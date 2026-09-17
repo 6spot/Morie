@@ -18,7 +18,7 @@ Morie intentionally does not support older Macs by adding alternate ASR/LLM runt
 2. Create or check out a task branch from current `main`.
 3. Open `Morie.xcodeproj` in Xcode.
 4. Select the `Morie` target.
-5. Configure your Development Team if Xcode requests signing configuration.
+5. Confirm the Morie target uses the configured Apple Development Team (`CBS2JVR55U`) and that Xcode reports no signing error.
 6. Build and run on a supported Mac.
 
 Command-line compile validation must use isolated temporary DerivedData so it cannot overwrite the signed app used by an active Xcode session:
