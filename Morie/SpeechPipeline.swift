@@ -39,7 +39,10 @@ actor SpeechPipeline {
             throw PipelineError.unsupportedLocale
         }
 
-        let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
+        // Live push-to-talk needs volatile/fast results. The basic `.transcription`
+        // preset only publishes stable results and is therefore the wrong preset
+        // for Morie's live transcript UI.
+        let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
 
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             try await installation.downloadAndInstall()
@@ -84,13 +87,20 @@ actor SpeechPipeline {
             throw PipelineError.notRunning
         }
 
+        // Stop producing new microphone buffers first. `analyzeSequence(_:)`
+        // otherwise waits for its async sequence to terminate. Apple documents
+        // that cancelling the task running analyzeSequence terminates most input
+        // sequences early and still returns the last consumed sample time.
         provider.captureSession.stopRunning()
+        analysisTask.cancel()
 
         do {
-            if let lastSampleTime = try await analysisTask.value {
+            let lastSampleTime = try await analysisTask.value
+
+            if let lastSampleTime {
                 try await analyzer.finalizeAndFinish(through: lastSampleTime)
             } else {
-                try analyzer.cancelAndFinishNow()
+                await analyzer.cancelAndFinishNow()
             }
 
             _ = try await resultTask?.value
@@ -98,10 +108,22 @@ actor SpeechPipeline {
             reset()
             return final
         } catch {
-            try? analyzer.cancelAndFinishNow()
+            await analyzer.cancelAndFinishNow()
             reset()
             throw error
         }
+    }
+
+    func cancel() async {
+        guard let analyzer else {
+            reset()
+            return
+        }
+
+        provider?.captureSession.stopRunning()
+        analysisTask?.cancel()
+        await analyzer.cancelAndFinishNow()
+        reset()
     }
 
     private func reset() {
@@ -111,6 +133,7 @@ actor SpeechPipeline {
         resultTask = nil
         provider = nil
         analyzer = nil
+        finalizedText = ""
         volatileText = ""
     }
 
