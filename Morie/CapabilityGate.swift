@@ -6,6 +6,10 @@ import Speech
 
 struct CapabilityGate {
     enum GateError: LocalizedError {
+        case appleIntelligenceUnsupportedDevice
+        case appleIntelligenceNotEnabled
+        case appleIntelligenceModelNotReady
+        case appleIntelligenceLocaleUnsupported(String)
         case appleIntelligenceUnavailable(String)
         case speechUnavailable
         case localeUnsupported(String)
@@ -15,6 +19,14 @@ struct CapabilityGate {
 
         var errorDescription: String? {
             switch self {
+            case .appleIntelligenceUnsupportedDevice:
+                "This Mac does not support Apple Intelligence, which is required for Morie Private Mode."
+            case .appleIntelligenceNotEnabled:
+                "Apple Intelligence is supported on this Mac but is not enabled. Turn it on in System Settings, then recheck Morie."
+            case .appleIntelligenceModelNotReady:
+                "Apple Intelligence is enabled, but the on-device model is not ready yet. It may still be downloading or preparing."
+            case .appleIntelligenceLocaleUnsupported(let locale):
+                "Apple Intelligence does not support the current locale (\(locale)) for Morie Private Mode."
             case .appleIntelligenceUnavailable(let reason):
                 "Apple Intelligence is unavailable: \(reason)"
             case .speechUnavailable:
@@ -26,7 +38,7 @@ struct CapabilityGate {
             case .speechPermissionDenied:
                 "Speech recognition permission is required."
             case .accessibilityDenied:
-                "Accessibility permission is required for global input and text delivery."
+                "Accessibility permission is required for the global shortcut and text delivery."
             }
         }
     }
@@ -45,8 +57,14 @@ struct CapabilityGate {
         switch model.availability {
         case .available:
             guard model.supportsLocale(.current) else {
-                throw GateError.appleIntelligenceUnavailable("current locale is unsupported")
+                throw GateError.appleIntelligenceLocaleUnsupported(Locale.current.identifier)
             }
+        case .unavailable(.deviceNotEligible):
+            throw GateError.appleIntelligenceUnsupportedDevice
+        case .unavailable(.appleIntelligenceNotEnabled):
+            throw GateError.appleIntelligenceNotEnabled
+        case .unavailable(.modelNotReady):
+            throw GateError.appleIntelligenceModelNotReady
         case .unavailable(let reason):
             throw GateError.appleIntelligenceUnavailable(String(describing: reason))
         }
