@@ -17,6 +17,7 @@
 		A10000000000000000000009 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* CaptureRecord.swift */; };
 		A1000000000000000000000A /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
 		A1000000000000000000000B /* CaptureHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* CaptureHistoryView.swift */; };
+		A1000000000000000000000C /* MorieControlCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* MorieControlCenter.swift */; };
 		A20000000000000000000001 /* CaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* CaptureStoreTests.swift */; };
 		A20000000000000000000002 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* CaptureRecord.swift */; };
 		A20000000000000000000003 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
@@ -36,6 +37,7 @@
 		B10000000000000000000010 /* CaptureRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRecord.swift; sourceTree = "<group>"; };
 		B10000000000000000000011 /* CaptureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStore.swift; sourceTree = "<group>"; };
 		B10000000000000000000012 /* CaptureHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryView.swift; sourceTree = "<group>"; };
+		B10000000000000000000013 /* MorieControlCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieControlCenter.swift; sourceTree = "<group>"; };
 		B20000000000000000000001 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000002 /* MorieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -79,6 +81,7 @@
 				B10000000000000000000010 /* CaptureRecord.swift */,
 				B10000000000000000000011 /* CaptureStore.swift */,
 				B10000000000000000000012 /* CaptureHistoryView.swift */,
+				B10000000000000000000013 /* MorieControlCenter.swift */,
 			);
 			path = Morie;
 			sourceTree = "<group>";
@@ -194,6 +197,7 @@
 				A10000000000000000000009 /* CaptureRecord.swift in Sources */,
 				A1000000000000000000000A /* CaptureStore.swift in Sources */,
 				A1000000000000000000000B /* CaptureHistoryView.swift in Sources */,
+				A1000000000000000000000C /* MorieControlCenter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

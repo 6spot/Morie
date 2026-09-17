@@ -90,7 +90,7 @@ Explicitly excluded:
 | Type4Me injection/focus audit | DONE | Retained no-loss/clipboard/synthetic-event lessons; app-specific branches remain VERIFY-only. |
 | Type4Me Apple Speech audit | DONE | Used only as behavioral reference; implementation follows current Apple Speech APIs. |
 | Menu Bar shell | IN PROGRESS | Native `MenuBarExtra` with a stable waveform entry icon; runtime state remains in the HUD and textual menu content instead of changing the persistent system-bar icon. Real macOS 27 visual/interaction validation still required. |
-| Native Debug window | DONE / VERIFY | Native `Window` + `List`; Copy All/Clear/Show Log File; traces capability/hotkey/session/Speech/delivery paths and mirrors the current launch to `~/Library/Logs/Morie/morie-debug.log` without transcript content. Real-device log usefulness is being validated. |
+| Native Diagnostics surface | DONE / VERIFY | Native `List` within the Morie management window; Copy All/Clear/Show Log File; traces capability/hotkey/session/Speech/delivery paths and mirrors the current launch to `~/Library/Logs/Morie/morie-debug.log` without transcript content. Real-device log usefulness is being validated. |
 | Foundation Models capability check | DONE | `SystemLanguageModel` availability + locale. |
 | Speech capability/locale check | DONE | `SpeechTranscriber` availability + locale. |
 | Microphone/Speech authorization | DONE / VERIFY | Native first-request prompts plus persistent menu/alert System Settings recovery after denial; microphone revoke/re-enable/recheck needs another real-device pass. |

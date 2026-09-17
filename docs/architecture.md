@@ -53,6 +53,7 @@ Morie/
 │   ├── CaptureRecord.swift
 │   ├── CaptureStore.swift
 │   ├── CaptureHistoryView.swift
+│   ├── MorieControlCenter.swift
 │   ├── CaptureHUD.swift
 │   ├── Diagnostics.swift
 │   ├── PushToTalkHotkey.swift
@@ -270,7 +271,11 @@ The local `ModelConfiguration` explicitly disables CloudKit until a real contain
 
 ### `CaptureHistoryView`
 
-Native SwiftUI/SwiftData History surface using system `Window`, `NavigationStack`, `List`, `ContentUnavailableView`, and `@Query`. It is intentionally a basic inspection surface while M-003 persistence semantics are validated.
+Native SwiftUI/SwiftData History surface using system `List`, `ContentUnavailableView`, and `@Query`. It is intentionally a basic inspection surface while M-003 persistence semantics are validated.
+
+### `MorieControlCenter`
+
+The primary management surface is one native SwiftUI `Window` with a standard `NavigationSplitView`. Its sidebar currently routes to History, Settings, and Diagnostics so product-management surfaces can grow without accumulating separate actions in the menu-bar panel. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
 
 ### `MorieTests`
 

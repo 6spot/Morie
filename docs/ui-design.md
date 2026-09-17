@@ -94,4 +94,6 @@ Then wait for explicit project-owner approval. Do not implement the exception fi
 
 The current menu-bar shell should stay system-native. As Phase 0 adds visible recording/permission/status experiences, they must be designed with macOS 27 native components and Liquid Glass behavior from the start rather than being retrofitted later.
 
+The menu-bar panel is a compact status and launch surface, not the long-term product navigation hierarchy. History, Settings, Diagnostics, and future management sections belong in Morie's native management window, organized with a system `NavigationSplitView`; the panel exposes one **Open Morie** action instead of one action per section.
+
 UI polish is not a reason to fork the product away from the system. Morie's differentiation is Capture, Personal Memory, and personalization—not a custom macOS widget toolkit.

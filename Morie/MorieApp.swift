@@ -25,24 +25,10 @@ struct MorieApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Morie Debug", id: "debug") {
-            DiagnosticLogView()
+        Window("Morie", id: "control-center") {
+            MorieControlCenter(controller: controller, captureStore: captureStore)
         }
-        .defaultSize(width: 820, height: 520)
-
-        Window("Morie History", id: "history") {
-            if let captureStore {
-                CaptureHistoryView()
-                    .modelContainer(captureStore.container)
-            } else {
-                ContentUnavailableView(
-                    "History Unavailable",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("Morie could not open Capture storage.")
-                )
-            }
-        }
-        .defaultSize(width: 680, height: 480)
+        .defaultSize(width: 920, height: 600)
 
         Settings {
             MorieSettingsView(controller: controller)
@@ -84,18 +70,9 @@ private struct MorieMenuContent: View {
 
             Divider()
 
-            Button("Open Debug Log", systemImage: "ladybug") {
-                openWindow(id: "debug")
+            Button("Open Morie", systemImage: "macwindow") {
+                openWindow(id: "control-center")
                 NSApplication.shared.activate(ignoringOtherApps: true)
-            }
-
-            Button("History", systemImage: "clock.arrow.circlepath") {
-                openWindow(id: "history")
-                NSApplication.shared.activate()
-            }
-
-            SettingsLink {
-                Label("Settings", systemImage: "gearshape")
             }
 
             Button("Recheck Capabilities", systemImage: "arrow.clockwise") {
@@ -118,7 +95,7 @@ private struct MorieMenuContent: View {
 }
 
 @MainActor
-private struct MorieSettingsView: View {
+struct MorieSettingsView: View {
     @ObservedObject var controller: AppController
 
     var body: some View {

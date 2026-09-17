@@ -88,11 +88,11 @@ Morie's blocked-state alert provides **Open System Settings** for Microphone, Sp
 
 The menu-bar panel also keeps an **Open System Settings** recovery action visible while a permission-backed capability is blocked; **Recheck Capabilities** cannot itself re-prompt a permission whose TCC status is already denied.
 
-## Native debug window
+## Native diagnostics surface
 
 Morie includes a native `Morie Debug` window for Phase 0 runtime diagnosis.
 
-Open it from the menu-bar panel with **Open Debug Log**. The window uses only system SwiftUI/macOS controls and records the current process lifetime in memory.
+Open the Morie management window from the menu-bar panel, then choose **Diagnostics** in its sidebar. The diagnostics surface uses only system SwiftUI/macOS controls and records the current process lifetime in memory.
 
 It currently traces:
 
@@ -122,7 +122,7 @@ Recommended defect reproduction flow:
 3. press **Clear** if necessary;
 4. focus the target text field in another app;
 5. activate the configured shortcut (solo Fn release by default), speak, then activate it again to finish;
-6. return to the debug window and use **Copy All**;
+6. return to Morie → **Diagnostics** and use **Copy All**;
 7. attach/paste the log with the observed behavior.
 
 If no accepted Hotkey entry appears after the configured shortcut, diagnose the event-tap/shortcut path before investigating Speech or text injection. For Fn, distinguish `press began`, `solo release accepted`, and `candidate cancelled` entries. If Speech entries appear but no Delivery entries do, diagnose finalization/session lifecycle.
@@ -226,7 +226,7 @@ Phase 0 diagnostics must make the following distinguishable without logging priv
 - delivery success/failure;
 - latency checkpoints as they are added.
 
-The in-app debug window is the primary current runtime diagnostic surface. Do not log full user Capture content by default.
+The in-app Diagnostics section is the primary current runtime diagnostic surface. Do not log full user Capture content by default.
 
 ## Performance measurements
 

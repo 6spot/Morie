@@ -6,35 +6,33 @@ struct CaptureHistoryView: View {
     private var captures: [CaptureRecord]
 
     var body: some View {
-        NavigationStack {
-            List(captures) { capture in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(capture.finalText.isEmpty ? capture.recognizedText : capture.finalText)
-                        .lineLimit(3)
+        List(captures) { capture in
+            VStack(alignment: .leading, spacing: 6) {
+                Text(capture.finalText.isEmpty ? capture.recognizedText : capture.finalText)
+                    .lineLimit(3)
 
-                    HStack(spacing: 8) {
-                        Text(capture.createdAt, format: .dateTime)
-                        if let applicationName = capture.sourceApplicationName {
-                            Text(applicationName)
-                        }
-                        Text(capture.lifecycleRawValue)
+                HStack(spacing: 8) {
+                    Text(capture.createdAt, format: .dateTime)
+                    if let applicationName = capture.sourceApplicationName {
+                        Text(applicationName)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text(capture.lifecycleRawValue)
                 }
-                .padding(.vertical, 4)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .overlay {
-                if captures.isEmpty {
-                    ContentUnavailableView(
-                        "No Captures Yet",
-                        systemImage: "waveform",
-                        description: Text("Completed voice captures will appear here.")
-                    )
-                }
-            }
-            .navigationTitle("History")
+            .padding(.vertical, 4)
         }
+        .overlay {
+            if captures.isEmpty {
+                ContentUnavailableView(
+                    "No Captures Yet",
+                    systemImage: "waveform",
+                    description: Text("Completed voice captures will appear here.")
+                )
+            }
+        }
+        .navigationTitle("History")
         .frame(minWidth: 620, minHeight: 420)
     }
 }

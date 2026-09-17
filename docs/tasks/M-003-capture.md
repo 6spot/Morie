@@ -48,7 +48,7 @@ Excluded:
 | SwiftData Capture schema | IMPLEMENTED / VERIFY | `CaptureRecord` stores stable identity, timestamps, lifecycle, recognized/final text, delivery mode, source app/bundle, original window identity and delivery error. No uniqueness constraint or non-Apple dependency. |
 | Capture-first local store | IMPLEMENTED / VERIFY | A voice Capture is synchronously saved before Speech starts; progressive text is checkpointed at most every 500 ms, then final recognition and delivery state update the same record. Explicit user cancellation removes the empty/in-progress record. |
 | Input-loop integration | IMPLEMENTED / VERIFY | Capture UUID is shared with the Phase 0 session UUID. Storage initialization failure blocks capture rather than silently running without durability. |
-| Native History window | IMPLEMENTED / VERIFY | Native SwiftUI `Window`, `NavigationStack`, `List`, `ContentUnavailableView` and SwiftData `@Query`; opened from the menu-bar panel. |
+| Native management window / History | IMPLEMENTED / VERIFY | One native `Window` + `NavigationSplitView` contains History, Settings, and Diagnostics. History uses `List`, `ContentUnavailableView`, and SwiftData `@Query`; the menu-bar panel now has one `Open Morie` entry instead of separate management destinations. |
 | App Context | IN PROGRESS | Source app name, bundle identifier and original window number are stored. Window title collection remains excluded until a minimal privacy-safe requirement is approved. |
 | Tests | IMPLEMENTED / PASS | Logic-only XCTest target covers delivered, delivery-failed, operational-failed and explicit-cancel paths plus persistence across store recreation. Tests use in-memory or unique temporary stores and do not launch Morie. |
 | iCloud/CloudKit | TODO | Requires the real container, entitlements, account/capability handling and sync validation. Local configuration explicitly uses `.none`; it does not pretend CloudKit is active. |
@@ -63,11 +63,13 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 - The first durable write occurs before `SpeechPipeline.start`. Progressive recognized text is checkpointed with a bounded 500 ms cadence to avoid a disk save for every character callback.
 - Delivery success/failure and operational failure are durable terminal states. User cancellation is an explicit discard and removes the active record.
 - `CaptureStore` accepts an explicit file URL for isolated restart testing; production continues to use SwiftData's default local application store.
+- The menu-bar panel remains compact. History, Settings, Diagnostics, and future management destinations are organized in the standard sidebar of one Morie window.
 
 ## Validation evidence
 
 - `xcodebuild -scheme MorieTests ... test`: 5 tests passed on macOS 27 / Xcode 27 using `/tmp/morie-derived-data.o30wQv`.
 - `xcodebuild -scheme Morie ... build`: succeeded with signing disabled using `/tmp/morie-derived-data.0FA3Lq`.
+- Management-window restructuring compiled successfully with signing disabled using `/tmp/morie-derived-data.2ZXLp8`.
 - Runtime History and capture-first behavior still require owner validation from the normal Xcode-signed launch.
 
 ## Known design constraints
