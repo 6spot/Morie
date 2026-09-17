@@ -22,6 +22,14 @@ struct TextInjector {
 
     private static let syntheticInputEventMarker = Int64.random(in: 1...Int64.max)
 
+    /// Real macOS 27 validation showed that QQ can return `.success` for a
+    /// `kAXSelectedTextAttribute` write while silently ignoring the text.
+    /// Keep this evidence-driven and app-specific instead of treating every
+    /// Electron-style application as incompatible with direct AX insertion.
+    private static let directAXKnownUnreliableBundles: Set<String> = [
+        "com.tencent.qq",
+    ]
+
     static func markAsSyntheticInput(_ event: CGEvent) {
         event.setIntegerValueField(.eventSourceUserData, value: syntheticInputEventMarker)
     }
@@ -61,13 +69,21 @@ struct TextInjector {
         try await Task.sleep(for: .milliseconds(100))
         Diagnostics.record("Delivery", "Focus handoff grace period completed")
 
-        if setSelectedTextWithAccessibility(text) {
+        let skipDirectAX = Self.directAXKnownUnreliableBundles.contains(targetBundle)
+        if skipDirectAX {
+            Diagnostics.record(
+                "Delivery",
+                "Skipping direct AX insertion for \(targetBundle): macOS 27 validation reproduced AX success with no visible text",
+                level: .warning
+            )
+        } else if setSelectedTextWithAccessibility(text) {
             Diagnostics.record("Delivery", "Accessibility selected-text injection succeeded")
             return
         }
 
-        Diagnostics.record("Delivery", "Accessibility injection unavailable/failed; using clipboard Cmd+V fallback", level: .warning)
-        guard await pasteThroughClipboard(text) else {
+        Diagnostics.record("Delivery", "Using clipboard Cmd+V fallback", level: .warning)
+        let restoreDelay: Duration = skipDirectAX ? .milliseconds(500) : .milliseconds(300)
+        guard await pasteThroughClipboard(text, restoreDelay: restoreDelay) else {
             copyToClipboard(text)
             Diagnostics.record("Delivery", "Clipboard Cmd+V fallback failed; transcript left on clipboard", level: .error)
             throw InjectionError.pasteFailed
@@ -117,7 +133,7 @@ struct TextInjector {
     }
 
     @MainActor
-    private func pasteThroughClipboard(_ text: String) async -> Bool {
+    private func pasteThroughClipboard(_ text: String, restoreDelay: Duration) async -> Bool {
         let pasteboard = NSPasteboard.general
         let snapshot = ClipboardSnapshot.capture(from: pasteboard)
         Diagnostics.record("Clipboard", "Captured restorable clipboard snapshot; items=\(snapshot.itemCount)")
@@ -147,7 +163,7 @@ struct TextInjector {
         Diagnostics.record("Delivery", "Synthetic Cmd+V posted")
 
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
+            try? await Task.sleep(for: restoreDelay)
             let restored = snapshot.restore(to: pasteboard, expectedChangeCount: transcriptChangeCount)
             if restored {
                 Diagnostics.record("Clipboard", "Previous clipboard restored")
