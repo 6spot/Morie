@@ -12,6 +12,8 @@
 
 Morie's first product dependency is not Memory or cloud infrastructure. It is a reliable macOS voice-input loop. If recording, transcription, focus restoration, and text delivery are not dependable in everyday apps, later Personal Memory work has no stable product surface to improve.
 
+This is **not a greenfield voice-input implementation**. Type4Me already contains mature input infrastructure and real-world edge-case handling. M-002 must audit and selectively reuse/adapt that proven behavior while modernizing the actual recognition/UI path for macOS 27.
+
 ## Scope
 
 Included:
@@ -19,13 +21,16 @@ Included:
 - macOS 27+ only;
 - Apple Intelligence-capable Macs;
 - native Swift / SwiftUI / AppKit;
+- native macOS 27 system UI and Liquid Glass behavior;
+- Type4Me reference audit and selective input-foundation migration;
 - Private Mode capability checks relevant to Phase 0;
 - menu bar application shell;
 - global hold-to-talk shortcut;
+- reliable recording/session lifecycle;
 - latest Apple Speech transcription stack;
-- capture of the original frontmost application;
+- capture of the original frontmost application/input target;
 - focus restoration;
-- Accessibility text insertion;
+- Accessibility/text delivery;
 - clipboard + paste fallback;
 - failure/resource cleanup;
 - real-device target-app compatibility validation;
@@ -36,8 +41,9 @@ Explicitly excluded:
 - iOS;
 - Morie Cloud;
 - provider abstraction;
-- legacy ASR fallback;
-- third-party runtimes/models;
+- legacy ASR recognition fallback;
+- unapproved third-party runtime/model/UI library/dependency;
+- Type4Me's multi-provider and Python/sherpa-onnx runtime architecture;
 - durable Capture storage and History;
 - Personal Memory;
 - MCP/Public API/Relay.
@@ -45,37 +51,109 @@ Explicitly excluded:
 ## Acceptance criteria
 
 1. On a supported Mac, Morie enters Ready only when required Private Mode capabilities for the current phase are available.
-2. Holding the global shortcut starts intentional voice capture and releasing it finalizes the session.
-3. The modern Apple Speech stack produces the transcript without a legacy recognition fallback.
-4. Morie remembers the app active before capture, returns focus to it, and inserts the final transcript at the intended input location where supported.
-5. Direct Accessibility insertion falls back safely to clipboard paste when necessary.
-6. Cancel/error/interruption paths release capture resources and leave the app recoverable.
-7. The compatibility matrix is tested on real target applications.
-8. Initial binary/startup/memory/latency/energy observations are recorded.
-9. No third-party runtime or package is required.
+2. Holding the global shortcut starts intentional voice capture and releasing it finalizes the session reliably, including repeated/edge-case use.
+3. The modern Apple Speech stack produces partial/final transcription without a legacy recognition fallback.
+4. Morie remembers the app/input context active before capture, restores it, and delivers final text reliably where supported.
+5. Delivery fallback preserves the user's result and does not corrupt a newer clipboard change.
+6. Cancel/error/interruption/stale-result paths release capture resources and leave the app recoverable.
+7. Relevant Type4Me behavior has been reviewed and explicitly classified `ADOPT`, `ADAPT`, or `DROP` with rationale.
+8. All user-visible Phase 0 UI uses Apple native macOS 27 components/Liquid Glass behavior. Any native-UI gap requires owner approval before a substitute is implemented.
+9. The compatibility matrix is tested on real target applications.
+10. Initial binary/startup/memory/latency/energy observations are recorded.
+11. No external dependency is introduced without explicit project-owner approval; expected Phase 0 external dependency count is zero.
 
 ## Subtasks / progress
 
 | Subtask | Status | Notes |
 | --- | --- | --- |
 | Native macOS project | DONE | `Morie.xcodeproj`, deployment target macOS 27.0. |
-| Menu Bar shell | DONE | SwiftUI `MenuBarExtra`. |
+| Repository docs / task system | DONE | `AGENTS.md`, master/detail tasks, architecture/dev/deploy/validation docs established. |
+| Full owner design baseline in repo | DONE | Repository transcription under `docs/design/`. |
+| Native UI / Liquid Glass policy | DONE | Hard rule documented; system components required. |
+| Type4Me reference boundary | DONE | `docs/reference/type4me.md` establishes migration rules. |
+| Type4Me hotkey audit | IN PROGRESS | `HotkeyManager.swift` + state-machine tests identified; current Morie hotkey is only a scaffold until reconciled. |
+| Type4Me audio/session audit | IN PROGRESS | `AudioCaptureEngine.swift` / `RecognitionSession.swift` identified; lifecycle/cleanup behavior must be carried forward where relevant. |
+| Type4Me injection/focus audit | IN PROGRESS | `TextInjectionEngine.swift` identified; synthetic-event and clipboard restore behavior must be reconciled. |
+| Type4Me Apple Speech audit | TODO | Compare old/reference behavior to current macOS 27 Speech APIs and retain only relevant lifecycle lessons. |
+| Menu Bar shell | IN PROGRESS | Uses native SwiftUI `MenuBarExtra`; real macOS 27 appearance/interaction validation pending. |
 | Foundation Models capability check | DONE | `SystemLanguageModel.default.availability` and locale check. |
 | Speech capability/locale check | DONE | `SpeechTranscriber` availability and supported locale. |
 | Microphone/Speech authorization | DONE | Permission checks implemented. |
 | Accessibility trust check | DONE | Required for global interaction/text delivery. |
 | iCloud/CloudKit capability check | DEFERRED | Belongs with the real CloudKit container/entitlements in M-003; do not fake it in Phase 0. |
-| Global hold-to-talk hotkey | IN PROGRESS | Control+Space implementation exists; real-device validation pending. |
-| Modern Apple Speech pipeline | IN PROGRESS | `SpeechAnalyzer`, `SpeechTranscriber`, `AssetInventory`, `CaptureInputSequenceProvider`; compile/runtime validation pending. |
-| Original-app capture/focus restore | IN PROGRESS | Implemented with `NSWorkspace`/`NSRunningApplication`; validation pending. |
-| Accessibility insertion | IN PROGRESS | Selected-text mutation implemented; matrix validation pending. |
-| Clipboard paste fallback | IN PROGRESS | Cmd+V path implemented; clipboard timing/restore behavior requires validation. |
-| Cancellation/interruption hardening | IN PROGRESS | Basic cleanup exists; interruption cases remain. |
+| Global hold-to-talk hotkey | IN PROGRESS | Initial Control+Space scaffold exists; must be replaced/hardened using Type4Me state-machine lessons. |
+| Reliable recording/session layer | IN PROGRESS | Initial direct Speech capture exists; must be reconciled with Type4Me session lifecycle rather than treated as complete. |
+| Modern Apple Speech pipeline | IN PROGRESS | Uses current Speech framework concepts; API details/finalization behavior are being rechecked against macOS 27 SDK. |
+| Original-app capture/focus restore | IN PROGRESS | Initial implementation exists; Type4Me target/focus behavior audit pending. |
+| Text injection / clipboard fallback | IN PROGRESS | Initial implementation exists; must adopt relevant synthetic-event/change-count/clipboard safety lessons from Type4Me. |
+| Cancellation/interruption/stale-result hardening | IN PROGRESS | Current scaffold is insufficient; Type4Me generation/state lessons are part of the required work. |
 | Xcode/macOS 27 build | TODO | Must be performed on a supported Mac. |
 | Compatibility matrix | TODO | See `../validation.md`. |
 | Performance baseline | TODO | Record after the first stable device build. |
 
+## Type4Me audit record
+
+Reference: [`../reference/type4me.md`](../reference/type4me.md)
+
+### Hotkey
+
+**Current classification: ADAPT**
+
+Morie does not need Type4Me's full multi-binding/media/mouse feature surface in V0, but it does need its mature state-machine lessons:
+
+- explicit hold state;
+- repeat handling;
+- modifier transitions;
+- active recording ownership;
+- abort/reset idempotency;
+- stale timer/state cleanup;
+- synthetic event exclusion.
+
+The first Morie `NSEvent` press/release implementation is therefore a scaffold, not the final architecture.
+
+### Audio / recording session
+
+**Current classification: ADAPT**
+
+Keep relevant lifecycle behavior from Type4Me:
+
+- explicit permission/device failure handling;
+- reliable stop/cleanup;
+- immediate capture graph/resource release;
+- no accidental Bluetooth call-mode warm-up;
+- stale asynchronous result protection;
+- one authoritative recording generation/session.
+
+Do not inherit its ASR provider requirements or PCM format solely for compatibility with external ASR engines.
+
+### Text injection / clipboard
+
+**Current classification: ADAPT**
+
+Keep/reconcile:
+
+- synthetic paste-event marker so internal Cmd+V cannot trigger input hotkeys;
+- target validity/self-app exclusion;
+- fallback that preserves dictated text if delivery is impossible;
+- change-count-aware clipboard restore;
+- Electron/native timing differences;
+- defensive/bounded Accessibility access.
+
+Do not inherit correction-observation complexity until the relevant later phase.
+
+### Multi-provider/runtime architecture
+
+**Classification: DROP**
+
+Morie Phase 0 does not inherit Type4Me provider registries, cloud providers, sherpa-onnx, SenseVoice, Qwen3 Python/MLX, Silero VAD, CppJieba, subscription/pricing/build variants, or related configuration UI.
+
 ## Implementation notes
+
+### Native UI
+
+Morie must use native macOS 27 system components. Standard SwiftUI/AppKit surfaces should pick up Liquid Glass from the system. Custom imitation is prohibited.
+
+If a future visible interaction has no adequate system component, the implementation must stop and request explicit owner approval before building a custom substitute or adding an external UI dependency.
 
 ### App state
 
@@ -83,30 +161,34 @@ The initial controller keeps the Phase 0 flow explicit:
 
 `checking → ready → recording → delivering → ready`
 
-Blocked/failed states carry user-visible reasons. This is deliberately small rather than introducing a generic workflow framework.
+This high-level state model may remain, but session-generation/terminal-path reliability should be reconciled with Type4Me's mature `RecognitionSession` lessons.
 
 ### Speech
 
-The implementation targets the current Speech framework path:
+Morie targets the current macOS 27 Speech framework path, centered on:
 
 - `SpeechAnalyzer`
 - `SpeechTranscriber`
 - `AssetInventory`
-- `CaptureInputSequenceProvider`
+- current Apple capture/input APIs
 
-There is no `SFSpeechRecognizer` recognition fallback. The older type is currently used only for Speech authorization where needed by the platform API.
+There is no `SFSpeechRecognizer` recognition fallback. Older API usage is allowed only if the current SDK still requires it for authorization.
+
+Partial/volatile transcription and analyzer finalization behavior must match the current SDK rather than assumptions from older Speech APIs.
 
 ### Delivery
 
-The target application is captured before recording. On completion:
+The current scaffold captures the target application before recording and restores it before delivery. This is being reconciled with Type4Me's proven injection behavior before Phase 0 can be considered stable.
 
-1. reactivate the target application;
-2. allow focus to settle;
-3. attempt Accessibility selected-text insertion;
-4. if unavailable, temporarily place the transcript on the pasteboard and synthesize Cmd+V;
-5. restore representable previous pasteboard contents after a short delay.
+The final path must account for:
 
-Real applications vary considerably, so this is not considered complete before matrix testing.
+- self-target avoidance;
+- focus timing;
+- synthetic-event tagging;
+- target disappearance;
+- clipboard change-count safety;
+- Electron/native paste timing;
+- no-loss fallback.
 
 ### Capability gate boundary
 
@@ -119,29 +201,35 @@ Verified at repository/static level:
 - source files are connected to the Xcode project;
 - deployment target is macOS 27.0;
 - no external package dependency is present;
-- implementation boundaries match the V0 architecture baseline;
+- owner design baseline has been preserved in the repository;
+- native UI and dependency approval gates are documented;
+- Type4Me reference repository and key input-foundation paths have been identified;
 - Phase 0 Issue and draft PR exist.
 
 Not yet verified:
 
 - Xcode 27 compilation;
+- modern Speech API calls against the actual macOS 27 SDK;
 - microphone/Speech runtime behavior;
 - Apple Intelligence behavior on supported hardware;
 - Accessibility permission lifecycle;
 - global shortcut behavior across apps;
+- robust repeated recording/session behavior;
 - focus restoration timing;
 - target-app injection matrix;
+- native Liquid Glass appearance/behavior on actual macOS 27;
 - performance/energy measurements.
 
 These items keep the task `IN PROGRESS`.
 
 ## Known issues / risks
 
-- New Apple Speech APIs must be compiled against the actual target SDK; API shape changes discovered by Xcode should be fixed against official current APIs rather than introducing legacy fallback.
-- Global event monitoring behavior can vary with Accessibility/Input Monitoring permissions.
-- `kAXSelectedTextAttribute` support differs between applications and custom editors.
-- Clipboard restoration timing needs careful testing so it neither overwrites a user's subsequent copy nor races the target app's paste action.
-- Focus restoration may need app/editor-specific handling discovered by the compatibility matrix.
+- The first Phase 0 code was intentionally small and is not allowed to bypass mature Type4Me lessons. Hotkey/audio/injection code remains provisional until the reference audit is reconciled.
+- Current Apple Speech APIs must be compiled against the actual target SDK; API-shape changes should be fixed against the latest Apple API rather than introducing legacy fallback.
+- Global event handling varies with Accessibility/Input Monitoring behavior and needs real-device validation.
+- Accessibility support differs between native applications, Electron editors, terminals and custom text controls.
+- Clipboard restoration must not overwrite a clipboard change made after Morie's paste.
+- UI changes must not introduce custom faux-Liquid-Glass surfaces simply to match a mockup.
 
 ## Follow-up
 
@@ -157,7 +245,10 @@ Memory extraction/personalization remains later work.
 
 ## References
 
-- Product baseline: Apple Native First · Product & Architecture Baseline v2 · 2026-09-17
+- Full product baseline: [`../design/apple-native-first-v0-baseline-v2.md`](../design/apple-native-first-v0-baseline-v2.md)
+- Native UI rules: [`../ui-design.md`](../ui-design.md)
+- Type4Me reference: [`../reference/type4me.md`](../reference/type4me.md)
+- Type4Me repository: https://github.com/joewongjc/type4me
 - Issue #2: https://github.com/6spot/Morie/issues/2
 - Draft PR #3: https://github.com/6spot/Morie/pull/3
 - Validation matrix: [`../validation.md`](../validation.md)
