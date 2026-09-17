@@ -37,8 +37,12 @@ private struct MorieMenuContent: View {
 
             Divider()
 
-            Text("Hold ⌃Space to talk")
+            Text("Press ⌃Space to start / finish")
                 .font(.caption)
+
+            Text("Esc cancels while recording")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             if !controller.transcript.isEmpty {
                 Text(controller.transcript)
