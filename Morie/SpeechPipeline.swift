@@ -105,17 +105,22 @@ actor SpeechPipeline {
                         volatileText = ""
                         Diagnostics.record(
                             "Speech",
-                            "Final result for \(session); segmentCharacters=\(text.count), accumulatedCharacters=\(finalizedText.count)"
+                            "Final result for \(session); text=\"\(text)\"; accumulated=\"\(finalizedText)\""
                         )
                     } else {
                         volatileText = text
                         Diagnostics.record(
                             "Speech",
-                            "Volatile result for \(session); characters=\(text.count)"
+                            "Volatile result for \(session); text=\"\(text)\""
                         )
                     }
 
-                    onTranscript(sessionID, join(finalizedText, volatileText))
+                    let combined = join(finalizedText, volatileText)
+                    Diagnostics.record(
+                        "SpeechText",
+                        "Session \(session) transcript=\"\(combined)\""
+                    )
+                    onTranscript(sessionID, combined)
                 }
 
                 Diagnostics.record("Speech", "Transcriber result stream ended for \(session)")
@@ -133,12 +138,12 @@ actor SpeechPipeline {
 
             provider.captureSession.startRunning()
             Diagnostics.record("Speech", "AVCaptureSession startRunning called for \(session)")
+            startAudioLevelPolling(
+                provider: provider,
+                sessionID: sessionID,
+                onAudioLevel: onAudioLevel
+            )
             try requireActiveSession(sessionID)
-
-            levelTask = Task { [sessionID, onAudioLevel] in
-                await self.pollAudioLevels(sessionID: sessionID, onAudioLevel: onAudioLevel)
-            }
-            Diagnostics.record("Speech", "Native microphone level polling started for \(session)")
         } catch {
             Diagnostics.record("Speech", "Pipeline start failed for \(session): \(error.localizedDescription)", level: .error)
             preparedProvider?.captureSession.stopRunning()
@@ -188,7 +193,7 @@ actor SpeechPipeline {
             try requireActiveSession(sessionID)
 
             let final = join(finalizedText, volatileText)
-            Diagnostics.record("Speech", "Normal stop completed for \(session); finalCharacters=\(final.count)")
+            Diagnostics.record("Speech", "Normal stop completed for \(session); finalText=\"\(final)\"")
             reset(sessionID: sessionID)
             return final
         } catch {
@@ -223,46 +228,6 @@ actor SpeechPipeline {
         Diagnostics.record("Speech", "Pipeline cancelled/reset for \(session)", level: .warning)
     }
 
-    private func pollAudioLevels(
-        sessionID: UUID,
-        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
-    ) async {
-        var smoothedLevel = 0.0
-
-        while !Task.isCancelled,
-              activeSessionID == sessionID,
-              let provider
-        {
-            var peakAveragePower: Float = -60
-
-            for connection in provider.captureAudioDataOutput.connections {
-                for channel in connection.audioChannels {
-                    let power = channel.averagePowerLevel
-                    if power.isFinite {
-                        peakAveragePower = max(peakAveragePower, power)
-                    }
-                }
-            }
-
-            let normalized = Self.normalizedPowerLevel(peakAveragePower)
-            smoothedLevel = smoothedLevel * 0.65 + normalized * 0.35
-            onAudioLevel(sessionID, smoothedLevel)
-
-            do {
-                try await Task.sleep(for: .milliseconds(50))
-            } catch {
-                return
-            }
-        }
-    }
-
-    private static func normalizedPowerLevel(_ decibels: Float) -> Double {
-        let floor: Double = -60
-        let value = min(max(Double(decibels), floor), 0)
-        let normalized = (value - floor) / -floor
-        return pow(normalized, 1.35)
-    }
-
     private func makeTranscriber(locale requestedLocale: Locale) async throws -> SpeechTranscriber {
         guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
             Diagnostics.record("Speech", "Unsupported requested locale: \(requestedLocale.identifier)", level: .error)
@@ -271,6 +236,38 @@ actor SpeechPipeline {
 
         Diagnostics.record("Speech", "Resolved Speech locale: \(locale.identifier)")
         return SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+    }
+
+    private func startAudioLevelPolling(
+        provider: CaptureInputSequenceProvider,
+        sessionID: UUID,
+        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
+    ) {
+        levelTask?.cancel()
+        let session = label(sessionID)
+
+        levelTask = Task {
+            Diagnostics.record("Speech", "Native microphone level polling started for \(session)")
+            var smoothed = 0.0
+
+            while !Task.isCancelled {
+                guard activeSessionID == sessionID else { return }
+
+                let channels = provider.captureSession.connections.flatMap(\.audioChannels)
+                let averagePower = channels.map(\.averagePowerLevel).max() ?? -60
+                let normalized = Self.normalizedPower(averagePower)
+                smoothed = smoothed * 0.7 + normalized * 0.3
+                onAudioLevel(sessionID, smoothed)
+
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+        }
+    }
+
+    private static func normalizedPower(_ decibels: Float) -> Double {
+        let floor: Float = -60
+        let clamped = min(max(decibels, floor), 0)
+        return Double((clamped - floor) / -floor)
     }
 
     private func requireActiveSession(_ sessionID: UUID) throws {
