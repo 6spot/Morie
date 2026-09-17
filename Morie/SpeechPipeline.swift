@@ -4,11 +4,16 @@ import Foundation
 import Speech
 
 actor SpeechPipeline {
+    struct Result: Sendable {
+        let transcript: String
+        let sourceAudio: CapturedSourceAudio
+    }
     enum PipelineError: LocalizedError {
         case alreadyRunning
         case noMicrophone
         case unsupportedLocale
         case notRunning
+        case recognitionFailed(String, CapturedSourceAudio)
 
         var errorDescription: String? {
             switch self {
@@ -16,6 +21,7 @@ actor SpeechPipeline {
             case .noMicrophone: "No audio capture device is available."
             case .unsupportedLocale: "The current locale is not supported by SpeechTranscriber."
             case .notRunning: "Speech capture is not running."
+            case .recognitionFailed(let reason, _): reason
             }
         }
     }
@@ -26,6 +32,7 @@ actor SpeechPipeline {
     private var resultTask: Task<Void, Error>?
     private var analysisTask: Task<CMTime?, Error>?
     private var levelTask: Task<Void, Never>?
+    private var audioArchive: CaptureAudioArchive?
     private var finalizedText = ""
     private var volatileText = ""
 
@@ -51,6 +58,7 @@ actor SpeechPipeline {
     func start(
         sessionID: UUID,
         locale requestedLocale: Locale,
+        sourceAudioURL: URL,
         onTranscript: @escaping @Sendable (UUID, String) -> Void,
         onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
     ) async throws {
@@ -93,6 +101,9 @@ actor SpeechPipeline {
 
             self.provider = provider
             self.analyzer = analyzer
+            let audioArchive = CaptureAudioArchive()
+            try audioArchive.attach(to: provider.captureSession, destinationURL: sourceAudioURL)
+            self.audioArchive = audioArchive
 
             resultTask = Task {
                 for try await result in transcriber.results {
@@ -146,6 +157,8 @@ actor SpeechPipeline {
             try requireActiveSession(sessionID)
         } catch {
             Diagnostics.record("Speech", "Pipeline start failed for \(session): \(error.localizedDescription)", level: .error)
+            audioArchive?.cancel()
+            audioArchive = nil
             preparedProvider?.captureSession.stopRunning()
             levelTask?.cancel()
             levelTask = nil
@@ -159,9 +172,9 @@ actor SpeechPipeline {
         }
     }
 
-    func stop(sessionID: UUID) async throws -> String {
+    func stop(sessionID: UUID) async throws -> Result {
         try requireActiveSession(sessionID)
-        guard let analyzer, let analysisTask else {
+        guard let analyzer, let analysisTask, let provider else {
             throw PipelineError.notRunning
         }
 
@@ -170,8 +183,19 @@ actor SpeechPipeline {
 
         levelTask?.cancel()
         levelTask = nil
-        provider?.captureSession.stopRunning()
-        provider = nil
+        let sourceAudio: CapturedSourceAudio
+        do {
+            guard let completedAudio = try await audioArchive?.finish(stopping: provider.captureSession) else {
+                throw PipelineError.notRunning
+            }
+            sourceAudio = completedAudio
+            audioArchive = nil
+        } catch {
+            await analyzer.cancelAndFinishNow()
+            reset(sessionID: sessionID)
+            throw error
+        }
+        self.provider = nil
         Diagnostics.record("Speech", "Capture session stopped and provider released for \(session)")
 
         do {
@@ -195,12 +219,12 @@ actor SpeechPipeline {
             let final = join(finalizedText, volatileText)
             Diagnostics.record("Speech", "Normal stop completed for \(session); finalCharacters=\(final.count)")
             reset(sessionID: sessionID)
-            return final
+            return Result(transcript: final, sourceAudio: sourceAudio)
         } catch {
             Diagnostics.record("Speech", "Normal stop failed for \(session): \(error.localizedDescription)", level: .error)
             await analyzer.cancelAndFinishNow()
             reset(sessionID: sessionID)
-            throw error
+            throw PipelineError.recognitionFailed(error.localizedDescription, sourceAudio)
         }
     }
 
@@ -215,8 +239,10 @@ actor SpeechPipeline {
 
         levelTask?.cancel()
         levelTask = nil
+        audioArchive?.cancel()
         provider?.captureSession.stopRunning()
         provider = nil
+        audioArchive = nil
         analysisTask?.cancel()
         resultTask?.cancel()
 

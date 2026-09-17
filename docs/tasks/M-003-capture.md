@@ -24,6 +24,8 @@ Planned:
 - real iCloud/CloudKit container and entitlements;
 - CloudKit sync semantics;
 - iCloud/CloudKit capability check as part of full Private Mode readiness.
+- compressed source-audio preservation and re-recognition;
+- configurable source-audio retention, defaulting to 7 days.
 
 Excluded:
 
@@ -40,6 +42,8 @@ Excluded:
 4. iCloud/CloudKit is configured against a real container, not a placeholder.
 5. Private Mode readiness includes the required iCloud/CloudKit availability state.
 6. Sync semantics are documented and tested for the macOS client.
+7. Meaningful source audio survives recognition/processing failure and can be submitted for recognition again.
+8. Source audio defaults to 7-day retention, can be configured in days, and expires without deleting retained text/history metadata.
 
 ## Progress
 
@@ -50,6 +54,8 @@ Excluded:
 | Input-loop integration | IMPLEMENTED / VERIFY | Capture UUID is shared with the Phase 0 session UUID. Storage initialization failure blocks capture rather than silently running without durability. |
 | Native management window / History | IMPLEMENTED / VERIFY | One native `Window` + `NavigationSplitView` contains History, Settings, and Diagnostics. The SwiftData container is attached at the window root before History's `@Query` is constructed, keeping the initial History layout consistent; the menu-bar panel has one `Open Morie` entry instead of separate management destinations. |
 | App Context | IN PROGRESS | Source app name, bundle identifier and original window number are stored. Window title collection remains excluded until a minimal privacy-safe requirement is approved. |
+| Source audio / retry | IMPLEMENTED / VERIFY | The existing `AVCaptureSession` also streams 16 kHz mono AAC at 32 kbps into `.m4a`; no second microphone session or full PCM buffer is used. Empty/failed recognition retains completed source audio. History retry UI remains follow-up work. |
+| Audio retention | IMPLEMENTED / VERIFY | Default 7 days with a 1–365 day native Settings control. Launch and setting changes prune expired audio assets without deleting Capture metadata/text. Actual size/CPU require real-device measurement. |
 | Tests | IMPLEMENTED / PASS | Logic-only XCTest target covers delivered, delivery-failed, operational-failed and explicit-cancel paths plus persistence across store recreation. Tests use in-memory or unique temporary stores and do not launch Morie. |
 | iCloud/CloudKit | TODO | Requires the real container, entitlements, account/capability handling and sync validation. Local configuration explicitly uses `.none`; it does not pretend CloudKit is active. |
 
@@ -64,13 +70,17 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 - Delivery success/failure and operational failure are durable terminal states. User cancellation is an explicit discard and removes the active record.
 - `CaptureStore` accepts an explicit file URL for isolated restart testing; production continues to use SwiftData's default local application store.
 - The menu-bar panel remains compact. History, Settings, Diagnostics, and future management destinations are organized in the standard sidebar of one Morie window.
+- Once source-audio storage lands, an empty transcript is not sufficient reason to discard a Capture: meaningful recorded audio is the raw Capture and must remain retryable until its retention deadline.
+- Final text belongs to the post-processing result. The durable sequence is source audio → recognition state → optional processing → final text; delivery follows the required durable writes.
 
 ## Validation evidence
 
-- `xcodebuild -scheme MorieTests ... test`: 5 tests passed on macOS 27 / Xcode 27 using `/tmp/morie-derived-data.o30wQv`.
+- `xcodebuild -scheme MorieTests ... test`: 7 tests passed on macOS 27 / Xcode 27 using `/tmp/morie-audio-tests`, including audio-expiry preservation and empty-Capture lifecycle coverage.
+- Full app sources passed a Swift 6 `swiftc -typecheck` against the macOS 27 SDK without launching or signing Morie.
 - `xcodebuild -scheme Morie ... build`: succeeded with signing disabled using `/tmp/morie-derived-data.0FA3Lq`.
 - Management-window restructuring compiled successfully with signing disabled using `/tmp/morie-derived-data.2ZXLp8`.
 - Runtime History and capture-first behavior still require owner validation from the normal Xcode-signed launch.
+- Real-device validation remains open for simultaneous Speech + `.m4a` capture, actual file size/CPU, retention-setting behavior, cancellation cleanup, and preservation after empty/failed recognition.
 
 ## Known design constraints
 

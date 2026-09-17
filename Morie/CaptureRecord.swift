@@ -29,6 +29,11 @@ final class CaptureRecord {
     var sourceBundleIdentifier: String?
     var originalWindowNumber: Int64?
     var deliveryErrorDescription: String?
+    var sourceAudioRelativePath: String?
+    var sourceAudioDurationSeconds: Double?
+    var sourceAudioByteCount: Int64?
+    var sourceAudioExpiresAt: Date?
+    var recognitionErrorDescription: String?
 
     init(
         id: UUID,

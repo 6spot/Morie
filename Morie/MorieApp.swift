@@ -126,6 +126,22 @@ struct MorieSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+
+            Section("Source Audio") {
+                Stepper(
+                    "Keep recordings for \(controller.audioRetentionDays) days",
+                    value: Binding(
+                        get: { controller.audioRetentionDays },
+                        set: { controller.setAudioRetentionDays($0) }
+                    ),
+                    in: 1...365
+                )
+
+                Text("Morie stores compressed source audio locally so failed recognition can be retried. Expiration removes only the audio; text and History remain.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding(20)
