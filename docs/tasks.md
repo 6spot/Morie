@@ -17,7 +17,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | --- | --- | --- | --- | --- | --- |
 | M-001 | Bootstrap | Initialize Morie repository and product baseline | DONE | — | [`M-001`](./tasks/M-001-repository-bootstrap.md) |
 | M-002 | Phase 0 | macOS input foundation | IN PROGRESS | [#2](https://github.com/6spot/Morie/issues/2) / [PR #3](https://github.com/6spot/Morie/pull/3) | [`M-002`](./tasks/M-002-macos-input-foundation.md) |
-| M-003 | Phase 1 | Durable Capture store, History, App Context and iCloud/CloudKit | TODO | — | [`M-003`](./tasks/M-003-capture.md) |
+| M-003 | Phase 1 | Durable Capture store, History, App Context and iCloud/CloudKit | IN PROGRESS | — | [`M-003`](./tasks/M-003-capture.md) |
 | M-004 | Phase 2 | Vocabulary, Project and Relevant Context retrieval | TODO | — | [`M-004`](./tasks/M-004-memory.md) |
 | M-005 | Phase 3 | Context-aware correction, personalization and style learning | TODO | — | [`M-005`](./tasks/M-005-personalization.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
@@ -32,6 +32,8 @@ The current priority is the reliable daily input loop:
 `press shortcut → speak → press again → final transcript → restore original app → insert text`
 
 Phase 0 remains `IN PROGRESS` until it has been built and exercised on a supported macOS 27 Apple Intelligence-capable Mac and the target-app compatibility matrix has been completed.
+
+M-003 has started with the owner-approved local Capture-first slice while remaining M-002 runtime observations continue. CloudKit is not claimed ready until a real container and entitlements are configured.
 
 ## Maintenance rules
 

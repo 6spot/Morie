@@ -23,9 +23,10 @@ The first implementation includes:
 - configurable global toggle-capture shortcut, defaulting to a solo **Fn / Globe release** to start and finish; Fn chords pass through and **Escape** cancels;
 - frontmost-app capture before recording;
 - focus restoration and universal clipboard + synthetic paste delivery;
-- a native macOS 27 Liquid Glass capture HUD with cancel, live level, and finish controls.
+- a native macOS 27 Liquid Glass capture HUD with cancel, live level, and finish controls;
+- the first local SwiftData Capture-first persistence slice and native History window.
 
-Phase 0 still requires a real macOS 27 build/run and compatibility validation across the target application matrix before it is considered complete.
+Phase 0 runtime validation and Phase 1 Capture persistence development are both in progress. CloudKit is not yet configured.
 
 ## Documentation
 

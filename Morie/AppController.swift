@@ -3,6 +3,17 @@ import Foundation
 
 @MainActor
 final class AppController: ObservableObject {
+    enum ControllerError: LocalizedError {
+        case persistenceUnavailable(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .persistenceUnavailable(let reason):
+                "Capture storage is unavailable: \(reason)"
+            }
+        }
+    }
+
     enum State: Equatable {
         case checking
         case blocked(String)
@@ -22,6 +33,8 @@ final class AppController: ObservableObject {
     private let speech = SpeechPipeline()
     private let injector = TextInjector()
     private let hud = CaptureHUDController()
+    private let captureStore: CaptureStore?
+    private let persistenceError: Error?
     private let speechLocale = Locale(identifier: "zh-CN")
 
     private var hotkey: PushToTalkHotkey?
@@ -34,7 +47,9 @@ final class AppController: ObservableObject {
     private var captureFinishTask: Task<Void, Never>?
     private var lastPresentedFailure: String?
 
-    init() {
+    init(captureStore: CaptureStore?, persistenceError: Error? = nil) {
+        self.captureStore = captureStore
+        self.persistenceError = persistenceError
         let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
@@ -86,6 +101,13 @@ final class AppController: ObservableObject {
         recoverySettingsURL = nil
 
         do {
+            if let persistenceError {
+                throw ControllerError.persistenceUnavailable(persistenceError.localizedDescription)
+            }
+            guard captureStore != nil else {
+                throw ControllerError.persistenceUnavailable("Capture store was not initialized.")
+            }
+
             try await capabilityGate.requirePrivateMode()
             Diagnostics.record(
                 "App",
@@ -197,11 +219,27 @@ final class AppController: ObservableObject {
         lastPresentedFailure = nil
 
         let sessionID = UUID()
+        targetApplication = NSWorkspace.shared.frontmostApplication
+        targetWindowNumber = TextInjector.frontmostWindowNumber(for: targetApplication)
+
+        do {
+            try captureStore?.beginVoiceCapture(
+                id: sessionID,
+                applicationName: targetApplication?.localizedName,
+                bundleIdentifier: targetApplication?.bundleIdentifier,
+                windowNumber: targetWindowNumber
+            )
+        } catch {
+            let message = error.localizedDescription
+            state = .failed(message)
+            Diagnostics.record("CaptureStore", "Could not create Capture \(label(sessionID)): \(message)", level: .error)
+            presentFailure(title: "Morie couldn't save this capture", message: message)
+            return
+        }
+
         activeCaptureID = sessionID
         speechReadyCaptureID = nil
         finishRequestedCaptureID = nil
-        targetApplication = NSWorkspace.shared.frontmostApplication
-        targetWindowNumber = TextInjector.frontmostWindowNumber(for: targetApplication)
         transcript = ""
         state = .recording
 
@@ -272,6 +310,15 @@ final class AppController: ObservableObject {
                         }
 
                         self?.transcript = text
+                        do {
+                            try self?.captureStore?.updateRecognizedText(text, for: resultSessionID)
+                        } catch {
+                            Diagnostics.record(
+                                "CaptureStore",
+                                "Progressive save failed for \(String(resultSessionID.uuidString.prefix(8))): \(error.localizedDescription)",
+                                level: .error
+                            )
+                        }
                         Diagnostics.record(
                             "Speech",
                             "Transcript update for \(String(resultSessionID.uuidString.prefix(8))); characters=\(text.count)"
@@ -337,9 +384,11 @@ final class AppController: ObservableObject {
 
             transcript = finalText
             Diagnostics.record("Speech", "Final transcript ready; characters=\(finalText.count)")
+            try captureStore?.completeRecognition(finalText, for: sessionID)
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 Diagnostics.record("Delivery", "Final transcript is empty; nothing to inject", level: .warning)
+                try captureStore?.markDelivered(sessionID)
                 completeSuccessfulSession(sessionID)
                 return
             }
@@ -358,6 +407,7 @@ final class AppController: ObservableObject {
             )
             try Task.checkCancellation()
             Diagnostics.record("Delivery", "Injection completed for \(label(sessionID))")
+            try captureStore?.markDelivered(sessionID)
             completeSuccessfulSession(sessionID)
         } catch is CancellationError {
             Diagnostics.record("Session", "Finish cancelled for \(label(sessionID))", level: .warning)
@@ -382,6 +432,11 @@ final class AppController: ObservableObject {
         }
 
         Diagnostics.record("Session", "Capture \(label(sessionID)) cancelled by \(source)", level: .warning)
+        do {
+            try captureStore?.cancel(sessionID)
+        } catch {
+            Diagnostics.record("CaptureStore", "Cancel cleanup failed: \(error.localizedDescription)", level: .error)
+        }
         hotkey?.setCancellationEnabled(false)
         hud.hide()
         await cancelActiveCapture(transitionToReady: true)
@@ -416,6 +471,12 @@ final class AppController: ObservableObject {
         }
 
         Diagnostics.record("Session", "Cancelling active capture \(label(sessionID))")
+
+        do {
+            try captureStore?.cancel(sessionID)
+        } catch {
+            Diagnostics.record("CaptureStore", "Active Capture cleanup failed: \(error.localizedDescription)", level: .error)
+        }
 
         let startTask = captureStartTask
         let finishTask = captureFinishTask
@@ -462,6 +523,15 @@ final class AppController: ObservableObject {
 
         let message = error.localizedDescription
         let preservedOnClipboard = error is TextInjector.InjectionError
+        do {
+            if preservedOnClipboard {
+                try captureStore?.markDeliveryFailed(sessionID, error: message)
+            } else {
+                try captureStore?.markFailed(sessionID, error: message)
+            }
+        } catch {
+            Diagnostics.record("CaptureStore", "Failure state save failed: \(error.localizedDescription)", level: .error)
+        }
         Diagnostics.record("Session", "Capture \(label(sessionID)) failed: \(message)", level: .error)
         hotkey?.setCancellationEnabled(false)
         resetSessionIdentity()

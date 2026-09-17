@@ -50,11 +50,16 @@ Morie/
 │   ├── MorieApp.swift
 │   ├── AppController.swift
 │   ├── CapabilityGate.swift
+│   ├── CaptureRecord.swift
+│   ├── CaptureStore.swift
+│   ├── CaptureHistoryView.swift
 │   ├── CaptureHUD.swift
 │   ├── Diagnostics.swift
 │   ├── PushToTalkHotkey.swift
 │   ├── SpeechPipeline.swift
 │   └── TextInjector.swift
+├── MorieTests/
+│   └── CaptureStoreTests.swift
 ├── .github/workflows/
 │   ├── macos-27-ci.yml
 │   └── macos-27-package.yml
@@ -249,6 +254,27 @@ Owns a native, non-activating recording surface that does not replace the origin
 - no custom glass imitation or third-party UI.
 
 The microphone waveform is the only custom-drawn control because macOS does not provide a system live-audio waveform component. It renders a complete center-weighted envelope from the first frame—low at both edges and tallest in the middle—then smoothly changes the middle bars with actual microphone level. Its silence threshold and restrained gain curve retain the relevant proven behavior from Type4Me without importing Type4Me's scrolling-history presentation or UI system.
+
+### `CaptureRecord` / `CaptureStore`
+
+M-003 introduces the first durable product boundary using Apple SwiftData:
+
+- the Phase 0 session UUID is also the Capture identity;
+- an intentional voice Capture is saved before Speech startup;
+- progressive recognition checkpoints update the same record with a bounded save cadence;
+- final recognition, delivery success, clipboard-preserved delivery failure, and operational failure become explicit durable lifecycle states;
+- explicit user cancellation discards the in-progress record;
+- source application name, bundle identifier and original window identity are the current minimal App Context.
+
+The local `ModelConfiguration` explicitly disables CloudKit until a real container and entitlements are configured. This is an implementation stage, not a Device Only product mode.
+
+### `CaptureHistoryView`
+
+Native SwiftUI/SwiftData History surface using system `Window`, `NavigationStack`, `List`, `ContentUnavailableView`, and `@Query`. It is intentionally a basic inspection surface while M-003 persistence semantics are validated.
+
+### `MorieTests`
+
+The first logic-only XCTest target compiles the Capture persistence sources directly so tests can run without launching the menu-bar app or entering its permission/capability lifecycle. It uses in-memory stores for lifecycle transitions and a unique temporary file URL for store-recreation coverage; it never opens the production Capture database.
 
 ## Type4Me extraction boundary
 

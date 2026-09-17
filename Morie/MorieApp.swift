@@ -3,7 +3,21 @@ import SwiftUI
 
 @main
 struct MorieApp: App {
-    @StateObject private var controller = AppController()
+    @StateObject private var controller: AppController
+    private let captureStore: CaptureStore?
+
+    init() {
+        do {
+            let store = try CaptureStore()
+            captureStore = store
+            _controller = StateObject(wrappedValue: AppController(captureStore: store))
+        } catch {
+            captureStore = nil
+            _controller = StateObject(
+                wrappedValue: AppController(captureStore: nil, persistenceError: error)
+            )
+        }
+    }
 
     var body: some Scene {
         MenuBarExtra("Morie", systemImage: "waveform") {
@@ -15,6 +29,20 @@ struct MorieApp: App {
             DiagnosticLogView()
         }
         .defaultSize(width: 820, height: 520)
+
+        Window("Morie History", id: "history") {
+            if let captureStore {
+                CaptureHistoryView()
+                    .modelContainer(captureStore.container)
+            } else {
+                ContentUnavailableView(
+                    "History Unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("Morie could not open Capture storage.")
+                )
+            }
+        }
+        .defaultSize(width: 680, height: 480)
 
         Settings {
             MorieSettingsView(controller: controller)
@@ -59,6 +87,11 @@ private struct MorieMenuContent: View {
             Button("Open Debug Log", systemImage: "ladybug") {
                 openWindow(id: "debug")
                 NSApplication.shared.activate(ignoringOtherApps: true)
+            }
+
+            Button("History", systemImage: "clock.arrow.circlepath") {
+                openWindow(id: "history")
+                NSApplication.shared.activate()
             }
 
             SettingsLink {

@@ -38,6 +38,25 @@ xcodebuild \
 
 Disabling signing here is for compile validation only; normal local launch/distribution follows the appropriate signing path. Never direct this unsigned build into the repository `build/Debug/Morie.app` while Xcode is running it, because changing the executable's signing identity can invalidate TCC permissions and make microphone behavior impossible to interpret.
 
+## Unit tests
+
+Run logic tests with their own temporary DerivedData directory:
+
+```bash
+validation_dir="$(mktemp -d /tmp/morie-derived-data.XXXXXX)"
+xcodebuild \
+  -project Morie.xcodeproj \
+  -scheme MorieTests \
+  -configuration Debug \
+  -sdk macosx27.0 \
+  -derivedDataPath "$validation_dir" \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  test
+```
+
+`MorieTests` is a logic-only target: it does not launch the menu-bar app or exercise TCC. Capture persistence tests use in-memory storage or a unique temporary file and do not access the production SwiftData store.
+
 ## CI compile gate
 
 `.github/workflows/macos-27-ci.yml` compiles product changes on GitHub's `xcode-27` hosted environment. `.github/workflows/macos-27-package.yml` creates the test artifact.

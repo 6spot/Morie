@@ -2,7 +2,7 @@
 
 ## Status
 
-- **State:** TODO
+- **State:** IN PROGRESS
 - **Phase:** Phase 1
 - **Starts after:** M-002 macOS Input Foundation reaches an acceptable stable baseline
 
@@ -43,7 +43,32 @@ Excluded:
 
 ## Progress
 
-Not started. Detailed subtasks will be refined before implementation begins.
+| Subtask | Status | Notes |
+| --- | --- | --- |
+| SwiftData Capture schema | IMPLEMENTED / VERIFY | `CaptureRecord` stores stable identity, timestamps, lifecycle, recognized/final text, delivery mode, source app/bundle, original window identity and delivery error. No uniqueness constraint or non-Apple dependency. |
+| Capture-first local store | IMPLEMENTED / VERIFY | A voice Capture is synchronously saved before Speech starts; progressive text is checkpointed at most every 500 ms, then final recognition and delivery state update the same record. Explicit user cancellation removes the empty/in-progress record. |
+| Input-loop integration | IMPLEMENTED / VERIFY | Capture UUID is shared with the Phase 0 session UUID. Storage initialization failure blocks capture rather than silently running without durability. |
+| Native History window | IMPLEMENTED / VERIFY | Native SwiftUI `Window`, `NavigationStack`, `List`, `ContentUnavailableView` and SwiftData `@Query`; opened from the menu-bar panel. |
+| App Context | IN PROGRESS | Source app name, bundle identifier and original window number are stored. Window title collection remains excluded until a minimal privacy-safe requirement is approved. |
+| Tests | IMPLEMENTED / PASS | Logic-only XCTest target covers delivered, delivery-failed, operational-failed and explicit-cancel paths plus persistence across store recreation. Tests use in-memory or unique temporary stores and do not launch Morie. |
+| iCloud/CloudKit | TODO | Requires the real container, entitlements, account/capability handling and sync validation. Local configuration explicitly uses `.none`; it does not pretend CloudKit is active. |
+
+Isolated macOS 27 Debug compilation passed using temporary DerivedData, without overwriting the owner's Xcode-run product. All five CaptureStore tests passed on 2026-09-17.
+
+## Implementation notes
+
+- The persistent entity is `CaptureRecord`; voice is represented as a source of Capture rather than the domain root.
+- The authoritative session UUID is also the Capture UUID, avoiding a second identity mapping during the input loop.
+- Local persistence uses SwiftData with an explicit non-CloudKit configuration until the real iCloud container exists.
+- The first durable write occurs before `SpeechPipeline.start`. Progressive recognized text is checkpointed with a bounded 500 ms cadence to avoid a disk save for every character callback.
+- Delivery success/failure and operational failure are durable terminal states. User cancellation is an explicit discard and removes the active record.
+- `CaptureStore` accepts an explicit file URL for isolated restart testing; production continues to use SwiftData's default local application store.
+
+## Validation evidence
+
+- `xcodebuild -scheme MorieTests ... test`: 5 tests passed on macOS 27 / Xcode 27 using `/tmp/morie-derived-data.o30wQv`.
+- `xcodebuild -scheme Morie ... build`: succeeded with signing disabled using `/tmp/morie-derived-data.0FA3Lq`.
+- Runtime History and capture-first behavior still require owner validation from the normal Xcode-signed launch.
 
 ## Known design constraints
 
