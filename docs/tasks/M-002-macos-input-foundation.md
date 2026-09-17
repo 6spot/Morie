@@ -365,6 +365,7 @@ These items keep M-002 **IN PROGRESS** even though the initial Phase 0 implement
 ## Known risks / decisions still open
 
 - solo `Fn / Globe` release is the owner-approved default; macOS system-action conflicts and external-keyboard behavior must be evaluated in real use, with alternate bindings retained in Settings.
+- a 2026-09-17 Xcode test run later produced capture sessions pinned at `-758.6 dB` and empty transcripts after the repository build directory had also been overwritten by unsigned command-line builds. The owner approved deferring this case unless it reproduces from a clean, Xcode-signed run. Automated agent builds must use isolated temporary DerivedData and must not overwrite the locally running Xcode product.
 - Hosted compile validation is not a substitute for TCC/Accessibility/microphone and cross-app behavior on real hardware.
 - Do not add a compatibility branch merely because Type4Me has one. Reproduce on macOS 27 first.
 - Do not add custom/faux Liquid Glass UI if a native system component exists.

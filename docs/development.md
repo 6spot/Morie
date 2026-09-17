@@ -21,20 +21,22 @@ Morie intentionally does not support older Macs by adding alternate ASR/LLM runt
 5. Configure your Development Team if Xcode requests signing configuration.
 6. Build and run on a supported Mac.
 
-Command-line compile validation can use:
+Command-line compile validation must use isolated temporary DerivedData so it cannot overwrite the signed app used by an active Xcode session:
 
 ```bash
+validation_dir="$(mktemp -d /tmp/morie-derived-data.XXXXXX)"
 xcodebuild \
   -project Morie.xcodeproj \
-  -target Morie \
+  -scheme Morie \
   -configuration Debug \
   -sdk macosx27.0 \
+  -derivedDataPath "$validation_dir" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   build
 ```
 
-Disabling signing here is for compile validation only; normal local launch/distribution follows the appropriate signing path.
+Disabling signing here is for compile validation only; normal local launch/distribution follows the appropriate signing path. Never direct this unsigned build into the repository `build/Debug/Morie.app` while Xcode is running it, because changing the executable's signing identity can invalidate TCC permissions and make microphone behavior impossible to interpret.
 
 ## CI compile gate
 
