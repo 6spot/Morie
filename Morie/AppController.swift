@@ -133,14 +133,14 @@ final class AppController: ObservableObject {
             Diagnostics.record("App", "Bootstrap blocked: \(message)", level: .error)
             if let gateError = error as? CapabilityGate.GateError {
                 recoverySettingsURL = gateError.settingsURL
-                if gateError.settingsURL == nil {
-                    presentCapabilityFailure(gateError)
-                } else {
+                if case .accessibilityDenied = gateError {
                     Diagnostics.record(
                         "UI",
-                        "Permission failure remains visible in app status; duplicate Morie alert suppressed",
+                        "Accessibility failure remains visible in app status; duplicate Morie alert suppressed",
                         level: .warning
                     )
+                } else {
+                    presentCapabilityFailure(gateError)
                 }
             } else {
                 presentFailure(title: "Morie can't start", message: message)
@@ -593,9 +593,21 @@ final class AppController: ObservableObject {
         alert.alertStyle = .warning
         alert.messageText = "Morie can't start"
         alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        alert.runModal()
+
+        if let settingsURL = error.settingsURL {
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Not Now")
+
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn {
+                Diagnostics.record("Permission", "Opening System Settings for \(String(describing: error))")
+                NSWorkspace.shared.open(settingsURL)
+            }
+        } else {
+            alert.addButton(withTitle: "OK")
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 
     private func label(_ sessionID: UUID) -> String {
