@@ -1,8 +1,11 @@
 name: macOS 27 Build
 
 on:
-  push:
   pull_request:
+    paths:
+      - "Morie/**"
+      - "Morie.xcodeproj/**"
+      - ".github/workflows/macos-27-build.yml"
   workflow_dispatch:
 
 permissions:
