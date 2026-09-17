@@ -18,8 +18,13 @@ final class AppController: ObservableObject {
     private let capabilityGate = CapabilityGate()
     private let speech = SpeechPipeline()
     private let injector = TextInjector()
+
     private var hotkey: PushToTalkHotkey?
     private var targetApplication: NSRunningApplication?
+    private var activeCaptureID: UUID?
+    private var speechReadyCaptureID: UUID?
+    private var captureStartTask: Task<Void, Never>?
+    private var captureFinishTask: Task<Void, Never>?
 
     var statusSymbol: String {
         switch state {
@@ -34,8 +39,8 @@ final class AppController: ObservableObject {
 
     var statusTitle: String {
         switch state {
-        case .checking: "Checking Private Mode"
-        case .blocked: "Private Mode unavailable"
+        case .checking: "Checking device capabilities"
+        case .blocked: "Required capability unavailable"
         case .ready: "Ready"
         case .recording: "Listening…"
         case .delivering: "Delivering…"
@@ -51,13 +56,24 @@ final class AppController: ObservableObject {
     }
 
     func bootstrap() async {
+        await cancelActiveCapture(transitionToReady: false)
+        hotkey?.invalidate()
+        hotkey = nil
+
         state = .checking
         transcript = ""
 
         do {
             try await capabilityGate.requirePrivateMode()
-            installHotkeyIfNeeded()
+
+            // Speech assets must be ready before the shortcut becomes active.
+            // A model download must never start in the middle of a user's hold.
+            try await speech.prepare(locale: .current)
+
+            try installHotkeyIfNeeded()
             state = .ready
+        } catch is CancellationError {
+            // A newer bootstrap/cancellation path owns the visible state.
         } catch {
             hotkey?.invalidate()
             hotkey = nil
@@ -65,52 +81,193 @@ final class AppController: ObservableObject {
         }
     }
 
-    private func installHotkeyIfNeeded() {
+    private func installHotkeyIfNeeded() throws {
         guard hotkey == nil else { return }
 
-        hotkey = PushToTalkHotkey(
+        let hotkey = PushToTalkHotkey(
             onPress: { [weak self] in
-                Task { @MainActor in await self?.beginCapture() }
+                Task { @MainActor in
+                    self?.handleHotkeyPress()
+                }
             },
             onRelease: { [weak self] in
-                Task { @MainActor in await self?.finishCapture() }
+                Task { @MainActor in
+                    self?.handleHotkeyRelease()
+                }
+            },
+            onUnavailable: { [weak self] error in
+                let message = error.localizedDescription
+                Task { @MainActor in
+                    await self?.handleHotkeyUnavailable(message)
+                }
             }
         )
+
+        try hotkey.start()
+        self.hotkey = hotkey
     }
 
-    private func beginCapture() async {
-        guard state == .ready else { return }
+    private func handleHotkeyPress() {
+        guard activeCaptureID == nil else { return }
 
+        switch state {
+        case .ready, .failed:
+            break
+        default:
+            return
+        }
+
+        let sessionID = UUID()
+        activeCaptureID = sessionID
+        speechReadyCaptureID = nil
         targetApplication = NSWorkspace.shared.frontmostApplication
         transcript = ""
         state = .recording
 
-        do {
-            try await speech.start(locale: .current) { [weak self] text in
-                Task { @MainActor in self?.transcript = text }
-            }
-        } catch {
-            state = .failed(error.localizedDescription)
+        captureStartTask = Task { @MainActor [weak self] in
+            await self?.startCapture(sessionID: sessionID)
         }
     }
 
-    private func finishCapture() async {
-        guard state == .recording else { return }
+    private func handleHotkeyRelease() {
+        guard let sessionID = activeCaptureID else { return }
+
+        if speechReadyCaptureID == sessionID {
+            guard captureFinishTask == nil else { return }
+
+            captureFinishTask = Task { @MainActor [weak self] in
+                await self?.finishCapture(sessionID: sessionID)
+            }
+        } else {
+            // Release during asynchronous setup means the user's intentional
+            // hold is already over. Cancel setup instead of starting a late,
+            // orphaned microphone session after release.
+            captureStartTask?.cancel()
+        }
+    }
+
+    private func startCapture(sessionID: UUID) async {
+        do {
+            try await speech.start(
+                sessionID: sessionID,
+                locale: .current
+            ) { [weak self] resultSessionID, text in
+                Task { @MainActor in
+                    guard self?.activeCaptureID == resultSessionID else { return }
+                    self?.transcript = text
+                }
+            }
+
+            try Task.checkCancellation()
+            guard activeCaptureID == sessionID else {
+                await speech.cancel(sessionID: sessionID)
+                return
+            }
+
+            speechReadyCaptureID = sessionID
+            captureStartTask = nil
+        } catch is CancellationError {
+            await speech.cancel(sessionID: sessionID)
+            completeCancelledSession(sessionID)
+        } catch {
+            await speech.cancel(sessionID: sessionID)
+            failSession(sessionID, error: error)
+        }
+    }
+
+    private func finishCapture(sessionID: UUID) async {
+        guard activeCaptureID == sessionID,
+              speechReadyCaptureID == sessionID
+        else {
+            return
+        }
+
         state = .delivering
 
         do {
-            let finalText = try await speech.stop()
+            let finalText = try await speech.stop(sessionID: sessionID)
+            try Task.checkCancellation()
+            guard activeCaptureID == sessionID else { return }
+
             transcript = finalText
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                state = .ready
+                completeSuccessfulSession(sessionID)
                 return
             }
 
             try await injector.deliver(finalText, to: targetApplication)
-            state = .ready
+            try Task.checkCancellation()
+            completeSuccessfulSession(sessionID)
+        } catch is CancellationError {
+            await speech.cancel(sessionID: sessionID)
+            completeCancelledSession(sessionID)
         } catch {
-            state = .failed(error.localizedDescription)
+            await speech.cancel(sessionID: sessionID)
+            failSession(sessionID, error: error)
         }
+    }
+
+    private func handleHotkeyUnavailable(_ message: String) async {
+        await cancelActiveCapture(transitionToReady: false)
+        state = .blocked(message)
+    }
+
+    private func cancelActiveCapture(transitionToReady: Bool) async {
+        guard let sessionID = activeCaptureID else {
+            captureStartTask?.cancel()
+            captureFinishTask?.cancel()
+            captureStartTask = nil
+            captureFinishTask = nil
+            speechReadyCaptureID = nil
+            targetApplication = nil
+            return
+        }
+
+        let startTask = captureStartTask
+        let finishTask = captureFinishTask
+        startTask?.cancel()
+        finishTask?.cancel()
+
+        if let startTask {
+            await startTask.value
+        }
+        if let finishTask {
+            await finishTask.value
+        }
+
+        await speech.cancel(sessionID: sessionID)
+
+        guard activeCaptureID == sessionID else { return }
+        resetSessionIdentity()
+        if transitionToReady {
+            state = .ready
+        }
+    }
+
+    private func completeSuccessfulSession(_ sessionID: UUID) {
+        guard activeCaptureID == sessionID else { return }
+        resetSessionIdentity()
+        state = .ready
+    }
+
+    private func completeCancelledSession(_ sessionID: UUID) {
+        guard activeCaptureID == sessionID else { return }
+        resetSessionIdentity()
+        state = .ready
+    }
+
+    private func failSession(_ sessionID: UUID, error: Error) {
+        guard activeCaptureID == sessionID else { return }
+        resetSessionIdentity()
+        state = .failed(error.localizedDescription)
+    }
+
+    private func resetSessionIdentity() {
+        activeCaptureID = nil
+        speechReadyCaptureID = nil
+        captureStartTask = nil
+        captureFinishTask = nil
+        targetApplication = nil
     }
 }
