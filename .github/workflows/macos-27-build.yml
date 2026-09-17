@@ -6,6 +6,11 @@ on:
       - "Morie/**"
       - "Morie.xcodeproj/**"
       - ".github/workflows/macos-27-build.yml"
+  push:
+    branches:
+      - phase0/input-foundation
+    paths:
+      - ".github/package-request"
   workflow_dispatch:
 
 permissions:
@@ -13,7 +18,7 @@ permissions:
 
 jobs:
   build:
-    name: Xcode 27 build and package
+    name: Xcode 27 compile
     runs-on: xcode-27
 
     steps:
@@ -39,6 +44,7 @@ jobs:
             build
 
       - name: Ad-hoc sign and verify
+        if: github.event_name != 'pull_request'
         run: |
           codesign \
             --force \
@@ -49,6 +55,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 build/Release/Morie.app
 
       - name: Package test build
+        if: github.event_name != 'pull_request'
         run: |
           mkdir -p dist
           ditto \
@@ -60,6 +67,7 @@ jobs:
           shasum -a 256 dist/Morie-macOS27-test.zip | tee dist/Morie-macOS27-test.zip.sha256
 
       - name: Upload test build
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: Morie-macOS27-test-${{ github.sha }}
