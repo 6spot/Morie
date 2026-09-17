@@ -1,67 +1,201 @@
 import AppKit
+import ApplicationServices
+import Foundation
 
-@MainActor
+/// Minimal macOS 27 push-to-talk hotkey.
+///
+/// Morie intentionally supports one focused keyboard interaction here. This is
+/// not a generalized hotkey subsystem: no media keys, mouse buttons, modes, or
+/// legacy compatibility paths.
 final class PushToTalkHotkey {
+    enum StartError: LocalizedError {
+        case accessibilityUnavailable
+        case eventTapCreationFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .accessibilityUnavailable:
+                "Accessibility permission is required for the global push-to-talk shortcut."
+            case .eventTapCreationFailed:
+                "Morie could not install the global push-to-talk shortcut."
+            }
+        }
+    }
+
+    private static let shortcutKeyCode = CGKeyCode(49) // Space
+    private static let requiredModifiers: CGEventFlags = [.maskControl]
+    private static let relevantModifiers: CGEventFlags = [
+        .maskCommand,
+        .maskShift,
+        .maskAlternate,
+        .maskControl,
+        .maskSecondaryFn,
+    ]
+
     private let onPress: () -> Void
     private let onRelease: () -> Void
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
+    private let onUnavailable: (Error) -> Void
+
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
     private var isPressed = false
 
-    init(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) {
+    init(
+        onPress: @escaping () -> Void,
+        onRelease: @escaping () -> Void,
+        onUnavailable: @escaping (Error) -> Void
+    ) {
         self.onPress = onPress
         self.onRelease = onRelease
-        install()
+        self.onUnavailable = onUnavailable
     }
 
     deinit {
         invalidate()
     }
 
+    func start() throws {
+        guard eventTap == nil else { return }
+        guard AXIsProcessTrusted() else {
+            throw StartError.accessibilityUnavailable
+        }
+
+        let mask = Self.mask(for: .keyDown) | Self.mask(for: .keyUp)
+        let userInfo = Unmanaged.passUnretained(self).toOpaque()
+
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: moriePushToTalkEventTapCallback,
+            userInfo: userInfo
+        ) else {
+            throw StartError.eventTapCreationFailed
+        }
+
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        eventTap = tap
+        runLoopSource = source
+
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+
+        guard CGEvent.tapIsEnabled(tap: tap) else {
+            invalidate()
+            throw StartError.eventTapCreationFailed
+        }
+    }
+
     func invalidate() {
-        if let globalMonitor {
-            NSEvent.removeMonitor(globalMonitor)
-            self.globalMonitor = nil
-        }
-        if let localMonitor {
-            NSEvent.removeMonitor(localMonitor)
-            self.localMonitor = nil
-        }
         isPressed = false
-    }
 
-    private func install() {
-        let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp]
-
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
-            Task { @MainActor in self?.handle(event) }
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
         }
 
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            self?.handle(event)
-            return event
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+            CFRunLoopSourceInvalidate(source)
         }
+
+        if let tap = eventTap {
+            CFMachPortInvalidate(tap)
+        }
+
+        runLoopSource = nil
+        eventTap = nil
     }
 
-    private func handle(_ event: NSEvent) {
-        guard event.keyCode == 49 else { return } // Space
-        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.control) else {
-            if event.type == .keyUp, isPressed {
-                isPressed = false
-                onRelease()
+    fileprivate func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            recoverEventTapIfPossible()
+            return Unmanaged.passUnretained(event)
+        }
+
+        // Morie-generated delivery keystrokes are never hotkey input.
+        if TextInjector.isSyntheticInput(event) {
+            return Unmanaged.passUnretained(event)
+        }
+
+        let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
+        guard keyCode == Self.shortcutKeyCode else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        switch type {
+        case .keyDown:
+            guard Self.hasExactShortcutModifiers(event.flags) else {
+                return Unmanaged.passUnretained(event)
             }
+
+            // Consume repeat events but never dispatch another recording start.
+            if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || isPressed {
+                return nil
+            }
+
+            isPressed = true
+            onPress()
+            return nil
+
+        case .keyUp:
+            // Once Morie owns the hold, release must terminate it even if the
+            // user released Control before releasing Space.
+            guard isPressed else {
+                return Unmanaged.passUnretained(event)
+            }
+
+            isPressed = false
+            onRelease()
+            return nil
+
+        default:
+            return Unmanaged.passUnretained(event)
+        }
+    }
+
+    private func recoverEventTapIfPossible() {
+        guard let tap = eventTap else { return }
+
+        guard AXIsProcessTrusted() else {
+            invalidate()
+            onUnavailable(StartError.accessibilityUnavailable)
             return
         }
 
-        switch event.type {
-        case .keyDown where !event.isARepeat && !isPressed:
-            isPressed = true
-            onPress()
-        case .keyUp where isPressed:
-            isPressed = false
-            onRelease()
-        default:
-            break
+        CGEvent.tapEnable(tap: tap, enable: true)
+        guard CGEvent.tapIsEnabled(tap: tap) else {
+            invalidate()
+            onUnavailable(StartError.eventTapCreationFailed)
+            return
         }
     }
+
+    private static func hasExactShortcutModifiers(_ flags: CGEventFlags) -> Bool {
+        flags.intersection(relevantModifiers) == requiredModifiers
+    }
+
+    private static func mask(for type: CGEventType) -> CGEventMask {
+        CGEventMask(1) << type.rawValue
+    }
+}
+
+private func moriePushToTalkEventTapCallback(
+    proxy: CGEventTapProxy,
+    type: CGEventType,
+    event: CGEvent,
+    userInfo: UnsafeMutableRawPointer?
+) -> Unmanaged<CGEvent>? {
+    guard let userInfo else {
+        return Unmanaged.passUnretained(event)
+    }
+
+    // The tap source is installed on the main run loop. Keeping all mutable
+    // hotkey state on that run loop gives Morie deterministic press/release
+    // ownership without a generalized synchronization layer.
+    let hotkey = Unmanaged<PushToTalkHotkey>
+        .fromOpaque(userInfo)
+        .takeUnretainedValue()
+
+    return hotkey.handle(type: type, event: event)
 }
