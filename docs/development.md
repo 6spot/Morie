@@ -21,6 +21,8 @@ Morie intentionally does not support older Macs by adding alternate ASR/LLM runt
 5. Configure your Development Team if Xcode requests signing configuration.
 6. Build and run on a supported Mac.
 
+The macOS app bundle identifier is `me.morie.mac`. Privacy permissions are associated with this identifier and the current local signing identity.
+
 Command-line compile validation must use isolated temporary DerivedData so it cannot overwrite the signed app used by an active Xcode session:
 
 ```bash

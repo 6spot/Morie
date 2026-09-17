@@ -248,7 +248,7 @@
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morie uses Apple Speech to transcribe your intentional voice captures on device.";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sixspot.Morie;
+				PRODUCT_BUNDLE_IDENTIFIER = me.morie.mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -267,7 +267,7 @@
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morie uses Apple Speech to transcribe your intentional voice captures on device.";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sixspot.Morie;
+				PRODUCT_BUNDLE_IDENTIFIER = me.morie.mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
