@@ -133,7 +133,15 @@ final class AppController: ObservableObject {
             Diagnostics.record("App", "Bootstrap blocked: \(message)", level: .error)
             if let gateError = error as? CapabilityGate.GateError {
                 recoverySettingsURL = gateError.settingsURL
-                presentCapabilityFailure(gateError)
+                if gateError.settingsURL == nil {
+                    presentCapabilityFailure(gateError)
+                } else {
+                    Diagnostics.record(
+                        "UI",
+                        "Permission failure remains visible in app status; duplicate Morie alert suppressed",
+                        level: .warning
+                    )
+                }
             } else {
                 presentFailure(title: "Morie can't start", message: message)
             }
@@ -583,23 +591,11 @@ final class AppController: ObservableObject {
 
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Morie needs permission"
+        alert.messageText = "Morie can't start"
         alert.informativeText = message
-
-        if let settingsURL = error.settingsURL {
-            alert.addButton(withTitle: "Open System Settings")
-            alert.addButton(withTitle: "Not Now")
-
-            NSApplication.shared.activate(ignoringOtherApps: true)
-            if alert.runModal() == .alertFirstButtonReturn {
-                Diagnostics.record("Permission", "Opening System Settings for \(String(describing: error))")
-                NSWorkspace.shared.open(settingsURL)
-            }
-        } else {
-            alert.addButton(withTitle: "OK")
-            NSApplication.shared.activate(ignoringOtherApps: true)
-            alert.runModal()
-        }
+        alert.addButton(withTitle: "OK")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     private func label(_ sessionID: UUID) -> String {

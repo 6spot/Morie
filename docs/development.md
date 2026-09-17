@@ -84,7 +84,7 @@ The app should surface capability failures rather than silently degrading to a t
 
 If permissions were denied during development, use macOS System Settings to restore access before retesting. When testing permission onboarding behavior itself, reset the relevant app permission state using normal macOS developer/test procedures.
 
-Morie's blocked-state alert provides **Open System Settings** for Microphone, Speech Recognition, and Accessibility failures. Microphone and Speech show native consent prompts only while their TCC status is undetermined; after denial, macOS requires the user to re-enable them in System Settings. Accessibility always requires the user to enable Morie in the system list. After changing a permission, choose **Recheck Capabilities** from the menu-bar panel.
+Microphone, Speech Recognition, and Accessibility use the macOS-owned consent prompt only; Morie does not stack a second modal permission alert over it. A denied permission remains visible in the menu-bar status together with **Open System Settings**. Microphone and Speech show native consent prompts only while their TCC status is undetermined; after denial, macOS requires the user to re-enable them in System Settings. Accessibility always requires the user to enable Morie in the system list. After changing a permission, choose **Recheck Capabilities** from the menu-bar panel.
 
 The menu-bar panel also keeps an **Open System Settings** recovery action visible while a permission-backed capability is blocked; **Recheck Capabilities** cannot itself re-prompt a permission whose TCC status is already denied.
 
