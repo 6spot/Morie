@@ -18,6 +18,18 @@ Mandatory order:
 
 `Morie design → Morie architecture → M-002 requirement → current macOS 27 Apple API → Type4Me reference → smallest Morie-native implementation`
 
+### Approved migration mode
+
+M-002 uses **extractive migration by subsystem**.
+
+We do not copy Type4Me wholesale and delete features afterward, because that would import compatibility layers, provider/runtime abstractions, UI assumptions, and coupling before Morie has justified them. We also do not ignore Type4Me and rediscover its solved failure modes.
+
+For each Phase 0 subsystem:
+
+`Morie requirement → inspect matching Type4Me code/tests → ADAPT / DROP / VERIFY → smallest macOS 27-native implementation`
+
+Direct source transfer is exceptional. The normal path is to retain proven behavior and reimplement it in Morie's architecture using current Apple APIs. The optimization target is completing M-002, not maximizing Type4Me code reuse.
+
 ## Scope
 
 Included:
@@ -78,7 +90,7 @@ Explicitly excluded:
 | Repository docs / task system | DONE | `AGENTS.md`, master/detail tasks, architecture/dev/deploy/validation docs established. |
 | Full owner design baseline in repo | DONE | Repository transcription under `docs/design/`. |
 | Native UI / Liquid Glass policy | DONE | Hard rule documented; system components required. |
-| Type4Me reference boundary | DONE | Morie-first migration order and macOS 27 filter documented. |
+| Type4Me reference boundary | DONE | Morie-first order plus extractive per-subsystem migration strategy documented. |
 | Type4Me hotkey audit | IN PROGRESS | Inspect only behaviors relevant to Morie's selected hold-to-talk interaction; generalized compatibility is out of scope. |
 | Type4Me audio/session audit | IN PROGRESS | Keep only lifecycle/failure lessons still relevant to current Apple-native macOS 27 path. |
 | Type4Me injection/focus audit | IN PROGRESS | Keep current-relevant no-loss/clipboard/focus lessons; do not create a speculative per-app framework. |
@@ -102,6 +114,17 @@ Explicitly excluded:
 ## Type4Me audit record
 
 Reference: [`../reference/type4me.md`](../reference/type4me.md)
+
+### Strategy decision
+
+**Classification: extractive migration**
+
+- Do not transplant the full Type4Me repository and trim it afterward.
+- Do not treat Type4Me as an architecture source.
+- Inspect only the subsystem needed for the active Morie acceptance criterion.
+- Reuse behavior and failure-mode knowledge before source structure.
+- Prefer small Morie-native implementations over compatibility-preserving ports.
+- Preserve Type4Me MIT attribution if substantial source is ever transferred directly.
 
 ### Hotkey
 
@@ -216,6 +239,7 @@ Verified at repository/static level:
 - owner design baseline has been preserved in the repository;
 - native UI and dependency approval gates are documented;
 - Morie-first Type4Me migration order is documented;
+- extractive Type4Me migration strategy is documented;
 - Phase 0 Issue and draft PR exist.
 
 Not yet verified:
