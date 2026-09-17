@@ -12,6 +12,7 @@
 		A10000000000000000000004 /* SpeechPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* SpeechPipeline.swift */; };
 		A10000000000000000000005 /* PushToTalkHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* PushToTalkHotkey.swift */; };
 		A10000000000000000000006 /* TextInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* TextInjector.swift */; };
+		A10000000000000000000007 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* Diagnostics.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +23,7 @@
 		B10000000000000000000005 /* PushToTalkHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushToTalkHotkey.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* TextInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInjector.swift; sourceTree = "<group>"; };
 		B10000000000000000000007 /* Morie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Morie.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000008 /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,6 +53,7 @@
 				B10000000000000000000004 /* SpeechPipeline.swift */,
 				B10000000000000000000005 /* PushToTalkHotkey.swift */,
 				B10000000000000000000006 /* TextInjector.swift */,
+				B10000000000000000000008 /* Diagnostics.swift */,
 			);
 			path = Morie;
 			sourceTree = "<group>";
@@ -127,6 +130,7 @@
 				A10000000000000000000004 /* SpeechPipeline.swift in Sources */,
 				A10000000000000000000005 /* PushToTalkHotkey.swift in Sources */,
 				A10000000000000000000006 /* TextInjector.swift in Sources */,
+				A10000000000000000000007 /* Diagnostics.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
