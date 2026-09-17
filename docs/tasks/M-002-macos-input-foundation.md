@@ -365,6 +365,7 @@ These items keep M-002 **IN PROGRESS** even though the initial Phase 0 implement
 ## Known risks / decisions still open
 
 - The macOS app bundle identifier is `me.morie.mac`. The earlier development identifier `com.sixspot.Morie` accumulated conflicting ad-hoc build/TCC identities and is no longer used by the app target.
+- Hardened Runtime builds explicitly include the Apple audio-input entitlement. A missing entitlement reproduced as `notDetermined → requestAccess(false) → denied` with no system consent sheet, even though the microphone usage description was present.
 
 - solo `Fn / Globe` release is the owner-approved default; macOS system-action conflicts and external-keyboard behavior must be evaluated in real use, with alternate bindings retained in Settings.
 - a 2026-09-17 Xcode test run later produced capture sessions pinned at `-758.6 dB` and empty transcripts after the repository build directory had also been overwritten by unsigned command-line builds. The owner approved deferring this case unless it reproduces from a clean, Xcode-signed run. Automated agent builds must use isolated temporary DerivedData and must not overwrite the locally running Xcode product.

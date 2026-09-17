@@ -23,6 +23,8 @@ Morie intentionally does not support older Macs by adding alternate ASR/LLM runt
 
 The macOS app bundle identifier is `me.morie.mac`. Privacy permissions are associated with this identifier and the current local signing identity.
 
+The target enables Hardened Runtime and signs with `Morie/Morie.entitlements`. The Apple audio-input entitlement is required in addition to `NSMicrophoneUsageDescription`; without it, macOS can reject `AVCaptureDevice.requestAccess(for: .audio)` immediately without presenting consent.
+
 Command-line compile validation must use isolated temporary DerivedData so it cannot overwrite the signed app used by an active Xcode session:
 
 ```bash

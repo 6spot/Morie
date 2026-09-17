@@ -38,6 +38,7 @@
 		B10000000000000000000011 /* CaptureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStore.swift; sourceTree = "<group>"; };
 		B10000000000000000000012 /* CaptureHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryView.swift; sourceTree = "<group>"; };
 		B10000000000000000000013 /* MorieControlCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieControlCenter.swift; sourceTree = "<group>"; };
+		B10000000000000000000014 /* Morie.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Morie.entitlements; sourceTree = "<group>"; };
 		B20000000000000000000001 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000002 /* MorieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -82,6 +83,7 @@
 				B10000000000000000000011 /* CaptureStore.swift */,
 				B10000000000000000000012 /* CaptureHistoryView.swift */,
 				B10000000000000000000013 /* MorieControlCenter.swift */,
+				B10000000000000000000014 /* Morie.entitlements */,
 			);
 			path = Morie;
 			sourceTree = "<group>";
@@ -239,6 +241,7 @@
 		F20000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Morie/Morie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -258,6 +261,7 @@
 		F20000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Morie/Morie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
