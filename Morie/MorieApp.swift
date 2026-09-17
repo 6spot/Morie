@@ -6,7 +6,7 @@ struct MorieApp: App {
     @StateObject private var controller = AppController()
 
     var body: some Scene {
-        MenuBarExtra("Morie", systemImage: controller.statusSymbol) {
+        MenuBarExtra("Morie", systemImage: "waveform") {
             MorieMenuContent(controller: controller)
         }
         .menuBarExtraStyle(.window)
@@ -15,6 +15,10 @@ struct MorieApp: App {
             DiagnosticLogView()
         }
         .defaultSize(width: 820, height: 520)
+
+        Settings {
+            MorieSettingsView(controller: controller)
+        }
     }
 }
 
@@ -37,7 +41,7 @@ private struct MorieMenuContent: View {
 
             Divider()
 
-            Text("Press ⌃Space to start / finish")
+            Text("Press \(controller.captureShortcut.displayName) to start / finish")
                 .font(.caption)
 
             Text("Esc cancels while recording")
@@ -57,8 +61,18 @@ private struct MorieMenuContent: View {
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
 
+            SettingsLink {
+                Label("Settings", systemImage: "gearshape")
+            }
+
             Button("Recheck Capabilities", systemImage: "arrow.clockwise") {
                 Task { await controller.bootstrap() }
+            }
+
+            if controller.recoverySettingsURL != nil {
+                Button("Open System Settings", systemImage: "gearshape.arrow.triangle.2.circlepath") {
+                    controller.openRecoverySettings()
+                }
             }
 
             Button("Quit Morie", systemImage: "power") {
@@ -67,5 +81,35 @@ private struct MorieMenuContent: View {
         }
         .padding(14)
         .frame(width: 320)
+    }
+}
+
+@MainActor
+private struct MorieSettingsView: View {
+    @ObservedObject var controller: AppController
+
+    var body: some View {
+        Form {
+            Section("Capture Shortcut") {
+                Picker(
+                    "Shortcut",
+                    selection: Binding(
+                        get: { controller.captureShortcut },
+                        set: { controller.setCaptureShortcut($0) }
+                    )
+                ) {
+                    ForEach(CaptureShortcut.allCases) { shortcut in
+                        Text(shortcut.displayName).tag(shortcut)
+                    }
+                }
+
+                Text("Fn / Globe toggles capture only after a solo press is released. Fn combined with another key passes through without triggering Morie.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .padding(20)
+        .frame(width: 460)
     }
 }

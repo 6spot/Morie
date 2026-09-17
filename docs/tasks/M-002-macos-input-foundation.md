@@ -6,7 +6,7 @@
 - **Last updated:** 2026-09-17
 - **GitHub Issue:** https://github.com/6spot/Morie/issues/2
 - **Pull Request:** https://github.com/6spot/Morie/pull/3
-- **Branch:** `phase0/input-foundation`
+- **Merged baseline:** `main` at `2cda9a3`; continue implementation on task branches
 
 ## Why
 
@@ -34,7 +34,7 @@ Included:
 - Apple Intelligence-capable Macs;
 - native Swift / SwiftUI / AppKit;
 - native macOS 27 system UI / Liquid Glass behavior;
-- focused global hold-to-talk shortcut;
+- focused global toggle-capture shortcut;
 - authoritative recording-session lifecycle;
 - latest Apple Speech stack;
 - original target-app capture and focus restoration;
@@ -62,8 +62,8 @@ Explicitly excluded:
 ## Acceptance criteria
 
 1. A supported Mac enters Ready only when the capabilities owned by this phase are available.
-2. Holding the selected global shortcut starts intentional voice capture and releasing it finalizes the same session reliably, including repeated use.
-3. Releasing while Speech setup is still in flight cannot create a late/orphaned microphone session.
+2. The first shortcut press starts intentional voice capture, releasing it leaves capture active, and a second press reliably finalizes the same session; `Escape` cancels only while recording.
+3. Finishing or cancelling while Speech setup is still in flight cannot create a late/orphaned microphone session.
 4. The modern Apple Speech stack produces live/partial and final output without a legacy recognition fallback.
 5. Stale results from an earlier session cannot mutate a newer session.
 6. Morie remembers the app active before capture, restores it, and delivers final text where supported.
@@ -85,23 +85,24 @@ Explicitly excluded:
 | Full owner design baseline | DONE | Preserved under `docs/design/`. |
 | Native UI / Liquid Glass policy | DONE | Native system controls are a hard gate. |
 | Type4Me migration boundary | DONE | Morie-first, extractive per-subsystem migration documented. |
-| Type4Me hotkey audit | DONE | Retained hold/release ownership, repeat suppression, reset/failure lessons; dropped generalized hotkey features. |
+| Type4Me hotkey audit | DONE | Retained physical-press ownership, repeat suppression, reset/failure lessons; dropped generalized hotkey features. |
 | Type4Me audio/session audit | DONE | Retained session identity/stale-result/cleanup principles; dropped external-ASR audio architecture. |
 | Type4Me injection/focus audit | DONE | Retained no-loss/clipboard/synthetic-event lessons; app-specific branches remain VERIFY-only. |
 | Type4Me Apple Speech audit | DONE | Used only as behavioral reference; implementation follows current Apple Speech APIs. |
-| Menu Bar shell | IN PROGRESS | Native `MenuBarExtra`; real macOS 27 visual/interaction validation still required. |
-| Native Debug window | DONE / VERIFY | Native `Window` + `List`; Copy All/Clear; traces capability/hotkey/session/Speech/delivery paths. Real-device log usefulness is being validated. |
+| Menu Bar shell | IN PROGRESS | Native `MenuBarExtra` with a stable waveform entry icon; runtime state remains in the HUD and textual menu content instead of changing the persistent system-bar icon. Real macOS 27 visual/interaction validation still required. |
+| Native Debug window | DONE / VERIFY | Native `Window` + `List`; Copy All/Clear/Show Log File; traces capability/hotkey/session/Speech/delivery paths and mirrors the current launch to `~/Library/Logs/Morie/morie-debug.log` without transcript content. Real-device log usefulness is being validated. |
 | Foundation Models capability check | DONE | `SystemLanguageModel` availability + locale. |
 | Speech capability/locale check | DONE | `SpeechTranscriber` availability + locale. |
-| Microphone/Speech authorization | DONE | Native permission checks. |
-| Accessibility trust check | DONE | Native Accessibility trust/prompt path. |
+| Microphone/Speech authorization | DONE / VERIFY | Native first-request prompts plus persistent menu/alert System Settings recovery after denial; microphone revoke/re-enable/recheck needs another real-device pass. |
+| Accessibility trust check | DONE | Native trust prompt/check plus direct System Settings recovery; user manually enables Morie, then rechecks. |
 | iCloud/CloudKit capability check | DEFERRED | M-003 owns the real container/entitlements and Private Mode persistence gate. |
-| Global hold-to-talk hotkey | IMPLEMENTED / VERIFY | Minimal session-level `CGEventTap`; real-device hold/release/permission-revocation validation remains. |
+| Global toggle-capture hotkey | IMPLEMENTED / VERIFY | Owner-approved default is solo `Fn / Globe` release: first release starts, second finishes, Fn chords do not trigger, and `Escape` cancels. A timed-out event tap now fails open and is released instead of entering an automatic re-enable loop that can block keyboard input. Native Settings provides alternate combinations; real-device timeout recovery and Fn/system-conflict validation remain. |
 | Reliable recording/session layer | IMPLEMENTED / VERIFY | Unique session IDs, setup cancellation, stale-result rejection, deterministic terminal cleanup. |
 | Modern Apple Speech pipeline | IMPLEMENTED / VERIFY | `SpeechAnalyzer` + `SpeechTranscriber` + `CaptureInputSequenceProvider`; runtime finalization still needs device proof. |
-| Original-app capture/focus restore | IMPLEMENTED / VERIFY | Target captured before recording; timing requires target-app validation. |
-| Text injection / clipboard fallback | IMPLEMENTED / VERIFY | AX first, synthetic Cmd+V fallback, change-count-aware restore, no app-specific compatibility branch. |
-| Cancellation/stale-result hardening | IMPLEMENTED / VERIFY | Early release cancels in-flight setup; per-session identity protects new sessions. |
+| Original-app capture/focus restore | IMPLEMENTED / VERIFY | App and original on-screen window identity are captured before recording; a closed original window now blocks false-success paste and preserves the transcript on the ordinary clipboard. Remaining timing/alternate-window behavior requires validation. |
+| Text injection / clipboard fallback | IMPLEMENTED / VERIFY | Universal synthetic Cmd+V delivery, change-count-aware restore (including an originally empty clipboard), and transient markers for Raycast/clipboard-history exclusion; no app-specific compatibility branch. |
+| Cancellation/stale-result hardening | IMPLEMENTED / VERIFY | Finish/cancel during in-flight setup stays bound to its session; per-session identity protects new sessions. |
+| Liquid Glass capture HUD | IMPLEMENTED / VERIFY | One native `NSGlassEffectView` capsule in the non-activating panel, system buttons, and a Type4Me-informed live waveform. The HUD uses quiet-speech-sensitive mapping, real-signal transient emphasis, 60 Hz metering/rendering, and asymmetric per-bar history. Edge bars remain active while the center keeps the largest travel. Successful delivery now uses animated, labelled feedback; recoverable delivery failure reports “已复制到剪贴板” in the HUD instead of opening a modal alert. Visual response/accessibility validation remains. |
 | macOS 27 / Xcode 27 compile | DONE | GitHub hosted `xcode-27`: diagnostics build/package passed at `ec888bd4`. |
 | Compatibility matrix | TODO | Real app/device validation in `../validation.md`. |
 | Performance baseline | TODO | Measure after runtime loop is proven on supported hardware. |
@@ -110,22 +111,23 @@ Explicitly excluded:
 
 ## Implemented design
 
-### 1. Push-to-talk hotkey
+### 1. Toggle-capture hotkey
 
 `PushToTalkHotkey` is now deliberately small rather than a Type4Me-style generalized subsystem.
 
 Current behavior:
 
 - session-level `CGEventTap`;
-- one current V0 shortcut: `Control + Space`;
+- one active persisted V0 shortcut, defaulting to solo `Fn / Globe` release, with a small native set of alternate keyboard combinations;
 - exact modifier match;
 - autorepeat suppression;
-- one explicit active hold;
-- release belongs to the active hold even if Control is released before Space;
+- one action per physical press;
+- key release only resets press ownership;
+- first press starts, second press finishes, and `Escape` cancels an active recording;
 - matched shortcut events are consumed;
 - Morie-generated synthetic delivery events are ignored;
-- tap-disabled events attempt native re-enable;
-- loss of Accessibility trust blocks the input path rather than silently degrading.
+- Accessibility loss in the event path immediately releases the tap and passes the current event through;
+- tap-disabled/timeout events release the tap and block Morie until an explicit capability recheck, protecting system-wide keyboard availability.
 
 Intentionally not present:
 
@@ -140,25 +142,25 @@ Current classification: **ADAPT + DROP**.
 
 ### 2. Authoritative capture identity
 
-`AppController` and `SpeechPipeline` share a UUID session identity for each intentional hold.
+`AppController` and `SpeechPipeline` share a UUID session identity for each intentional toggle capture.
 
 Current rule:
 
 - press creates the authoritative session ID immediately;
 - Speech setup belongs to that ID;
-- release before setup completion cancels setup;
-- release after setup completion finalizes that ID;
+- finish before setup completion remains pending for that ID and finalizes it as soon as setup is ready;
+- cancel before setup completion cancels that ID and cannot start a late session;
 - transcript callbacks carry the ID;
 - callbacks/results whose ID is no longer active are ignored;
 - cancel/error/success all clear the same identity.
 
-This prevents a release-during-setup race from later creating an orphaned microphone session. No generalized session framework was introduced.
+This prevents finish/cancel-during-setup races from later creating an orphaned microphone session. No generalized session framework was introduced.
 
 ### 3. Speech asset readiness
 
 Speech asset preparation occurs during bootstrap, before the global shortcut is installed and before Morie enters Ready.
 
-A model-asset download must not begin after the user has already started an intentional push-to-talk hold.
+A model-asset download must not begin after the user has already started an intentional capture.
 
 The current Speech path uses:
 
@@ -169,11 +171,11 @@ The current Speech path uses:
 
 There is no legacy recognition fallback.
 
-### 4. Speech stop vs cancel
+### 4. Speech finish vs cancel
 
-Normal release and cancellation are different lifecycle events.
+Finish and cancellation are different lifecycle events.
 
-Normal release:
+Finish:
 
 1. stop microphone capture;
 2. release the provider so the analyzer input sequence can end;
@@ -198,8 +200,8 @@ Delivery remains generic and evidence-driven:
 
 1. reject missing/terminated/self target and preserve transcript on clipboard;
 2. restore the original app;
-3. try bounded Accessibility selected-text replacement;
-4. fall back to synthetic Cmd+V;
+3. snapshot safe text-like clipboard representations;
+4. write the transcript and send synthetic Cmd+V;
 5. tag Morie's generated events so the hotkey layer ignores them;
 6. restore the old clipboard only if `changeCount` proves nobody changed it after Morie's temporary write.
 
@@ -223,7 +225,7 @@ The Swift 6 build exposed that `kAXTrustedCheckOptionPrompt` comes through the C
 
 ### 7. Native runtime diagnostics
 
-Real-device testing exposed that a silent push-to-talk failure is not diagnosable from the menu-bar status alone. M-002 now includes a native `Morie Debug` window.
+Real-device testing exposed that a silent shortcut failure is not diagnosable from the menu-bar status alone. M-002 now includes a native `Morie Debug` window.
 
 Implementation:
 
@@ -238,7 +240,7 @@ Tracked categories include:
 
 - `App` — bootstrap and Ready/blocked transitions;
 - `Capability` / `Permission` — Apple Intelligence, Speech, microphone, Speech authorization, Accessibility;
-- `Hotkey` — event-tap install, accepted keyDown/keyUp, repeats, modifier mismatch, tap disable/recovery;
+- `Hotkey` — event-tap install, accepted keyDown/keyUp, repeats, modifier mismatch, tap disable/fail-open release;
 - `Session` — capture IDs, target app/bundle, cancellation/completion;
 - `Speech` — assets, microphone/provider/analyzer lifecycle, result lengths, finalization/cancel;
 - `Delivery` — target activation, AX write, clipboard fallback, synthetic Cmd+V;
@@ -246,6 +248,8 @@ Tracked categories include:
 - `UI` — native failure alerts.
 
 This diagnostic surface is explicitly a developer/runtime-validation aid. It does not replace user-facing product feedback design.
+
+File output is serialized on a dedicated background queue. The hotkey/UI path does not synchronously flush every Speech update to disk; the earlier synchronous per-entry flush contributed to real-device event-tap timeouts after idle microphone wake-up.
 
 ## Compile / package validation
 
@@ -270,7 +274,7 @@ This is compile/package evidence only. CI cannot prove microphone routing, TCC p
 ADAPT:
 
 - repeat suppression;
-- explicit hold ownership;
+- explicit physical-press ownership;
 - deterministic reset/failure semantics;
 - synthetic-event exclusion;
 - session-level event-tap reliability concept.
@@ -331,27 +335,36 @@ Verified:
 - current `CGEventTap` implementation compiles against that SDK;
 - native debug window/instrumentation compiles and packages against that SDK;
 - Morie-first Type4Me extraction boundaries are documented.
+- local clean Debug and Release builds passed against the macOS 27 SDK after the event-tap fail-open and background diagnostics changes; the obsolete `activateIgnoringOtherApps` option was removed in favor of the current native activation call.
+- real-device solo Fn toggle produced 16 accepted releases forming exactly 8 start/finish pairs with no duplicate trigger, failure, or orphaned session in the captured run;
+- all 8 logged captures completed Speech finalization, target activation, synthetic paste delivery, and change-count-safe clipboard restoration;
+- the same run successfully delivered to WeChat, Safari, QQ, Xcode, and Otty, including repeated captures in Xcode and Otty;
+- Chinese `zh-CN` progressive/final transcription and the native HUD/audio meter operated throughout the run.
+- subsequent real-device testing verified Fn chord rejection for a regular key and Shift, with candidate-cancel/pass-through diagnostics and no Capture start;
+- rapid empty captures terminated cleanly without injection, two Escape cancellations released/reset Speech, and repeated short captures remained recoverable;
+- native Settings switched live between Control+Space and Fn and reinstalled the matching event tap;
+- Terminal and Notes delivery succeeded, WeChat sustained repeated delivery, and an approximately 85-second/371-character capture completed successfully with clipboard restoration.
 
 Still required on a supported real Mac:
 
 - first-launch permission lifecycle;
 - Apple Intelligence/Speech asset runtime behavior;
-- actual `Control + Space` hold/release semantics across apps and keyboard input sources;
+- Fn chord rejection, system Globe/Fn conflict observation, alternate-binding persistence, and external keyboards (solo Fn start/finish is now evidenced on the built-in keyboard);
 - use Debug log to identify the current observed no-response shortcut path;
-- rapid/short/repeated hold behavior;
+- additional interruption/failure recovery beyond the verified rapid/short/repeated toggle and Escape paths;
 - microphone/session cleanup after failure/cancel;
-- volatile/final transcript behavior under real speech;
-- focus restoration;
-- AX insertion and clipboard fallback matrix;
-- clipboard restore timing;
+- volatile/final transcript edge cases such as immediate finish and end-of-short-utterance retention;
+- remaining focus restoration and universal clipboard/paste delivery matrix applications/fields;
+- clipboard replacement race where another app/user changes it during Morie's restore window;
 - native Liquid Glass appearance/interaction;
+- Reduce Motion, Reduce Transparency, Increase Contrast, VoiceOver, and keyboard-control behavior for the capture HUD;
 - performance and energy measurements.
 
-These items keep M-002 **IN PROGRESS** and PR #3 **Draft**.
+These items keep M-002 **IN PROGRESS** even though the initial Phase 0 implementation baseline has merged to `main`.
 
 ## Known risks / decisions still open
 
-- `Control + Space` is the current implementation shortcut, not a permanent product decision; macOS input-source conflicts must be evaluated in real use before freezing the default.
+- solo `Fn / Globe` release is the owner-approved default; macOS system-action conflicts and external-keyboard behavior must be evaluated in real use, with alternate bindings retained in Settings.
 - Hosted compile validation is not a substitute for TCC/Accessibility/microphone and cross-app behavior on real hardware.
 - Do not add a compatibility branch merely because Type4Me has one. Reproduce on macOS 27 first.
 - Do not add custom/faux Liquid Glass UI if a native system component exists.

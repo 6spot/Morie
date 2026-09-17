@@ -23,22 +23,37 @@ final class DiagnosticLogStore: ObservableObject {
     @Published private(set) var entries: [Entry] = []
 
     private let maximumEntries = 1_000
+    let logFileURL: URL
 
-    private init() {}
+    private init() {
+        let logsDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/Morie", isDirectory: true)
+        logFileURL = logsDirectory.appendingPathComponent("morie-debug.log")
+
+        do {
+            try FileManager.default.createDirectory(
+                at: logsDirectory,
+                withIntermediateDirectories: true
+            )
+            FileManager.default.createFile(atPath: logFileURL.path, contents: nil)
+        } catch {
+            // The in-memory debug view remains usable if the file is unavailable.
+        }
+    }
 
     func append(
         _ message: String,
         category: String,
         level: DiagnosticLevel
     ) {
-        entries.append(
-            Entry(
-                timestamp: Date(),
-                level: level,
-                category: category,
-                message: message
-            )
+        let entry = Entry(
+            timestamp: Date(),
+            level: level,
+            category: category,
+            message: message
         )
+        entries.append(entry)
+        appendToFile(entry)
 
         if entries.count > maximumEntries {
             entries.removeFirst(entries.count - maximumEntries)
@@ -47,14 +62,56 @@ final class DiagnosticLogStore: ObservableObject {
 
     func clear() {
         entries.removeAll(keepingCapacity: true)
+        DiagnosticFileWriter.clear(logFileURL)
     }
 
     var plainText: String {
-        entries.map { entry in
-            let time = entry.timestamp.formatted(date: .omitted, time: .standard)
-            return "\(time) [\(entry.level.rawValue)] [\(entry.category)] \(entry.message)"
-        }
+        entries.map(format)
         .joined(separator: "\n")
+    }
+
+    private func appendToFile(_ entry: Entry) {
+        DiagnosticFileWriter.append(format(entry) + "\n", to: logFileURL)
+    }
+
+    private func format(_ entry: Entry) -> String {
+        let time = entry.timestamp.formatted(
+            .iso8601.year().month().day().dateSeparator(.dash)
+                .time(includingFractionalSeconds: true)
+        )
+        return "\(time) [\(entry.level.rawValue)] [\(entry.category)] \(entry.message)"
+    }
+}
+
+private enum DiagnosticFileWriter {
+    private static let queue = DispatchQueue(label: "com.sixspot.morie.diagnostics-file")
+
+    static func append(_ text: String, to url: URL) {
+        queue.async {
+            guard let data = text.data(using: .utf8),
+                  let handle = try? FileHandle(forWritingTo: url)
+            else { return }
+
+            do {
+                try handle.seekToEnd()
+                try handle.write(contentsOf: data)
+                try handle.close()
+            } catch {
+                try? handle.close()
+            }
+        }
+    }
+
+    static func clear(_ url: URL) {
+        queue.async {
+            guard let handle = try? FileHandle(forWritingTo: url) else { return }
+            do {
+                try handle.truncate(atOffset: 0)
+                try handle.close()
+            } catch {
+                try? handle.close()
+            }
+        }
     }
 }
 
@@ -84,7 +141,7 @@ struct DiagnosticLogView: View {
                 ContentUnavailableView(
                     "No Diagnostics Yet",
                     systemImage: "ladybug",
-                    description: Text("Start Morie or press Control + Space. Runtime events will appear here.")
+                    description: Text("Start Morie or use the configured capture shortcut. Runtime events will appear here.")
                 )
             } else {
                 List(store.entries) { entry in
@@ -126,6 +183,10 @@ struct DiagnosticLogView: View {
                     store.clear()
                 }
                 .disabled(store.entries.isEmpty)
+
+                Button("Show Log File", systemImage: "doc.text.magnifyingglass") {
+                    NSWorkspace.shared.activateFileViewerSelecting([store.logFileURL])
+                }
             }
         }
         .frame(minWidth: 760, minHeight: 460)

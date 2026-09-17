@@ -50,11 +50,14 @@ Morie/
 │   ├── MorieApp.swift
 │   ├── AppController.swift
 │   ├── CapabilityGate.swift
+│   ├── CaptureHUD.swift
+│   ├── Diagnostics.swift
 │   ├── PushToTalkHotkey.swift
 │   ├── SpeechPipeline.swift
 │   └── TextInjector.swift
 ├── .github/workflows/
-│   └── macos-27-build.yml
+│   ├── macos-27-ci.yml
+│   └── macos-27-package.yml
 └── docs/
     ├── architecture.md
     ├── development.md
@@ -79,11 +82,11 @@ capability checks
   ↓
 prepare required Apple Speech assets
   ↓
-install minimal global push-to-talk event tap
+install minimal global toggle-capture event tap
   ↓
 Ready
 
-Control+Space press
+solo configured shortcut activation (Fn / Globe release by default)
   ↓
 create authoritative capture UUID
   ↓
@@ -93,7 +96,7 @@ start Apple capture + Speech session for that UUID
   ↓
 progressive / volatile transcript
   ↓
-Control+Space release
+second configured shortcut activation (or HUD confirm)
   ↓
 stop capture input
   ↓
@@ -103,8 +106,6 @@ final transcript
   ↓
 restore original target
   ↓
-AX text delivery
-  ↓ fallback
 safe synthetic Cmd+V using temporary clipboard value
   ↓
 restore clipboard only if user did not change it
@@ -112,7 +113,7 @@ restore clipboard only if user did not change it
 clear session identity and return Ready
 ```
 
-If release occurs while asynchronous Speech setup is still in flight, that setup is cancelled. A late setup completion must never create an orphaned recording after the user's hold has ended.
+Releasing the shortcut never finishes a toggle capture. If finish or cancel is requested while asynchronous Speech setup is still in flight, that request remains attached to the same capture UUID; late setup cannot create an orphaned recording.
 
 ## Phase 0 state ownership
 
@@ -128,7 +129,7 @@ Two levels of state are intentional.
 
 ### Capture identity
 
-A UUID is created for every intentional hold. It is the authority for setup, transcript callbacks, stop/cancel, and cleanup.
+A UUID is created for every intentional toggle capture. It is the authority for setup, transcript callbacks, finish/cancel, and cleanup.
 
 This identity exists because UI state alone is not sufficient to protect against asynchronous setup/results arriving after a newer user interaction. Stale callbacks are ignored rather than being allowed to mutate the next session.
 
@@ -138,7 +139,7 @@ Morie does not introduce a generalized multi-provider session framework to solve
 
 ### `MorieApp`
 
-Thin native menu-bar application shell. It owns presentation composition only and uses Apple system components.
+Thin native menu-bar application shell. It owns presentation composition only and uses Apple system components. Its menu-bar item uses one stable product-entry symbol; capture and delivery state belong to the HUD and textual menu content rather than repeatedly changing the persistent system-bar icon.
 
 ### `AppController`
 
@@ -149,11 +150,11 @@ Owns Phase 0 orchestration:
 - hotkey installation;
 - authoritative capture UUID;
 - original target-app capture;
-- start/release coordination;
+- start/finish/cancel coordination;
 - delivery transition;
 - terminal success/cancel/failure cleanup.
 
-It specifically prevents release-during-setup from becoming a late recording session.
+It specifically prevents finish/cancel-during-setup from becoming a late or orphaned recording session.
 
 ### `CapabilityGate`
 
@@ -171,20 +172,22 @@ CloudKit/iCloud gating belongs to M-003 where a real container and entitlements 
 
 ### `PushToTalkHotkey`
 
-A **minimal macOS 27 push-to-talk subsystem**, not a Type4Me-style generalized hotkey manager.
+A **minimal macOS 27 toggle-capture subsystem**, not a Type4Me-style generalized hotkey manager. The type name is retained temporarily to avoid unrelated churn during M-002.
 
 Current behavior:
 
 - session-level `CGEventTap`;
-- current V0 binding `Control + Space`;
+- persisted native shortcut selection, defaulting to solo `Fn / Globe` release;
+- Fn chord rejection: any other key/modifier used while Fn is held cancels the solo candidate and passes the chord through;
 - exact modifier matching;
-- autorepeat suppression;
-- explicit one-hold ownership;
-- release terminates the active hold even if Control is released first;
+- one action per physical press, with autorepeat suppressed;
+- key release only resets press ownership and never changes capture state;
+- first press starts, second press finishes, and `Escape` cancels only while recording;
 - matched shortcut events are consumed;
 - Morie-generated synthetic input is excluded;
-- disabled event tap is re-enabled when native permission is still valid;
-- Accessibility loss blocks the input path.
+- Accessibility trust is checked in the event path and loss immediately releases the tap while passing the current event through;
+- a system-disabled or timed-out tap is released instead of automatically re-enabled, so a Morie failure cannot repeatedly block the system keyboard event chain;
+- recovery after a timeout is explicit through capability recheck.
 
 Not present by design:
 
@@ -194,7 +197,7 @@ Not present by design:
 - modifier-prefix gestures;
 - old macOS compatibility machinery.
 
-The default shortcut itself remains a runtime-validation decision because `Control + Space` may conflict with some input-source configurations.
+The owner-approved default is solo `Fn / Globe` release. Its interaction with the macOS Globe/Fn system action and external keyboards remains a real-device validation item; Settings provides alternate native keyboard combinations.
 
 ### `SpeechPipeline`
 
@@ -210,9 +213,9 @@ An actor owns the Apple-native speech session state:
 - stale-session rejection;
 - resource cleanup.
 
-Speech assets are prepared before Ready so a model download is not started inside an active push-to-talk hold.
+Speech assets are prepared before Ready so a model download is not started inside an active capture.
 
-Normal release stops capture and lets already-captured analyzer input finish before finalization. Cancellation instead terminates analysis immediately. The most recent volatile segment is preserved because the current Speech result contract does not guarantee that each volatile result will later be emitted again as final.
+A finish action stops capture and lets already-captured analyzer input finish before finalization. Cancellation instead terminates analysis immediately. The most recent volatile segment is preserved because the current Speech result contract does not guarantee that each volatile result will later be emitted again as final.
 
 There is no legacy recognition fallback and no provider abstraction.
 
@@ -221,15 +224,31 @@ There is no legacy recognition fallback and no provider abstraction.
 Delivery is intentionally generic and macOS 27 evidence-driven:
 
 - rejects missing/terminated/self target;
+- captures the original on-screen window identity and refuses delivery if that window closes before paste;
 - preserves undelivered transcript on clipboard;
 - restores the original app;
-- performs bounded AX selected-text insertion first;
-- falls back to synthetic Cmd+V;
+- snapshots the clipboard, writes the final transcript, and uses synthetic Cmd+V;
 - tags synthetic key events so Morie's own hotkey path ignores them;
 - snapshots only safe text-like clipboard representations;
 - restores the previous clipboard only when `changeCount` proves no newer user/app clipboard write occurred.
 
 There is no Electron-specific or per-app compatibility branch. Such behavior can be added only after reproduction on macOS 27 and recording the evidence in the active task.
+
+### `CaptureHUD`
+
+Owns a native, non-activating recording surface that does not replace the original target application:
+
+- system `NSPanel` placement and focus behavior;
+- one AppKit `NSGlassEffectView` that embeds the complete HUD content and samples behind the transparent panel;
+- standard bordered system buttons inside that single glass surface;
+- cancel / live microphone level / finish layout;
+- processing, success, and failure feedback;
+- inline delivery fallback feedback that states when the transcript was copied to the clipboard, without a focus-stealing modal alert;
+- animated, labelled successful-input feedback instead of an isolated static status glyph;
+- stationary level feedback when Reduce Motion is enabled;
+- no custom glass imitation or third-party UI.
+
+The microphone waveform is the only custom-drawn control because macOS does not provide a system live-audio waveform component. It renders a complete center-weighted envelope from the first frame—low at both edges and tallest in the middle—then smoothly changes the middle bars with actual microphone level. Its silence threshold and restrained gain curve retain the relevant proven behavior from Type4Me without importing Type4Me's scrolling-history presentation or UI system.
 
 ## Type4Me extraction boundary
 
@@ -239,7 +258,7 @@ Phase 0 reviewed the relevant hotkey/session/audio/injection/Speech behavior, bu
 
 ### ADAPT
 
-- hold/release ownership and repeat suppression;
+- physical key-press ownership and repeat suppression;
 - session-level event handling reliability lessons;
 - one authoritative session identity;
 - stale async result rejection;
@@ -270,7 +289,7 @@ The rule for VERIFY work is:
 
 ## Compile-validation boundary
 
-`.github/workflows/macos-27-build.yml` compiles product changes on GitHub's hosted macOS 27 / Xcode 27 image with signing disabled.
+`.github/workflows/macos-27-ci.yml` compiles product changes on GitHub's hosted macOS 27 / Xcode 27 image with signing disabled. `.github/workflows/macos-27-package.yml` produces the test artifact.
 
 This protects the repository from drifting away from the actual macOS 27 SDK/Swift 6 compiler and has already caught a strict-concurrency issue in the native Accessibility bridge.
 

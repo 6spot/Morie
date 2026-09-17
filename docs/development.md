@@ -15,7 +15,7 @@ Morie intentionally does not support older Macs by adding alternate ASR/LLM runt
 ## Open and build
 
 1. Clone `https://github.com/6spot/Morie.git`.
-2. Check out the active task branch, currently `phase0/input-foundation`.
+2. Create or check out a task branch from current `main`.
 3. Open `Morie.xcodeproj` in Xcode.
 4. Select the `Morie` target.
 5. Configure your Development Team if Xcode requests signing configuration.
@@ -38,7 +38,7 @@ Disabling signing here is for compile validation only; normal local launch/distr
 
 ## CI compile gate
 
-`.github/workflows/macos-27-build.yml` compiles product changes on GitHub's `xcode-27` hosted environment.
+`.github/workflows/macos-27-ci.yml` compiles product changes on GitHub's `xcode-27` hosted environment. `.github/workflows/macos-27-package.yml` creates the test artifact.
 
 The CI gate exists to catch:
 
@@ -63,6 +63,10 @@ The app should surface capability failures rather than silently degrading to a t
 
 If permissions were denied during development, use macOS System Settings to restore access before retesting. When testing permission onboarding behavior itself, reset the relevant app permission state using normal macOS developer/test procedures.
 
+Morie's blocked-state alert provides **Open System Settings** for Microphone, Speech Recognition, and Accessibility failures. Microphone and Speech show native consent prompts only while their TCC status is undetermined; after denial, macOS requires the user to re-enable them in System Settings. Accessibility always requires the user to enable Morie in the system list. After changing a permission, choose **Recheck Capabilities** from the menu-bar panel.
+
+The menu-bar panel also keeps an **Open System Settings** recovery action visible while a permission-backed capability is blocked; **Recheck Capabilities** cannot itself re-prompt a permission whose TCC status is already denied.
+
 ## Native debug window
 
 Morie includes a native `Morie Debug` window for Phase 0 runtime diagnosis.
@@ -73,14 +77,17 @@ It currently traces:
 
 - launch/bootstrap start and Ready/blocked state;
 - Apple Intelligence, Speech, microphone, Speech authorization, and Accessibility checks;
-- global `Control + Space` event-tap installation, accepted keyDown/keyUp, repeats, and tap recovery;
+- configured global-shortcut event-tap installation, solo Fn candidate/release/chord rejection, accepted key events, repeats, and tap recovery;
 - capture session identity and original target app/bundle identifier;
 - Speech asset preparation, microphone/provider/analyzer lifecycle, partial/final result lengths, stop/cancel/failure;
+- microphone meter channel count, average/peak power, normalized HUD level, and warnings when channels are missing or remain pinned at the floor;
 - target activation and Accessibility insertion result;
 - clipboard fallback, synthetic Cmd+V dispatch, and clipboard restoration result;
 - native alerts and terminal session state.
 
 Privacy rule: diagnostics do **not** record the full transcript by default. They record character counts and lifecycle/error metadata instead.
+
+Diagnostics are also persisted for the current app launch at `~/Library/Logs/Morie/morie-debug.log`. The file is recreated at launch, **Clear** truncates both the window and file, and **Show Log File** reveals it in Finder. This runtime file is outside the repository and must not be committed.
 
 The window provides:
 
@@ -93,11 +100,11 @@ Recommended defect reproduction flow:
 2. open **Morie Debug**;
 3. press **Clear** if necessary;
 4. focus the target text field in another app;
-5. hold `Control + Space`, speak, then release;
+5. activate the configured shortcut (solo Fn release by default), speak, then activate it again to finish;
 6. return to the debug window and use **Copy All**;
 7. attach/paste the log with the observed behavior.
 
-If no `Hotkey` keyDown entry appears after a physical `Control + Space`, diagnose the event-tap/shortcut path before investigating Speech or text injection. If Speech entries appear but no Delivery entries do, diagnose finalization/session lifecycle. If Delivery entries appear, the log identifies whether AX insertion or clipboard fallback was used.
+If no accepted Hotkey entry appears after the configured shortcut, diagnose the event-tap/shortcut path before investigating Speech or text injection. For Fn, distinguish `press began`, `solo release accepted`, and `candidate cancelled` entries. If Speech entries appear but no Delivery entries do, diagnose finalization/session lifecycle.
 
 ## Current manual smoke test
 
@@ -105,15 +112,15 @@ If no `Hotkey` keyDown entry appears after a physical `Control + Space`, diagnos
 2. Confirm the menu bar item reaches `Ready` on a supported system.
 3. Open `Morie Debug` and confirm bootstrap/capability/hotkey-install entries are present.
 4. Place the caret in another application.
-5. Hold `Control + Space`.
+5. Press and release `Fn / Globe` once (or use the configured alternate binding).
 6. Speak a short phrase.
-7. Release `Control + Space`.
+7. Activate the same shortcut again to finish.
 8. Verify the original app regains focus and receives the final text.
 9. Verify the debug log contains the corresponding Hotkey → Session → Speech → Delivery path.
-10. Repeat several times, including short taps, rapid repeated holds, and Chinese/English mixed content where relevant.
+10. Repeat several times, including rapid toggles, `Escape` cancellation, HUD cancel/finish, and Chinese/English mixed content where relevant.
 11. Verify the previous clipboard content is restored after clipboard fallback unless another app/user changed the clipboard meanwhile.
 
-Also validate release during startup/session setup: releasing the shortcut must not allow a late microphone session to start afterward.
+Also request finish and cancellation during startup/session setup: neither may allow a late orphaned microphone session afterward.
 
 A successful smoke test is not the full acceptance test. Complete [`validation.md`](./validation.md) before Phase 0 is considered done.
 
@@ -133,9 +140,9 @@ After implementation, update code and task documentation together.
 
 Use feature/task branches. Do not implement directly on `main`.
 
-Current convention can remain simple:
+Branch naming can remain simple:
 
-- `phase0/input-foundation`
+- `phase0/<focused-change>`
 - future examples: `phase1/capture-store`, `phase2/relevant-context`
 
 Task IDs remain stable in docs even if branch naming evolves.
@@ -194,7 +201,7 @@ Phase 0 diagnostics must make the following distinguishable without logging priv
 - Speech asset availability/download failure;
 - transcription finalization failure;
 - focus restore failure;
-- AX insertion failure and clipboard fallback;
+- clipboard staging, synthetic paste, and safe restoration;
 - delivery success/failure;
 - latency checkpoints as they are added.
 

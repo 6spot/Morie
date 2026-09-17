@@ -123,7 +123,9 @@ See [`reference/type4me.md`](./reference/type4me.md).
 
 Validate the core daily input loop:
 
-`hold → speak → release → transcript → restore focus → inject text`
+`press → speak → press again → transcript → restore focus → inject text`
+
+Toggle capture is the approved V0 interaction: releasing the shortcut does not stop recording, a second press finishes, and `Escape` cancels an active recording. The non-activating capture HUD exposes the same cancel/finish actions without stealing focus.
 
 Scope includes:
 

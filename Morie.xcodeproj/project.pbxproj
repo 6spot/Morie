@@ -170,7 +170,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morie needs microphone access for intentional push-to-talk capture.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morie needs microphone access for intentional toggle voice capture.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morie uses Apple Speech to transcribe your intentional voice captures on device.";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 0.1.0;
@@ -189,7 +189,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morie needs microphone access for intentional push-to-talk capture.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morie needs microphone access for intentional toggle voice capture.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morie uses Apple Speech to transcribe your intentional voice captures on device.";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 0.1.0;

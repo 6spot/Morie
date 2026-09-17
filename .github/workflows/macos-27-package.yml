@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - phase0/input-foundation
+      - main
     paths:
       - ".github/package-request"
 

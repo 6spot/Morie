@@ -85,9 +85,11 @@ Capture...
 第一阶段只做 macOS，并把最关键的价值链一次跑通。iOS 不与 macOS 并行开发，避免在核心体验尚未验证前引入移动端生命周期、Action Button、AppIntent 等额外变量。
 
 ```text
-按住快捷键
+第一次按下快捷键
   ↓
 开始录音
+  ↓
+第二次按下完成（Esc 取消）
   ↓
 Apple Speech
   ↓
@@ -458,7 +460,7 @@ Type4Me 对 Morie 最有价值的是“输入基础设施已经踩过的坑”�
 
 | 阶段 | 主题 | 验收结果 | 主要范围 |
 | --- | --- | --- | --- |
-| Phase 0 | Input Foundation | 按住 → 说话 → 松开 → 文本在主流目标 App 中稳定进入当前输入位置 | Type4Me reference audit / Audio / Session / Hotkey / latest Speech / Focus / Injection / Capability Gate / Compatibility Matrix / native macOS 27 UI |
+| Phase 0 | Input Foundation | 按下 → 说话 → 再次按下 → 文本在主流目标 App 中稳定进入当前输入位置 | Type4Me reference audit / Audio / Session / Hotkey / latest Speech / Focus / Injection / Capability Gate / Compatibility Matrix / native macOS 27 UI |
 | Phase 1 | Capture | 所有主动表达可可靠沉淀 | Capture Model / Store / App Context / History / iCloud |
 | Phase 2 | Memory | 系统开始稳定认识用户的专有词、项目与当前相关上下文 | Vocabulary / Project / Relevant Context Retrieval；Person / Decision / Style 先保留数据模型，不要求一次做完 |
 | Phase 3 | Personalization | 历史 Context 明显改善当前表达 | Context-aware Correction / Style / Rewrite / Learning |

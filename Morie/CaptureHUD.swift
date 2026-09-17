@@ -8,15 +8,15 @@ final class CaptureHUDController {
     private var hideTask: Task<Void, Never>?
 
     private enum Layout {
-        static let capsuleWidth: CGFloat = 180
-        static let capsuleHeight: CGFloat = 24
-        static let shadowInset: CGFloat = 8
+        static let contentWidth: CGFloat = 142
+        static let contentHeight: CGFloat = 34
+        static let effectInset: CGFloat = 6
         static let bottomOffset: CGFloat = 48
 
         static var panelSize: NSSize {
             NSSize(
-                width: capsuleWidth + shadowInset * 2,
-                height: capsuleHeight + shadowInset * 2
+                width: contentWidth + effectInset * 2,
+                height: contentHeight + effectInset * 2
             )
         }
     }
@@ -54,12 +54,25 @@ final class CaptureHUDController {
 
     func showSuccess() {
         hideTask?.cancel()
-        model.phase = .success
+        model.showFeedback(.success)
         showPanel()
-        Diagnostics.record("HUD", "Compact capture HUD showing success")
+        Diagnostics.record("HUD", "Compact capture HUD showing animated input success")
 
         hideTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(for: .milliseconds(850))
+            guard !Task.isCancelled else { return }
+            self?.hide()
+        }
+    }
+
+    func showClipboardFallback() {
+        hideTask?.cancel()
+        model.showFeedback(.clipboardFallback)
+        showPanel()
+        Diagnostics.record("HUD", "Compact capture HUD showing clipboard fallback", level: .warning)
+
+        hideTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
             self?.hide()
         }
@@ -95,7 +108,7 @@ final class CaptureHUDController {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.12
+                context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.14
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 panel.animator().alphaValue = 1
             }
@@ -125,11 +138,32 @@ final class CaptureHUDController {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.animationBehavior = .utilityWindow
 
+        let rootView = NSView(frame: NSRect(origin: .zero, size: size))
+        rootView.autoresizingMask = [.width, .height]
+
+        let glassFrame = NSRect(
+            x: Layout.effectInset,
+            y: Layout.effectInset,
+            width: Layout.contentWidth,
+            height: Layout.contentHeight
+        )
+        let glassView = NSGlassEffectView(frame: glassFrame)
+        glassView.autoresizingMask = []
+        glassView.style = .regular
+        glassView.cornerRadius = Layout.contentHeight / 2
+        glassView.tintColor = NSColor.black.withAlphaComponent(0.38)
+        glassView.effectIsInteractive = true
+
         let hostingView = NSHostingView(rootView: CaptureHUDView(model: model))
         hostingView.sizingOptions = []
-        hostingView.frame = NSRect(origin: .zero, size: size)
+        hostingView.frame = NSRect(
+            origin: .zero,
+            size: NSSize(width: Layout.contentWidth, height: Layout.contentHeight)
+        )
         hostingView.autoresizingMask = [.width, .height]
-        panel.contentView = hostingView
+        glassView.contentView = hostingView
+        rootView.addSubview(glassView)
+        panel.contentView = rootView
 
         return panel
     }
@@ -146,7 +180,7 @@ final class CaptureHUDController {
         let frame = panel.frame
         let origin = NSPoint(
             x: (visibleFrame.midX - frame.width / 2).rounded(),
-            y: (visibleFrame.minY + Layout.bottomOffset - Layout.shadowInset).rounded()
+            y: (visibleFrame.minY + Layout.bottomOffset - Layout.effectInset).rounded()
         )
 
         panel.setFrameOrigin(origin)
@@ -163,11 +197,13 @@ private final class CaptureHUDModel: ObservableObject {
         case recording
         case processing
         case success
+        case clipboardFallback
         case failure
     }
 
     @Published var phase: Phase = .recording
     @Published private(set) var recordingGeneration = UUID()
+    @Published private(set) var feedbackGeneration = 0
 
     let audioLevel = CaptureAudioLevelMeter()
 
@@ -188,6 +224,11 @@ private final class CaptureHUDModel: ObservableObject {
         audioLevel.current = 0
     }
 
+    func showFeedback(_ feedback: Phase) {
+        feedbackGeneration += 1
+        phase = feedback
+    }
+
     func cancel() {
         Diagnostics.record("HUD", "Cancel button pressed")
         onCancel?()
@@ -202,44 +243,28 @@ private final class CaptureHUDModel: ObservableObject {
 @MainActor
 private struct CaptureHUDView: View {
     @ObservedObject var model: CaptureHUDModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Layout {
-        static let capsuleWidth: CGFloat = 180
-        static let capsuleHeight: CGFloat = 24
-        static let shadowInset: CGFloat = 8
-        static let controlLaneWidth: CGFloat = 32
-        static let controlVisualSize: CGFloat = 15
-        static let waveformBarWidth: CGFloat = 2
-        static let waveformMinHeight: CGFloat = 2
-        static let waveformMaxHeight: CGFloat = 18
-    }
+        static let contentWidth: CGFloat = 142
+        static let contentHeight: CGFloat = 34
+        static let contentInset: CGFloat = 3
+        static let controlLaneWidth: CGFloat = 28
+        static let controlVisualSize: CGFloat = 20
+        static let waveformLaneWidth: CGFloat = 80
+        static let waveformWidth: CGFloat = 56
+        static let waveformHeight: CGFloat = 20
+        static let waveformInset: CGFloat = 2
+        static let waveformBarWidth: CGFloat = 2.5
+        static let waveformMinHeight: CGFloat = 3
+        static let waveformMaxHeight: CGFloat = 16
 
-    private let background = Color(
-        red: 17.0 / 255.0,
-        green: 18.0 / 255.0,
-        blue: 20.0 / 255.0
-    )
-    private let border = Color(
-        red: 38.0 / 255.0,
-        green: 39.0 / 255.0,
-        blue: 41.0 / 255.0
-    )
+        static let innerHeight = contentHeight - contentInset * 2
+    }
 
     var body: some View {
         phaseContent
-            .frame(width: Layout.capsuleWidth, height: Layout.capsuleHeight)
-            .background(background, in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(border, lineWidth: 0.5)
-            }
-            .shadow(color: .black.opacity(0.30), radius: 6, y: 2)
-            .padding(Layout.shadowInset)
-            .frame(
-                width: Layout.capsuleWidth + Layout.shadowInset * 2,
-                height: Layout.capsuleHeight + Layout.shadowInset * 2
-            )
-            .environment(\.colorScheme, .dark)
+            .frame(width: Layout.contentWidth, height: Layout.contentHeight)
     }
 
     @ViewBuilder
@@ -247,184 +272,193 @@ private struct CaptureHUDView: View {
         switch model.phase {
         case .recording:
             HStack(spacing: 0) {
-                compactButton(
-                    systemImage: "xmark",
-                    foreground: .white,
-                    background: Color(red: 51.0 / 255.0, green: 51.0 / 255.0, blue: 51.0 / 255.0),
-                    accessibilityLabel: "取消录音",
-                    action: model.cancel
-                )
-                .frame(width: Layout.controlLaneWidth, height: Layout.capsuleHeight)
+                Button(action: model.cancel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: Layout.controlVisualSize, height: Layout.controlVisualSize)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .controlSize(.small)
+                .tint(.black.opacity(0.58))
+                .frame(width: Layout.controlLaneWidth, height: Layout.innerHeight)
+                .accessibilityLabel("取消录音")
+                .help("取消录音")
 
                 CompactWaveform(
                     meter: model.audioLevel,
+                    reduceMotion: reduceMotion,
                     barWidth: Layout.waveformBarWidth,
                     minHeight: Layout.waveformMinHeight,
                     maxHeight: Layout.waveformMaxHeight
                 )
                 .id(model.recordingGeneration)
-                .frame(maxWidth: .infinity, maxHeight: Layout.capsuleHeight)
-
-                compactButton(
-                    systemImage: "checkmark",
-                    foreground: background,
-                    background: Color(red: 251.0 / 255.0, green: 251.0 / 255.0, blue: 251.0 / 255.0),
-                    accessibilityLabel: "完成录音",
-                    action: model.confirm
+                .frame(
+                    width: Layout.waveformWidth - Layout.waveformInset * 2,
+                    height: Layout.waveformHeight - Layout.waveformInset * 2
                 )
-                .frame(width: Layout.controlLaneWidth, height: Layout.capsuleHeight)
+                .padding(Layout.waveformInset)
+                .frame(width: Layout.waveformWidth, height: Layout.waveformHeight)
+                .frame(width: Layout.waveformLaneWidth, height: Layout.innerHeight)
+                .accessibilityLabel("麦克风输入电平")
+
+                Button(action: model.confirm) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(width: Layout.controlVisualSize, height: Layout.controlVisualSize)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.circle)
+                .controlSize(.small)
+                .tint(.white.opacity(0.94))
+                .frame(width: Layout.controlLaneWidth, height: Layout.innerHeight)
+                .accessibilityLabel("完成录音")
+                .help("完成录音")
             }
+            .frame(
+                width: Layout.contentWidth - Layout.contentInset * 2,
+                height: Layout.innerHeight
+            )
+            .padding(Layout.contentInset)
 
         case .processing:
             ProgressView()
-                .controlSize(.mini)
-                .tint(.white)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .controlSize(.small)
+                .frame(width: Layout.waveformWidth, height: Layout.waveformHeight)
+                .accessibilityLabel("正在处理录音")
 
         case .success:
-            Image(systemName: "checkmark")
+            Label("已输入", systemImage: "checkmark.circle.fill")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.green)
+                .symbolEffect(.bounce, value: model.feedbackGeneration)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityLabel("文字已输入")
+
+        case .clipboardFallback:
+            Label("已复制到剪贴板", systemImage: "doc.on.clipboard.fill")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.primary)
+                .symbolEffect(.bounce, value: model.feedbackGeneration)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityLabel("输入位置不可用，文字已复制到剪贴板")
 
         case .failure:
             Image(systemName: "exclamationmark")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.red)
+                .frame(width: Layout.waveformWidth, height: Layout.waveformHeight)
+                .accessibilityLabel("录音失败")
         }
     }
-
-    private func compactButton(
-        systemImage: String,
-        foreground: Color,
-        background: Color,
-        accessibilityLabel: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Circle()
-                .fill(background)
-                .frame(width: Layout.controlVisualSize, height: Layout.controlVisualSize)
-                .overlay {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 7.5, weight: .bold))
-                        .foregroundStyle(foreground)
-                }
-                .frame(width: Layout.controlLaneWidth, height: Layout.capsuleHeight)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel)
-    }
-}
-
-private struct CompactWaveSample {
-    let height: CGFloat
-    let isActive: Bool
 }
 
 @MainActor
-private final class CompactWaveHistory {
-    var samples: [CompactWaveSample] = []
-    var lastSampleTime: TimeInterval = 0
+private final class CompactWaveDynamics {
+    private var displayedLevel: CGFloat = 0
+    private var previousTarget: CGFloat = 0
+    private var lastFrameTime: TimeInterval = 0
+    private var lastSampleTime: TimeInterval = 0
+    private var recentLevels = Array(repeating: CGFloat.zero, count: 11)
 
-    private let sampleInterval: TimeInterval = 0.085
-    private let maxSamples = 64
+    func update(currentTime: TimeInterval, rawLevel: Double, reduceMotion: Bool) -> [CGFloat] {
+        if lastFrameTime == 0 {
+            lastFrameTime = currentTime
+        }
 
-    func update(
-        currentTime: TimeInterval,
-        level: Double,
-        minHeight: CGFloat,
-        maxHeight: CGFloat
-    ) -> CGFloat {
-        if lastSampleTime == 0 {
+        let elapsed = min(max(currentTime - lastFrameTime, 0), 0.1)
+        lastFrameTime = currentTime
+        let normalized = max(0, min(1, CGFloat(rawLevel)))
+        // Preserve quiet speech while still mapping normal speech across most
+        // of the available height.
+        let threshold: CGFloat = 0.10
+        let ceiling: CGFloat = 0.88
+        let baseTarget = normalized <= threshold
+            ? 0
+            : pow(min(1, (normalized - threshold) / (ceiling - threshold)), 0.78)
+        // Rapid changes are themselves meaningful voice information. A short
+        // transient accent makes consonants feel immediate without inventing
+        // motion during silence.
+        let transient = min(1, abs(baseTarget - previousTarget) * 2.4)
+        previousTarget = baseTarget
+        let target = min(1, baseTarget + transient * 0.28)
+
+        guard !reduceMotion else {
+            displayedLevel = target
+            return Array(repeating: displayedLevel, count: recentLevels.count)
+        }
+
+        // Preserve continuity between 40 Hz microphone samples, but converge
+        // within roughly one rendered frame so consonants do not turn into a
+        // slow decorative pulse.
+        let response = target > displayedLevel ? 140.0 : 95.0
+        let blend = 1 - exp(-response * CGFloat(elapsed))
+        displayedLevel += (target - displayedLevel) * blend
+
+        if lastSampleTime == 0 || currentTime - lastSampleTime >= 1.0 / 60.0 {
+            recentLevels.insert(displayedLevel, at: 0)
+            recentLevels.removeLast()
             lastSampleTime = currentTime
         }
 
-        let elapsed = currentTime - lastSampleTime
-        if elapsed >= sampleInterval {
-            let steps = Int(elapsed / sampleInterval)
-            let normalized = max(0, min(1, CGFloat(level)))
-            let silenceThreshold: CGFloat = 0.025
-
-            for _ in 0..<min(steps, 10) {
-                let sample: CompactWaveSample
-                if normalized <= silenceThreshold {
-                    sample = CompactWaveSample(height: minHeight, isActive: false)
-                } else {
-                    let effective = (normalized - silenceThreshold) / (1 - silenceThreshold)
-                    // Audio-derived visual gain only: preserve the real level shape while
-                    // expanding normal speaking dynamics so the compact meter is legible.
-                    let visualEnergy = min(1, pow(effective, 0.55) * 1.18)
-                    let height = minHeight + visualEnergy * (maxHeight - minHeight)
-                    sample = CompactWaveSample(
-                        height: min(maxHeight, max(minHeight + 1, height)),
-                        isActive: true
-                    )
-                }
-
-                samples.insert(sample, at: 0)
-                if samples.count > maxSamples {
-                    samples.removeLast()
-                }
-            }
-
-            lastSampleTime += Double(steps) * sampleInterval
-        }
-
-        return CGFloat(max(0, min(1, (currentTime - lastSampleTime) / sampleInterval)))
+        return recentLevels
     }
 }
 
 private struct CompactWaveform: View {
     let meter: CaptureAudioLevelMeter
+    let reduceMotion: Bool
     let barWidth: CGFloat
     let minHeight: CGFloat
     let maxHeight: CGFloat
 
-    @State private var history = CompactWaveHistory()
+    @State private var dynamics = CompactWaveDynamics()
+
+    // Matches the reference's immediate visual rhythm: quiet edges, an
+    // irregular speech-like rise, and one clear center peak. The live meter
+    // expands this profile instead of waiting for history to scroll in.
+    private let profile: [CGFloat] = [
+        0.22, 0.38, 0.55, 0.74, 0.60, 1.00,
+        0.68, 0.82, 0.51, 0.34, 0.20,
+    ]
+
+    // Center is the newest sample. Moving away from center walks backward
+    // through different moments rather than mirroring one shared scalar.
+    private let sampleOrder = [10, 8, 6, 4, 2, 0, 1, 3, 5, 7, 9]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
             Canvas { context, size in
                 let time = timeline.date.timeIntervalSinceReferenceDate
-                let fraction = history.update(
+                let levels = dynamics.update(
                     currentTime: time,
-                    level: meter.current,
-                    minHeight: minHeight,
-                    maxHeight: maxHeight
+                    rawLevel: meter.current,
+                    reduceMotion: reduceMotion
                 )
-
-                let pitch: CGFloat = 4.5
+                let pitch: CGFloat = 4.95
                 guard size.width >= barWidth else { return }
 
-                let rightEdge = size.width - 1 - fraction * pitch
-                let totalColumns = Int(ceil((size.width + pitch) / pitch)) + 1
-                let activeColor = Color.white
-                let inactiveColor = Color(
-                    red: 138.0 / 255.0,
-                    green: 138.0 / 255.0,
-                    blue: 138.0 / 255.0
-                )
+                let totalColumns = profile.count
+                let usedWidth = CGFloat(totalColumns - 1) * pitch + barWidth
+                let leading = (size.width - usedWidth) / 2
 
                 for index in 0..<totalColumns {
-                    let x = rightEdge - CGFloat(index) * pitch
-                    guard x >= -barWidth && x <= size.width else { continue }
-
-                    let barHeight: CGFloat
-                    let color: Color
-                    if index < history.samples.count {
-                        let sample = history.samples[index]
-                        barHeight = sample.height
-                        color = sample.isActive ? activeColor : inactiveColor
-                    } else {
-                        barHeight = minHeight
-                        color = inactiveColor
-                    }
+                    let envelope = profile[index]
+                    let historicalLevel = levels[sampleOrder[index]]
+                    // Keep the recognizable center-weighted resting silhouette,
+                    // but reserve most of the available height for live speech.
+                    let restingHeight = minHeight + envelope * 1.5
+                    // Edge bars remain alive while the center retains the
+                    // largest travel. Avoid a symmetric dead-zone at either end.
+                    let activityWeight = 0.34 + 0.66 * pow(envelope, 1.55)
+                    let barHeight = restingHeight
+                        + activityWeight * historicalLevel * (maxHeight - restingHeight)
+                    let color: Color = levels[0] > 0.01 ? .primary : .secondary
 
                     let rect = CGRect(
-                        x: x,
+                        x: leading + CGFloat(index) * pitch,
                         y: (size.height - barHeight) / 2,
                         width: barWidth,
                         height: barHeight

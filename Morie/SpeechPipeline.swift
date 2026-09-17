@@ -105,20 +105,20 @@ actor SpeechPipeline {
                         volatileText = ""
                         Diagnostics.record(
                             "Speech",
-                            "Final result for \(session); text=\"\(text)\"; accumulated=\"\(finalizedText)\""
+                            "Final result for \(session); segmentCharacters=\(text.count), accumulatedCharacters=\(finalizedText.count)"
                         )
                     } else {
                         volatileText = text
                         Diagnostics.record(
                             "Speech",
-                            "Volatile result for \(session); text=\"\(text)\""
+                            "Volatile result for \(session); characters=\(text.count)"
                         )
                     }
 
                     let combined = join(finalizedText, volatileText)
                     Diagnostics.record(
                         "SpeechText",
-                        "Session \(session) transcript=\"\(combined)\""
+                        "Session \(session) transcriptCharacters=\(combined.count)"
                     )
                     onTranscript(sessionID, combined)
                 }
@@ -193,7 +193,7 @@ actor SpeechPipeline {
             try requireActiveSession(sessionID)
 
             let final = join(finalizedText, volatileText)
-            Diagnostics.record("Speech", "Normal stop completed for \(session); finalText=\"\(final)\"")
+            Diagnostics.record("Speech", "Normal stop completed for \(session); finalCharacters=\(final.count)")
             reset(sessionID: sessionID)
             return final
         } catch {
@@ -249,20 +249,61 @@ actor SpeechPipeline {
         levelTask = Task {
             Diagnostics.record("Speech", "Native microphone level polling started for \(session)")
             var sampleCount = 0
+            var floorSampleCount = 0
+            var didReportMissingChannels = false
+            var didReportPinnedFloor = false
 
             while !Task.isCancelled {
                 guard activeSessionID == sessionID else { return }
 
-                let channels = provider.captureSession.connections.flatMap(\.audioChannels)
+                // Read the connection owned by the provider's audio output first.
+                // A capture session can contain connections that do not expose the
+                // live microphone channels used by SpeechAnalyzer.
+                let outputChannels = provider.captureAudioDataOutput
+                    .connection(with: .audio)?
+                    .audioChannels ?? []
+                let channels = outputChannels.isEmpty
+                    ? provider.captureSession.connections.flatMap(\.audioChannels)
+                    : outputChannels
                 let averagePower = channels.map(\.averagePowerLevel).max() ?? -60
                 let peakPower = channels.map(\.peakHoldLevel).max() ?? -60
-                let normalized = Self.normalizedPower(averagePower)
+                let averageLevel = Self.normalizedPower(averagePower)
+                let peakLevel = Self.normalizedPower(peakPower)
+                // Average power carries the visible envelope. Peak-hold changes
+                // more slowly, so use only a small part of its excess as transient
+                // emphasis; taking max/most of peak pins ordinary speech near 1.
+                let peakAccent = max(0, peakLevel - averageLevel) * 0.15
+                let normalized = min(1, averageLevel + peakAccent)
 
                 // Keep the audio signal raw here. The HUD owns visual shaping/history;
                 // pre-smoothing at the capture layer makes normal speech look flat.
                 onAudioLevel(sessionID, normalized)
 
                 sampleCount += 1
+                if channels.isEmpty, !didReportMissingChannels, sampleCount >= 5 {
+                    didReportMissingChannels = true
+                    Diagnostics.record(
+                        "Audio",
+                        "Meter \(session) has no audio channels after capture started; HUD cannot receive microphone level",
+                        level: .warning
+                    )
+                }
+
+                if channels.isEmpty || (averagePower <= -59.9 && peakPower <= -59.9) {
+                    floorSampleCount += 1
+                } else {
+                    floorSampleCount = 0
+                }
+
+                if floorSampleCount >= 125, !didReportPinnedFloor {
+                    didReportPinnedFloor = true
+                    Diagnostics.record(
+                        "Audio",
+                        "Meter \(session) remained at its floor for 2 seconds while capture was running",
+                        level: .warning
+                    )
+                }
+
                 if sampleCount.isMultiple(of: 20) {
                     let averageText = String(format: "%.1f", averagePower)
                     let peakText = String(format: "%.1f", peakPower)
@@ -273,15 +314,21 @@ actor SpeechPipeline {
                     )
                 }
 
-                try? await Task.sleep(for: .milliseconds(50))
+                // 60 Hz keeps short syllables and consonants visible without
+                // coupling rendering to every audio callback.
+                try? await Task.sleep(for: .milliseconds(16))
             }
         }
     }
 
     private static func normalizedPower(_ decibels: Float) -> Double {
-        let floor: Float = -60
-        let clamped = min(max(decibels, floor), 0)
-        return Double((clamped - floor) / -floor)
+        // The built-in microphone reports ordinary speech roughly in this
+        // range. Reserving values below -42 dB for quiet and above -6 dB for
+        // loud speech gives the HUD useful travel instead of crowding it at 1.
+        let floor: Float = -42
+        let ceiling: Float = -6
+        let clamped = min(max(decibels, floor), ceiling)
+        return Double((clamped - floor) / (ceiling - floor))
     }
 
     private func requireActiveSession(_ sessionID: UUID) throws {

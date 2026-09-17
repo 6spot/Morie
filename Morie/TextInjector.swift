@@ -4,6 +4,7 @@ import Foundation
 struct TextInjector {
     enum InjectionError: LocalizedError {
         case noTargetApplication
+        case targetWindowClosed
         case focusRestoreFailed
         case pasteFailed
 
@@ -11,6 +12,8 @@ struct TextInjector {
             switch self {
             case .noTargetApplication:
                 "The original target application is unavailable. The transcript was copied to the clipboard."
+            case .targetWindowClosed:
+                "The original input window was closed. The transcript was copied to the clipboard."
             case .focusRestoreFailed:
                 "Could not restore focus to the original application. The transcript was copied to the clipboard."
             case .pasteFailed:
@@ -22,6 +25,9 @@ struct TextInjector {
     private static let syntheticInputEventMarker = Int64.random(in: 1...Int64.max)
     private static let focusHandoffDelay: Duration = .milliseconds(100)
     private static let clipboardRestoreDelay: Duration = .milliseconds(500)
+    private static let transientPasteboardType = NSPasteboard.PasteboardType(
+        "org.nspasteboard.TransientType"
+    )
 
     static func markAsSyntheticInput(_ event: CGEvent) {
         event.setIntegerValueField(.eventSourceUserData, value: syntheticInputEventMarker)
@@ -32,7 +38,29 @@ struct TextInjector {
     }
 
     @MainActor
-    func deliver(_ text: String, to application: NSRunningApplication?) async throws {
+    static func frontmostWindowNumber(for application: NSRunningApplication?) -> CGWindowID? {
+        guard let application,
+              let windows = CGWindowListCopyWindowInfo(
+                [.optionOnScreenOnly, .excludeDesktopElements],
+                kCGNullWindowID
+              ) as? [[CFString: Any]]
+        else { return nil }
+
+        return windows.first { window in
+            let ownerPID = window[kCGWindowOwnerPID] as? NSNumber
+            let layer = window[kCGWindowLayer] as? NSNumber
+            return ownerPID?.int32Value == application.processIdentifier
+                && layer?.intValue == 0
+        }
+        .flatMap { ($0[kCGWindowNumber] as? NSNumber)?.uint32Value }
+    }
+
+    @MainActor
+    func deliver(
+        _ text: String,
+        to application: NSRunningApplication?,
+        originalWindowNumber: CGWindowID?
+    ) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             Diagnostics.record("Delivery", "deliver() received empty text; returning", level: .warning)
@@ -54,9 +82,20 @@ struct TextInjector {
 
         let targetName = application.localizedName ?? "unknown"
         let targetBundle = application.bundleIdentifier ?? "unknown"
+
+        if let originalWindowNumber, !Self.windowExists(originalWindowNumber) {
+            Diagnostics.record(
+                "Delivery",
+                "Original target window \(originalWindowNumber) no longer exists; preserving transcript on clipboard",
+                level: .error
+            )
+            copyToClipboard(text)
+            throw InjectionError.targetWindowClosed
+        }
+
         Diagnostics.record("Delivery", "Restoring target application \(targetName) (\(targetBundle))")
 
-        let activated = application.activate(options: [.activateIgnoringOtherApps])
+        let activated = application.activate()
         Diagnostics.record("Delivery", "Target activation returned \(activated)")
         guard activated else {
             copyToClipboard(text)
@@ -65,6 +104,16 @@ struct TextInjector {
 
         try await Task.sleep(for: Self.focusHandoffDelay)
         Diagnostics.record("Delivery", "Focus handoff grace period completed")
+
+        if let originalWindowNumber, !Self.windowExists(originalWindowNumber) {
+            Diagnostics.record(
+                "Delivery",
+                "Original target window \(originalWindowNumber) closed during focus handoff; preserving transcript on clipboard",
+                level: .error
+            )
+            copyToClipboard(text)
+            throw InjectionError.targetWindowClosed
+        }
 
         // Morie intentionally uses one generic delivery mechanism for current-app
         // insertion. Direct AX writes can report success while some editors ignore
@@ -86,14 +135,29 @@ struct TextInjector {
         Diagnostics.record("Delivery", "Clipboard Cmd+V delivery dispatched")
     }
 
+    private static func windowExists(_ windowNumber: CGWindowID) -> Bool {
+        guard let windows = CGWindowListCopyWindowInfo(
+            [.optionIncludingWindow, .excludeDesktopElements],
+            windowNumber
+        ) as? [[CFString: Any]] else { return false }
+
+        return windows.contains { window in
+            (window[kCGWindowNumber] as? NSNumber)?.uint32Value == windowNumber
+        }
+    }
+
     @MainActor
     private func pasteThroughClipboard(_ text: String) async -> Bool {
         let pasteboard = NSPasteboard.general
         let snapshot = ClipboardSnapshot.capture(from: pasteboard)
         Diagnostics.record("Clipboard", "Captured restorable clipboard snapshot; items=\(snapshot.itemCount)")
 
+        let temporaryItem = NSPasteboardItem()
+        temporaryItem.setString(text, forType: .string)
+        temporaryItem.setData(Data(), forType: Self.transientPasteboardType)
+
         pasteboard.clearContents()
-        guard pasteboard.setString(text, forType: .string) else {
+        guard pasteboard.writeObjects([temporaryItem]) else {
             Diagnostics.record("Clipboard", "Failed to write transcript to pasteboard", level: .error)
             return false
         }
@@ -182,7 +246,13 @@ private struct ClipboardSnapshot: Sendable {
             return false
         }
 
-        guard !items.isEmpty else { return false }
+        // An empty clipboard is still a valid snapshot. After a successful
+        // temporary paste, clear Morie's transcript so it does not become the
+        // user's new clipboard contents.
+        guard !items.isEmpty else {
+            pasteboard.clearContents()
+            return true
+        }
 
         pasteboard.clearContents()
         let restored = items.map { item -> NSPasteboardItem in
@@ -190,6 +260,10 @@ private struct ClipboardSnapshot: Sendable {
             for (rawType, data) in item.values {
                 pasteboardItem.setData(data, forType: NSPasteboard.PasteboardType(rawType))
             }
+            pasteboardItem.setData(
+                Data(),
+                forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
+            )
             return pasteboardItem
         }
 

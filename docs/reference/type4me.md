@@ -92,15 +92,23 @@ Primary reference:
 - `Type4MeTests/HotkeyStateMachineTests.swift`
 - relevant review/development reports
 
-Morie requirement is currently a focused push-to-talk interaction, not Type4Me's generalized hotkey subsystem.
+Morie requirement is a focused toggle-capture interaction, not Type4Me's generalized hotkey subsystem.
 
 Potentially reusable lessons:
 
 - repeat suppression;
-- explicit press/hold/release ownership;
+- explicit key-press ownership and repeat suppression;
 - stale state cleanup;
 - stop/abort/reset idempotency;
 - synthetic-event exclusion where Morie's own injected events can feed the same event path.
+- fail-open handling when Accessibility trust disappears: tear down the tap and return the event untouched;
+- keep file logging off the event/UI path on a dedicated serial queue.
+
+Current Morie-specific decision after the 2026-09-17 real-device timeout incident:
+
+- **ADAPT:** Type4Me's immediate Accessibility check, tap teardown, state reset, pass-through behavior, and background diagnostic-file queue.
+- **DROP:** media/mouse/generalized binding machinery and its broad 0.5-second hotkey watchdog.
+- **DO NOT COPY:** Type4Me automatically re-enables a disabled tap while Accessibility remains trusted. Morie observed six disable/re-enable events in one short run together with system-wide keyboard unresponsiveness, so Phase 0 uses the safer policy: release on timeout and require an explicit capability recheck.
 
 Do **not** automatically migrate:
 
@@ -142,6 +150,7 @@ Potentially reusable lessons:
 - avoid delivering into Morie itself;
 - preserve user text if the target disappears;
 - change-count-aware clipboard restore;
+- transient pasteboard markers so temporary injection/restoration traffic is not captured by clipboard-history apps such as Raycast;
 - synthetic Cmd+V event marking if required by Morie's chosen event mechanism;
 - bounded Accessibility access;
 - real compatibility testing across representative apps.

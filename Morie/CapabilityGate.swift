@@ -34,12 +34,28 @@ struct CapabilityGate {
             case .localeUnsupported(let locale):
                 "Speech transcription does not support the current locale (\(locale))."
             case .microphoneDenied:
-                "Microphone permission is required."
+                "Microphone permission is required. If access was previously denied, enable Morie in System Settings → Privacy & Security → Microphone, then recheck capabilities."
             case .speechPermissionDenied:
-                "Speech recognition permission is required."
+                "Speech Recognition permission is required. If access was previously denied, enable Morie in System Settings → Privacy & Security → Speech Recognition, then recheck capabilities."
             case .accessibilityDenied:
-                "Accessibility permission is required for the global shortcut and text delivery."
+                "Accessibility permission must be enabled manually in System Settings → Privacy & Security → Accessibility. Enable Morie there, then recheck capabilities."
             }
+        }
+
+        var settingsURL: URL? {
+            let pane: String
+            switch self {
+            case .microphoneDenied:
+                pane = "Privacy_Microphone"
+            case .speechPermissionDenied:
+                pane = "Privacy_SpeechRecognition"
+            case .accessibilityDenied:
+                pane = "Privacy_Accessibility"
+            default:
+                return nil
+            }
+
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")
         }
     }
 

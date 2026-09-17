@@ -120,7 +120,7 @@ Current Phase 0 responsibilities:
 
 - native macOS 27 app shell and Liquid Glass UI;
 - capability gate;
-- focused global push-to-talk interaction;
+- focused global toggle-capture interaction;
 - audio capture/session lifecycle;
 - latest Apple Speech transcription;
 - frontmost-app/target capture;

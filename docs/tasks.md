@@ -29,7 +29,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 
 The current priority is the reliable daily input loop:
 
-`hold shortcut → speak → release → final transcript → restore original app → insert text`
+`press shortcut → speak → press again → final transcript → restore original app → insert text`
 
 Phase 0 remains `IN PROGRESS` until it has been built and exercised on a supported macOS 27 Apple Intelligence-capable Mac and the target-app compatibility matrix has been completed.
 

@@ -15,6 +15,8 @@ final class AppController: ObservableObject {
 
     @Published private(set) var state: State = .checking
     @Published private(set) var transcript = ""
+    @Published private(set) var captureShortcut: CaptureShortcut
+    @Published private(set) var recoverySettingsURL: URL?
 
     private let capabilityGate = CapabilityGate()
     private let speech = SpeechPipeline()
@@ -24,6 +26,7 @@ final class AppController: ObservableObject {
 
     private var hotkey: PushToTalkHotkey?
     private var targetApplication: NSRunningApplication?
+    private var targetWindowNumber: CGWindowID?
     private var activeCaptureID: UUID?
     private var speechReadyCaptureID: UUID?
     private var finishRequestedCaptureID: UUID?
@@ -32,6 +35,10 @@ final class AppController: ObservableObject {
     private var lastPresentedFailure: String?
 
     init() {
+        let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
+            .flatMap(CaptureShortcut.init(rawValue:))
+        captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
+
         hud.onCancel = { [weak self] in
             Task { @MainActor in
                 await self?.cancelCaptureFromUser(source: "HUD")
@@ -46,18 +53,6 @@ final class AppController: ObservableObject {
         Diagnostics.record("App", "Morie controller initialized; launch bootstrap scheduled")
         Task { @MainActor [weak self] in
             await self?.bootstrap()
-        }
-    }
-
-    var statusSymbol: String {
-        switch state {
-        case .checking: "ellipsis.circle"
-        case .blocked: "exclamationmark.triangle"
-        case .ready: "waveform"
-        case .recording: "waveform.circle.fill"
-        case .finalizing: "ellipsis.circle"
-        case .delivering: "arrow.right.circle"
-        case .failed: "xmark.circle"
         }
     }
 
@@ -88,6 +83,7 @@ final class AppController: ObservableObject {
 
         state = .checking
         transcript = ""
+        recoverySettingsURL = nil
 
         do {
             try await capabilityGate.requirePrivateMode()
@@ -101,6 +97,7 @@ final class AppController: ObservableObject {
 
             try installHotkeyIfNeeded()
             lastPresentedFailure = nil
+            recoverySettingsURL = nil
             state = .ready
             Diagnostics.record("App", "Bootstrap complete; Morie is Ready")
         } catch is CancellationError {
@@ -112,8 +109,19 @@ final class AppController: ObservableObject {
             let message = error.localizedDescription
             state = .blocked(message)
             Diagnostics.record("App", "Bootstrap blocked: \(message)", level: .error)
-            presentFailure(title: "Morie can't start", message: message)
+            if let gateError = error as? CapabilityGate.GateError {
+                recoverySettingsURL = gateError.settingsURL
+                presentCapabilityFailure(gateError)
+            } else {
+                presentFailure(title: "Morie can't start", message: message)
+            }
         }
+    }
+
+    func openRecoverySettings() {
+        guard let recoverySettingsURL else { return }
+        Diagnostics.record("Permission", "Opening recovery System Settings from menu")
+        NSWorkspace.shared.open(recoverySettingsURL)
     }
 
     private func installHotkeyIfNeeded() throws {
@@ -123,6 +131,7 @@ final class AppController: ObservableObject {
         }
 
         let hotkey = PushToTalkHotkey(
+            shortcut: captureShortcut,
             onToggle: { [weak self] in
                 Task { @MainActor in
                     self?.handleHotkeyToggle()
@@ -143,12 +152,34 @@ final class AppController: ObservableObject {
 
         try hotkey.start()
         self.hotkey = hotkey
-        Diagnostics.record("Hotkey", "Controller installed Control+Space toggle hotkey")
+        Diagnostics.record("Hotkey", "Controller installed \(captureShortcut.logName) toggle hotkey")
+    }
+
+    func setCaptureShortcut(_ shortcut: CaptureShortcut) {
+        guard shortcut != captureShortcut else { return }
+        guard activeCaptureID == nil else {
+            Diagnostics.record("Hotkey", "Shortcut change ignored during an active capture", level: .warning)
+            return
+        }
+
+        captureShortcut = shortcut
+        UserDefaults.standard.set(shortcut.rawValue, forKey: CaptureShortcut.defaultsKey)
+        Diagnostics.record("Hotkey", "Shortcut preference changed to \(shortcut.logName)")
+
+        hotkey?.invalidate()
+        hotkey = nil
+        do {
+            try installHotkeyIfNeeded()
+        } catch {
+            Task { @MainActor [weak self] in
+                await self?.handleHotkeyUnavailable(error.localizedDescription)
+            }
+        }
     }
 
     private func handleHotkeyToggle() {
         if activeCaptureID != nil {
-            requestFinishActiveCapture(source: "Control+Space")
+            requestFinishActiveCapture(source: captureShortcut.logName)
             return
         }
 
@@ -170,6 +201,7 @@ final class AppController: ObservableObject {
         speechReadyCaptureID = nil
         finishRequestedCaptureID = nil
         targetApplication = NSWorkspace.shared.frontmostApplication
+        targetWindowNumber = TextInjector.frontmostWindowNumber(for: targetApplication)
         transcript = ""
         state = .recording
 
@@ -180,7 +212,7 @@ final class AppController: ObservableObject {
         let targetBundle = targetApplication?.bundleIdentifier ?? "unknown"
         Diagnostics.record(
             "Session",
-            "Capture \(label(sessionID)) started; target=\(targetName) (\(targetBundle)); locale=\(speechLocale.identifier)"
+            "Capture \(label(sessionID)) started; target=\(targetName) (\(targetBundle)); window=\(targetWindowNumber.map(String.init) ?? "unknown"); locale=\(speechLocale.identifier)"
         )
 
         captureStartTask = Task { @MainActor [weak self] in
@@ -319,7 +351,11 @@ final class AppController: ObservableObject {
             let targetBundle = targetApplication?.bundleIdentifier ?? "unknown"
             Diagnostics.record("Delivery", "Injecting \(finalText.count) characters into \(targetName) (\(targetBundle))")
 
-            try await injector.deliver(finalText, to: targetApplication)
+            try await injector.deliver(
+                finalText,
+                to: targetApplication,
+                originalWindowNumber: targetWindowNumber
+            )
             try Task.checkCancellation()
             Diagnostics.record("Delivery", "Injection completed for \(label(sessionID))")
             completeSuccessfulSession(sessionID)
@@ -355,7 +391,12 @@ final class AppController: ObservableObject {
         Diagnostics.record("Hotkey", "Global shortcut became unavailable: \(message)", level: .error)
         await cancelActiveCapture(transitionToReady: false)
         state = .blocked(message)
-        presentFailure(title: "Morie shortcut unavailable", message: message)
+        hud.showFailure()
+        Diagnostics.record(
+            "UI",
+            "Hotkey failure reported without a modal alert so keyboard and pointer interaction remain available",
+            level: .warning
+        )
     }
 
     private func cancelActiveCapture(transitionToReady: Bool) async {
@@ -370,6 +411,7 @@ final class AppController: ObservableObject {
             speechReadyCaptureID = nil
             finishRequestedCaptureID = nil
             targetApplication = nil
+            targetWindowNumber = nil
             return
         }
 
@@ -419,12 +461,23 @@ final class AppController: ObservableObject {
         guard activeCaptureID == sessionID else { return }
 
         let message = error.localizedDescription
+        let preservedOnClipboard = error is TextInjector.InjectionError
         Diagnostics.record("Session", "Capture \(label(sessionID)) failed: \(message)", level: .error)
         hotkey?.setCancellationEnabled(false)
         resetSessionIdentity()
         state = .failed(message)
-        hud.showFailure()
-        presentFailure(title: "Morie input failed", message: message)
+
+        if preservedOnClipboard {
+            hud.showClipboardFallback()
+            Diagnostics.record(
+                "UI",
+                "Delivery fallback reported in HUD; modal alert suppressed because transcript is preserved",
+                level: .warning
+            )
+        } else {
+            hud.showFailure()
+            presentFailure(title: "Morie input failed", message: message)
+        }
     }
 
     private func resetSessionIdentity() {
@@ -434,6 +487,7 @@ final class AppController: ObservableObject {
         captureStartTask = nil
         captureFinishTask = nil
         targetApplication = nil
+        targetWindowNumber = nil
     }
 
     private func presentFailure(title: String, message: String) {
@@ -449,6 +503,33 @@ final class AppController: ObservableObject {
 
         NSApplication.shared.activate(ignoringOtherApps: true)
         alert.runModal()
+    }
+
+    private func presentCapabilityFailure(_ error: CapabilityGate.GateError) {
+        let message = error.localizedDescription
+        guard lastPresentedFailure != message else { return }
+        lastPresentedFailure = message
+        Diagnostics.record("UI", "Presenting capability alert: \(message)", level: .warning)
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Morie needs permission"
+        alert.informativeText = message
+
+        if let settingsURL = error.settingsURL {
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Not Now")
+
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn {
+                Diagnostics.record("Permission", "Opening System Settings for \(String(describing: error))")
+                NSWorkspace.shared.open(settingsURL)
+            }
+        } else {
+            alert.addButton(withTitle: "OK")
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 
     private func label(_ sessionID: UUID) -> String {
