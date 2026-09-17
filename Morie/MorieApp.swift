@@ -41,9 +41,6 @@ struct MorieApp: App {
             }
             .padding(14)
             .frame(width: 320)
-            .task {
-                await controller.bootstrap()
-            }
         }
         .menuBarExtraStyle(.window)
     }
