@@ -1,0 +1,71 @@
+name: macOS 27 Test Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - phase0/input-foundation
+    paths:
+      - ".github/package-request"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build, sign, and package
+    runs-on: xcode-27
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+
+      - name: Build Morie
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Morie.xcodeproj \
+            -target Morie \
+            -configuration Release \
+            -sdk macosx27.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Ad-hoc sign and verify
+        run: |
+          codesign \
+            --force \
+            --deep \
+            --sign - \
+            --timestamp=none \
+            build/Release/Morie.app
+          codesign --verify --deep --strict --verbose=2 build/Release/Morie.app
+
+      - name: Package test build
+        run: |
+          mkdir -p dist
+          ditto \
+            -c \
+            -k \
+            --keepParent \
+            build/Release/Morie.app \
+            dist/Morie-macOS27-test.zip
+          shasum -a 256 dist/Morie-macOS27-test.zip | tee dist/Morie-macOS27-test.zip.sha256
+
+      - name: Upload test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Morie-macOS27-test-${{ github.sha }}
+          path: |
+            dist/Morie-macOS27-test.zip
+            dist/Morie-macOS27-test.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
