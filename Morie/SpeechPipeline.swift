@@ -28,20 +28,23 @@ actor SpeechPipeline {
     private var finalizedText = ""
     private var volatileText = ""
 
-    /// Prepare the current locale before the hotkey becomes Ready. Asset
-    /// installation can take much longer than a push-to-talk press, so it must
-    /// not be deferred until the user is already holding the shortcut.
     func prepare(locale requestedLocale: Locale) async throws {
         guard activeSessionID == nil else { throw PipelineError.alreadyRunning }
 
+        Diagnostics.record("Speech", "Preparing SpeechTranscriber for locale \(requestedLocale.identifier)")
         let transcriber = try await makeTranscriber(locale: requestedLocale)
         try Task.checkCancellation()
 
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            Diagnostics.record("Speech", "Speech asset installation required; starting download/install")
             try await installation.downloadAndInstall()
+            Diagnostics.record("Speech", "Speech asset installation completed")
+        } else {
+            Diagnostics.record("Speech", "Speech assets already available")
         }
 
         try Task.checkCancellation()
+        Diagnostics.record("Speech", "Speech preparation completed")
     }
 
     func start(
@@ -54,6 +57,9 @@ actor SpeechPipeline {
         finalizedText = ""
         volatileText = ""
 
+        let session = label(sessionID)
+        Diagnostics.record("Speech", "Pipeline start requested for \(session)")
+
         var preparedProvider: CaptureInputSequenceProvider?
         var preparedAnalyzer: SpeechAnalyzer?
 
@@ -61,11 +67,14 @@ actor SpeechPipeline {
             try requireActiveSession(sessionID)
 
             guard let microphone = AVCaptureDevice.default(for: .audio) else {
+                Diagnostics.record("Speech", "No default microphone available for \(session)", level: .error)
                 throw PipelineError.noMicrophone
             }
+            Diagnostics.record("Speech", "Default microphone resolved for \(session): \(microphone.localizedName)")
 
             let transcriber = try await makeTranscriber(locale: requestedLocale)
             try requireActiveSession(sessionID)
+            Diagnostics.record("Speech", "SpeechTranscriber created for \(session)")
 
             let provider = try await CaptureInputSequenceProvider.providerWithSession(
                 from: microphone,
@@ -74,6 +83,7 @@ actor SpeechPipeline {
             )
             preparedProvider = provider
             try requireActiveSession(sessionID)
+            Diagnostics.record("Speech", "CaptureInputSequenceProvider created for \(session)")
 
             let analyzer = SpeechAnalyzer(modules: [transcriber])
             preparedAnalyzer = analyzer
@@ -91,21 +101,39 @@ actor SpeechPipeline {
                     if result.isFinal {
                         finalizedText = join(finalizedText, text)
                         volatileText = ""
+                        Diagnostics.record(
+                            "Speech",
+                            "Final result for \(session); segmentCharacters=\(text.count), accumulatedCharacters=\(finalizedText.count)"
+                        )
                     } else {
                         volatileText = text
+                        Diagnostics.record(
+                            "Speech",
+                            "Volatile result for \(session); characters=\(text.count)"
+                        )
                     }
 
                     onTranscript(sessionID, join(finalizedText, volatileText))
                 }
+
+                Diagnostics.record("Speech", "Transcriber result stream ended for \(session)")
             }
 
             analysisTask = Task {
-                try await analyzer.analyzeSequence(analyzerInputs)
+                Diagnostics.record("Speech", "Analyzer sequence started for \(session)")
+                let lastSampleTime = try await analyzer.analyzeSequence(analyzerInputs)
+                Diagnostics.record(
+                    "Speech",
+                    "Analyzer sequence ended for \(session); lastSampleTime=\(String(describing: lastSampleTime))"
+                )
+                return lastSampleTime
             }
 
             provider.captureSession.startRunning()
+            Diagnostics.record("Speech", "AVCaptureSession startRunning called for \(session)")
             try requireActiveSession(sessionID)
         } catch {
+            Diagnostics.record("Speech", "Pipeline start failed for \(session): \(error.localizedDescription)", level: .error)
             preparedProvider?.captureSession.stopRunning()
 
             if let preparedAnalyzer {
@@ -123,19 +151,22 @@ actor SpeechPipeline {
             throw PipelineError.notRunning
         }
 
-        // Normal stop is not cancellation. Stop capture, then release the
-        // provider/session so its analyzer input sequence can terminate and the
-        // analyzer can consume everything that was already captured.
+        let session = label(sessionID)
+        Diagnostics.record("Speech", "Normal stop started for \(session)")
+
         provider?.captureSession.stopRunning()
         provider = nil
+        Diagnostics.record("Speech", "Capture session stopped and provider released for \(session)")
 
         do {
             let lastSampleTime = try await analysisTask.value
             try requireActiveSession(sessionID)
 
             if let lastSampleTime {
+                Diagnostics.record("Speech", "Finalizing analyzer through last sample for \(session)")
                 try await analyzer.finalizeAndFinish(through: lastSampleTime)
             } else {
+                Diagnostics.record("Speech", "Analyzer returned no last sample; cancelling immediately for \(session)", level: .warning)
                 await analyzer.cancelAndFinishNow()
             }
 
@@ -145,13 +176,12 @@ actor SpeechPipeline {
 
             try requireActiveSession(sessionID)
 
-            // Apple documents that a volatile result is not guaranteed to be
-            // reissued as final. Keep the latest volatile segment if no later
-            // final result replaced it.
             let final = join(finalizedText, volatileText)
+            Diagnostics.record("Speech", "Normal stop completed for \(session); finalCharacters=\(final.count)")
             reset(sessionID: sessionID)
             return final
         } catch {
+            Diagnostics.record("Speech", "Normal stop failed for \(session): \(error.localizedDescription)", level: .error)
             await analyzer.cancelAndFinishNow()
             reset(sessionID: sessionID)
             throw error
@@ -159,7 +189,13 @@ actor SpeechPipeline {
     }
 
     func cancel(sessionID: UUID) async {
-        guard activeSessionID == sessionID else { return }
+        guard activeSessionID == sessionID else {
+            Diagnostics.record("Speech", "Cancel ignored for stale session \(label(sessionID))", level: .warning)
+            return
+        }
+
+        let session = label(sessionID)
+        Diagnostics.record("Speech", "Cancelling pipeline for \(session)", level: .warning)
 
         provider?.captureSession.stopRunning()
         provider = nil
@@ -171,13 +207,16 @@ actor SpeechPipeline {
         }
 
         reset(sessionID: sessionID)
+        Diagnostics.record("Speech", "Pipeline cancelled/reset for \(session)", level: .warning)
     }
 
     private func makeTranscriber(locale requestedLocale: Locale) async throws -> SpeechTranscriber {
         guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
+            Diagnostics.record("Speech", "Unsupported requested locale: \(requestedLocale.identifier)", level: .error)
             throw PipelineError.unsupportedLocale
         }
 
+        Diagnostics.record("Speech", "Resolved Speech locale: \(locale.identifier)")
         return SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
     }
 
@@ -209,5 +248,9 @@ actor SpeechPipeline {
         if left.isEmpty { return right }
         if right.isEmpty { return left }
         return left + " " + right
+    }
+
+    private func label(_ sessionID: UUID) -> String {
+        String(sessionID.uuidString.prefix(8))
     }
 }
