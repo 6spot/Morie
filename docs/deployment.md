@@ -42,7 +42,33 @@ For Phase 0 testing:
 5. grant required Microphone, Speech Recognition, and Accessibility permissions;
 6. execute the validation matrix in [`validation.md`](./validation.md).
 
-This is the preferred deployment path while the input foundation is still changing.
+This remains the preferred path for debugging because Xcode exposes runtime diagnostics directly.
+
+## GitHub test artifact
+
+The `macOS 27 Build` GitHub Actions workflow also produces an installable Phase 0 test artifact for owner/device testing.
+
+The workflow:
+
+1. builds the `Release` configuration on GitHub's `xcode-27` runner;
+2. performs ad-hoc code signing (`codesign --sign -`);
+3. verifies the resulting app with `codesign --verify --deep --strict`;
+4. packages `Morie.app` as `Morie-macOS27-test.zip`;
+5. writes `Morie-macOS27-test.zip.sha256`;
+6. uploads both files as a GitHub Actions artifact retained for 14 days.
+
+This artifact is intentionally **not Developer ID signed and not notarized**. It is for internal Phase 0 validation, not public distribution.
+
+To test it:
+
+1. download the latest successful `Morie-macOS27-test-*` Actions artifact;
+2. extract the artifact archive, then extract `Morie-macOS27-test.zip`;
+3. move `Morie.app` to `/Applications` if desired;
+4. open Morie and grant Microphone, Speech Recognition, and Accessibility permissions when required;
+5. if Gatekeeper blocks the ad-hoc test build because it is not notarized, use the normal macOS Privacy & Security **Open Anyway** flow. For development-only troubleshooting, the downloaded app's quarantine attribute may also be removed explicitly before launching;
+6. execute the Phase 0 checks in [`validation.md`](./validation.md).
+
+Do not treat successful installation of this artifact as release-signing validation.
 
 ## Release build
 
@@ -101,14 +127,15 @@ Use Apple/Xcode-supported credential storage and CI secret facilities when autom
 
 ## CI/CD direction
 
-CI is not required to prove Phase 0's device behavior, because microphone, Accessibility, frontmost-app focus, and cross-application injection require real macOS validation.
+CI can verify buildability and package structure, but it cannot prove Phase 0's device behavior because microphone, Accessibility, frontmost-app focus, and cross-application injection require real macOS validation.
 
-When CI is introduced, it should at minimum perform what can be automated safely:
+The current macOS 27 CI performs:
 
-- project build/compile checks;
-- unit tests;
-- static checks;
-- archive verification where credentials/environment permit.
+- Xcode 27 / macOS 27 SDK build checks;
+- Release test packaging;
+- ad-hoc signature verification;
+- SHA-256 generation;
+- GitHub Actions artifact upload.
 
 Real-device compatibility validation remains a distinct release gate.
 
