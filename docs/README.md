@@ -4,7 +4,10 @@ This directory is the maintained engineering documentation for Morie.
 
 ## Start here
 
-- [`product-architecture-baseline.md`](./product-architecture-baseline.md) — product/architecture decisions that constrain implementation.
+- [`design/apple-native-first-v0-baseline-v2.md`](./design/apple-native-first-v0-baseline-v2.md) — repository transcription of the project-owner supplied V0 design baseline, plus explicitly approved amendments.
+- [`product-architecture-baseline.md`](./product-architecture-baseline.md) — concise implementation baseline and hard constraints.
+- [`ui-design.md`](./ui-design.md) — macOS 27 Native UI Only / Liquid Glass rules and owner-approval gate.
+- [`reference/type4me.md`](./reference/type4me.md) — Type4Me input-foundation reference and selective migration boundary.
 - [`tasks.md`](./tasks.md) — master task plan and overall progress.
 - [`tasks/`](./tasks/README.md) — detailed task records and execution history.
 - [`architecture.md`](./architecture.md) — code/module boundaries and current technical architecture.
@@ -14,9 +17,16 @@ This directory is the maintained engineering documentation for Morie.
 
 ## Documentation ownership
 
-Documentation changes with the code. A behavior, architecture, task status, build process, permission requirement, or release process that changes in implementation must be updated here in the same pull request.
+Documentation changes with the code. A behavior, architecture, UI rule, task status, build process, permission requirement, reference-migration decision, or release process that changes in implementation must be updated here in the same pull request.
 
 `docs/tasks.md` is the concise project-level task overview. Detailed execution history belongs in `docs/tasks/M-xxx-*.md`.
+
+## Hard implementation rules
+
+- UI uses Apple system components and native macOS 27 Liquid Glass behavior.
+- If native UI cannot satisfy a requirement, implementation stops until the project owner explicitly approves an exception.
+- External dependencies require explicit owner approval; they are never introduced unilaterally.
+- Phase 0 input infrastructure must audit/adapt proven Type4Me behavior rather than re-inventing solved recording/hotkey/focus/injection problems.
 
 ## Current product stage
 
