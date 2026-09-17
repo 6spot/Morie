@@ -55,8 +55,14 @@ final class PushToTalkHotkey {
     }
 
     func start() throws {
-        guard eventTap == nil else { return }
-        guard AXIsProcessTrusted() else {
+        guard eventTap == nil else {
+            Diagnostics.record("Hotkey", "start() ignored because event tap already exists")
+            return
+        }
+
+        let trusted = AXIsProcessTrusted()
+        Diagnostics.record("Hotkey", "Installing Control+Space event tap; accessibilityTrusted=\(trusted)")
+        guard trusted else {
             throw StartError.accessibilityUnavailable
         }
 
@@ -71,6 +77,7 @@ final class PushToTalkHotkey {
             callback: moriePushToTalkEventTapCallback,
             userInfo: userInfo
         ) else {
+            Diagnostics.record("Hotkey", "CGEvent.tapCreate returned nil", level: .error)
             throw StartError.eventTapCreationFailed
         }
 
@@ -82,12 +89,16 @@ final class PushToTalkHotkey {
         CGEvent.tapEnable(tap: tap, enable: true)
 
         guard CGEvent.tapIsEnabled(tap: tap) else {
+            Diagnostics.record("Hotkey", "Event tap exists but is not enabled", level: .error)
             invalidate()
             throw StartError.eventTapCreationFailed
         }
+
+        Diagnostics.record("Hotkey", "Control+Space event tap installed and enabled")
     }
 
     func invalidate() {
+        let hadTap = eventTap != nil
         isPressed = false
 
         if let tap = eventTap {
@@ -105,15 +116,19 @@ final class PushToTalkHotkey {
 
         runLoopSource = nil
         eventTap = nil
+
+        if hadTap {
+            Diagnostics.record("Hotkey", "Event tap invalidated")
+        }
     }
 
     fileprivate func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            Diagnostics.record("Hotkey", "Event tap disabled by system; attempting recovery", level: .warning)
             recoverEventTapIfPossible()
             return Unmanaged.passUnretained(event)
         }
 
-        // Morie-generated delivery keystrokes are never hotkey input.
         if TextInjector.isSyntheticInput(event) {
             return Unmanaged.passUnretained(event)
         }
@@ -126,26 +141,36 @@ final class PushToTalkHotkey {
         switch type {
         case .keyDown:
             guard Self.hasExactShortcutModifiers(event.flags) else {
+                if event.flags.contains(.maskControl) {
+                    Diagnostics.record(
+                        "Hotkey",
+                        "Space keyDown ignored because modifiers were not exactly Control; flags=0x\(String(event.flags.rawValue, radix: 16))",
+                        level: .warning
+                    )
+                }
                 return Unmanaged.passUnretained(event)
             }
 
-            // Consume repeat events but never dispatch another recording start.
             if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || isPressed {
+                Diagnostics.record("Hotkey", "Control+Space repeat suppressed")
                 return nil
             }
 
             isPressed = true
+            Diagnostics.record("Hotkey", "Control+Space keyDown accepted")
             onPress()
             return nil
 
         case .keyUp:
-            // Once Morie owns the hold, release must terminate it even if the
-            // user released Control before releasing Space.
             guard isPressed else {
+                if event.flags.contains(.maskControl) {
+                    Diagnostics.record("Hotkey", "Space keyUp observed without an owned hold", level: .warning)
+                }
                 return Unmanaged.passUnretained(event)
             }
 
             isPressed = false
+            Diagnostics.record("Hotkey", "Control+Space keyUp accepted; ending hold")
             onRelease()
             return nil
 
@@ -155,9 +180,13 @@ final class PushToTalkHotkey {
     }
 
     private func recoverEventTapIfPossible() {
-        guard let tap = eventTap else { return }
+        guard let tap = eventTap else {
+            Diagnostics.record("Hotkey", "Cannot recover event tap because it no longer exists", level: .error)
+            return
+        }
 
         guard AXIsProcessTrusted() else {
+            Diagnostics.record("Hotkey", "Event tap recovery failed: Accessibility trust lost", level: .error)
             invalidate()
             onUnavailable(StartError.accessibilityUnavailable)
             return
@@ -165,10 +194,13 @@ final class PushToTalkHotkey {
 
         CGEvent.tapEnable(tap: tap, enable: true)
         guard CGEvent.tapIsEnabled(tap: tap) else {
+            Diagnostics.record("Hotkey", "Event tap recovery failed after re-enable", level: .error)
             invalidate()
             onUnavailable(StartError.eventTapCreationFailed)
             return
         }
+
+        Diagnostics.record("Hotkey", "Event tap recovered")
     }
 
     private static func hasExactShortcutModifiers(_ flags: CGEventFlags) -> Bool {
@@ -190,9 +222,6 @@ private func moriePushToTalkEventTapCallback(
         return Unmanaged.passUnretained(event)
     }
 
-    // The tap source is installed on the main run loop. Keeping all mutable
-    // hotkey state on that run loop gives Morie deterministic press/release
-    // ownership without a generalized synchronization layer.
     let hotkey = Unmanaged<PushToTalkHotkey>
         .fromOpaque(userInfo)
         .takeUnretainedValue()
