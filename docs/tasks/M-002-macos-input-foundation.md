@@ -105,7 +105,7 @@ Explicitly excluded:
 | Liquid Glass capture HUD | IMPLEMENTED / VERIFY | One native `NSGlassEffectView` capsule in the non-activating panel, system buttons, and a Type4Me-informed live waveform. The HUD uses quiet-speech-sensitive mapping, real-signal transient emphasis, 60 Hz metering/rendering, and asymmetric per-bar history. Edge bars remain active while the center keeps the largest travel. Successful delivery now uses animated, labelled feedback; recoverable delivery failure reports “已复制到剪贴板” in the HUD instead of opening a modal alert. Visual response/accessibility validation remains. |
 | macOS 27 / Xcode 27 compile | DONE | GitHub hosted `xcode-27`: diagnostics build/package passed at `ec888bd4`. |
 | Compatibility matrix | TODO | Real app/device validation in `../validation.md`. |
-| Performance baseline | TODO | Measure after runtime loop is proven on supported hardware. |
+| Performance baseline | IN PROGRESS | Local unsigned arm64 Release bundle/executable size recorded; cold launch, RSS, final/delivery latency, CPU/energy and capture-loss measurements still require real runtime observation. |
 
 `IMPLEMENTED / VERIFY` means the implementation exists and compiles, but the acceptance criterion is intentionally not marked DONE until actual macOS 27 runtime/device behavior is observed.
 

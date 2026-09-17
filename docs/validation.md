@@ -200,7 +200,7 @@ Record observations for the same tested build:
 
 | Metric | Measurement | Environment / notes |
 | --- | --- | --- |
-| App binary size | TBD | |
+| App bundle / executable size | 1,060,864-byte app bundle / 1,050,744-byte executable | Local unsigned arm64 Release build, Xcode 27 / macOS 27 SDK; establish signed-package size separately |
 | Cold launch time | TBD | |
 | Idle RSS | TBD | |
 | Recording RSS | TBD | |
