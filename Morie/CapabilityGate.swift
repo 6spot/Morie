@@ -1,4 +1,4 @@
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import AVFoundation
 import Foundation
 import FoundationModels
@@ -94,6 +94,10 @@ struct CapabilityGate {
     }
 
     private func requireAccessibility() throws {
+        // ApplicationServices is a C framework and its option-key global is not
+        // annotated for Swift 6 concurrency. `@preconcurrency import` keeps the
+        // native API while acknowledging that legacy annotation boundary; this
+        // method is only called from Morie's serialized capability check.
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let options = [promptKey: true] as CFDictionary
 
