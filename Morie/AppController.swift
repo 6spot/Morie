@@ -25,6 +25,16 @@ final class AppController: ObservableObject {
     private var speechReadyCaptureID: UUID?
     private var captureStartTask: Task<Void, Never>?
     private var captureFinishTask: Task<Void, Never>?
+    private var lastPresentedFailure: String?
+
+    init() {
+        // Morie is a menu-bar app. Capability checks and shortcut installation
+        // must happen when the app launches, not only after the MenuBarExtra
+        // content is opened for the first time.
+        Task { @MainActor [weak self] in
+            await self?.bootstrap()
+        }
+    }
 
     var statusSymbol: String {
         switch state {
@@ -71,13 +81,17 @@ final class AppController: ObservableObject {
             try await speech.prepare(locale: .current)
 
             try installHotkeyIfNeeded()
+            lastPresentedFailure = nil
             state = .ready
         } catch is CancellationError {
             // A newer bootstrap/cancellation path owns the visible state.
         } catch {
             hotkey?.invalidate()
             hotkey = nil
-            state = .blocked(error.localizedDescription)
+
+            let message = error.localizedDescription
+            state = .blocked(message)
+            presentFailure(title: "Morie can't start", message: message)
         }
     }
 
@@ -116,6 +130,8 @@ final class AppController: ObservableObject {
         default:
             return
         }
+
+        lastPresentedFailure = nil
 
         let sessionID = UUID()
         activeCaptureID = sessionID
@@ -211,6 +227,7 @@ final class AppController: ObservableObject {
     private func handleHotkeyUnavailable(_ message: String) async {
         await cancelActiveCapture(transitionToReady: false)
         state = .blocked(message)
+        presentFailure(title: "Morie shortcut unavailable", message: message)
     }
 
     private func cancelActiveCapture(transitionToReady: Bool) async {
@@ -248,6 +265,7 @@ final class AppController: ObservableObject {
     private func completeSuccessfulSession(_ sessionID: UUID) {
         guard activeCaptureID == sessionID else { return }
         resetSessionIdentity()
+        lastPresentedFailure = nil
         state = .ready
     }
 
@@ -259,8 +277,11 @@ final class AppController: ObservableObject {
 
     private func failSession(_ sessionID: UUID, error: Error) {
         guard activeCaptureID == sessionID else { return }
+
+        let message = error.localizedDescription
         resetSessionIdentity()
-        state = .failed(error.localizedDescription)
+        state = .failed(message)
+        presentFailure(title: "Morie input failed", message: message)
     }
 
     private func resetSessionIdentity() {
@@ -269,5 +290,22 @@ final class AppController: ObservableObject {
         captureStartTask = nil
         captureFinishTask = nil
         targetApplication = nil
+    }
+
+    private func presentFailure(title: String, message: String) {
+        guard lastPresentedFailure != message else { return }
+        lastPresentedFailure = message
+
+        // NSAlert is a native macOS surface. It remains visible even though
+        // Morie runs as an LSUIElement menu-bar app, so launch/runtime failures
+        // are never hidden behind an unopened menu extra.
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 }
