@@ -1,0 +1,172 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000101 /* MorieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* MorieApp.swift */; };
+		A10000000000000000000102 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* AppModel.swift */; };
+		A10000000000000000000103 /* CapabilityGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* CapabilityGate.swift */; };
+		A10000000000000000000104 /* AppleSpeechSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* AppleSpeechSession.swift */; };
+		A10000000000000000000105 /* GlobalHotKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* GlobalHotKey.swift */; };
+		A10000000000000000000106 /* FrontmostAppTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000026 /* FrontmostAppTarget.swift */; };
+		A10000000000000000000107 /* TextInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* TextInjector.swift */; };
+		A10000000000000000000108 /* MenuBarContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000028 /* MenuBarContent.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000020 /* Morie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Morie.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000021 /* MorieApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000022 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000023 /* CapabilityGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilityGate.swift; sourceTree = "<group>"; };
+		A10000000000000000000024 /* AppleSpeechSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechSession.swift; sourceTree = "<group>"; };
+		A10000000000000000000025 /* GlobalHotKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKey.swift; sourceTree = "<group>"; };
+		A10000000000000000000026 /* FrontmostAppTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmostAppTarget.swift; sourceTree = "<group>"; };
+		A10000000000000000000027 /* TextInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInjector.swift; sourceTree = "<group>"; };
+		A10000000000000000000028 /* MenuBarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContent.swift; sourceTree = "<group>"; };
+		A10000000000000000000029 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1000000000000000000002A /* Morie.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Morie.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A10000000000000000000012 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A10000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000004 /* MorieApp */,
+				A10000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A10000000000000000000003 /* Products */ = {isa = PBXGroup; children = (A10000000000000000000020 /* Morie.app */,); name = Products; sourceTree = "<group>"; };
+		A10000000000000000000004 /* MorieApp */ = {
+			isa = PBXGroup;
+			path = MorieApp;
+			sourceTree = "<group>";
+			children = (
+				A10000000000000000000021 /* MorieApp.swift */,
+				A10000000000000000000022 /* AppModel.swift */,
+				A10000000000000000000005 /* Capabilities */,
+				A10000000000000000000006 /* Speech */,
+				A10000000000000000000007 /* HotKey */,
+				A10000000000000000000008 /* Delivery */,
+				A10000000000000000000009 /* UI */,
+				A10000000000000000000029 /* Info.plist */,
+				A1000000000000000000002A /* Morie.entitlements */,
+			);
+		};
+		A10000000000000000000005 /* Capabilities */ = {isa = PBXGroup; path = Capabilities; sourceTree = "<group>"; children = (A10000000000000000000023 /* CapabilityGate.swift */,); };
+		A10000000000000000000006 /* Speech */ = {isa = PBXGroup; path = Speech; sourceTree = "<group>"; children = (A10000000000000000000024 /* AppleSpeechSession.swift */,); };
+		A10000000000000000000007 /* HotKey */ = {isa = PBXGroup; path = HotKey; sourceTree = "<group>"; children = (A10000000000000000000025 /* GlobalHotKey.swift */,); };
+		A10000000000000000000008 /* Delivery */ = {isa = PBXGroup; path = Delivery; sourceTree = "<group>"; children = (A10000000000000000000026 /* FrontmostAppTarget.swift */, A10000000000000000000027 /* TextInjector.swift */,); };
+		A10000000000000000000009 /* UI */ = {isa = PBXGroup; path = UI; sourceTree = "<group>"; children = (A10000000000000000000028 /* MenuBarContent.swift */,); };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10000000000000000000010 /* Morie */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000042 /* Build configuration list for PBXNativeTarget "Morie" */;
+			buildPhases = (A10000000000000000000011 /* Sources */, A10000000000000000000012 /* Frameworks */, A10000000000000000000013 /* Resources */,);
+			buildRules = ();
+			dependencies = ();
+			name = Morie;
+			productName = Morie;
+			productReference = A10000000000000000000020 /* Morie.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2700; LastUpgradeCheck = 2700; TargetAttributes = {A10000000000000000000010 = {CreatedOnToolsVersion = 27.0; };};};
+			buildConfigurationList = A10000000000000000000041 /* Build configuration list for PBXProject "Morie" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base,);
+			mainGroup = A10000000000000000000002;
+			productRefGroup = A10000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (A10000000000000000000010 /* Morie */,);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A10000000000000000000013 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A10000000000000000000011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000101 /* MorieApp.swift in Sources */,
+				A10000000000000000000102 /* AppModel.swift in Sources */,
+				A10000000000000000000103 /* CapabilityGate.swift in Sources */,
+				A10000000000000000000104 /* AppleSpeechSession.swift in Sources */,
+				A10000000000000000000105 /* GlobalHotKey.swift in Sources */,
+				A10000000000000000000106 /* FrontmostAppTarget.swift in Sources */,
+				A10000000000000000000107 /* TextInjector.swift in Sources */,
+				A10000000000000000000108 /* MenuBarContent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A10000000000000000000031 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 27.0; SDKROOT = macosx; SWIFT_VERSION = 6.0;}; name = Debug; };
+		A10000000000000000000032 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 27.0; SDKROOT = macosx; SWIFT_VERSION = 6.0;}; name = Release; };
+		A10000000000000000000033 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MorieApp/Morie.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MorieApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.6spot.Morie;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A10000000000000000000034 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MorieApp/Morie.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MorieApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.6spot.Morie;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A10000000000000000000041 /* Build configuration list for PBXProject "Morie" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000031 /* Debug */, A10000000000000000000032 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A10000000000000000000042 /* Build configuration list for PBXNativeTarget "Morie" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000033 /* Debug */, A10000000000000000000034 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = A10000000000000000000001 /* Project object */;
+}
