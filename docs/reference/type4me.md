@@ -43,6 +43,29 @@ Primary Morie sources of truth:
 
 The desired result is a significantly smaller Morie-native implementation for macOS 27+, not a compatibility-preserving extraction of Type4Me.
 
+## Approved extraction strategy
+
+Morie uses **extractive migration by subsystem**.
+
+This deliberately rejects both extremes:
+
+- **Do not copy the complete Type4Me repository into Morie and delete features afterward.** That would import provider abstractions, compatibility layers, settings assumptions, dependencies, and coupling before Morie has justified them.
+- **Do not ignore Type4Me and independently rediscover solved failure modes.** Its mature implementation/tests remain valuable evidence for lifecycle and reliability behavior.
+
+For every subsystem, use this workflow:
+
+1. Start from the active Morie task and architecture.
+2. State the smallest current macOS 27 requirement.
+3. Inspect only the corresponding Type4Me implementation, tests, and relevant review/history.
+4. Classify discovered behavior as `ADAPT`, `DROP`, or `VERIFY`.
+5. Reimplement the retained behavior as the smallest Morie-native solution using current Apple APIs.
+6. Copy Type4Me source code directly only when there is a concrete reason that reimplementation would be worse; preserve applicable MIT attribution when substantial code is transferred.
+7. Validate against the current supported macOS 27 environment before adding compatibility branches.
+
+The optimization target is **completion of the active Morie task**, not percentage of Type4Me migrated.
+
+Expected reuse varies by subsystem. For example, Hotkey may reuse mostly state-machine lessons while little source structure survives; Injection may retain more concrete safety behavior; Apple Speech should use Type4Me mostly as behavioral evidence because Morie targets the current Apple Speech stack.
+
 ## Platform boundary
 
 Morie starts at **macOS 27+** and does not preserve Type4Me behavior merely because it was needed for earlier macOS releases, older Apple APIs, broader hardware support, or historical implementation constraints.
