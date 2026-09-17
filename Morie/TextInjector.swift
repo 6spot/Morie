@@ -20,9 +20,8 @@ struct TextInjector {
         }
     }
 
-    /// Type4Me proved that synthetic delivery events need an identity so the
-    /// hotkey path can ignore Morie's own Cmd+V events when that path moves to
-    /// a CGEvent tap. Keep this marker process-local and randomized.
+    /// Synthetic delivery events carry a process-local identity so Morie's
+    /// global input path can always distinguish them from physical user input.
     private static let syntheticInputEventMarker = Int64.random(in: 1...Int64.max)
 
     static func markAsSyntheticInput(_ event: CGEvent) {
@@ -52,9 +51,9 @@ struct TextInjector {
             throw InjectionError.focusRestoreFailed
         }
 
-        // Focus restoration is asynchronous across applications. Keep this
-        // short here; the compatibility matrix will determine whether a
-        // bounded target-aware retry is required for specific app classes.
+        // Application activation/focus handoff is asynchronous. Keep this one
+        // bounded delay generic; app-specific timing is added only after a
+        // macOS 27 validation case demonstrates it is necessary.
         try await Task.sleep(for: .milliseconds(100))
 
         if setSelectedTextWithAccessibility(text) {
@@ -103,11 +102,6 @@ struct TextInjector {
         guard pasteboard.setString(text, forType: .string) else { return false }
         let transcriptChangeCount = pasteboard.changeCount
 
-        // Give native/Electron editors a short opportunity to observe the new
-        // pasteboard value before Cmd+V. This value remains part of the real-app
-        // compatibility test rather than being treated as universally correct.
-        try? await Task.sleep(for: .milliseconds(50))
-
         guard let source = CGEventSource(stateID: .combinedSessionState),
               let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false)
@@ -122,9 +116,10 @@ struct TextInjector {
         keyDown.post(tap: .cghidEventTap)
         keyUp.post(tap: .cghidEventTap)
 
-        // Type4Me found Electron-family apps may read the clipboard late. More
-        // importantly, only restore if nobody changed the clipboard after Morie
-        // wrote the transcript; otherwise restoration would destroy user data.
+        // Paste is delivered cross-process. Restore the previous clipboard only
+        // after a bounded grace period, and only if nobody changed the clipboard
+        // after Morie wrote the transcript. Exact timing remains a macOS 27
+        // validation item rather than an app-family compatibility rule.
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(300))
             snapshot.restore(to: pasteboard, expectedChangeCount: transcriptChangeCount)
