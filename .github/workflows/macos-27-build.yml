@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Xcode 27 compile
+    name: Xcode 27 build and package
     runs-on: xcode-27
 
     steps:
@@ -32,8 +32,40 @@ jobs:
           xcodebuild \
             -project Morie.xcodeproj \
             -target Morie \
-            -configuration Debug \
+            -configuration Release \
             -sdk macosx27.0 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
+
+      - name: Ad-hoc sign and verify
+        run: |
+          codesign \
+            --force \
+            --deep \
+            --sign - \
+            --timestamp=none \
+            build/Release/Morie.app
+          codesign --verify --deep --strict --verbose=2 build/Release/Morie.app
+
+      - name: Package test build
+        run: |
+          mkdir -p dist
+          ditto \
+            -c \
+            -k \
+            --keepParent \
+            build/Release/Morie.app \
+            dist/Morie-macOS27-test.zip
+          shasum -a 256 dist/Morie-macOS27-test.zip | tee dist/Morie-macOS27-test.zip.sha256
+
+      - name: Upload test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Morie-macOS27-test-${{ github.sha }}
+          path: |
+            dist/Morie-macOS27-test.zip
+            dist/Morie-macOS27-test.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
