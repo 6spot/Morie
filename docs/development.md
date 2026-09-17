@@ -63,17 +63,55 @@ The app should surface capability failures rather than silently degrading to a t
 
 If permissions were denied during development, use macOS System Settings to restore access before retesting. When testing permission onboarding behavior itself, reset the relevant app permission state using normal macOS developer/test procedures.
 
+## Native debug window
+
+Morie includes a native `Morie Debug` window for Phase 0 runtime diagnosis.
+
+Open it from the menu-bar panel with **Open Debug Log**. The window uses only system SwiftUI/macOS controls and records the current process lifetime in memory.
+
+It currently traces:
+
+- launch/bootstrap start and Ready/blocked state;
+- Apple Intelligence, Speech, microphone, Speech authorization, and Accessibility checks;
+- global `Control + Space` event-tap installation, accepted keyDown/keyUp, repeats, and tap recovery;
+- capture session identity and original target app/bundle identifier;
+- Speech asset preparation, microphone/provider/analyzer lifecycle, partial/final result lengths, stop/cancel/failure;
+- target activation and Accessibility insertion result;
+- clipboard fallback, synthetic Cmd+V dispatch, and clipboard restoration result;
+- native alerts and terminal session state.
+
+Privacy rule: diagnostics do **not** record the full transcript by default. They record character counts and lifecycle/error metadata instead.
+
+The window provides:
+
+- **Copy All** — copy the complete current in-memory diagnostic log for issue/debug sharing;
+- **Clear** — reset the current log before reproducing a defect.
+
+Recommended defect reproduction flow:
+
+1. launch Morie;
+2. open **Morie Debug**;
+3. press **Clear** if necessary;
+4. focus the target text field in another app;
+5. hold `Control + Space`, speak, then release;
+6. return to the debug window and use **Copy All**;
+7. attach/paste the log with the observed behavior.
+
+If no `Hotkey` keyDown entry appears after a physical `Control + Space`, diagnose the event-tap/shortcut path before investigating Speech or text injection. If Speech entries appear but no Delivery entries do, diagnose finalization/session lifecycle. If Delivery entries appear, the log identifies whether AX insertion or clipboard fallback was used.
+
 ## Current manual smoke test
 
 1. Launch Morie.
 2. Confirm the menu bar item reaches `Ready` on a supported system.
-3. Place the caret in another application.
-4. Hold `Control + Space`.
-5. Speak a short phrase.
-6. Release `Control + Space`.
-7. Verify the original app regains focus and receives the final text.
-8. Repeat several times, including short taps, rapid repeated holds, and Chinese/English mixed content where relevant.
-9. Verify the previous clipboard content is restored after clipboard fallback unless another app/user changed the clipboard meanwhile.
+3. Open `Morie Debug` and confirm bootstrap/capability/hotkey-install entries are present.
+4. Place the caret in another application.
+5. Hold `Control + Space`.
+6. Speak a short phrase.
+7. Release `Control + Space`.
+8. Verify the original app regains focus and receives the final text.
+9. Verify the debug log contains the corresponding Hotkey → Session → Speech → Delivery path.
+10. Repeat several times, including short taps, rapid repeated holds, and Chinese/English mixed content where relevant.
+11. Verify the previous clipboard content is restored after clipboard fallback unless another app/user changed the clipboard meanwhile.
 
 Also validate release during startup/session setup: releasing the shortcut must not allow a late microphone session to start afterward.
 
@@ -147,19 +185,20 @@ Native C frameworks that lack Swift 6 concurrency annotations may use an explici
 
 ## Logging and diagnostics
 
-As Phase 0 hardens, diagnostics should make the following distinguishable without logging private transcript content unnecessarily:
+Phase 0 diagnostics must make the following distinguishable without logging private transcript content unnecessarily:
 
 - capability failure;
 - permission state;
+- hotkey installation and physical shortcut events;
 - recording/session transition;
 - Speech asset availability/download failure;
 - transcription finalization failure;
 - focus restore failure;
 - AX insertion failure and clipboard fallback;
 - delivery success/failure;
-- latency checkpoints.
+- latency checkpoints as they are added.
 
-Do not log full user Capture content by default.
+The in-app debug window is the primary current runtime diagnostic surface. Do not log full user Capture content by default.
 
 ## Performance measurements
 
