@@ -24,6 +24,7 @@ Planned:
 - real iCloud/CloudKit container and entitlements;
 - CloudKit sync semantics;
 - iCloud/CloudKit capability check as part of full Private Mode readiness.
+- compressed source-audio preservation and re-recognition, defaulting to 7-day retention with a configurable day-based policy.
 
 Excluded:
 
@@ -50,6 +51,7 @@ Excluded:
 | Input-loop integration | IMPLEMENTED / VERIFY | Capture UUID is shared with the Phase 0 session UUID. Storage initialization failure blocks capture rather than silently running without durability. |
 | Native management window / History | IMPLEMENTED / VERIFY | One native `Window` + `NavigationSplitView` contains History, Settings, and Diagnostics. The SwiftData container is attached at the window root before History's `@Query` is constructed, keeping the initial History layout consistent; the menu-bar panel has one `Open Morie` entry instead of separate management destinations. |
 | App Context | IN PROGRESS | Source app name, bundle identifier and original window number are stored. Window title collection remains excluded until a minimal privacy-safe requirement is approved. |
+| Source audio / retry | TODO / REDESIGN | Audio-first semantics are approved. The attempted second `AVCaptureAudioFileOutput` was removed after a reproducible AVFoundation `SIGABRT` on macOS 27. Replacement must retain one authoritative data-output path, stream compressed audio, and pass real-device start/stop/failure validation before integration. |
 | Tests | IMPLEMENTED / PASS | Logic-only XCTest target covers delivered, delivery-failed, operational-failed and explicit-cancel paths plus persistence across store recreation. Tests use in-memory or unique temporary stores and do not launch Morie. |
 | iCloud/CloudKit | TODO | Requires the real container, entitlements, account/capability handling and sync validation. Local configuration explicitly uses `.none`; it does not pretend CloudKit is active. |
 
@@ -71,6 +73,7 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 - `xcodebuild -scheme Morie ... build`: succeeded with signing disabled using `/tmp/morie-derived-data.0FA3Lq`.
 - Management-window restructuring compiled successfully with signing disabled using `/tmp/morie-derived-data.2ZXLp8`.
 - Runtime History and capture-first behavior still require owner validation from the normal Xcode-signed launch.
+- 2026-09-18 real-device crash evidence: incident `F160F627-871F-4F35-A880-74BAFBE55D67` terminates in `AVCaptureAudioFileOutput.startRecording` immediately after `CaptureInputSequenceProvider` creation. The unsafe implementation was reverted in commits `37c7877` and `dd7c782`; strict Swift 6 type-check passes after restoration.
 
 ## Known design constraints
 

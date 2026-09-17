@@ -247,3 +247,10 @@ For each, record:
 ## Current assessment
 
 The first Morie Phase 0 skeleton is still provisional, but the goal is **not** to replace it with Type4Me's full mature machinery. The goal is to use Type4Me to identify which failure modes are worth protecting against, then implement only the macOS 27-native subset that Morie's design actually requires.
+
+M-003 source-audio evidence:
+
+- `ADAPT`: Type4Me's single authoritative `AVCaptureAudioDataOutput`, deterministic stop/drain/detach lifecycle, and streaming sample ownership.
+- `DROP`: full uncompressed PCM accumulation in memory and provider/runtime complexity.
+- `REJECTED`: adding `AVCaptureAudioFileOutput` beside Apple's `CaptureInputSequenceProvider` data output. Although `canAddOutput` returned true, macOS 27 threw an Objective-C exception from `startRecording` and aborted Morie on owner hardware.
+- Morie's replacement must preserve the approved 7-day compressed-audio policy while using one proven data-output path; it must not start a second microphone session.

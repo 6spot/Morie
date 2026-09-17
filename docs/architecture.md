@@ -269,6 +269,10 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 
 The local `ModelConfiguration` explicitly disables CloudKit until a real container and entitlements are configured. This is an implementation stage, not a Device Only product mode.
 
+M-003's approved persistence direction is audio-first: the durable raw Capture is compressed source audio, recognized text is the Speech result, and final text is the later post-processing result. Source audio defaults to 7-day retention, Settings will expose a day-based policy, and expiry removes audio without deleting text/history metadata. Encoding must stream to disk rather than retain a complete PCM recording in memory.
+
+The first attempted implementation using `AVCaptureAudioFileOutput` beside `CaptureInputSequenceProvider.captureAudioDataOutput` is rejected. On the owner's macOS 27 hardware, `canAddOutput` succeeded but `startRecording(to:outputFileType:recordingDelegate:)` raised an Objective-C exception inside AVFoundation and terminated Morie with `SIGABRT` (incident `F160F627-871F-4F35-A880-74BAFBE55D67`). Because this exception cannot be handled by Swift `throws`, that output must not be reintroduced without a proven Apple-supported configuration and real-device validation. The replacement must follow the proven single-`AVCaptureAudioDataOutput` ownership/lifecycle pattern and stream encoded samples without duplicating the microphone session.
+
 ### `CaptureHistoryView`
 
 Native SwiftUI/SwiftData History surface using system `List`, `ContentUnavailableView`, and `@Query`. It is intentionally a basic inspection surface while M-003 persistence semantics are validated.
