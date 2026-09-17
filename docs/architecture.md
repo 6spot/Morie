@@ -264,7 +264,7 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 - an intentional voice Capture is saved before Speech startup;
 - progressive recognition checkpoints update the same record with a bounded save cadence;
 - final recognition, delivery success, clipboard-preserved delivery failure, and operational failure become explicit durable lifecycle states;
-- explicit user cancellation discards the in-progress record;
+- explicit user cancellation and an empty final transcript discard the in-progress record; empty leftovers from an interrupted earlier build are removed when the store opens;
 - source application name, bundle identifier and original window identity are the current minimal App Context.
 
 The local `ModelConfiguration` explicitly disables CloudKit until a real container and entitlements are configured. This is an implementation stage, not a Device Only product mode.
@@ -275,7 +275,7 @@ Native SwiftUI/SwiftData History surface using system `List`, `ContentUnavailabl
 
 ### `MorieControlCenter`
 
-The primary management surface is one native SwiftUI `Window` with a standard `NavigationSplitView`. Its sidebar currently routes to History, Settings, and Diagnostics so product-management surfaces can grow without accumulating separate actions in the menu-bar panel. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
+The primary management surface is one native SwiftUI `Window` with a standard `NavigationSplitView`. Its sidebar currently routes to History, Settings, and Diagnostics so product-management surfaces can grow without accumulating separate actions in the menu-bar panel. The SwiftData container is attached at the window root before `@Query` builds the initial History detail, avoiding a different first-render environment. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
 
 ### `MorieTests`
 

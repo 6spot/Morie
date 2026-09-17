@@ -27,7 +27,6 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
 @MainActor
 struct MorieControlCenter: View {
     @ObservedObject var controller: AppController
-    let captureStore: CaptureStore?
 
     @State private var selection: ControlCenterSection? = .history
 
@@ -42,7 +41,7 @@ struct MorieControlCenter: View {
         } detail: {
             switch selection ?? .history {
             case .history:
-                history
+                CaptureHistoryView()
             case .settings:
                 MorieSettingsView(controller: controller)
             case .diagnostics:
@@ -51,18 +50,4 @@ struct MorieControlCenter: View {
         }
     }
 
-    @ViewBuilder
-    private var history: some View {
-        if let captureStore {
-            CaptureHistoryView()
-                .modelContainer(captureStore.container)
-        } else {
-            ContentUnavailableView(
-                "History Unavailable",
-                systemImage: "exclamationmark.triangle",
-                description: Text("Morie could not open Capture storage.")
-            )
-            .navigationTitle("History")
-        }
-    }
 }

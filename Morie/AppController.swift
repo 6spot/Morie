@@ -392,14 +392,15 @@ final class AppController: ObservableObject {
 
             transcript = finalText
             Diagnostics.record("Speech", "Final transcript ready; characters=\(finalText.count)")
-            try captureStore?.completeRecognition(finalText, for: sessionID)
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                Diagnostics.record("Delivery", "Final transcript is empty; nothing to inject", level: .warning)
-                try captureStore?.markDelivered(sessionID)
+                Diagnostics.record("CaptureStore", "Discarding empty Capture \(label(sessionID))", level: .warning)
+                try captureStore?.cancel(sessionID)
                 completeSuccessfulSession(sessionID)
                 return
             }
+
+            try captureStore?.completeRecognition(finalText, for: sessionID)
 
             state = .delivering
             hud.showProcessing()

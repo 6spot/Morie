@@ -90,6 +90,24 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertEqual(record.sourceBundleIdentifier, "com.apple.dt.Xcode")
     }
 
+    func testStoreRecreationRemovesEmptyPersistedCapture() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "MorieEmptyCaptureTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let storeURL = directory.appending(path: "captures.store")
+        let id = UUID()
+
+        do {
+            let store = try CaptureStore(storageURL: storeURL)
+            try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        }
+
+        let reopenedStore = try CaptureStore(storageURL: storeURL)
+        XCTAssertNil(try fetch(id, from: reopenedStore))
+    }
+
     private func fetch(_ id: UUID, from store: CaptureStore) throws -> CaptureRecord? {
         var descriptor = FetchDescriptor<CaptureRecord>(
             predicate: #Predicate { $0.id == id }

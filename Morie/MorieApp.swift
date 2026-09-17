@@ -26,7 +26,16 @@ struct MorieApp: App {
         .menuBarExtraStyle(.window)
 
         Window("Morie", id: "control-center") {
-            MorieControlCenter(controller: controller, captureStore: captureStore)
+            if let captureStore {
+                MorieControlCenter(controller: controller)
+                    .modelContainer(captureStore.container)
+            } else {
+                ContentUnavailableView(
+                    "Morie Unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("Morie could not open Capture storage.")
+                )
+            }
         }
         .defaultSize(width: 920, height: 600)
 

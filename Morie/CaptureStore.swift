@@ -30,6 +30,7 @@ final class CaptureStore {
             )
         }
         container = try ModelContainer(for: schema, configurations: [configuration])
+        try removeEmptyRecords()
     }
 
     func beginVoiceCapture(
@@ -104,6 +105,21 @@ final class CaptureStore {
         records[id] = nil
         lastProgressiveSave[id] = nil
         Diagnostics.record("CaptureStore", "Capture \(label(id)) saved with lifecycle=\(lifecycle.rawValue)")
+    }
+
+    private func removeEmptyRecords() throws {
+        let descriptor = FetchDescriptor<CaptureRecord>()
+        let emptyRecords = try container.mainContext.fetch(descriptor).filter {
+            $0.recognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && $0.finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard !emptyRecords.isEmpty else { return }
+
+        for record in emptyRecords {
+            container.mainContext.delete(record)
+        }
+        try container.mainContext.save()
+        Diagnostics.record("CaptureStore", "Removed \(emptyRecords.count) empty persisted Capture(s)")
     }
 
     private func label(_ id: UUID) -> String {
