@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import Foundation
 
 struct TextInjector {
@@ -21,14 +20,8 @@ struct TextInjector {
     }
 
     private static let syntheticInputEventMarker = Int64.random(in: 1...Int64.max)
-
-    /// Real macOS 27 validation showed that QQ can return `.success` for a
-    /// `kAXSelectedTextAttribute` write while silently ignoring the text.
-    /// Keep this evidence-driven and app-specific instead of treating every
-    /// Electron-style application as incompatible with direct AX insertion.
-    private static let directAXKnownUnreliableBundles: Set<String> = [
-        "com.tencent.qq",
-    ]
+    private static let focusHandoffDelay: Duration = .milliseconds(100)
+    private static let clipboardRestoreDelay: Duration = .milliseconds(500)
 
     static func markAsSyntheticInput(_ event: CGEvent) {
         event.setIntegerValueField(.eventSourceUserData, value: syntheticInputEventMarker)
@@ -50,7 +43,11 @@ struct TextInjector {
               !application.isTerminated,
               application.bundleIdentifier != Bundle.main.bundleIdentifier
         else {
-            Diagnostics.record("Delivery", "Target application missing/terminated/self; preserving transcript on clipboard", level: .error)
+            Diagnostics.record(
+                "Delivery",
+                "Target application missing/terminated/self; preserving transcript on clipboard",
+                level: .error
+            )
             copyToClipboard(text)
             throw InjectionError.noTargetApplication
         }
@@ -66,74 +63,31 @@ struct TextInjector {
             throw InjectionError.focusRestoreFailed
         }
 
-        try await Task.sleep(for: .milliseconds(100))
+        try await Task.sleep(for: Self.focusHandoffDelay)
         Diagnostics.record("Delivery", "Focus handoff grace period completed")
 
-        let skipDirectAX = Self.directAXKnownUnreliableBundles.contains(targetBundle)
-        if skipDirectAX {
+        // Morie intentionally uses one generic delivery mechanism for current-app
+        // insertion. Direct AX writes can report success while some editors ignore
+        // the mutation, which makes success impossible to trust uniformly. A
+        // temporary clipboard value plus a synthetic Cmd+V exercises the same
+        // standard paste path the target application already supports for users.
+        Diagnostics.record("Delivery", "Using universal clipboard Cmd+V delivery")
+
+        guard await pasteThroughClipboard(text) else {
+            copyToClipboard(text)
             Diagnostics.record(
                 "Delivery",
-                "Skipping direct AX insertion for \(targetBundle): macOS 27 validation reproduced AX success with no visible text",
-                level: .warning
+                "Clipboard Cmd+V delivery failed; transcript left on clipboard",
+                level: .error
             )
-        } else if setSelectedTextWithAccessibility(text) {
-            Diagnostics.record("Delivery", "Accessibility selected-text injection succeeded")
-            return
-        }
-
-        Diagnostics.record("Delivery", "Using clipboard Cmd+V fallback", level: .warning)
-        let restoreDelay: Duration = skipDirectAX ? .milliseconds(500) : .milliseconds(300)
-        guard await pasteThroughClipboard(text, restoreDelay: restoreDelay) else {
-            copyToClipboard(text)
-            Diagnostics.record("Delivery", "Clipboard Cmd+V fallback failed; transcript left on clipboard", level: .error)
             throw InjectionError.pasteFailed
         }
 
-        Diagnostics.record("Delivery", "Clipboard Cmd+V fallback dispatched")
-    }
-
-    private func setSelectedTextWithAccessibility(_ text: String) -> Bool {
-        let system = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(system, 0.20)
-
-        var focused: CFTypeRef?
-        let focusResult = AXUIElementCopyAttributeValue(
-            system,
-            kAXFocusedUIElementAttribute as CFString,
-            &focused
-        )
-
-        guard focusResult == .success, let focused else {
-            Diagnostics.record(
-                "Delivery",
-                "Could not resolve focused AX element; result=\(String(describing: focusResult))",
-                level: .warning
-            )
-            return false
-        }
-
-        let element = unsafeDowncast(focused, to: AXUIElement.self)
-        AXUIElementSetMessagingTimeout(element, 0.20)
-
-        let setResult = AXUIElementSetAttributeValue(
-            element,
-            kAXSelectedTextAttribute as CFString,
-            text as CFTypeRef
-        )
-
-        if setResult != .success {
-            Diagnostics.record(
-                "Delivery",
-                "AX selected-text write failed; result=\(String(describing: setResult))",
-                level: .warning
-            )
-        }
-
-        return setResult == .success
+        Diagnostics.record("Delivery", "Clipboard Cmd+V delivery dispatched")
     }
 
     @MainActor
-    private func pasteThroughClipboard(_ text: String, restoreDelay: Duration) async -> Bool {
+    private func pasteThroughClipboard(_ text: String) async -> Bool {
         let pasteboard = NSPasteboard.general
         let snapshot = ClipboardSnapshot.capture(from: pasteboard)
         Diagnostics.record("Clipboard", "Captured restorable clipboard snapshot; items=\(snapshot.itemCount)")
@@ -143,6 +97,7 @@ struct TextInjector {
             Diagnostics.record("Clipboard", "Failed to write transcript to pasteboard", level: .error)
             return false
         }
+
         let transcriptChangeCount = pasteboard.changeCount
         Diagnostics.record("Clipboard", "Temporary transcript written; changeCount=\(transcriptChangeCount)")
 
@@ -163,7 +118,7 @@ struct TextInjector {
         Diagnostics.record("Delivery", "Synthetic Cmd+V posted")
 
         Task { @MainActor in
-            try? await Task.sleep(for: restoreDelay)
+            try? await Task.sleep(for: Self.clipboardRestoreDelay)
             let restored = snapshot.restore(to: pasteboard, expectedChangeCount: transcriptChangeCount)
             if restored {
                 Diagnostics.record("Clipboard", "Previous clipboard restored")
