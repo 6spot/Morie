@@ -1,0 +1,36 @@
+name: macOS 27 Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Xcode 27 compile
+    runs-on: xcode-27
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+
+      - name: Build Morie
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Morie.xcodeproj \
+            -target Morie \
+            -configuration Debug \
+            -sdk macosx27.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
