@@ -29,7 +29,7 @@ Current target settings include:
 - automatic code signing;
 - microphone and Speech usage descriptions.
 
-Before a distributable build, verify the signing team, bundle identifier, entitlements, version/build numbers, and release identity in Xcode.
+Before a distributable build, verify the signing team, bundle identifier, entitlements, version/build numbers, and release identity in Xcode. Local Xcode runs use the repository target's Apple Development Team setting so privacy permissions remain attached to a stable signed identity across rebuilds.
 
 ## Local development deployment
 

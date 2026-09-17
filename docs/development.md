@@ -18,7 +18,7 @@ Morie intentionally does not support older Macs by adding alternate ASR/LLM runt
 2. Create or check out a task branch from current `main`.
 3. Open `Morie.xcodeproj` in Xcode.
 4. Select the `Morie` target.
-5. Configure your Development Team if Xcode requests signing configuration.
+5. Confirm the Morie target uses the repository's Apple Development Team setting. If your local certificate/account changes, select the matching Development Team before running.
 6. Build and run on a supported Mac.
 
 Command-line compile validation must use isolated temporary DerivedData so it cannot overwrite the signed app used by an active Xcode session:
@@ -37,6 +37,8 @@ xcodebuild \
 ```
 
 Disabling signing here is for compile validation only; normal local launch/distribution follows the appropriate signing path. Never direct this unsigned build into the repository `build/Debug/Morie.app` while Xcode is running it, because changing the executable's signing identity can invalidate TCC permissions and make microphone behavior impossible to interpret.
+
+Do not launch or register unsigned validation products. A local Xcode run must use the target's Apple Development signature; ad-hoc signatures use a changing code-directory hash and therefore do not provide a stable TCC identity across rebuilds. If an unsigned duplicate with the same bundle identifier has been launched, stop it and unregister that stale app path before diagnosing Microphone/Speech/Accessibility behavior.
 
 ## Unit tests
 
