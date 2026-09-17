@@ -2,7 +2,13 @@
 
 This document defines the real-device acceptance checks for **M-002 — macOS Input Foundation**.
 
-Phase 0 cannot be marked `DONE` solely from static review or compilation. Global keyboard capture, microphone behavior, focus restoration, Accessibility APIs, and editor-specific insertion must be exercised on a supported Mac.
+Phase 0 cannot be marked `DONE` solely from static review or compilation. Global keyboard capture, microphone behavior, permission lifecycle, focus restoration, Accessibility APIs, and editor insertion must be exercised on a supported Mac.
+
+## Compile gate
+
+Product/Xcode-project changes must first pass `.github/workflows/macos-27-build.yml` on the hosted macOS 27 / Xcode 27 environment.
+
+This proves current SDK/Swift compilation only. It does not replace any runtime check below.
 
 ## Test environment
 
@@ -21,14 +27,15 @@ Record for each validation run:
 Verify:
 
 - supported Mac + Apple Intelligence available → passes model capability check;
-- unsupported/unavailable model state → Morie remains blocked with a useful reason;
+- unavailable model state → Morie remains blocked with a useful reason;
 - unsupported Speech locale → blocked rather than silently falling back;
 - denied microphone permission → blocked/recoverable;
 - denied Speech permission → blocked/recoverable;
 - missing Accessibility trust → blocked/recoverable;
-- rechecking after permission changes can reach Ready without relaunch where platform behavior permits.
+- rechecking after permission changes can reach Ready without adding a fallback implementation;
+- revoking Accessibility after startup does not leave a broken/stuck global shortcut session.
 
-CloudKit/iCloud is intentionally not part of the Phase 0 gate yet; it will be added with the real Phase 1 container and entitlements.
+CloudKit/iCloud is intentionally not part of the Phase 0 gate; M-003 adds it with the real container/entitlements.
 
 ## Push-to-talk lifecycle
 
@@ -45,13 +52,34 @@ Verify repeated sequences:
 
 Also test:
 
-- very short press;
+- very short press/release while Speech session setup is still starting — no late/orphaned recording may appear afterward;
+- rapid repeated holds;
 - long utterance;
-- key repeat while held;
-- release after modifier changes;
+- key autorepeat while held — recording starts only once;
+- release Space after releasing Control first — the active hold still ends once;
+- press additional modifiers while held;
 - switching/closing target app during recording;
+- Accessibility revocation after Morie has reached Ready;
 - microphone interruption where practical;
 - capture/transcription error followed by another successful attempt.
+
+Record any stuck hotkey, duplicate start/stop, orphan microphone indicator, or event that leaks unexpectedly into the target application.
+
+## Session identity / stale result checks
+
+Exercise timing-sensitive transitions deliberately:
+
+- start → immediate release → new start;
+- start → error/cancel → immediate new start;
+- finalize one utterance while rapidly beginning the next after Ready returns;
+- repeat short sessions around Speech asset/session initialization.
+
+Expected behavior:
+
+- a previous session's partial/final callback never changes the visible transcript of a newer session;
+- a cancelled setup never starts recording later;
+- only the active session can finalize/deliver;
+- every terminal path releases recording resources.
 
 ## Transcription
 
@@ -64,7 +92,7 @@ Test at least:
 - project/product names to establish a Phase 0 baseline before Vocabulary learning exists;
 - quiet and normal office acoustic conditions.
 
-Record whether partial text is sensible and whether finalization changes the text materially.
+Record whether partial/volatile text is sensible, whether finalization changes it materially, and whether the end of a short utterance is ever lost on release.
 
 ## Delivery behavior
 
@@ -78,12 +106,16 @@ For every target app, validate:
 - Chinese/English mixed text survives insertion;
 - repeated captures do not progressively lose focus;
 - undo behavior is acceptable;
-- clipboard fallback does not leave Morie transcript in the clipboard after restoration in ordinary cases;
+- clipboard fallback does not overwrite a newer clipboard change;
+- ordinary fallback restores the previous text-like clipboard value after delivery;
+- Morie's synthetic Cmd+V never triggers the push-to-talk shortcut path;
 - no unexpected keystrokes are delivered to the target.
+
+Do not add an app-specific workaround merely because an app fails once. Reproduce on macOS 27, record the exact failure here/M-002, then implement the smallest native fix.
 
 ## Compatibility matrix
 
-Use the following as the first mandatory matrix. Add discovered problem cases rather than removing them silently.
+Use the following as the first representative matrix. The purpose is to validate Morie's generic path across common native/web/electron/editor surfaces, not to create a permanent per-app compatibility subsystem.
 
 | App | App/version | Focus restore | AX insert | Clipboard fallback | Mixed text | Multiline | Repeat input | Undo | Result / notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -101,7 +133,19 @@ Use the following as the first mandatory matrix. Add discovered problem cases ra
 | Pages | TBD | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | Not tested |
 | Microsoft Word | TBD | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | Not tested |
 
-When AX insertion is unsupported but clipboard fallback works reliably, record that explicitly; it can still be an acceptable compatibility result.
+When AX insertion is unsupported but the generic clipboard fallback works reliably, record that explicitly; it can still be an acceptable compatibility result.
+
+## Shortcut conflict check
+
+`Control + Space` is the current Phase 0 binding, not yet a frozen product default.
+
+On the validation Mac, record:
+
+- configured input-source shortcuts;
+- whether `Control + Space` conflicts with system/user input switching;
+- whether Morie consuming the shortcut causes unacceptable side effects.
+
+If a conflict is material, resolve the product shortcut decision directly rather than building broad hotkey compatibility machinery.
 
 ## Reliability run
 
@@ -110,10 +154,10 @@ After individual app checks, perform repeated use rather than only one-shot test
 Suggested initial baseline:
 
 - at least 50 consecutive captures across several target apps;
-- include rapid back-to-back captures;
-- record any lost capture, stuck recording state, duplicate delivery, wrong target, failed focus restore, or paste failure.
+- include rapid back-to-back captures and very short holds;
+- record any lost capture, stuck recording state, duplicate delivery, wrong target, failed focus restore, orphan microphone session, or paste failure.
 
-The objective is to discover state/lifecycle defects before Memory work starts.
+The objective is to discover lifecycle defects before Memory work starts.
 
 ## Performance baseline
 
@@ -141,4 +185,4 @@ When validation is complete, update:
 - [`tasks.md`](./tasks.md) task state;
 - PR #3 with the tested environment/results.
 
-Do not replace test evidence with assumptions or static code inspection.
+Do not replace device/runtime evidence with assumptions, Type4Me history, or compile success.
