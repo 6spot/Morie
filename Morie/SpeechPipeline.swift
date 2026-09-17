@@ -248,16 +248,27 @@ actor SpeechPipeline {
 
         levelTask = Task {
             Diagnostics.record("Speech", "Native microphone level polling started for \(session)")
-            var smoothed = 0.0
+            var sampleCount = 0
 
             while !Task.isCancelled {
                 guard activeSessionID == sessionID else { return }
 
                 let channels = provider.captureSession.connections.flatMap(\.audioChannels)
                 let averagePower = channels.map(\.averagePowerLevel).max() ?? -60
+                let peakPower = channels.map(\.peakHoldLevel).max() ?? -60
                 let normalized = Self.normalizedPower(averagePower)
-                smoothed = smoothed * 0.7 + normalized * 0.3
-                onAudioLevel(sessionID, smoothed)
+
+                // Keep the audio signal raw here. The HUD owns visual shaping/history;
+                // pre-smoothing at the capture layer makes normal speech look flat.
+                onAudioLevel(sessionID, normalized)
+
+                sampleCount += 1
+                if sampleCount.isMultiple(of: 20) {
+                    Diagnostics.record(
+                        "Audio",
+                        "Meter \(session): channels=\(channels.count), average=\(String(format: \"%.1f\", averagePower))dB, peak=\(String(format: \"%.1f\", peakPower))dB, normalized=\(String(format: \"%.3f\", normalized)), captureRunning=\(provider.captureSession.isRunning)"
+                    )
+                }
 
                 try? await Task.sleep(for: .milliseconds(50))
             }
