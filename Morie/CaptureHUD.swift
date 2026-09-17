@@ -81,7 +81,7 @@ final class CaptureHUDController {
     }
 
     private func makePanel() -> NSPanel {
-        let size = NSSize(width: 228, height: 68)
+        let size = NSSize(width: 170, height: 50)
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -116,7 +116,7 @@ final class CaptureHUDController {
         let frame = panel.frame
         let origin = NSPoint(
             x: visibleFrame.midX - frame.width / 2,
-            y: visibleFrame.minY + 72
+            y: visibleFrame.minY + 58
         )
 
         panel.setFrameOrigin(origin)
@@ -133,7 +133,7 @@ private final class CaptureHUDModel: ObservableObject {
     }
 
     @Published var phase: Phase = .recording
-    @Published private(set) var levels = Array(repeating: 0.03, count: 13)
+    @Published private(set) var levels = Array(repeating: 0.03, count: 11)
 
     var onCancel: (() -> Void)?
     var onConfirm: (() -> Void)?
@@ -164,48 +164,92 @@ private struct CaptureHUDView: View {
     @ObservedObject var model: CaptureHUDModel
 
     var body: some View {
-        HStack(spacing: 14) {
+        Group {
             switch model.phase {
             case .recording:
-                hudButton(systemImage: "xmark", action: model.cancel)
+                HStack(spacing: 8) {
+                    hudButton(
+                        systemImage: "xmark",
+                        foreground: .white,
+                        background: Color(nsColor: .darkGray),
+                        action: model.cancel
+                    )
 
-                AudioLevelBars(levels: model.levels)
-                    .frame(width: 92, height: 34)
+                    AudioLevelBars(levels: model.levels)
+                        .frame(width: 70, height: 26)
 
-                hudButton(systemImage: "checkmark", action: model.confirm)
+                    hudButton(
+                        systemImage: "checkmark",
+                        foreground: .black,
+                        background: .white,
+                        action: model.confirm
+                    )
+                }
 
             case .processing:
-                Spacer(minLength: 0)
-                ProgressView()
-                    .controlSize(.regular)
-                Spacer(minLength: 0)
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color(nsColor: .darkGray))
+                        .frame(width: 34, height: 34)
+                        .overlay {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.45))
+                        }
+
+                    Spacer(minLength: 0)
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                    Spacer(minLength: 0)
+
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 34, height: 34)
+                        .overlay {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.black)
+                        }
+                }
 
             case .success:
-                Spacer(minLength: 0)
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 30, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                Spacer(minLength: 0)
+                HStack {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
 
             case .failure:
-                Spacer(minLength: 0)
-                Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 30, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                Spacer(minLength: 0)
+                HStack {
+                    Spacer()
+                    Image(systemName: "exclamationmark")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
             }
         }
-        .padding(.horizontal, 12)
-        .frame(width: 228, height: 68)
-        .background(.ultraThinMaterial, in: Capsule())
+        .padding(6)
+        .frame(width: 170, height: 50)
+        .background(.black, in: Capsule())
     }
 
-    private func hudButton(systemImage: String, action: @escaping () -> Void) -> some View {
+    private func hudButton(
+        systemImage: String,
+        foreground: Color,
+        background: Color,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 19, weight: .semibold))
-                .frame(width: 42, height: 42)
-                .background(.regularMaterial, in: Circle())
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(foreground)
+                .frame(width: 34, height: 34)
+                .background(background, in: Circle())
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
     }
@@ -215,14 +259,14 @@ private struct AudioLevelBars: View {
     let levels: [Double]
 
     var body: some View {
-        HStack(alignment: .center, spacing: 3) {
+        HStack(alignment: .center, spacing: 2.5) {
             ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
                 Capsule()
-                    .fill(.primary)
-                    .frame(width: 3, height: 5 + 27 * level)
+                    .fill(.white)
+                    .frame(width: 2.5, height: 4 + 22 * level)
             }
         }
         .frame(maxHeight: .infinity, alignment: .center)
-        .animation(.linear(duration: 0.08), value: levels)
+        .animation(.linear(duration: 0.07), value: levels)
     }
 }
