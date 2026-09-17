@@ -4,16 +4,16 @@ This file defines the working rules for humans and coding agents contributing to
 
 ## Source of truth
 
-Read these before changing code:
+Read these before changing code, in this order:
 
 1. `README.md` — project direction and current status.
-2. `docs/product-architecture-baseline.md` — approved product/architecture constraints.
-3. `docs/design/apple-native-first-v0-baseline-v2.md` — repository copy of the approved design baseline.
-4. `docs/ui-design.md` — macOS 27 native UI / Liquid Glass rules.
-5. `docs/architecture.md` — current code/module architecture.
-6. `docs/reference/type4me.md` — Type4Me reference/migration boundary for input infrastructure.
-7. `docs/tasks.md` — master task plan and overall progress.
-8. `docs/tasks/M-xxx-*.md` — detailed execution record for the active task.
+2. `docs/design/apple-native-first-v0-baseline-v2.md` — repository copy of the approved design baseline and owner-approved amendments.
+3. `docs/product-architecture-baseline.md` — approved product/architecture constraints.
+4. `docs/architecture.md` — current code/module architecture.
+5. `docs/ui-design.md` — macOS 27 native UI / Liquid Glass rules.
+6. `docs/tasks.md` — master task plan and overall progress.
+7. `docs/tasks/M-xxx-*.md` — detailed execution record for the active task.
+8. `docs/reference/type4me.md` — Type4Me reference/migration boundary, consulted only after the Morie requirement is understood.
 9. `docs/development.md` — local development workflow.
 10. `docs/deployment.md` — build, signing, packaging, and release workflow.
 11. `docs/validation.md` — Phase 0 real-device validation matrix.
@@ -23,14 +23,15 @@ When implementation changes behavior, update the relevant documentation in the s
 ## Non-negotiable product constraints
 
 - **macOS First**: finish the macOS input loop before building iOS.
-- **Latest Apple Only**: target macOS 27+ and Apple Intelligence-capable Macs. Do not add legacy-platform compatibility layers.
+- **Latest Apple Only**: start at macOS 27+ and Apple Intelligence-capable Macs. Do not add old-platform or old-API compatibility layers.
 - **Apple Native First**: the Apple system implementation is the default and required implementation path.
 - **Native UI Only**: product UI must use Apple system UI components and the native macOS 27 Liquid Glass design language. Do not replace a system component with a custom imitation.
 - **Private Mode first**: V0 has no Morie cloud backend.
 - **No Device Only mode**: Private Mode is Apple-native local intelligence plus iCloud/CloudKit once persistence ships.
 - **Capture First**: intentional user input must be durably saved before AI enrichment once Phase 1 persistence exists.
 - **Expression First**: personalization must not make ordinary voice input slow or unreliable.
-- **Reuse Proven Input Infrastructure**: Phase 0 is not a from-scratch voice-input rewrite. Type4Me is the reference implementation for already-proven recording/session/hotkey/focus/injection/Speech patterns. Reuse, extract, or adapt proven behavior where it still matches Morie's Latest Apple Only constraints.
+- **Morie Architecture First**: architecture/design/task requirements are decided from Morie's documents first. Type4Me never overrides them.
+- **Reuse Proven Lessons, Not Compatibility Baggage**: Type4Me is an experience/reference source for solved input problems, not a compatibility target or migration template.
 
 ## Native UI policy — hard approval gate
 
@@ -72,6 +73,7 @@ For Phase 0, the expected third-party dependency count is **zero**.
 ## Platform/API policy
 
 - Use the newest stable Apple APIs available to the macOS 27 deployment target.
+- Do not preserve or recreate old-macOS compatibility behavior without reproducing a current macOS 27 requirement.
 - Speech recognition uses the modern Speech stack (`SpeechAnalyzer`, `SpeechTranscriber`, `AssetInventory`, related capture APIs).
 - Do not introduce `SFSpeechRecognizer` as a recognition fallback. It may only be used where Apple still requires it for authorization until a newer authorization API replaces it.
 - Foundation Models capability checks use `SystemLanguageModel`.
@@ -81,18 +83,34 @@ For Phase 0, the expected third-party dependency count is **zero**.
 
 Reference repository: `joewongjc/type4me`.
 
-Before implementing or redesigning a Phase 0 input-infrastructure behavior, inspect the corresponding mature Type4Me path and its tests/review history. Important reference areas include:
+The mandatory order is:
+
+`Morie design → Morie architecture → active Morie task → exact macOS 27 requirement → Type4Me reference → smallest Apple-native implementation`
+
+Never start from Type4Me code and then bend Morie around it.
+
+Before implementing or redesigning a Phase 0 input behavior, inspect only the relevant Type4Me path and tests/review history to learn which failure modes were real. Then determine whether those failure modes still apply to macOS 27.
+
+Important reference areas include:
 
 - `Type4Me/Audio/AudioCaptureEngine.swift`
 - `Type4Me/Session/RecognitionSession.swift`
 - `Type4Me/Input/HotkeyManager.swift`
 - `Type4Me/Injection/TextInjectionEngine.swift`
-- Apple Speech implementation under `Type4Me/ASR/`
+- Apple Speech behavior under `Type4Me/ASR/`
 - permission/onboarding handling
 - focus/target capture logic
 - hotword/vocabulary and correction-learning paths when those phases begin
 
-Do not copy Type4Me wholesale. Morie intentionally excludes its multi-provider, Python, sherpa-onnx, old-runtime and subscription complexity. The rule is: **reuse proven behavior, remove irrelevant architecture, modernize to the macOS 27 Apple-native path**.
+Use these decision labels:
+
+- `ADAPT` — proven concept still matters; reimplement the smallest macOS 27-native version.
+- `DROP` — unnecessary under Morie's architecture/platform baseline.
+- `VERIFY` — only add compatibility logic after reproducing the issue on current macOS 27.
+
+Do not migrate Type4Me's generalized compatibility surface merely because it exists. In particular, Morie does not automatically inherit multi-hotkey/media/mouse behavior, broad device compatibility, old-system workarounds, old Speech paths, provider routers, Python, sherpa-onnx, C/C++ bridges, subscription/build variants, or external runtimes.
+
+Any code copied substantially from Type4Me must also preserve applicable MIT attribution/license requirements. Prefer concept-level adaptation against current Apple APIs.
 
 ## Architecture boundaries
 
@@ -102,15 +120,15 @@ Current Phase 0 responsibilities:
 
 - native macOS 27 app shell and Liquid Glass UI;
 - capability gate;
-- proven global push-to-talk behavior;
+- focused global push-to-talk interaction;
 - audio capture/session lifecycle;
 - latest Apple Speech transcription;
 - frontmost-app/target capture;
 - focus restore;
 - text injection and clipboard fallback;
-- Type4Me reference audit and selective migration.
+- Type4Me reference audit only for currently relevant failure modes.
 
-Do not pull Phase 1+ persistence, Memory, iOS, provider abstractions, MCP, or Morie Cloud into a Phase 0 change unless the task explicitly requires it.
+Do not pull Phase 1+ persistence, Memory, iOS, provider abstractions, MCP, Morie Cloud, or generalized backward-compatibility systems into a Phase 0 change unless the task explicitly requires it.
 
 ## Task workflow
 
@@ -143,13 +161,13 @@ Rules:
 
 ## Code quality
 
-- Use Swift Concurrency rather than ad-hoc thread management where it fits the platform API.
+- Use Swift Concurrency rather than ad-hoc thread management where it fits the current Apple API.
 - Keep state transitions explicit for recording/delivery flows.
 - Failure and cancellation paths must release microphone/capture resources.
 - Never lose the user's intentional capture because AI processing failed once persistence is introduced.
 - Prefer small, testable types over provider-style abstraction layers that are not yet needed.
-- Avoid speculative architecture.
-- Prefer extracting proven Type4Me behavior over re-inventing already-solved input infrastructure.
+- Avoid speculative architecture and speculative compatibility code.
+- Use Type4Me to identify proven failure modes, then implement only the current macOS 27-native protection Morie actually needs.
 
 ## Documentation rule
 
