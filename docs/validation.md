@@ -38,15 +38,6 @@ Verify:
 
 CloudKit/iCloud is intentionally not part of the Phase 0 gate; M-003 adds it with the real container/entitlements.
 
-M-003 source-audio validation (owner hardware):
-
-- a completed capture produces Speech output and one playable mono AAC `.m4a` source asset without opening a second microphone session;
-- an empty or failed recognition remains visible as a recoverable Capture while its source audio is retained;
-- explicit user cancellation removes its temporary source audio and Capture record;
-- Settings defaults retention to 7 days, accepts 1–365 days, and applies policy changes without deleting text/history metadata;
-- expiry removes only the audio asset; the Capture record and any recognized/final text remain;
-- measure representative file size, CPU and memory during a long capture; confirm encoding streams to disk and remains near the 32 kbps target (approximately 14 MB/hour).
-
 ## Toggle-capture lifecycle
 
 Verify repeated sequences:

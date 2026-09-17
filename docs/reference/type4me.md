@@ -247,9 +247,3 @@ For each, record:
 ## Current assessment
 
 The first Morie Phase 0 skeleton is still provisional, but the goal is **not** to replace it with Type4Me's full mature machinery. The goal is to use Type4Me to identify which failure modes are worth protecting against, then implement only the macOS 27-native subset that Morie's design actually requires.
-
-For M-003 source-audio preservation, the current decision is:
-
-- `ADAPT`: keep one authoritative capture session and preserve the full source recording for later recognition retry;
-- `DROP`: Type4Me's complete uncompressed PCM accumulation in memory and its provider/runtime complexity;
-- Morie path: attach Apple-native compressed recording to the existing `CaptureInputSequenceProvider` session, stream mono AAC into an `.m4a` file, and retain it for 7 days by default under a user-configurable day-based policy.

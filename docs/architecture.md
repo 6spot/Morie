@@ -269,17 +269,6 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 
 The local `ModelConfiguration` explicitly disables CloudKit until a real container and entitlements are configured. This is an implementation stage, not a Device Only product mode.
 
-M-003's approved source-preservation direction is audio-first rather than an empty database placeholder:
-
-- one microphone capture session feeds both Apple Speech and an Apple-native compressed source recording;
-- source audio is stored as mono AAC in an `.m4a` container, targeting speech quality and bounded disk usage rather than uncompressed PCM;
-- the default source-audio retention period is 7 days and Settings will allow a day-based policy;
-- a recording with meaningful audio but no recognized text remains recoverable for another recognition attempt;
-- recognized text and the post-processing final text are separate states; final text is saved after processing;
-- expiration removes the source audio asset, not the Capture's text/history metadata.
-
-At approximately 32 kbps, compressed source audio uses about 14 MB per recorded hour. It is a disk-retention concern, not resident memory: encoding must stream to file rather than accumulating a complete recording in RAM.
-
 ### `CaptureHistoryView`
 
 Native SwiftUI/SwiftData History surface using system `List`, `ContentUnavailableView`, and `@Query`. It is intentionally a basic inspection surface while M-003 persistence semantics are validated.
