@@ -7,11 +7,13 @@ This file defines the working rules for humans and coding agents contributing to
 Read these before changing code:
 
 1. `README.md` — project direction and current status.
-2. `docs/architecture.md` — product/technical architecture constraints.
-3. `docs/tasks.md` — task scope and completion state.
-4. `docs/development.md` — local development workflow.
-5. `docs/deployment.md` — build, signing, packaging, and release workflow.
-6. `docs/validation.md` — Phase 0 real-device validation matrix.
+2. `docs/product-architecture-baseline.md` — approved product/architecture constraints.
+3. `docs/architecture.md` — current code/module architecture.
+4. `docs/tasks.md` — master task plan and overall progress.
+5. `docs/tasks/M-xxx-*.md` — detailed execution record for the active task.
+6. `docs/development.md` — local development workflow.
+7. `docs/deployment.md` — build, signing, packaging, and release workflow.
+8. `docs/validation.md` — Phase 0 real-device validation matrix.
 
 When implementation changes behavior, update the relevant documentation in the same pull request.
 
@@ -62,11 +64,22 @@ Do not pull Phase 1+ persistence, Memory, iOS, provider abstractions, MCP, or Mo
 
 ## Task workflow
 
-- Every implementation task must exist in `docs/tasks.md`.
-- Update task status in the same PR as the implementation.
-- Keep GitHub Issue and `docs/tasks.md` aligned when an Issue exists.
-- Use one of: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`.
-- Do not mark device-dependent work `DONE` until it has actually been validated on supported hardware.
+Morie uses two documentation levels for tasks:
+
+- `docs/tasks.md` is the **master task overview and progress index**.
+- `docs/tasks/M-xxx-*.md` is the **detailed record for one task**.
+
+Rules:
+
+1. Every implementation task gets a stable `M-xxx` ID and a row in `docs/tasks.md`.
+2. As soon as a task becomes `IN PROGRESS`, create its dedicated file under `docs/tasks/`.
+3. The detail file records: why, scope, exclusions, acceptance criteria, subtasks/progress, implementation notes, validation evidence, blockers/known issues, follow-up, and Issue/PR references.
+4. `docs/tasks.md` must remain concise; do not turn it into an implementation log.
+5. Update the task detail file in the same PR as meaningful implementation progress.
+6. If task-level status changes, update `docs/tasks.md` in the same PR.
+7. Keep GitHub Issue/PR and repository task docs linked, but GitHub metadata does not replace the repository task record.
+8. Use one of the task states: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`.
+9. Do not mark device-dependent work `DONE` until it has actually been validated on supported hardware.
 
 ## Pull request workflow
 
@@ -74,7 +87,7 @@ Do not pull Phase 1+ persistence, Memory, iOS, provider abstractions, MCP, or Mo
 - Keep acceptance criteria explicit.
 - Update docs with code.
 - Run all checks available in the current environment.
-- If a check cannot be run because it needs macOS/Xcode/Apple Intelligence hardware, state that clearly in the PR and leave the relevant validation task open.
+- If a check cannot be run because it needs macOS/Xcode/Apple Intelligence hardware, state that clearly in the PR and leave the relevant validation item open.
 - Do not merge Phase 0 until the required real-device compatibility matrix is completed or the project owner explicitly narrows the acceptance criteria.
 
 ## Code quality
@@ -88,4 +101,10 @@ Do not pull Phase 1+ persistence, Memory, iOS, provider abstractions, MCP, or Mo
 
 ## Documentation rule
 
-A task is not complete if code changed but the affected documentation and `docs/tasks.md` were not updated.
+A task is not complete if code changed but any of the following are stale:
+
+- `docs/tasks.md` task-level progress;
+- the task's `docs/tasks/M-xxx-*.md` execution record;
+- architecture/development/deployment/validation documentation affected by the change.
+
+Documentation is part of the implementation, not post-task cleanup.
