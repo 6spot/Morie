@@ -25,6 +25,7 @@ actor SpeechPipeline {
     private var provider: CaptureInputSequenceProvider?
     private var resultTask: Task<Void, Error>?
     private var analysisTask: Task<CMTime?, Error>?
+    private var levelTask: Task<Void, Never>?
     private var finalizedText = ""
     private var volatileText = ""
 
@@ -50,7 +51,8 @@ actor SpeechPipeline {
     func start(
         sessionID: UUID,
         locale requestedLocale: Locale,
-        onTranscript: @escaping @Sendable (UUID, String) -> Void
+        onTranscript: @escaping @Sendable (UUID, String) -> Void,
+        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
     ) async throws {
         guard activeSessionID == nil else { throw PipelineError.alreadyRunning }
         activeSessionID = sessionID
@@ -132,9 +134,16 @@ actor SpeechPipeline {
             provider.captureSession.startRunning()
             Diagnostics.record("Speech", "AVCaptureSession startRunning called for \(session)")
             try requireActiveSession(sessionID)
+
+            levelTask = Task { [sessionID, onAudioLevel] in
+                await self.pollAudioLevels(sessionID: sessionID, onAudioLevel: onAudioLevel)
+            }
+            Diagnostics.record("Speech", "Native microphone level polling started for \(session)")
         } catch {
             Diagnostics.record("Speech", "Pipeline start failed for \(session): \(error.localizedDescription)", level: .error)
             preparedProvider?.captureSession.stopRunning()
+            levelTask?.cancel()
+            levelTask = nil
 
             if let preparedAnalyzer {
                 await preparedAnalyzer.cancelAndFinishNow()
@@ -154,6 +163,8 @@ actor SpeechPipeline {
         let session = label(sessionID)
         Diagnostics.record("Speech", "Normal stop started for \(session)")
 
+        levelTask?.cancel()
+        levelTask = nil
         provider?.captureSession.stopRunning()
         provider = nil
         Diagnostics.record("Speech", "Capture session stopped and provider released for \(session)")
@@ -197,6 +208,8 @@ actor SpeechPipeline {
         let session = label(sessionID)
         Diagnostics.record("Speech", "Cancelling pipeline for \(session)", level: .warning)
 
+        levelTask?.cancel()
+        levelTask = nil
         provider?.captureSession.stopRunning()
         provider = nil
         analysisTask?.cancel()
@@ -208,6 +221,46 @@ actor SpeechPipeline {
 
         reset(sessionID: sessionID)
         Diagnostics.record("Speech", "Pipeline cancelled/reset for \(session)", level: .warning)
+    }
+
+    private func pollAudioLevels(
+        sessionID: UUID,
+        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
+    ) async {
+        var smoothedLevel = 0.0
+
+        while !Task.isCancelled,
+              activeSessionID == sessionID,
+              let provider
+        {
+            var peakAveragePower: Float = -60
+
+            for connection in provider.captureAudioDataOutput.connections {
+                for channel in connection.audioChannels {
+                    let power = channel.averagePowerLevel
+                    if power.isFinite {
+                        peakAveragePower = max(peakAveragePower, power)
+                    }
+                }
+            }
+
+            let normalized = Self.normalizedPowerLevel(peakAveragePower)
+            smoothedLevel = smoothedLevel * 0.65 + normalized * 0.35
+            onAudioLevel(sessionID, smoothedLevel)
+
+            do {
+                try await Task.sleep(for: .milliseconds(50))
+            } catch {
+                return
+            }
+        }
+    }
+
+    private static func normalizedPowerLevel(_ decibels: Float) -> Double {
+        let floor: Double = -60
+        let value = min(max(Double(decibels), floor), 0)
+        let normalized = (value - floor) / -floor
+        return pow(normalized, 1.35)
     }
 
     private func makeTranscriber(locale requestedLocale: Locale) async throws -> SpeechTranscriber {
@@ -230,8 +283,10 @@ actor SpeechPipeline {
     private func reset(sessionID: UUID) {
         guard activeSessionID == sessionID else { return }
 
+        levelTask?.cancel()
         analysisTask?.cancel()
         resultTask?.cancel()
+        levelTask = nil
         analysisTask = nil
         resultTask = nil
         provider = nil
