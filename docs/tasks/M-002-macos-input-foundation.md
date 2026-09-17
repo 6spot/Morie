@@ -41,7 +41,8 @@ Included:
 - Accessibility text delivery;
 - safe clipboard + paste fallback;
 - cancellation/error/stale-result cleanup;
-- macOS 27 compile CI;
+- native in-app runtime diagnostics for Phase 0 validation;
+- macOS 27 compile CI and test-package artifact;
 - real-device compatibility validation;
 - initial performance baseline.
 
@@ -71,8 +72,9 @@ Explicitly excluded:
 9. Relevant Type4Me behavior is classified `ADAPT`, `DROP`, or `VERIFY` only after the Morie/macOS 27 requirement is defined.
 10. All Phase 0 UI is Apple-native macOS 27 UI; any native-UI gap requires owner approval before a substitute is implemented.
 11. The project compiles against the macOS 27 SDK with Swift 6 strict concurrency.
-12. The real-app validation matrix and initial performance observations are recorded before M-002 is DONE.
-13. No external product dependency is introduced without explicit project-owner approval; expected Phase 0 product dependency count is zero.
+12. Runtime diagnostics distinguish capability, hotkey, Speech/session, focus/injection, and clipboard paths without recording full transcript content by default.
+13. The real-app validation matrix and initial performance observations are recorded before M-002 is DONE.
+14. No external product dependency is introduced without explicit project-owner approval; expected Phase 0 product dependency count is zero.
 
 ## Subtasks / progress
 
@@ -88,6 +90,7 @@ Explicitly excluded:
 | Type4Me injection/focus audit | DONE | Retained no-loss/clipboard/synthetic-event lessons; app-specific branches remain VERIFY-only. |
 | Type4Me Apple Speech audit | DONE | Used only as behavioral reference; implementation follows current Apple Speech APIs. |
 | Menu Bar shell | IN PROGRESS | Native `MenuBarExtra`; real macOS 27 visual/interaction validation still required. |
+| Native Debug window | DONE / VERIFY | Native `Window` + `List`; Copy All/Clear; traces capability/hotkey/session/Speech/delivery paths. Real-device log usefulness is being validated. |
 | Foundation Models capability check | DONE | `SystemLanguageModel` availability + locale. |
 | Speech capability/locale check | DONE | `SpeechTranscriber` availability + locale. |
 | Microphone/Speech authorization | DONE | Native permission checks. |
@@ -99,7 +102,7 @@ Explicitly excluded:
 | Original-app capture/focus restore | IMPLEMENTED / VERIFY | Target captured before recording; timing requires target-app validation. |
 | Text injection / clipboard fallback | IMPLEMENTED / VERIFY | AX first, synthetic Cmd+V fallback, change-count-aware restore, no app-specific compatibility branch. |
 | Cancellation/stale-result hardening | IMPLEMENTED / VERIFY | Early release cancels in-flight setup; per-session identity protects new sessions. |
-| macOS 27 / Xcode 27 compile | DONE | GitHub hosted `xcode-27`: macOS 27.0, Xcode 27.0, macOS 27 SDK; build passed at `66d7bbf8`. |
+| macOS 27 / Xcode 27 compile | DONE | GitHub hosted `xcode-27`: diagnostics build/package passed at `ec888bd4`. |
 | Compatibility matrix | TODO | Real app/device validation in `../validation.md`. |
 | Performance baseline | TODO | Measure after runtime loop is proven on supported hardware. |
 
@@ -137,9 +140,7 @@ Current classification: **ADAPT + DROP**.
 
 ### 2. Authoritative capture identity
 
-`AppController` and `SpeechPipeline` now share a UUID session identity for each intentional hold.
-
-This closes an important race in the initial scaffold: previously, key release could call `stop()` while async Speech setup was still awaiting. That could yield `notRunning` while the setup task later continued and created an orphaned microphone session.
+`AppController` and `SpeechPipeline` share a UUID session identity for each intentional hold.
 
 Current rule:
 
@@ -151,7 +152,7 @@ Current rule:
 - callbacks/results whose ID is no longer active are ignored;
 - cancel/error/success all clear the same identity.
 
-No generalized session framework was introduced.
+This prevents a release-during-setup race from later creating an orphaned microphone session. No generalized session framework was introduced.
 
 ### 3. Speech asset readiness
 
@@ -206,7 +207,7 @@ There is currently **no Electron/app-family branch**. Any app-specific delay or 
 
 ### 6. Capability gate
 
-Phase 0 currently checks:
+Phase 0 checks:
 
 - Apple Intelligence / `SystemLanguageModel` availability and locale;
 - modern Speech availability and locale;
@@ -214,25 +215,53 @@ Phase 0 currently checks:
 - Speech authorization;
 - Accessibility trust.
 
+Launch bootstrap now begins from `AppController.init`, not from opening the menu-bar panel, so capability detection and hotkey installation cannot remain dormant just because the user has not clicked the menu extra.
+
+Apple Intelligence failure reasons are surfaced explicitly for device ineligibility, Apple Intelligence disabled, model not ready, locale unsupported, and other unavailable states.
+
 The Swift 6 build exposed that `kAXTrustedCheckOptionPrompt` comes through the C framework without concurrency annotations. The native ApplicationServices import is explicitly bridged with `@preconcurrency`; no replacement permission framework or dependency was introduced.
 
-The UI now says it is checking device capabilities rather than claiming that full Private Mode is available. iCloud/CloudKit remains M-003 work.
+### 7. Native runtime diagnostics
 
-## Compile validation
+Real-device testing exposed that a silent push-to-talk failure is not diagnosable from the menu-bar status alone. M-002 now includes a native `Morie Debug` window.
 
-A repository workflow now compiles product code on GitHub's macOS 27 hosted image using:
+Implementation:
+
+- native SwiftUI `Window`;
+- native `List` for in-memory entries;
+- system **Copy All** and **Clear** buttons;
+- maximum 1,000 entries per process lifetime;
+- no third-party logging/UI dependency;
+- no full transcript content logged by default.
+
+Tracked categories include:
+
+- `App` — bootstrap and Ready/blocked transitions;
+- `Capability` / `Permission` — Apple Intelligence, Speech, microphone, Speech authorization, Accessibility;
+- `Hotkey` — event-tap install, accepted keyDown/keyUp, repeats, modifier mismatch, tap disable/recovery;
+- `Session` — capture IDs, target app/bundle, cancellation/completion;
+- `Speech` — assets, microphone/provider/analyzer lifecycle, result lengths, finalization/cancel;
+- `Delivery` — target activation, AX write, clipboard fallback, synthetic Cmd+V;
+- `Clipboard` — temporary write and change-count-aware restore;
+- `UI` — native failure alerts.
+
+This diagnostic surface is explicitly a developer/runtime-validation aid. It does not replace user-facing product feedback design.
+
+## Compile / package validation
+
+A repository workflow compiles and packages product code on GitHub's macOS 27 hosted image using:
 
 - macOS 27.0;
 - Xcode 27.0;
 - macOS 27 SDK;
 - Swift 6 project settings;
-- code signing disabled for CI compilation.
+- Release test build with ad-hoc signing;
+- `codesign` verification;
+- zipped GitHub Actions artifact.
 
-The first run exposed the ApplicationServices strict-concurrency issue above. After the native bridge fix, build `66d7bbf8` completed successfully.
+The diagnostics build containing the native Debug window and cross-layer instrumentation passed Xcode 27 build/sign/package at commit `ec888bd4`.
 
-The workflow is scoped to product/Xcode/workflow changes so documentation-only commits do not create redundant compile runs.
-
-This is compile evidence only. CI cannot prove microphone routing, TCC permission UI, global keyboard behavior, focus restoration, target-app insertion, Liquid Glass appearance, or latency on the user's real Mac.
+This is compile/package evidence only. CI cannot prove microphone routing, TCC permission UI, physical global keyboard behavior, focus restoration, target-app insertion, Liquid Glass appearance, or latency on the user's real Mac.
 
 ## Type4Me audit result
 
@@ -300,6 +329,7 @@ Verified:
 - the project compiles with Xcode 27 / macOS 27 SDK and Swift 6;
 - current `SpeechAnalyzer`/`SpeechTranscriber`/capture-input API usage compiles against that SDK;
 - current `CGEventTap` implementation compiles against that SDK;
+- native debug window/instrumentation compiles and packages against that SDK;
 - Morie-first Type4Me extraction boundaries are documented.
 
 Still required on a supported real Mac:
@@ -307,6 +337,7 @@ Still required on a supported real Mac:
 - first-launch permission lifecycle;
 - Apple Intelligence/Speech asset runtime behavior;
 - actual `Control + Space` hold/release semantics across apps and keyboard input sources;
+- use Debug log to identify the current observed no-response shortcut path;
 - rapid/short/repeated hold behavior;
 - microphone/session cleanup after failure/cancel;
 - volatile/final transcript behavior under real speech;
