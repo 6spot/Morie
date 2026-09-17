@@ -20,6 +20,7 @@ final class AppController: ObservableObject {
     private let speech = SpeechPipeline()
     private let injector = TextInjector()
     private let hud = CaptureHUDController()
+    private let speechLocale = Locale(identifier: "zh-CN")
 
     private var hotkey: PushToTalkHotkey?
     private var targetApplication: NSRunningApplication?
@@ -90,9 +91,12 @@ final class AppController: ObservableObject {
 
         do {
             try await capabilityGate.requirePrivateMode()
-            Diagnostics.record("App", "Capability gate passed; preparing Speech assets")
+            Diagnostics.record(
+                "App",
+                "Capability gate passed; preparing Speech assets for locale \(speechLocale.identifier)"
+            )
 
-            try await speech.prepare(locale: .current)
+            try await speech.prepare(locale: speechLocale)
             Diagnostics.record("App", "Speech assets ready; installing global hotkey")
 
             try installHotkeyIfNeeded()
@@ -176,7 +180,7 @@ final class AppController: ObservableObject {
         let targetBundle = targetApplication?.bundleIdentifier ?? "unknown"
         Diagnostics.record(
             "Session",
-            "Capture \(label(sessionID)) started; target=\(targetName) (\(targetBundle))"
+            "Capture \(label(sessionID)) started; target=\(targetName) (\(targetBundle)); locale=\(speechLocale.identifier)"
         )
 
         captureStartTask = Task { @MainActor [weak self] in
@@ -227,7 +231,7 @@ final class AppController: ObservableObject {
         do {
             try await speech.start(
                 sessionID: sessionID,
-                locale: .current,
+                locale: speechLocale,
                 onTranscript: { [weak self] resultSessionID, text in
                     Task { @MainActor in
                         guard self?.activeCaptureID == resultSessionID else {
