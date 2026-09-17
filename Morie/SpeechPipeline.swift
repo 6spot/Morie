@@ -264,9 +264,12 @@ actor SpeechPipeline {
 
                 sampleCount += 1
                 if sampleCount.isMultiple(of: 20) {
+                    let averageText = String(format: "%.1f", averagePower)
+                    let peakText = String(format: "%.1f", peakPower)
+                    let normalizedText = String(format: "%.3f", normalized)
                     Diagnostics.record(
                         "Audio",
-                        "Meter \(session): channels=\(channels.count), average=\(String(format: \"%.1f\", averagePower))dB, peak=\(String(format: \"%.1f\", peakPower))dB, normalized=\(String(format: \"%.3f\", normalized)), captureRunning=\(provider.captureSession.isRunning)"
+                        "Meter \(session): channels=\(channels.count), average=\(averageText)dB, peak=\(peakText)dB, normalized=\(normalizedText), captureRunning=\(provider.captureSession.isRunning)"
                     )
                 }
 
