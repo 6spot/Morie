@@ -8,6 +8,7 @@ final class AppController: ObservableObject {
         case blocked(String)
         case ready
         case recording
+        case finalizing
         case delivering
         case failed(String)
     }
@@ -18,16 +19,29 @@ final class AppController: ObservableObject {
     private let capabilityGate = CapabilityGate()
     private let speech = SpeechPipeline()
     private let injector = TextInjector()
+    private let hud = CaptureHUDController()
 
     private var hotkey: PushToTalkHotkey?
     private var targetApplication: NSRunningApplication?
     private var activeCaptureID: UUID?
     private var speechReadyCaptureID: UUID?
+    private var finishRequestedCaptureID: UUID?
     private var captureStartTask: Task<Void, Never>?
     private var captureFinishTask: Task<Void, Never>?
     private var lastPresentedFailure: String?
 
     init() {
+        hud.onCancel = { [weak self] in
+            Task { @MainActor in
+                await self?.cancelCaptureFromUser(source: "HUD")
+            }
+        }
+        hud.onConfirm = { [weak self] in
+            Task { @MainActor in
+                self?.requestFinishActiveCapture(source: "HUD")
+            }
+        }
+
         Diagnostics.record("App", "Morie controller initialized; launch bootstrap scheduled")
         Task { @MainActor [weak self] in
             await self?.bootstrap()
@@ -40,6 +54,7 @@ final class AppController: ObservableObject {
         case .blocked: "exclamationmark.triangle"
         case .ready: "waveform"
         case .recording: "waveform.circle.fill"
+        case .finalizing: "ellipsis.circle"
         case .delivering: "arrow.right.circle"
         case .failed: "xmark.circle"
         }
@@ -51,6 +66,7 @@ final class AppController: ObservableObject {
         case .blocked: "Required capability unavailable"
         case .ready: "Ready"
         case .recording: "Listening…"
+        case .finalizing: "Finalizing…"
         case .delivering: "Delivering…"
         case .failed: "Input failed"
         }
@@ -103,14 +119,14 @@ final class AppController: ObservableObject {
         }
 
         let hotkey = PushToTalkHotkey(
-            onPress: { [weak self] in
+            onToggle: { [weak self] in
                 Task { @MainActor in
-                    self?.handleHotkeyPress()
+                    self?.handleHotkeyToggle()
                 }
             },
-            onRelease: { [weak self] in
+            onCancel: { [weak self] in
                 Task { @MainActor in
-                    self?.handleHotkeyRelease()
+                    await self?.cancelCaptureFromUser(source: "Escape")
                 }
             },
             onUnavailable: { [weak self] error in
@@ -123,31 +139,38 @@ final class AppController: ObservableObject {
 
         try hotkey.start()
         self.hotkey = hotkey
-        Diagnostics.record("Hotkey", "Controller installed Control+Space hotkey")
+        Diagnostics.record("Hotkey", "Controller installed Control+Space toggle hotkey")
     }
 
-    private func handleHotkeyPress() {
-        guard activeCaptureID == nil else {
-            Diagnostics.record("Session", "Hotkey press ignored because a capture is already active", level: .warning)
+    private func handleHotkeyToggle() {
+        if activeCaptureID != nil {
+            requestFinishActiveCapture(source: "Control+Space")
             return
         }
 
         switch state {
         case .ready, .failed:
-            break
+            startNewCapture()
         default:
-            Diagnostics.record("Session", "Hotkey press ignored while state=\(String(describing: state))", level: .warning)
-            return
+            Diagnostics.record("Session", "Toggle ignored while state=\(String(describing: state))", level: .warning)
         }
+    }
+
+    private func startNewCapture() {
+        guard activeCaptureID == nil else { return }
 
         lastPresentedFailure = nil
 
         let sessionID = UUID()
         activeCaptureID = sessionID
         speechReadyCaptureID = nil
+        finishRequestedCaptureID = nil
         targetApplication = NSWorkspace.shared.frontmostApplication
         transcript = ""
         state = .recording
+
+        hotkey?.setCancellationEnabled(true)
+        hud.showRecording()
 
         let targetName = targetApplication?.localizedName ?? "unknown"
         let targetBundle = targetApplication?.bundleIdentifier ?? "unknown"
@@ -161,30 +184,40 @@ final class AppController: ObservableObject {
         }
     }
 
-    private func handleHotkeyRelease() {
+    private func requestFinishActiveCapture(source: String) {
         guard let sessionID = activeCaptureID else {
-            Diagnostics.record("Session", "Hotkey release received with no active capture", level: .warning)
+            Diagnostics.record("Session", "Finish requested from \(source) with no active capture", level: .warning)
             return
         }
 
-        Diagnostics.record("Session", "Capture \(label(sessionID)) release received")
+        guard finishRequestedCaptureID != sessionID, captureFinishTask == nil else {
+            Diagnostics.record("Session", "Duplicate finish request ignored for \(label(sessionID))", level: .warning)
+            return
+        }
+
+        finishRequestedCaptureID = sessionID
+        state = .finalizing
+        hotkey?.setCancellationEnabled(false)
+        hud.showProcessing()
+        Diagnostics.record("Session", "Finish requested for \(label(sessionID)) from \(source)")
 
         if speechReadyCaptureID == sessionID {
-            guard captureFinishTask == nil else {
-                Diagnostics.record("Session", "Finish already running for \(label(sessionID))", level: .warning)
-                return
-            }
-
-            captureFinishTask = Task { @MainActor [weak self] in
-                await self?.finishCapture(sessionID: sessionID)
-            }
+            beginFinish(sessionID: sessionID)
         } else {
-            Diagnostics.record(
-                "Session",
-                "Capture \(label(sessionID)) released before Speech start completed; cancelling setup",
-                level: .warning
-            )
-            captureStartTask?.cancel()
+            Diagnostics.record("Session", "Finish for \(label(sessionID)) is pending Speech startup")
+        }
+    }
+
+    private func beginFinish(sessionID: UUID) {
+        guard activeCaptureID == sessionID,
+              speechReadyCaptureID == sessionID,
+              captureFinishTask == nil
+        else {
+            return
+        }
+
+        captureFinishTask = Task { @MainActor [weak self] in
+            await self?.finishCapture(sessionID: sessionID)
         }
     }
 
@@ -194,21 +227,31 @@ final class AppController: ObservableObject {
         do {
             try await speech.start(
                 sessionID: sessionID,
-                locale: .current
-            ) { [weak self] resultSessionID, text in
-                Task { @MainActor in
-                    guard self?.activeCaptureID == resultSessionID else {
-                        Diagnostics.record("Speech", "Ignored stale transcript for \(String(resultSessionID.uuidString.prefix(8)))", level: .warning)
-                        return
-                    }
+                locale: .current,
+                onTranscript: { [weak self] resultSessionID, text in
+                    Task { @MainActor in
+                        guard self?.activeCaptureID == resultSessionID else {
+                            Diagnostics.record("Speech", "Ignored stale transcript for \(String(resultSessionID.uuidString.prefix(8)))", level: .warning)
+                            return
+                        }
 
-                    self?.transcript = text
-                    Diagnostics.record(
-                        "Speech",
-                        "Transcript update for \(String(resultSessionID.uuidString.prefix(8))); characters=\(text.count)"
-                    )
+                        self?.transcript = text
+                        Diagnostics.record(
+                            "Speech",
+                            "Transcript update for \(String(resultSessionID.uuidString.prefix(8))); characters=\(text.count)"
+                        )
+                    }
+                },
+                onAudioLevel: { [weak self] resultSessionID, level in
+                    Task { @MainActor in
+                        guard self?.activeCaptureID == resultSessionID,
+                              self?.state == .recording
+                        else { return }
+
+                        self?.hud.updateAudioLevel(level)
+                    }
                 }
-            }
+            )
 
             try Task.checkCancellation()
             guard activeCaptureID == sessionID else {
@@ -220,6 +263,11 @@ final class AppController: ObservableObject {
             speechReadyCaptureID = sessionID
             captureStartTask = nil
             Diagnostics.record("Speech", "Speech session \(label(sessionID)) is recording")
+
+            if finishRequestedCaptureID == sessionID {
+                Diagnostics.record("Session", "Applying pending finish request for \(label(sessionID))")
+                beginFinish(sessionID: sessionID)
+            }
         } catch is CancellationError {
             Diagnostics.record("Speech", "Speech start cancelled for \(label(sessionID))", level: .warning)
             await speech.cancel(sessionID: sessionID)
@@ -239,7 +287,8 @@ final class AppController: ObservableObject {
             return
         }
 
-        state = .delivering
+        state = .finalizing
+        hud.showProcessing()
         Diagnostics.record("Speech", "Finalizing Speech session \(label(sessionID))")
 
         do {
@@ -258,6 +307,9 @@ final class AppController: ObservableObject {
                 completeSuccessfulSession(sessionID)
                 return
             }
+
+            state = .delivering
+            hud.showProcessing()
 
             let targetName = targetApplication?.localizedName ?? "unknown"
             let targetBundle = targetApplication?.bundleIdentifier ?? "unknown"
@@ -278,6 +330,23 @@ final class AppController: ObservableObject {
         }
     }
 
+    private func cancelCaptureFromUser(source: String) async {
+        guard let sessionID = activeCaptureID else {
+            Diagnostics.record("Session", "Cancel requested from \(source) with no active capture", level: .warning)
+            return
+        }
+
+        guard state == .recording else {
+            Diagnostics.record("Session", "Cancel from \(source) ignored while state=\(String(describing: state))", level: .warning)
+            return
+        }
+
+        Diagnostics.record("Session", "Capture \(label(sessionID)) cancelled by \(source)", level: .warning)
+        hotkey?.setCancellationEnabled(false)
+        hud.hide()
+        await cancelActiveCapture(transitionToReady: true)
+    }
+
     private func handleHotkeyUnavailable(_ message: String) async {
         Diagnostics.record("Hotkey", "Global shortcut became unavailable: \(message)", level: .error)
         await cancelActiveCapture(transitionToReady: false)
@@ -286,12 +355,16 @@ final class AppController: ObservableObject {
     }
 
     private func cancelActiveCapture(transitionToReady: Bool) async {
+        hotkey?.setCancellationEnabled(false)
+        hud.hide()
+
         guard let sessionID = activeCaptureID else {
             captureStartTask?.cancel()
             captureFinishTask?.cancel()
             captureStartTask = nil
             captureFinishTask = nil
             speechReadyCaptureID = nil
+            finishRequestedCaptureID = nil
             targetApplication = nil
             return
         }
@@ -322,16 +395,20 @@ final class AppController: ObservableObject {
     private func completeSuccessfulSession(_ sessionID: UUID) {
         guard activeCaptureID == sessionID else { return }
         Diagnostics.record("Session", "Capture \(label(sessionID)) completed successfully")
+        hotkey?.setCancellationEnabled(false)
         resetSessionIdentity()
         lastPresentedFailure = nil
         state = .ready
+        hud.showSuccess()
     }
 
     private func completeCancelledSession(_ sessionID: UUID) {
         guard activeCaptureID == sessionID else { return }
         Diagnostics.record("Session", "Capture \(label(sessionID)) cancelled", level: .warning)
+        hotkey?.setCancellationEnabled(false)
         resetSessionIdentity()
         state = .ready
+        hud.hide()
     }
 
     private func failSession(_ sessionID: UUID, error: Error) {
@@ -339,14 +416,17 @@ final class AppController: ObservableObject {
 
         let message = error.localizedDescription
         Diagnostics.record("Session", "Capture \(label(sessionID)) failed: \(message)", level: .error)
+        hotkey?.setCancellationEnabled(false)
         resetSessionIdentity()
         state = .failed(message)
+        hud.showFailure()
         presentFailure(title: "Morie input failed", message: message)
     }
 
     private func resetSessionIdentity() {
         activeCaptureID = nil
         speechReadyCaptureID = nil
+        finishRequestedCaptureID = nil
         captureStartTask = nil
         captureFinishTask = nil
         targetApplication = nil
