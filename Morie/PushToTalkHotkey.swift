@@ -2,7 +2,7 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-/// Minimal macOS 27 push-to-talk hotkey.
+/// Minimal macOS 27 voice-capture shortcut.
 ///
 /// Morie intentionally supports one focused keyboard interaction here. This is
 /// not a generalized hotkey subsystem: no media keys, mouse buttons, modes, or
@@ -15,14 +15,15 @@ final class PushToTalkHotkey {
         var errorDescription: String? {
             switch self {
             case .accessibilityUnavailable:
-                "Accessibility permission is required for the global push-to-talk shortcut."
+                "Accessibility permission is required for the global voice-capture shortcut."
             case .eventTapCreationFailed:
-                "Morie could not install the global push-to-talk shortcut."
+                "Morie could not install the global voice-capture shortcut."
             }
         }
     }
 
     private static let shortcutKeyCode = CGKeyCode(49) // Space
+    private static let escapeKeyCode = CGKeyCode(53)
     private static let requiredModifiers: CGEventFlags = [.maskControl]
     private static let relevantModifiers: CGEventFlags = [
         .maskCommand,
@@ -32,21 +33,23 @@ final class PushToTalkHotkey {
         .maskSecondaryFn,
     ]
 
-    private let onPress: () -> Void
-    private let onRelease: () -> Void
+    private let onToggle: () -> Void
+    private let onCancel: () -> Void
     private let onUnavailable: (Error) -> Void
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var isPressed = false
+    private var shortcutPressOwned = false
+    private var escapePressOwned = false
+    private var cancellationEnabled = false
 
     init(
-        onPress: @escaping () -> Void,
-        onRelease: @escaping () -> Void,
+        onToggle: @escaping () -> Void,
+        onCancel: @escaping () -> Void,
         onUnavailable: @escaping (Error) -> Void
     ) {
-        self.onPress = onPress
-        self.onRelease = onRelease
+        self.onToggle = onToggle
+        self.onCancel = onCancel
         self.onUnavailable = onUnavailable
     }
 
@@ -61,7 +64,7 @@ final class PushToTalkHotkey {
         }
 
         let trusted = AXIsProcessTrusted()
-        Diagnostics.record("Hotkey", "Installing Control+Space event tap; accessibilityTrusted=\(trusted)")
+        Diagnostics.record("Hotkey", "Installing Control+Space toggle event tap; accessibilityTrusted=\(trusted)")
         guard trusted else {
             throw StartError.accessibilityUnavailable
         }
@@ -94,12 +97,20 @@ final class PushToTalkHotkey {
             throw StartError.eventTapCreationFailed
         }
 
-        Diagnostics.record("Hotkey", "Control+Space event tap installed and enabled")
+        Diagnostics.record("Hotkey", "Control+Space toggle event tap installed and enabled")
+    }
+
+    func setCancellationEnabled(_ enabled: Bool) {
+        guard cancellationEnabled != enabled else { return }
+        cancellationEnabled = enabled
+        Diagnostics.record("Hotkey", "Escape cancellation enabled=\(enabled)")
     }
 
     func invalidate() {
         let hadTap = eventTap != nil
-        isPressed = false
+        shortcutPressOwned = false
+        escapePressOwned = false
+        cancellationEnabled = false
 
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
@@ -134,10 +145,18 @@ final class PushToTalkHotkey {
         }
 
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-        guard keyCode == Self.shortcutKeyCode else {
-            return Unmanaged.passUnretained(event)
+        if keyCode == Self.shortcutKeyCode {
+            return handleShortcut(type: type, event: event)
         }
 
+        if keyCode == Self.escapeKeyCode {
+            return handleEscape(type: type, event: event)
+        }
+
+        return Unmanaged.passUnretained(event)
+    }
+
+    private func handleShortcut(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         switch type {
         case .keyDown:
             guard Self.hasExactShortcutModifiers(event.flags) else {
@@ -151,27 +170,52 @@ final class PushToTalkHotkey {
                 return Unmanaged.passUnretained(event)
             }
 
-            if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || isPressed {
+            if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || shortcutPressOwned {
                 Diagnostics.record("Hotkey", "Control+Space repeat suppressed")
                 return nil
             }
 
-            isPressed = true
-            Diagnostics.record("Hotkey", "Control+Space keyDown accepted")
-            onPress()
+            shortcutPressOwned = true
+            Diagnostics.record("Hotkey", "Control+Space keyDown accepted; toggling capture")
+            onToggle()
             return nil
 
         case .keyUp:
-            guard isPressed else {
-                if event.flags.contains(.maskControl) {
-                    Diagnostics.record("Hotkey", "Space keyUp observed without an owned hold", level: .warning)
-                }
+            guard shortcutPressOwned else {
                 return Unmanaged.passUnretained(event)
             }
 
-            isPressed = false
-            Diagnostics.record("Hotkey", "Control+Space keyUp accepted; ending hold")
-            onRelease()
+            shortcutPressOwned = false
+            Diagnostics.record("Hotkey", "Control+Space keyUp accepted; capture state unchanged")
+            return nil
+
+        default:
+            return Unmanaged.passUnretained(event)
+        }
+    }
+
+    private func handleEscape(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        switch type {
+        case .keyDown:
+            guard cancellationEnabled else {
+                return Unmanaged.passUnretained(event)
+            }
+
+            if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || escapePressOwned {
+                return nil
+            }
+
+            escapePressOwned = true
+            Diagnostics.record("Hotkey", "Escape keyDown accepted; cancelling capture")
+            onCancel()
+            return nil
+
+        case .keyUp:
+            guard escapePressOwned else {
+                return Unmanaged.passUnretained(event)
+            }
+
+            escapePressOwned = false
             return nil
 
         default:
