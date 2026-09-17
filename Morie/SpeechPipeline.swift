@@ -185,16 +185,18 @@ actor SpeechPipeline {
         levelTask = nil
         let sourceAudio: CapturedSourceAudio
         do {
-            guard let completedAudio = try await audioArchive?.finish(stopping: provider.captureSession) else {
+            guard let completedAudio = try await audioArchive?.finish() else {
                 throw PipelineError.notRunning
             }
             sourceAudio = completedAudio
             audioArchive = nil
         } catch {
+            provider.captureSession.stopRunning()
             await analyzer.cancelAndFinishNow()
             reset(sessionID: sessionID)
             throw error
         }
+        provider.captureSession.stopRunning()
         self.provider = nil
         Diagnostics.record("Speech", "Capture session stopped and provider released for \(session)")
 

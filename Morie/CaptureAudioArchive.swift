@@ -31,11 +31,10 @@ final class CaptureAudioArchive: NSObject, AVCaptureFileOutputRecordingDelegate,
         output.startRecording(to: destinationURL, outputFileType: .m4a, recordingDelegate: self)
     }
 
-    func finish(stopping session: AVCaptureSession) async throws -> CapturedSourceAudio {
+    func finish() async throws -> CapturedSourceAudio {
         try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             output.stopRecording()
-            session.stopRunning()
         }
     }
 
