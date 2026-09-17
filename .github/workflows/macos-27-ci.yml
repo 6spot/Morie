@@ -1,0 +1,48 @@
+name: macOS 27 CI
+
+on:
+  pull_request:
+    paths:
+      - "Morie/**"
+      - "Morie.xcodeproj/**"
+      - ".github/workflows/macos-27-ci.yml"
+      - ".github/workflows/macos-27-package.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Morie/**"
+      - "Morie.xcodeproj/**"
+      - ".github/workflows/macos-27-ci.yml"
+      - ".github/workflows/macos-27-package.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Xcode 27 compile
+    runs-on: xcode-27
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+
+      - name: Build Morie
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Morie.xcodeproj \
+            -target Morie \
+            -configuration Release \
+            -sdk macosx27.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
