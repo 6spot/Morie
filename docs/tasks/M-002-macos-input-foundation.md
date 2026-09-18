@@ -95,7 +95,7 @@ Explicitly excluded:
 | Speech capability/locale check | DONE | `SpeechTranscriber` availability + locale. |
 | Microphone/Speech authorization | DONE / VERIFY | Native first-request prompts plus modal/menu System Settings recovery when macOS returns denial without presenting consent. Only Accessibility suppresses Morie's modal to avoid stacking it over Device Control and Data Access; microphone revoke/re-enable/recheck needs another real-device pass. |
 | Accessibility trust check | DONE | Native trust prompt/check plus direct System Settings recovery; user manually enables Morie, then rechecks. |
-| iCloud/CloudKit capability check | DEFERRED | M-003 owns the real container/entitlements and Private Mode persistence gate. |
+| iCloud/CloudKit capability check | DEFERRED | M-003 owns the real container/entitlements and Private Mode persistence gate. On 2026-09-18 the owner deferred sync to final integration pending Apple Developer enrollment; current local work continues. |
 | Global toggle-capture hotkey | IMPLEMENTED / VERIFY | Owner-approved default is solo `Fn / Globe` release: first release starts, second finishes, Fn chords do not trigger, and `Escape` cancels. A timed-out event tap now fails open and is released instead of entering an automatic re-enable loop that can block keyboard input. Native Settings provides alternate combinations; real-device timeout recovery and Fn/system-conflict validation remain. |
 | Reliable recording/session layer | IMPLEMENTED / VERIFY | Unique session IDs, setup cancellation, stale-result rejection, deterministic terminal cleanup. |
 | Modern Apple Speech pipeline | IMPLEMENTED / VERIFY | `SpeechAnalyzer` + `SpeechTranscriber` + one `AVCaptureAudioDataOutput`/`AnalyzerInputConverter`; M-003 shares its buffers with streamed source-audio encoding. Remaining runtime finalization cases still need device proof. |
@@ -173,28 +173,33 @@ There is no legacy recognition fallback.
 
 ### 4. Speech finish vs cancel
 
-Finish and cancellation are different lifecycle events.
+Finish, explicit discard and operational interruption are distinct lifecycle events.
 
 Finish:
 
 1. stop microphone capture;
-2. release the provider so the analyzer input sequence can end;
+2. flush analyzer input and finalize the streamed AAC file, including on conversion failure;
 3. await consumed audio/sample time;
 4. finalize analysis through that point;
 5. await transcriber result completion;
-6. return accumulated text;
+6. return accumulated text and source-audio metadata;
 7. reset the session.
 
-Cancellation:
+Immediate stop (explicit cancellation or operational interruption):
 
-1. stop capture;
-2. cancel analysis/result tasks;
-3. `cancelAndFinishNow()`;
-4. reset the matching session.
+1. stop capture and close the audio file without flushing Speech conversion;
+2. capture the current text/audio snapshot and detach matching session ownership;
+3. cancel analysis/result tasks and call `cancelAndFinishNow()`;
+4. await native/task completion and return the snapshot;
+5. the controller joins outstanding start/finish work, then preserves an operational failure or deletes an explicit user discard.
+
+A single controller shutdown task serializes teardown. Capability recheck and shortcut loss preserve recordings and retain their checking/blocked UI ownership. Live Speech errors and capture-session interruption notifications trigger cleanup without another finish press. Async converter setup checks ownership before opening a source. Text delivery checks cancellation around focus handoff, while an already-dispatched paste retains its durable delivery outcome.
 
 The latest volatile segment is retained when producing Morie's final string because the current Speech result contract does not guarantee that every volatile result is emitted again as a final result.
 
 M-003's History follow-up keeps earlier nonempty transcript evidence when classifying an empty final result. The single capture output distinguishes no input/zero signal from unclassified nonzero audio; the latter remains retryable in History. An empty retained result shows “未识别，录音已保存”, while a discarded no-input capture hides the HUD. Neither reports successful text insertion. Live capture also stops History playback and cancels file re-recognition before Speech startup. These additions require the corresponding runtime checks in `validation.md`; they do not close M-002.
+
+The 2026-09-18 interruption follow-up passed isolated Xcode 27 Debug compilation and all 31 tests, including real AAC encode/decode under controlled failures. See [M-003's validation evidence](./M-003-capture.md#validation-evidence). Real microphone interruption, capture timing and cancellation around focus handoff remain open.
 
 ### 5. Text delivery
 

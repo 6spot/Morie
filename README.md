@@ -26,9 +26,10 @@ The first implementation includes:
 - a native macOS 27 Liquid Glass capture HUD with cancel, live level, and finish controls;
 - local SwiftData Capture-first persistence and a native Morie management window for History, Settings, and Diagnostics;
 - History recording playback, cancellable file re-recognition, explicit text copying, and Capture deletion with native confirmation;
+- retained audio/text after operational interruption, with explicit user cancellation handled as discard;
 - a native **Record Capture** action in History to save a voice idea without inserting it into another app.
 
-Phase 0 runtime validation and Phase 1 Capture persistence development are both in progress. CloudKit is not yet configured.
+Phase 0 runtime validation and Phase 1 Capture persistence development are both in progress. The owner has deferred iCloud/CloudKit sync to the final integration stage, after Apple Developer enrollment; current local development continues without it.
 
 ## Documentation
 

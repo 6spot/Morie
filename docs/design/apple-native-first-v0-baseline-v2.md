@@ -15,6 +15,7 @@ The following owner decisions are now hard requirements:
 3. **External dependency approval gate:** no third-party package/runtime/model/SDK/UI framework/network service may be introduced without explicit project-owner approval after documenting the Apple-native gap and trade-offs.
 4. **Type4Me is an input-foundation reference:** macOS voice input is not a greenfield rewrite. Audit and selectively reuse/adapt proven Type4Me recording-session, hotkey, target/focus, text-injection, Apple Speech, permission, packaging and correction-learning experience. Do not inherit its provider/runtime complexity.
 5. **Development stage, no legacy contract (2026-09-18):** implement the current product, schema and Apple APIs directly. Do not add old-version compatibility, legacy data reconstruction, schema migrations or speculative upgrade paths. Current-version crash recovery and Capture-first data protection still apply.
+6. **Sync sequencing (2026-09-18):** the owner has not set up an Apple Developer account/program and explicitly defers iCloud/CloudKit synchronization to the final integration stage. Continue local development without that configuration. The intended V0 data destination remains each user's own iCloud private database; no Morie backend or Device Only product mode is introduced by this development sequence.
 
 See also:
 

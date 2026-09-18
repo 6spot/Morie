@@ -5,19 +5,17 @@ import Speech
 
 final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate, @unchecked Sendable {
     enum SourceError: LocalizedError {
-        case noInput
         case inputUnavailable
         case outputUnavailable
         case invalidAudioBuffer
-        case encoderFailed(String)
+        case interrupted(String)
 
         var errorDescription: String? {
             switch self {
-            case .noInput: "No microphone input is available."
             case .inputUnavailable: "The microphone input cannot be attached to the capture session."
             case .outputUnavailable: "The microphone data output cannot be attached to the capture session."
             case .invalidAudioBuffer: "The microphone returned an unsupported audio buffer."
-            case .encoderFailed(let reason): "Source-audio encoding failed: \(reason)"
+            case .interrupted(let reason): "Audio capture was interrupted: \(reason)"
             }
         }
     }
@@ -27,15 +25,8 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
 
     private let output = AVCaptureAudioDataOutput()
     private let outputQueue = DispatchQueue(label: "me.morie.capture-audio", qos: .userInitiated)
-    private let converter: AnalyzerInputConverter
-    private let destinationURL: URL
-    private var audioFile: AVAudioFile?
-    private let continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation
-    private let onAudioLevel: @Sendable (Double) -> Void
-    private var writtenFrames: AVAudioFramePosition = 0
-    private var callbackCount = 0
-    private var hasAudioSignal = false
-    private var terminal = false
+    private let stream: CaptureAudioStream
+    private var notificationObservers: [NSObjectProtocol] = []
 
     init(
         device: AVCaptureDevice,
@@ -43,25 +34,13 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         destinationURL: URL,
         onAudioLevel: @escaping @Sendable (Double) -> Void
     ) throws {
-        var streamContinuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation!
-        analyzerInputs = AsyncThrowingStream { streamContinuation = $0 }
-        continuation = streamContinuation
-        self.converter = converter
-        self.destinationURL = destinationURL
-        self.onAudioLevel = onAudioLevel
-
-        try? FileManager.default.removeItem(at: destinationURL)
-        audioFile = try AVAudioFile(
-            forWriting: destinationURL,
-            settings: [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 16_000,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderBitRateKey: 32_000
-            ],
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
+        stream = try CaptureAudioStream(
+            destinationURL: destinationURL,
+            convert: { try converter.convert($0, at: nil) },
+            flush: { try converter.flush() },
+            onAudioLevel: onAudioLevel
         )
+        analyzerInputs = stream.analyzerInputs
 
         super.init()
 
@@ -80,39 +59,46 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         output.setSampleBufferDelegate(self, queue: outputQueue)
         guard session.canAddOutput(output) else { throw SourceError.outputUnavailable }
         session.addOutput(output)
+
+        notificationObservers.append(NotificationCenter.default.addObserver(
+            forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: nil
+        ) { [weak self] notification in
+            let reason = (notification.userInfo?[AVCaptureSessionErrorKey] as? NSError)?.localizedDescription
+                ?? "The microphone session stopped unexpectedly."
+            self?.reportFailure(SourceError.interrupted(reason))
+        })
+        notificationObservers.append(NotificationCenter.default.addObserver(
+            forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: nil
+        ) { [weak self] _ in
+            self?.reportFailure(SourceError.interrupted("The microphone became unavailable."))
+        })
     }
 
     func start() {
         session.startRunning()
     }
 
-    func finish() throws -> CapturedSourceAudio {
-        session.stopRunning()
-        outputQueue.sync {}
-        guard !terminal else { throw SourceError.encoderFailed("The audio stream ended unexpectedly.") }
-        for input in try converter.flush() {
-            continuation.yield(input)
-        }
-        terminal = true
-        continuation.finish()
-        output.setSampleBufferDelegate(nil, queue: nil)
-        audioFile = nil
-        let duration = Double(writtenFrames) / 16_000
-        return CapturedSourceAudio(
-            url: destinationURL,
-            duration: duration,
-            hasMeaningfulAudio: hasAudioSignal ? nil : false
-        )
+    func finish() -> CaptureAudioStream.Completion {
+        stopCaptureSession()
+        return outputQueue.sync { stream.finish() }
     }
 
-    func cancel() {
+    func stopImmediately() -> CapturedSourceAudio {
+        stopCaptureSession()
+        return outputQueue.sync { stream.stopImmediately() }
+    }
+
+    private func stopCaptureSession() {
+        for observer in notificationObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        notificationObservers.removeAll()
         session.stopRunning()
-        outputQueue.sync {}
-        terminal = true
-        continuation.finish(throwing: CancellationError())
         output.setSampleBufferDelegate(nil, queue: nil)
-        audioFile = nil
-        try? FileManager.default.removeItem(at: destinationURL)
+    }
+
+    private func reportFailure(_ error: Error) {
+        outputQueue.async { [weak self] in self?.stream.fail(error) }
     }
 
     func captureOutput(
@@ -120,45 +106,11 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        guard !terminal else { return }
-        do {
-            guard let pcmBuffer = sampleBuffer.moriePCMBuffer else {
-                throw SourceError.invalidAudioBuffer
-            }
-            guard let audioFile else { return }
-            try audioFile.write(from: pcmBuffer)
-            writtenFrames += AVAudioFramePosition(pcmBuffer.frameLength)
-            for input in try converter.convert(pcmBuffer, at: nil) {
-                continuation.yield(input)
-            }
-            let decibels = Self.signalDecibels(pcmBuffer)
-            // Nonzero signal alone cannot distinguish quiet speech from ambient noise.
-            if decibels != -.infinity { hasAudioSignal = true }
-            let level = Self.normalizedLevel(decibels)
-            callbackCount += 1
-            if callbackCount.isMultiple(of: 3) {
-                onAudioLevel(level)
-            }
-        } catch {
-            terminal = true
-            continuation.finish(throwing: error)
+        guard let pcmBuffer = sampleBuffer.moriePCMBuffer else {
+            stream.fail(SourceError.invalidAudioBuffer)
+            return
         }
-    }
-
-    private static func signalDecibels(_ buffer: AVAudioPCMBuffer) -> Float {
-        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return .nan }
-        var sum: Float = 0
-        for index in 0..<Int(buffer.frameLength) {
-            let sample = channel[index]
-            sum += sample * sample
-        }
-        let rms = sqrt(sum / Float(buffer.frameLength))
-        return rms == 0 ? -.infinity : 20 * log10(rms)
-    }
-
-    private static func normalizedLevel(_ decibels: Float) -> Double {
-        guard decibels.isFinite else { return 0 }
-        return Double((min(max(decibels, -42), -6) + 42) / 36)
+        stream.append(pcmBuffer)
     }
 }
 

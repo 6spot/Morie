@@ -277,3 +277,13 @@ The approved Morie baseline requires `captureOnly` as an intentional in-app entr
 - **VERIFY:** switching apps before capture-only finish, alternating with normal shortcut input, and live microphone/History preemption on macOS 27.
 
 The implementation adds no provider, legacy format, old API or compatibility route, and copies no Type4Me source.
+
+## M-003 interruption preservation audit — 2026-09-18
+
+Morie requirement: operational interruption must retain intentional audio/text; explicit user cancellation must close native recording before discarding it. Source conversion/finalization failure must not delete earlier AAC frames.
+
+Inspected explicit cancellation and terminal-error handling in `Type4Me/Session/RecognitionSession.swift`, stop/drain/detach in `Type4Me/Audio/AudioCaptureEngine.swift`, synchronous paste dispatch in `Type4Me/Injection/TextInjectionEngine.swift`, and the recording-cancellation tests/history at #311 (`cc56207b`). `AudioCaptureEngineTests.swift` covers format/chunk assumptions and does not prove error-path AAC finalization.
+
+- **ADAPT:** authoritative session identity, deterministic teardown, preservation of prior text/audio after operational error, explicit discard semantics, and recording delivery outcome at paste dispatch.
+- **DROP:** provider/network recovery, automatic partial-text injection, broad device workarounds, and complete PCM replay storage. No Type4Me source was copied.
+- **VERIFY:** actual macOS 27 microphone interruptions, startup/finalization cancellation timing and immediate subsequent capture. Apple AAC encode/decode tests now prove readable files for controlled converter/flush errors and immediate stop; they do not replace those device checks.

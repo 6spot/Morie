@@ -66,7 +66,9 @@ final class CaptureStoreTests: XCTestCase {
             }
         }
         try store.markDelivered(id)
+        try store.markFailed(id, error: "A late interruption arrived after paste dispatch")
         XCTAssertEqual(try store.capture(id).lifecycle, .delivered)
+        XCTAssertNil(try store.capture(id).deliveryErrorDescription)
         XCTAssertEqual(try store.sourceAudioURL(for: id), audioURL)
     }
 

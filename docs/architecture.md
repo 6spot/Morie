@@ -56,6 +56,7 @@ Morie/
 │   ├── CaptureHistoryController.swift
 │   ├── CaptureFileTranscriber.swift
 │   ├── CaptureAudioSource.swift
+│   ├── CaptureAudioStream.swift
 │   ├── MorieControlCenter.swift
 │   ├── CaptureHUD.swift
 │   ├── Diagnostics.swift
@@ -65,6 +66,7 @@ Morie/
 ├── MorieTests/
 │   ├── CaptureStoreTests.swift
 │   ├── CaptureHistoryTests.swift
+│   ├── CaptureAudioStreamTests.swift
 │   └── TestDiagnostics.swift
 ├── .github/workflows/
 │   ├── macos-27-ci.yml
@@ -134,9 +136,10 @@ Two levels of state are intentional.
 
 `AppController` owns the small UI-facing state machine:
 
-`checking → ready → recording → delivering → ready`
+`checking → ready → recording → finalizing → delivering → ready`
 
 `failed` and `blocked` represent recoverable operation failure and unavailable required capability respectively.
+Explicit cancellation uses `stopping` until native teardown and discard complete. Capability recheck enters `checking`, and shortcut loss enters `blocked`, before awaiting teardown; late capture work cannot replace these states with Ready.
 
 ### Capture identity
 
@@ -166,6 +169,8 @@ Owns Phase 0 orchestration:
 - terminal success/cancel/failure cleanup.
 
 It specifically prevents finish/cancel-during-setup from becoming a late or orphaned recording session.
+
+One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; capability recheck, shortcut failure, microphone interruption and Speech errors retain a failed Capture. New input waits until shutdown ends. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
 
 ### `CapabilityGate`
 
@@ -228,7 +233,13 @@ Speech assets are prepared before Ready so a model download is not started insid
 
 A finish action stops capture and lets already-captured analyzer input finish before finalization. Cancellation instead terminates analysis immediately. The most recent volatile segment is preserved because the current Speech result contract does not guarantee that each volatile result will later be emitted again as final.
 
+Native teardown always preserves the audio file and returns the best available text/audio snapshot. The snapshot remains available while normal finalization awaits Speech. Analyzer/result errors report to the controller during recording, so the microphone can stop without waiting for another user finish action. Capture-session runtime-error/interruption notifications end the input stream with an error. Session ownership is checked again after asynchronous converter creation, before constructing a microphone source.
+
 There is no legacy recognition fallback and no provider abstraction.
+
+### `CaptureAudioSource` / `CaptureAudioStream`
+
+`CaptureAudioSource` owns the microphone session, native notifications and serial sample queue. `CaptureAudioStream` writes AAC before Speech conversion, owns the analyzer input stream, and finalizes the file even if conversion or flushing fails. Immediate stop skips converter flushing. Repeated stop/finish returns the same closed artifact; late buffers cannot append to it. Only the store applies explicit discard, empty no-input removal, expiry or History deletion. The stream boundary allows real Apple AAC encoding/error-path tests with synthetic PCM and no microphone/model access.
 
 ### `TextInjector`
 
@@ -244,6 +255,8 @@ Delivery is intentionally generic and macOS 27 evidence-driven:
 - restores the previous clipboard only when `changeCount` proves no newer user/app clipboard write occurred.
 
 There is no Electron-specific or per-app compatibility branch. Such behavior can be added only after reproduction on macOS 27 and recording the evidence in the active task.
+
+Delivery checks cancellation before activation and after the asynchronous focus handoff. Clipboard staging and paste dispatch then run synchronously on the main actor, so an interruption cannot resume a pending paste afterward. Successful dispatch is persisted even if cancellation reaches the caller before it resumes.
 
 ### `CaptureHUD`
 
@@ -275,7 +288,7 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 
 Every new voice Capture has an explicit, durably saved delivery mode. The global shortcut creates `currentApp`; History's **Record Capture** action creates `captureOnly`. Both use the same capture UUID, microphone session, Speech pipeline, cancellation and History preemption. An in-app capture records Morie as the source and has no external target/window. Recognition completion returns the saved mode: capture-only completion ends as `recognized` and releases active-record ownership immediately; current-app completion retains ownership through delivery. Capture-only success never enters `TextInjector` or the clipboard/focus path and reports “已保存” in the shared HUD.
 
-The local `ModelConfiguration` explicitly disables CloudKit until a real container and entitlements are configured. This is an implementation stage, not a Device Only product mode.
+The local `ModelConfiguration` explicitly disables CloudKit. On 2026-09-18, the owner deferred synchronization to the final integration stage because Apple Developer enrollment is not yet set up. The intended destination remains each user's own iCloud private database within Morie's app container. This is an implementation stage, not a Device Only product mode.
 
 M-003's approved persistence direction is audio-first: the durable raw Capture is compressed source audio, recognized text is the Speech result, and final text is the later post-processing result. Source audio defaults to 7-day retention, Settings exposes a 1–365 day policy, and expiry removes audio without deleting text/history metadata. Encoding streams to disk rather than retaining a complete PCM recording in memory.
 
@@ -305,7 +318,7 @@ The primary management surface is one native SwiftUI `Window` with a standard `N
 
 ### `MorieTests`
 
-The logic-only XCTest target compiles persistence and History recovery sources directly, without launching Morie or entering TCC. Tests use in-memory or unique temporary databases/audio directories. An explicit store URL defaults audio storage to the same temporary parent. A test-only diagnostics sink prevents tests from touching the running app's log. File recognition is replaced by an injected async closure for deterministic success/failure/cancellation tests; native Speech and playback remain separate integration/device checks.
+The logic-only XCTest target compiles persistence, History recovery and the audio stream sources directly, without launching Morie or entering TCC. Tests use in-memory or unique temporary databases/audio directories. An explicit store URL defaults audio storage to the same temporary parent. A test-only diagnostics sink prevents tests from touching the running app's log. File recognition is replaced by an injected async closure for deterministic success/failure/cancellation tests. Audio stream tests write and decode real AAC using synthetic PCM and injected converter failures; native Speech, microphone lifecycle and playback interactions remain separate integration/device checks.
 
 ## Type4Me extraction boundary
 

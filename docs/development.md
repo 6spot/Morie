@@ -42,6 +42,8 @@ xcodebuild \
 
 Disabling signing here is for compile validation only; normal local launch/distribution follows the appropriate signing path. Never direct this unsigned build into the repository `build/Debug/Morie.app` while Xcode is running it, because changing the executable's signing identity can invalidate TCC permissions and make microphone behavior impossible to interpret.
 
+iCloud/CloudKit integration is deferred to the final integration stage by the owner's 2026-09-18 decision. Apple Developer enrollment and a real container are not yet set up; do not wait for them to continue local Capture work. The current store explicitly disables sync. The eventual integration uses each user's own iCloud private database and does not change the V0 no-Morie-backend boundary. See [`deployment.md`](./deployment.md#cloudkit-deployment--phase-1).
+
 ## Unit tests
 
 Run logic tests with their own temporary DerivedData directory:
@@ -60,6 +62,8 @@ xcodebuild \
 ```
 
 `MorieTests` is a logic-only target: it does not launch the menu-bar app or exercise TCC. Capture persistence tests use in-memory storage or a unique temporary file and audio directory. History tests inject file-recognition results to exercise recovery and cancellation without models or microphone access. The target uses `TestDiagnostics.swift` rather than the product logger, so tests cannot truncate an active Xcode-run app's diagnostic log.
+
+Audio stream tests use synthetic 16 kHz mono PCM and Apple's real AAC writer/decoder. They verify readable audio after conversion/flush failure, immediate stop, repeated finalization, restart preservation and explicit discard. Controller timing, capture-session notifications, microphone release and cross-app delivery still need the signed-app interruption checks in [`validation.md`](./validation.md#m-003-interruption-and-discard).
 
 ## CI compile gate
 

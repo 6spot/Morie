@@ -79,6 +79,22 @@ Automated persistence/History tests cover success, empty results, failure, cance
 
 2026-09-18: isolated Debug compilation and all **24 logic tests** passed (0 failed/skipped). Offscreen native rendering confirms the History toolbar action and the completed capture-only destination/status. These checks do not establish microphone, clipboard/focus or live interaction acceptance; the checklist remains open.
 
+## M-003 interruption and discard
+
+Use disposable captures from the normal Xcode-signed app. Repeat the relevant cases for both the shortcut and History's **Record Capture** entry:
+
+- [ ] Start recording, speak, then choose **Recheck Capabilities**. The microphone stops, text/audio remain in a failed History record, and the capability flow completes without a late paste.
+- [ ] Recheck during Speech startup and normal finalization. No orphan microphone session, duplicate teardown, stale Ready transition, or late delivery occurs.
+- [ ] Reproduce shortcut unavailability/Accessibility revocation while recording. Ordinary keyboard input remains usable; the Capture is retained and status stays blocked until explicit recheck.
+- [ ] Exercise a real microphone/capture-session interruption where practical. Failure ends capture without requiring the user to press Finish; retained audio can be played or shows an accurate native error.
+- [ ] Interrupt during focus handoff before paste. Saved text stays in History and no delayed clipboard staging/paste occurs. A paste already dispatched retains its actual delivery outcome.
+- [ ] Cancel with Escape/HUD during startup and recording. Native recording closes before the row/file disappear; a subsequent capture starts normally.
+- [ ] Repeat interruption/recheck/cancel followed by another capture. No stale text, stuck progress, duplicate recording or retained microphone indicator remains.
+
+Automated AAC tests establish finalization and data preservation for controlled conversion/flush errors, immediate stop and repeated completion. They do not establish real session-notification timing, controller scheduling, microphone release, or decodability after a force quit/storage failure. Those checks remain open.
+
+2026-09-18: final isolated Debug compilation and all **31 tests** passed on macOS 27 / Xcode 27 (0 failed/skipped). The seven new tests use real Apple AAC encoding/decoding plus temporary storage, without opening a microphone or launching Morie. Paths and limits are recorded in [M-003](./tasks/M-003-capture.md#validation-evidence).
+
 ## Toggle-capture lifecycle
 
 Verify repeated sequences:

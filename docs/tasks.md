@@ -33,7 +33,7 @@ The current priority is the reliable daily input loop:
 
 Phase 0 remains `IN PROGRESS` until it has been built and exercised on a supported macOS 27 Apple Intelligence-capable Mac and the target-app compatibility matrix has been completed.
 
-M-003's local Capture-first slice now includes SwiftData History, App Context basics, single-output compressed source audio, configurable local retention, native History playback/re-recognition, and an in-app capture-only voice entry. It remains `IN PROGRESS`: the new History/capture-only interactions need device validation, ambient-noise classification and App Context remain open, and CloudKit awaits creation of the real Apple Developer container. M-002 also remains open for the remaining runtime/performance validation matrix.
+M-003's local Capture-first slice now includes SwiftData History, App Context basics, compressed source audio with retention, native playback/re-recognition, capture-only recording, and preservation after operational interruption. It remains `IN PROGRESS`: History/capture-only/interruption interactions need device validation, and ambient-noise classification and App Context remain open. On 2026-09-18, the owner deferred iCloud/CloudKit sync to the final integration stage because Apple Developer enrollment is not yet set up; it does not block current local development. M-002 also remains open for the remaining runtime/performance validation matrix.
 
 ## Maintenance rules
 

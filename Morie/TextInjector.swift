@@ -61,6 +61,7 @@ struct TextInjector {
         to application: NSRunningApplication?,
         originalWindowNumber: CGWindowID?
     ) async throws {
+        try Task.checkCancellation()
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             Diagnostics.record("Delivery", "deliver() received empty text; returning", level: .warning)
@@ -103,6 +104,7 @@ struct TextInjector {
         }
 
         try await Task.sleep(for: Self.focusHandoffDelay)
+        try Task.checkCancellation()
         Diagnostics.record("Delivery", "Focus handoff grace period completed")
 
         if let originalWindowNumber, !Self.windowExists(originalWindowNumber) {
@@ -122,7 +124,7 @@ struct TextInjector {
         // standard paste path the target application already supports for users.
         Diagnostics.record("Delivery", "Using universal clipboard Cmd+V delivery")
 
-        guard await pasteThroughClipboard(text) else {
+        guard pasteThroughClipboard(text) else {
             copyToClipboard(text)
             Diagnostics.record(
                 "Delivery",
@@ -147,7 +149,7 @@ struct TextInjector {
     }
 
     @MainActor
-    private func pasteThroughClipboard(_ text: String) async -> Bool {
+    private func pasteThroughClipboard(_ text: String) -> Bool {
         let pasteboard = NSPasteboard.general
         let snapshot = ClipboardSnapshot.capture(from: pasteboard)
         Diagnostics.record("Clipboard", "Captured restorable clipboard snapshot; items=\(snapshot.itemCount)")

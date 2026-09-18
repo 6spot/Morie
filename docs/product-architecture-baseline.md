@@ -155,6 +155,8 @@ Add Capture-first persistence:
 
 Raw intentional Capture must be durable before optional AI enrichment.
 
+Owner sequencing decision, 2026-09-18: defer iCloud/CloudKit synchronization to the final integration stage because Apple Developer enrollment is not yet set up. This does not block current local development or remove the final sync acceptance criteria. The future app container uses each user's own iCloud private database; end users do not need developer accounts and Morie operates no V0 cloud backend.
+
 ### Phase 2 — Memory
 
 Start with restrained high-value context rather than a knowledge graph:
