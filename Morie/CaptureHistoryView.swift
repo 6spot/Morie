@@ -104,7 +104,7 @@ struct CaptureDetailView: View {
     let captureID: UUID
     @ObservedObject var history: CaptureHistoryController
     let memory: MemoryStore
-    let candidates: MemoryCandidateController
+    let learning: MemoryLearningController
     let canRecognize: Bool
     let onRecognize: (UUID) -> Void
 
@@ -146,8 +146,7 @@ struct CaptureDetailView: View {
                 }
             }
 
-            CaptureCandidatesSection(store: memory, controller: candidates, capture: capture)
-            CaptureMemorySection(store: memory, capture: capture)
+            CaptureMemorySection(store: memory, controller: learning, capture: capture)
 
             DisclosureGroup("Recognition & Refinement") {
                 VStack(alignment: .leading, spacing: 16) {
@@ -202,7 +201,7 @@ struct CaptureDetailView: View {
                 }
             }
         } message: {
-            Text("The saved text, source recording and memory candidate snapshots will be permanently deleted. Memories you saved separately remain.")
+            Text("The saved text, source recording and memory memory analysis snapshots will be permanently deleted. Memories you saved separately remain.")
         }
         .alert("Couldn’t Delete Capture", isPresented: Binding(
             get: { deletionError != nil },
@@ -276,20 +275,35 @@ struct CaptureRefinementSection: View {
                 DisclosureGroup("Changes") {
                     ForEach(Array(refinement.edits.enumerated()), id: \.offset) { _, edit in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("\(edit.proposal.original) → \(edit.proposal.replacement)")
+                            Text("\(edit.original) → \(edit.replacement)")
                                 .textSelection(.enabled)
-                            Text(edit.memoryID == nil ? "Punctuation and spacing" : "Confirmed name")
+                            Text(edit.dictionaryEntryID == nil ? "AI text cleanup" : "Your dictionary")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
-            if refinement.status != .skipped {
-                DisclosureGroup("Text Before Refinement") {
-                    Text(refinement.input.text)
+            DisclosureGroup("Text Before Refinement") {
+                Text(refinement.input.text)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !refinement.input.dictionary.isEmpty {
+                DisclosureGroup("Dictionary Used") {
+                    ForEach(refinement.input.dictionary) { entry in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(entry.name).font(.headline)
+                            if !entry.aliases.isEmpty {
+                                Text("Always replace: \(entry.aliases.joined(separator: ", "))")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Text("These are the saved dictionary entries used for this input. Later edits do not change this record.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
             if !refinement.input.context.isEmpty {
@@ -297,9 +311,6 @@ struct CaptureRefinementSection: View {
                     ForEach(refinement.input.context) { match in
                         VStack(alignment: .leading, spacing: 4) {
                             Label(match.memory.name, systemImage: match.memory.kind.systemImage)
-                            if !match.memory.aliases.isEmpty {
-                                Text("Aliases: \(match.memory.aliases.joined(separator: ", "))")
-                            }
                             if !match.memory.notes.isEmpty { Text(match.memory.notes) }
                         }
                         .textSelection(.enabled)

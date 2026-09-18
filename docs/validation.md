@@ -38,7 +38,7 @@ Verify:
 - revoking Accessibility after startup does not leave a broken/stuck global shortcut session.
 - a system event-tap timeout disables Morie's shortcut and leaves ordinary keyboard input immediately usable; Morie must not automatically re-enable a repeatedly failing tap;
 
-CloudKit/iCloud is intentionally not part of the Phase 0 gate; M-003 adds it with the real container/entitlements.
+CloudKit/iCloud is outside the current single-Mac milestone. Account/container gating will be validated when a later cross-device task is scheduled; it is not a prerequisite for M-003 local persistence.
 
 The initial `AVCaptureAudioFileOutput` integration caused a confirmed AVFoundation `SIGABRT` on macOS 27 and was removed. Its single-data-output replacement is implemented but must prove start, stop, cancellation, recognition failure, repeated capture, M4A playback, size, CPU and memory behavior on owner hardware before acceptance.
 
@@ -99,65 +99,63 @@ Automated AAC tests establish finalization and data preservation for controlled 
 
 ## M-004 Memory foundation
 
-Use disposable Capture/Memory entries when interactive validation resumes tonight:
+Current acceptance follows [M-009](tasks/M-009-macos-input-memory.md), which supersedes mandatory candidate review. Use disposable records in the signed app when deferred evening validation resumes:
 
-- [ ] Create vocabulary and projects from **Memory → New Memory** with Chinese/English names, multiline aliases and notes; relaunch and inspect the saved entries.
-- [ ] Save a selective memory from History, link another Capture to it, and inspect both sources without changing the original transcript or delivery outcome.
-- [ ] Cancel a new/edit sheet; saved data remains unchanged. Invalid input and duplicate active names keep the sheet open with a readable error.
-- [ ] Edit a memory and inspect updated matching context in History. Canonical names and aliases work without partial Latin-word matches.
-- [ ] Archive/restore a matching entry; it disappears/reappears in related context. Restoring a conflicting active name is refused.
-- [ ] Replace a memory; the new entry links to the old one, old status becomes **Superseded**, and old content no longer appears as relevant context.
-- [ ] Delete a disposable source Capture; separately confirmed Memory remains and the source is labelled deleted. Delete one memory; its sources and other memories remain.
-- [ ] Verify list/search/filter, source navigation, editor/save/cancel, lifecycle and delete controls with keyboard/VoiceOver and long text.
-- [ ] Open History/Memory while using voice capture; no automatic memory save, new model task, paste, or clipboard change occurs.
+- [ ] Completed ordinary input creates selective personal Memory during idle time without a confirmation inbox. Empty Memory does not prevent useful input/cleanup.
+- [ ] History's **Text Used for Learning** is the exact committed final text, including dictionary/cleanup output; recognized text remains separate.
+- [ ] Active, cancelled, capture-only, raw-only and running-refinement sources are excluded. Changed/deleted/unsaved sources cannot produce stale results.
+- [ ] Check actual Chinese/English personal projects, people, stable preferences, facts and decisions. Quoted, third-person, hypothetical, temporary and uncertain statements are not asserted as personal facts.
+- [ ] Repeat evidence and weaker recurring evidence across distinct inputs; sources merge without duplicate Memory or double-counting one Capture.
+- [ ] Express a clear later personal update; current automatic Memory is superseded with source history. Older/ambiguous information and user-edited records are not overwritten.
+- [ ] Edit, archive/restore, replace and delete Memory. Active context updates appropriately; the same normalized deleted topic is not immediately relearned. Evaluate differently phrased topic consistency too.
+- [ ] Delete a disposable source Capture; its analysis snapshots disappear while independent Memory shows the missing source. User Memory deletion preserves the intentional Capture.
+- [ ] New voice input promptly cancels optional analysis; no late result saves, and unfinished queue work resumes during idle time/relaunch. Exercise model unavailability/failure/backoff and optional retry.
+- [ ] Measure model selectivity, evidence correctness, idle energy, cancellation/draining and native keyboard/VoiceOver behavior.
 
-2026-09-18: all **47 isolated tests** passed, including 16 Memory tests and the 31 Capture/History/audio regression tests. Offscreen native rendering checked list/detail/editor/context layout with synthetic data. Evidence is in [M-004](./tasks/M-004-memory.md#validation-evidence); interactive acceptance remains open.
-
-## M-004 Memory Candidates
-
-- [ ] In a disposable saved Capture, choose **Find Memory Candidates**; verify zero to three selective Vocabulary/Project suggestions with grounded Chinese/English names, aliases, notes and literal evidence.
-- [ ] Inspect **Text Used for Extraction**. It must match saved final text, including M-005's refined output when applied; recognized text is used only when no final exists. Failed/skipped refinement must not be described as polished.
-- [ ] Edit/save, link to an existing active memory, dismiss and cancel review. Confirmed Memory and review states survive relaunch; pending suggestions never participate in related context.
-- [ ] Inspect the source snapshot from saved AI-derived Memory. The exact extraction text remains available even after a later source-text change, until that source Capture is deleted.
-- [ ] Change the source during extraction or before review confirmation. Stale results must not save; re-extraction uses the updated text. Repeating an already analyzed text preserves decisions and does not rerun inference.
-- [ ] Cancel inference, leave the detail and begin live capture. Verify no late candidates, blocked voice startup or unnecessary model work after cancellation.
-- [ ] Exercise empty suggestions, oversized input, model unavailability/refusal and unsupported language; Captures and existing Memory remain, with readable recovery.
-- [ ] Delete a disposable source Capture during/after extraction; its snapshots disappear, no late result recreates them, and separately confirmed Memory remains.
-- [ ] Verify Memory inbox/review/source disclosure/progress controls with keyboard, VoiceOver and long text; measure model latency/energy and live-input preemption.
-
-2026-09-18: all **65 isolated tests** pass, including 18 candidate tests with injected inference. The real macOS 27 Foundation Models path compiles. These results establish persistence and concurrency behavior, not AI quality; the real-model and interaction checks remain open for tonight. Evidence is in [M-004](./tasks/M-004-memory.md#candidate-slice-validation).
+Historical foundation/candidate build and fixture evidence remains in [M-004](tasks/M-004-memory.md#validation-evidence). Current injected-model tests establish persistence/control flow; they do not establish real-model accuracy.
 
 ## M-005 input personalization
 
-Use disposable captures in the owner's signed app when evening validation resumes:
+- [ ] With no personal Memory, cleanup removes meaningless speech redundancy and formats existing structure under [the approved contract](input-cleanup.md).
+- [ ] Dictionary spellings supply useful Speech hints; explicit aliases correct their actual recognized matches. Disabling cleanup still applies dictionary rules; a spelling-only entry does not establish an alias.
+- [ ] Cover Chinese/English/mixed input, 嗯/好的/OK replies, meaningful repetitions, uncertainty/alternatives, clear self-corrections, questions, requests, steps and ordinary narrative. No changed viewpoint, summary, invented heading, answer, explanation, translation or unspoken background.
+- [ ] Preserve people/product names, numbers/dates, negation, conditions, technical commands/paths/URLs/versions and code. Compare actual model output, not just validator acceptance.
+- [ ] Final text is saved before insertion; the target receives exactly that output. Original recognition, actual input, dictionary/Memory snapshots, changes, outcome and duration remain truthful.
+- [ ] Speech retry preserves completed final output and its old processing evidence, including existing capture-only records. Capture-only completion still does not paste/copy or restore another app.
+- [ ] Dictionary/Memory/source changes during inference invalidate stale results. Exercise unavailable/declined/oversized/slow models and save errors; unsaved AI text never reaches delivery.
+- [ ] Recheck capabilities/cancel during refinement and resume recording. No late paste, overlapping optional models or stuck processing. Relaunch recovers saved Capture without replaying a paste; pending personal analysis may resume separately.
+- [ ] Measure spelling-hint benefit, unintended edits, applied/skipped/timeout rates, real model time and final-to-delivery latency with cleanup on/off. Two seconds is a provisional model-wait budget, not an end-to-end guarantee.
+- [ ] Validate Settings persistence and native History/provenance/copy controls with keyboard, VoiceOver, long text and system appearance.
 
-- [ ] With refinement enabled, confirm a canonical name/alias in Memory, speak naturally, and inspect actual recognition. A matching alias should support correction while wording, tone, negation, numbers and intent remain intact. Compare with refinement disabled and with the memory archived/changed.
-- [ ] Cover Chinese/English/mixed phrases, short 嗯/OK/好的 acknowledgments, uncertainty, questions, repeated names, technical commands, paths, URLs, identifiers, versions and numeric values. Decline uncertain changes rather than inventing facts or answering dictated requests.
-- [ ] Current-app input saves **Final Text** before delivery and the target receives that exact text. **Recognition**, **Text Before Refinement**, **Changes** and **Memory Considered** retain truthful provenance.
-- [ ] **Record Capture** follows the same refinement/save path and shows “已保存”, with no paste, clipboard mutation or external focus restore.
-- [ ] Re-recognize a refined recording, including capture-only output. The latest recognized text changes independently; final output and its actual earlier input/context remain intact.
-- [ ] Automatic candidates start only after completion and use saved final text. Review/edit/dismiss remains explicit; no suggestion silently becomes Memory. Re-extraction after a changed final text rejects old pending candidates.
-- [ ] Start new voice input while optional candidate work is running. It cancels without delaying Speech startup or committing late suggestions. A draining model causes optional refinement/extraction to skip and leaves ordinary input usable.
-- [ ] Exercise unavailability, refusal, overlong text, deadline and storage-error recovery with disposable data. Saved original text/audio remain; failure is not labelled as successful polishing, and an unsaved AI result never reaches delivery.
-- [ ] Recheck capabilities during refinement. Cancellation must end waiting promptly and prevent a late paste. Relaunch after interrupted processing; the Capture remains recoverable, no model/delivery starts automatically, and a previous actual delivery outcome remains intact.
-- [ ] Verify Settings toggle persistence and native History/disclosure/copy/review controls with keyboard, VoiceOver, long text and light/dark appearance.
-- [ ] Measure confirmed-term recovery, unintended changes, refinement result/status/time, final-to-delivery latency, timeout rate and CPU/energy versus unrefined input. The provisional 2-second limit bounds model waiting, not total end-to-end latency.
+Earlier narrow-refinement evidence is retained in [M-005](tasks/M-005-personalization.md#validation-evidence); M-009 holds the current suite/build evidence. Device/model acceptance remains open.
 
-2026-09-18: isolated compilation and all **91 tests** passed (26 personalization plus 65 regression tests, 0 failed/skipped). Controlled model stubs establish persistence/cancellation/timeout behavior, including models that ignore cancellation. They do not establish real-model output quality, hardware latency, focus/delivery or interactive UI acceptance. Evidence and the first-slice scope are in [M-005](./tasks/M-005-personalization.md#validation-evidence).
+## M-009 correction suggestions
+
+This is an independent opt-in dictionary behavior, not personal-Memory approval. Use the normal signed app with disposable documents:
+
+- [ ] Default-off setting starts no observation/prompt. Turning it on affects subsequent successfully dispatched current-app input only.
+- [ ] Confirm exact insertion anchoring at the caret in current macOS native, browser and editor fields. Missing/unsupported range APIs cause a silent skip; no broad document fallback is used.
+- [ ] Correct a word, including Chinese/mixed words, added/deleted letters and joined words. A suggestion waits for at least two seconds of settled text; undo/intermediate typing does not save a partial word.
+- [ ] Pure append/delete of phrases, punctuation/numbers/code/URL edits and broad rewrites do not create word suggestions. Record false positives/negatives rather than assuming all edits are recognition corrections.
+- [ ] The native panel appears without activating Morie or stealing text focus. Remember saves the correct spelling with **no automatic alias**. Not Now/expiry saves nothing; one word does not repeatedly prompt per process.
+- [ ] Further edits, moving the selection outside the insertion, field/app changes, new input and disabling the setting stop observation/dismiss the suggestion. Exercise unrelated/concurrent edits elsewhere in the same document to check range inference.
+- [ ] Secure input/password fields and excluded terminal/password-manager apps do not produce reads/prompts. Capture-only input and clipboard fallback never attach the watcher.
+- [ ] Check the 30-second observation / 20-second prompt limits, save errors, longest supported words, keyboard/VoiceOver, fullscreen, multiple screens and system appearance.
+- [ ] Inspect diagnostics/storage behavior: external field text is not logged, sent to AI or copied into Capture; only explicit Remember persists the spelling.
+
+[OpenLess audit](reference/openless.md) records the behavior reference and native adaptation. Detector tests and offscreen rendering do not establish AX field semantics, no-focus-steal behavior or actual cross-app precision.
 
 ## M-008 unified macOS management UI
 
-Interactive acceptance remains deferred by the owner. Use the signed app and disposable data when validation resumes:
+- [ ] Sidebar/list/detail and native toolbars are consistent across History, Dictionary, Personal Memory, Settings and Diagnostics at default/minimum sizes and resized columns.
+- [ ] Keyboard selection, search, filters and deletion show the correct detail. Hidden selections clear and source navigation resets when selecting another record.
+- [ ] Moving between History records stops playback/re-recognition without affecting another Capture. Background personal learning follows input-idle lifecycle, not page selection.
+- [ ] Final text is primary; recognition/refinement/learning snapshots and recording destination/expiry/retry remain accessible. Long text scrolls/selects correctly.
+- [ ] Dictionary editor validates spellings/aliases; Personal Memory editor handles personal information/lifecycle. Save/cancel/error/delete flows use native controls and system confirmations. No routine review inbox remains.
+- [ ] Settings work in management and the native Settings scene. Diagnostics supports filters, complete selected messages, resizing, copy-all, file reveal and confirmed clear.
+- [ ] Verify empty/populated/error states, keyboard/VoiceOver, light/dark appearance, increased contrast, reduced motion and native glass/selection/toolbar rendering.
 
-- [ ] Sidebar groups, list/detail navigation and toolbars remain consistent across History, Memory, Settings and Diagnostics at 1120 × 720, 960 × 600 and resized column widths.
-- [ ] Native keyboard selection, search and filters update the correct detail. Hidden/deleted selections clear. Source/related navigation resets when selecting another record.
-- [ ] Switching records/sections during playback, file recognition or candidate extraction releases/cancels the previous work and cannot commit a late result into another record.
-- [ ] Final text is primary and copyable. Recognition/refinement/extraction snapshots and recording destination/expiry/retry remain accessible. Long text scrolls and stays selectable.
-- [ ] Candidates are distinct from confirmed memories. Review/save/cancel/dismiss, manual editing, save errors, archive/restore/replace/delete and deleted-source explanations work with native sheets/dialogs. Running refinement and stale source text remove pending reviewability.
-- [ ] Settings work from management and the native Settings scene. Diagnostics supports search/levels, complete selected messages, resizing, copy-all, file reveal and confirmed clear.
-- [ ] Check empty/populated/error states, VoiceOver, full keyboard access, light/dark appearance, increased contrast, reduced motion and system glass/selection/toolbar rendering.
-
-2026-09-18: isolated app compilation and **91 regression tests** passed (0 failed/skipped). Thirteen native offscreen fixture surfaces cover the main pages, minimum width, long text, empty states, candidate review, stale candidates, delivery failure and provenance. Fixtures use temporary stores, injected model/actions and a memory-only logger. Native glass/sidebar/selection layers are not fully reproduced by offscreen bitmap caching; these results establish compile/regression/layout evidence, not interactive or material acceptance. Detailed paths and remaining checks are in [M-008](./tasks/M-008-macos-management-ui.md#validation-evidence).
+Earlier M-008 compilation/tests/layout fixtures are documented in [its task record](tasks/M-008-macos-management-ui.md#validation-evidence). Current M-009 fixtures cover the changed pages. Offscreen bitmap caching omits some native material/selection layers and cannot complete interactive acceptance.
 
 ## Toggle-capture lifecycle
 
@@ -218,7 +216,7 @@ Test at least:
 - Simplified Chinese where supported/configured;
 - Chinese + English mixed sentence;
 - common punctuation behavior;
-- project/product names to establish a Phase 0 baseline before Vocabulary learning exists;
+- project/product names with and without dictionary Speech hints;
 - quiet and normal office acoustic conditions.
 
 Record whether partial/volatile text is sensible, whether finalization changes it materially, and whether the end of a short utterance is ever lost after the finish action.
@@ -313,7 +311,7 @@ Suggested initial baseline:
 - include rapid back-to-back captures, immediate finish, immediate cancel, and long captures;
 - record any lost capture, stuck recording state, duplicate delivery, wrong target, failed focus restore, orphan microphone session, or paste failure.
 
-The objective is to discover lifecycle defects before Memory work starts.
+This reliability run remains required as Dictionary, cleanup and automatic Memory are integrated; model tests cannot replace it.
 
 ## Performance baseline
 

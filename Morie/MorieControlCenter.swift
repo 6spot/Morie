@@ -4,6 +4,7 @@ import SwiftUI
 private enum ControlCenterSection: String, CaseIterable, Identifiable {
     case history
     case memory
+    case dictionary
     case settings
     case diagnostics
 
@@ -12,7 +13,8 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .history: "History"
-        case .memory: "Memory"
+        case .memory: "Personal Memory"
+        case .dictionary: "Dictionary"
         case .settings: "Settings"
         case .diagnostics: "Diagnostics"
         }
@@ -21,13 +23,14 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .history: "clock.arrow.circlepath"
-        case .memory: "text.book.closed"
+        case .memory: "person.text.rectangle"
+        case .dictionary: "character.book.closed"
         case .settings: "gearshape"
         case .diagnostics: "ladybug"
         }
     }
 
-    var isLibrary: Bool { self == .history || self == .memory }
+    var isLibrary: Bool { self == .history || self == .memory || self == .dictionary }
 }
 
 @MainActor
@@ -36,7 +39,8 @@ struct MorieControlCenter: View {
     @Query(sort: \CaptureRecord.createdAt, order: .reverse) private var captures: [CaptureRecord]
     @State private var selection: ControlCenterSection? = .history
     @State private var selectedCaptureID: UUID?
-    @State private var selectedMemory: MemorySelection?
+    @State private var selectedMemory: UUID?
+    @State private var selectedDictionaryEntry: UUID?
 
     var body: some View {
         Group {
@@ -73,6 +77,7 @@ struct MorieControlCenter: View {
         List(selection: $selection) {
             Section("Library") {
                 sidebarItem(.history)
+                sidebarItem(.dictionary)
                 sidebarItem(.memory)
             }
             Section("App") {
@@ -99,6 +104,10 @@ struct MorieControlCenter: View {
                 canStartCapture: controller.canStartCapture,
                 onRecord: controller.startCaptureOnly
             )
+        case .dictionary:
+            if let dictionary = controller.dictionary {
+                DictionaryView(store: dictionary, selection: $selectedDictionaryEntry)
+            }
         case .memory:
             if let memory = controller.memory {
                 MemoryView(store: memory, selection: $selectedMemory)
@@ -117,13 +126,13 @@ struct MorieControlCenter: View {
                    let capture = captures.first(where: { $0.id == id }),
                    let history = controller.history,
                    let memory = controller.memory,
-                   let candidates = controller.memoryCandidates {
+                   let learning = controller.memoryLearning {
                     CaptureDetailView(
                         capture: capture,
                         captureID: id,
                         history: history,
                         memory: memory,
-                        candidates: candidates,
+                        learning: learning,
                         canRecognize: controller.canStartCapture,
                         onRecognize: controller.recognizeHistoryCapture
                     )
@@ -139,21 +148,26 @@ struct MorieControlCenter: View {
         case .memory:
             NavigationStack {
                 if let memory = controller.memory, let selectedMemory {
-                    switch selectedMemory {
-                    case .memory(let id):
-                        MemoryDetailView(store: memory, memoryID: id, onDelete: { self.selectedMemory = nil })
-                    case .candidate(let id):
-                        MemoryCandidateDetailView(store: memory, candidateID: id)
-                    }
+                    MemoryDetailView(store: memory, memoryID: selectedMemory, onDelete: { self.selectedMemory = nil })
                 } else {
                     ContentUnavailableView(
                         "Select a Memory",
                         systemImage: "text.book.closed",
-                        description: Text("Keep the names and context that make future input sound like you.")
+                        description: Text("Personal information learned from your everyday input appears here.")
                     )
                 }
             }
             .id(selectedMemory)
+        case .dictionary:
+            NavigationStack {
+                if let dictionary = controller.dictionary, let id = selectedDictionaryEntry {
+                    DictionaryDetailView(store: dictionary, entryID: id, onDelete: { selectedDictionaryEntry = nil })
+                } else {
+                    ContentUnavailableView("Select a Word", systemImage: "character.book.closed",
+                                           description: Text("Your names, products and technical terms."))
+                }
+            }
+            .id(selectedDictionaryEntry)
         default:
             EmptyView()
         }

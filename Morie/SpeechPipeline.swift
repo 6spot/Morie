@@ -62,6 +62,7 @@ actor SpeechPipeline {
         sessionID: UUID,
         locale requestedLocale: Locale,
         sourceAudioURL: URL,
+        dictionaryWords: [String] = [],
         onTranscript: @escaping @Sendable (UUID, String) -> Void,
         onAudioLevel: @escaping @Sendable (UUID, Double) -> Void,
         onFailure: @escaping @Sendable (UUID, String) -> Void
@@ -103,6 +104,17 @@ actor SpeechPipeline {
 
             self.audioSource = source
             self.analyzer = analyzer
+
+            if !dictionaryWords.isEmpty {
+                let context = AnalysisContext()
+                context.contextualStrings = [.general: dictionaryWords]
+                do { try await analyzer.setContext(context) }
+                catch {
+                    // Dictionary hints are optional; a rejected hint must not prevent intentional input.
+                    Diagnostics.record("Speech", "Dictionary context was unavailable; continuing recognition", level: .warning)
+                }
+                try requireActiveSession(sessionID)
+            }
 
             resultTask = Task {
                 do {

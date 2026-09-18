@@ -14,7 +14,9 @@ Morie is a personal voice-input tool. Its management window should make saved ex
 
 ## Scope
 
-- A shared native sidebar and consistent list/detail browsing for History and Memory.
+M-009 extends this native navigation to Dictionary and automatic Personal Memory. Its current rules supersede candidate-review surfaces; the dated M-008 validation below remains historical evidence for that earlier UI.
+
+- A shared native sidebar and consistent list/detail browsing for History, Dictionary and Personal Memory.
 - Readable final Capture text and Memory content, with secondary provenance/recovery information disclosed progressively.
 - Consistent native toolbar actions, search, filters, selection and empty states.
 - Native grouped settings with a readable, flexible width.
@@ -25,19 +27,19 @@ Excluded: iOS, CloudKit integration, model behavior changes, new runtimes/depend
 
 ## Acceptance criteria
 
-1. History and Memory share a predictable sidebar → list → detail structure. Selection/search/filter changes do not show another record's data or keep stale media/model work alive.
-2. Final text and confirmed Memory are the primary reading content. Recognition/refinement/extraction provenance remains available without dominating the page.
-3. Equivalent actions occupy equivalent native toolbar positions; destructive actions retain system confirmation. Editing and candidate review remain explicit, with save errors visible.
+1. History, Dictionary and Personal Memory share a predictable sidebar → list → detail structure. Selection/search/filter changes do not show another record's data or keep stale media/model work alive.
+2. Final text, dictionary spellings and personal information are the primary reading content. Recognition/refinement/learning provenance remains available without dominating the page.
+3. Equivalent actions occupy equivalent native toolbar positions; destructive actions retain system confirmation. Optional editing and dictionary-word confirmation keep save errors visible; routine personal Memory has no review inbox.
 4. Settings and Diagnostics use the same window hierarchy, system typography, spacing and semantic colors. Diagnostics uses the system table rather than manual column imitations.
 5. All controls/presentation primitives use SwiftUI/AppKit system components. No decorative glass, custom navigation/control library or external dependency is introduced.
-6. Empty, populated, long-content, pending/stale candidate and error states have clear layouts. Isolated compilation and offscreen layout checks pass; keyboard/VoiceOver/material/interaction acceptance remains open until real-device validation.
+6. Empty, populated, long-content, learning status and error states have clear layouts. Isolated compilation and offscreen layout checks pass; keyboard/VoiceOver/material/interaction acceptance remains open until real-device validation.
 
 ## Progress
 
 - [x] Inspect current pages and approved native UI rules.
 - [x] Unify navigation, list selection, search/filter and toolbar placement.
 - [x] Rework Capture/Memory details around reading and progressive disclosure.
-- [x] Align Settings, candidate review and Diagnostics.
+- [x] Align Settings and Diagnostics; M-009 replaces the former candidate review with automatic learning status.
 - [x] Compile and inspect native offscreen previews; fix layout issues.
 - [x] Update architecture/UI/development/validation records.
 - [ ] Complete supported-device keyboard, accessibility and live-input checks.
@@ -51,11 +53,11 @@ Excluded: iOS, CloudKit integration, model behavior changes, new runtimes/depend
 
 ## Implementation notes
 
-- `MorieControlCenter` owns separate Capture/Memory selections and the shared sidebar. History/Memory use the native three-column split; Settings/Diagnostics use two columns. Default size is 1120 × 720 with a 960 × 600 minimum.
-- History and Memory use system List selection, search and filter menus. Hidden/deleted/reviewed entries clear selection. Each selected detail has its own NavigationStack identity, so related/source navigation cannot carry over to another record. Capture open/close, cancellation and audio-expiry hooks remain in place.
+- `MorieControlCenter` owns separate Capture/Dictionary/Personal Memory selections and the shared sidebar. Library sections use the native three-column split; Settings/Diagnostics use two columns. Default size is 1120 × 720 with a 960 × 600 minimum.
+- History and Memory use system List selection, search and filter menus. Hidden/deleted entries clear selection. Each selected detail has its own NavigationStack identity, so related/source navigation cannot carry over to another record. Capture open/close, cancellation and audio-expiry hooks remain in place.
 - Final Capture text is the primary reading content. The list normalizes whitespace for its preview only; saved text and the full detail remain exact. Recognition/refinement and source recording use native disclosures. The Recognition label stays neutral because later Speech retries can update that field; Text Before Refinement retains the actual earlier input.
-- Memory details prioritize names, aliases and notes, show confirmation/current use, and disclose sources/history. Pending suggestions have an independent reading detail with evidence and an explicit Review & Save entry into the existing editor sheet. Recording/cancelled/refining/stale sources are excluded from pending reviewability.
-- Capture/Memory supporting content uses native GroupBoxes. Primary copy/edit/review actions and secondary menus occupy matching toolbar positions; destruction retains native confirmation. The editor keeps native validation and puts Cancel beside the default Save action.
+- Personal Memory details prioritize personal information, automatic/user origin and source/history. Dictionary owns spellings/aliases. M-009 removes pending-candidate detail/review; History displays automatic learning status and exact final-text evidence.
+- Capture/Memory supporting content uses native GroupBoxes. Primary copy/edit actions and secondary menus occupy matching toolbar positions; destruction retains native confirmation. The editor keeps native validation and puts Cancel beside the default Save action.
 - Settings uses a flexible grouped Form. Diagnostics uses a native Table, search/level filter and a resizable selected-event detail. Copy All Events still copies the whole log, and Clear Diagnostics now confirms before clearing the existing logger/file.
 - The shared reading surface is a small ScrollView/VStack composition, not a replacement control system. No dependency, compatibility layer, schema, model policy, hotkey, microphone or delivery implementation changed.
 
@@ -72,11 +74,15 @@ Excluded: iOS, CloudKit integration, model behavior changes, new runtimes/depend
 
 Implementation is ready for the deferred [device checklist](../validation.md#m-008-unified-macos-management-ui); task state remains IN PROGRESS until those checks are complete.
 
+M-009 adds current isolated Dictionary/Personal Memory/Settings/word-prompt layouts and retains the outstanding interactive checks. See [its validation evidence](M-009-macos-input-memory.md#validation-evidence).
+
 ## Known issues / follow-up
+
+- Validate the current M-009 Dictionary, Personal Memory, automatic-learning status and nonactivating correction prompt using the updated [device matrix](../validation.md). Earlier candidate screenshots are not evidence for these new surfaces.
 
 - M-008 keyboard/VoiceOver, search/filter/selection interactions, native material appearance and live-input preemption require the normal signed window. Offscreen snapshots cannot close those items.
 - Real-device validation of M-002 through M-005 remains open.
-- iCloud remains deferred to final integration after Apple Developer enrollment.
+- iCloud belongs to a later scheduled cross-device milestone after the single-Mac loop works; it does not gate local task completion.
 - iOS is not the next task; reconsider it only after the macOS product is proven.
 
 ## Issue / PR

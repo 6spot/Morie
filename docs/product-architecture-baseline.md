@@ -1,7 +1,7 @@
 # Product & Architecture Baseline
 
 Version: V0 Baseline v2  
-Date: 2026-09-17
+Date: 2026-09-17; owner amendments: 2026-09-18
 
 This is the repository-native summary of the approved Morie product baseline. The complete repository transcription of the approved source design is in [`design/apple-native-first-v0-baseline-v2.md`](./design/apple-native-first-v0-baseline-v2.md).
 
@@ -14,7 +14,7 @@ Morie is an Apple-native voice input and intentional capture product that gradua
 1. **macOS First** — finish the macOS end-to-end loop before iOS development.
 2. **Latest Apple Only** — target the latest Apple platform capabilities and Apple Intelligence-capable Macs; do not create compatibility layers for old Macs or old APIs.
 3. **Private Mode only in V0** — no Morie-hosted cloud backend in V0.
-4. **Private Mode = Apple Native + iCloud** — there is no Device Only product mode.
+4. **Private Mode = Apple Native + eventual iCloud sync** — there is no separate Device Only product mode. Finish the single-Mac loop first; sync is outside the current milestone.
 5. **Apple Native First** — Apple system frameworks are the required default implementation path.
 6. **Native UI Only** — all product UI must use Apple system components and the current macOS 27 Liquid Glass design language. Morie does not introduce a parallel/custom UI system.
 7. **No unapproved external dependencies** — if Apple-native capabilities cannot meet a requirement, implementation stops until the project owner explicitly approves an exception.
@@ -63,7 +63,7 @@ Two intentional Capture modes are planned:
 - `currentApp`: transcribe, deliver to the current app, and retain the intentional capture.
 - `captureOnly`: record an idea without injecting it into another app.
 
-Normal keyboard input is not monitored and Morie is not a global keylogger.
+Normal keyboard input is not monitored. The independent, default-off correction suggestion feature uses bounded Accessibility reads of a verified recent Morie insertion, only while the same text field remains focused. It does not record keystrokes or analyze whole documents. Saving a suggested word requires explicit confirmation and creates a dictionary spelling, not personal Memory or an automatic replacement alias.
 
 ## V0 platform boundary
 
@@ -81,7 +81,7 @@ Current platform baseline:
 - AVFoundation
 - NaturalLanguage
 - Accessibility / AppKit / NSPasteboard for macOS delivery
-- iCloud / CloudKit once Capture persistence ships
+- iCloud / CloudKit in a later scheduled cross-device milestone, after the single-Mac loop is validated
 
 Unsupported required capabilities block Private Mode. V0 does not add a cloud fallback.
 
@@ -118,79 +118,42 @@ The migration rule is: **reuse proven behavior, not historical complexity**.
 
 See [`reference/type4me.md`](./reference/type4me.md).
 
-## Phase plan
+## Delivery order — owner amendment, 2026-09-18
 
-### Phase 0 — Input Foundation
+Historical phase numbers identify task areas, not a dependency chain that puts sync before useful local input. The current milestone is [M-009](tasks/M-009-macos-input-memory.md):
 
-Validate the core daily input loop:
+1. Reliable macOS recording, durable recognition, final-text save and insertion (M-002/M-003).
+2. Independent basic cleanup and a user-maintained dictionary, useful with no personal Memory (M-005/M-009).
+3. Periodic idle analysis of completed current-app input into selective personal Memory; future input uses relevant context without adding unspoken information (M-004/M-009).
+4. Consistent native management for History, Dictionary, Personal Memory, Settings and Diagnostics (M-008/M-009).
+5. Complete device/model/latency and daily-use acceptance. Device checks are deferred, not waived.
+6. Only then schedule actual multi-device needs, iOS/mobile inspiration and iCloud/CloudKit sync. Apple Developer enrollment and container configuration are not current blockers or current acceptance criteria.
 
-`press → speak → press again → transcript → restore focus → inject text`
+### Input and Capture foundations
 
-Toggle capture is the approved V0 interaction: releasing the shortcut does not stop recording, a second press finishes, and `Escape` cancels an active recording. The non-activating capture HUD exposes the same cancel/finish actions without stealing focus.
+Toggle capture uses a solo shortcut activation to start and the next to finish; Escape cancels. The nonactivating HUD exposes the same finish/cancel actions. Speech uses the modern Apple stack, and generic focus restore/clipboard paste delivers the saved final text.
 
-Scope includes:
+Persist the Capture and audio destination before recording; checkpoint recognition; save complete recognized text before enrichment. Preserve source audio, final text and recovery metadata through operational failures. Existing `captureOnly` persistence remains, without expanding inspiration recording or follow-up on Mac.
 
-- Type4Me reference audit and selective migration of proven input behavior;
-- audio/session lifecycle;
-- global shortcut;
-- modern Speech APIs;
-- capability gate;
-- target-app capture;
-- focus restoration;
-- Accessibility/text-injection delivery;
-- clipboard fallback;
-- native macOS 27 UI / Liquid Glass behavior;
-- compatibility testing;
-- performance baseline.
+### Independent cleanup and dictionary
 
-### Phase 1 — Capture
+Follow [the approved cleanup contract](input-cleanup.md): preserve meaning, tone, terminology, uncertainty and meaningful short replies; remove meaningless fillers and pause redundancy; fix clear self-corrections; add punctuation, paragraphs and lists only for structure already expressed. Do not summarize, expand, translate, answer or execute the input.
 
-Add Capture-first persistence:
+Dictionary entries are user-maintained spellings/names/technical terms. Native Speech context uses spelling hints. Only explicit aliases establish deterministic replacements; case/width variants can normalize to the saved spelling. Dictionary corrections remain available if optional AI cleanup is off, busy or fails. Manually correcting recently inserted text can offer an opt-in native confirmation to save its spelling; this never silently makes a common word a global alias.
 
-- durable Capture model/store;
-- History;
-- App Context persistence;
-- iCloud/CloudKit sync;
-- iCloud capability gate.
+### Automatic personal Memory
 
-Raw intentional Capture must be durable before optional AI enrichment.
+Memory records personal projects, relationships, stable preferences, facts and decisions from daily communication. Routine input must not create a mandatory candidate-review workflow. Saved final text is the analysis source; retain the exact snapshot and source Capture IDs, origin, confidence, evidence date and active/superseded/archived lifecycle.
 
-Owner sequencing decision, 2026-09-18: defer iCloud/CloudKit synchronization to the final integration stage because Apple Developer enrollment is not yet set up. This does not block current local development or remove the final sync acceptance criteria. The future app container uses each user's own iCloud private database; end users do not need developer accounts and Morie operates no V0 cloud backend.
+Use idle batches and durable retry, yielding to new voice input. Admit grounded personal information conservatively, accumulate weaker recurring evidence across distinct inputs, merge repeats and supersede explicit later changes. Quotes, hypothetical/temporary/uncertain statements and unsupported inferences must not be asserted as personal facts. Users may inspect, edit, archive or delete Memory; user changes take priority over automation.
 
-### Phase 2 — Memory
+Basic cleanup does not depend on Memory. Retrieved personal context helps interpret this input; it cannot insert background the user did not express or override the user's current view/style. Model estimates and deterministic checks are not evidence of semantic accuracy; evaluate actual outputs on supported hardware.
 
-Start with restrained high-value context rather than a knowledge graph:
+### iOS, inspiration and cross-device sync — unscheduled
 
-- Vocabulary;
-- Project;
-- Relevant Context retrieval;
-- data-model support for Person, Topic, Decision, Preference, Fact, Open Thread, and Writing Style.
+Inspiration recording, follow-up questions and user-led completion belong primarily to the future phone experience. iPhone may later offer Action Button/AppIntent voice/text Capture after the Mac loop works. Do not clone the macOS management UI or start mobile work automatically.
 
-Memory must retain provenance and lifecycle information such as source captures, confidence, confirmation state, timestamps, and active/superseded/archived status.
-
-Owner decision, 2026-09-18: use the saved final text for Memory extraction. Save refined output in `finalText`, retain `recognizedText`, and extract only after that save. Each extraction retains its exact input snapshot; pending suggestions from changed text require a new extraction. M-005 implements this boundary; skipped/failed refinement keeps the original without describing it as polished.
-
-### Phase 3 — Personalization
-
-Use relevant historical context to improve current input:
-
-- context-aware correction;
-- terminology recovery;
-- style-aware rewrite;
-- learning from user corrections.
-
-The goal is increasingly user-like output, not generic AI prose.
-
-### Phase 4 — iOS
-
-iPhone becomes an instant Capture surface after the macOS loop works:
-
-- Action Button;
-- AppIntent;
-- voice/text Capture;
-- shared iCloud data semantics.
-
-Do not copy the entire macOS UI to iPhone.
+CloudKit synchronizes the user's Capture/Memory across devices using that user's own iCloud private database. The developer provisions the app capability/container once; users do not need developer accounts. Morie does not operate a shared V0 data service. Schedule provisioning and sync semantics when there is a real cross-device milestone, not simply because local persistence exists.
 
 ### Later — Optional Morie Cloud
 

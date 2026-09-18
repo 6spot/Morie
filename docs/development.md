@@ -2,7 +2,7 @@
 
 ## Requirements
 
-Current Phase 0 development baseline:
+Current single-Mac development baseline:
 
 - Apple Intelligence-capable Mac
 - macOS 27+
@@ -42,7 +42,7 @@ xcodebuild \
 
 Disabling signing here is for compile validation only; normal local launch/distribution follows the appropriate signing path. Never direct this unsigned build into the repository `build/Debug/Morie.app` while Xcode is running it, because changing the executable's signing identity can invalidate TCC permissions and make microphone behavior impossible to interpret.
 
-iCloud/CloudKit integration is deferred to the final integration stage by the owner's 2026-09-18 decision. Apple Developer enrollment and a real container are not yet set up; do not wait for them to continue local Capture work. The current store explicitly disables sync. The eventual integration uses each user's own iCloud private database and does not change the V0 no-Morie-backend boundary. See [`deployment.md`](./deployment.md#cloudkit-deployment--phase-1).
+iCloud/CloudKit is outside the current single-Mac milestone. Complete input, dictionary, cleanup and automatic personal Memory before scheduling cross-device work. The local store explicitly disables sync; no enrollment/container configuration is requested now. Eventual sync uses each user's own private database, without a Morie backend. See [deployment.md](deployment.md#cloudkit-deployment--later-cross-device-milestone).
 
 ## Unit tests
 
@@ -65,11 +65,13 @@ xcodebuild \
 
 Audio stream tests use synthetic 16 kHz mono PCM and Apple's real AAC writer/decoder. They verify readable audio after conversion/flush failure, immediate stop, repeated finalization, restart preservation and explicit discard. Controller timing, capture-session notifications, microphone release and cross-app delivery still need the signed-app interruption checks in [`validation.md`](./validation.md#m-003-interruption-and-discard).
 
-Memory tests use isolated SwiftData containers and native NaturalLanguage word tokenization to check explicit persistence, provenance, deduplication, lifecycle and bounded retrieval. Memory shares the container schema with Capture but writes through a separate `ModelContext`; there is no migration/legacy-store setup step.
+Memory tests use isolated SwiftData containers and native NaturalLanguage tokenization to check provenance, lifecycle and bounded personal-context retrieval. Memory and Dictionary write through separate contexts in the same container; development requires no legacy schema or migration setup.
 
-Candidate tests inject structured suggestions or delayed async results. They exercise committed final-text snapshots, review decisions, filtering/conflicts, changed/deleted sources and cancellation without invoking Apple Intelligence. Product compilation includes the real Foundation Models structured-generation path. Model quality, context limits and latency must be exercised separately on disposable data.
+Dictionary tests cover spelling/alias persistence, conflicts, bounded Speech hints, whole-word replacement, overlap and technical-content protection. Correction detector tests cover Chinese/mixed words, shared letters, added/deleted/joined letters, stable-edit timing and undo. They do not observe real Accessibility fields or display prompts.
 
-Personalization tests inject edit proposals and models that ignore cancellation. They verify grounded corrections, punctuation/content protection, committed original/final ordering, retained context/input snapshots, History retry, source/Memory changes, save failures, restart recovery, deadline/cancellation and no late/overlapping work. They also verify that automatic candidates use the saved final text and require review. No actual model inference or delivery occurs in these tests.
+Learning tests inject structured evidence and delayed models. They verify exact committed final-text sources, idle queue/restart discovery, automatic admission/accumulation, merging/updates, user edits/archive/delete, atomic failure/backoff and input preemption. A cancelled model cannot create late Memory. Personalization tests inject full final text and uncooperative models to check independent cleanup, dictionary fallback, original/final save ordering, provenance, stale source/context, History retry, deadline/cancellation and current-version recovery.
+
+The actual Foundation Models and native Speech-hint paths compile. Logic tests never invoke a real model, microphone, clipboard or product app, and cannot establish semantic quality or cross-app acceptance.
 
 ## CI compile gate
 
@@ -183,56 +185,46 @@ Use generated fixture audio and temporary stores for automated API checks. Never
 
 Mode persistence, terminal capture-only storage, cancellation and retry are covered by isolated logic tests. These checks do not replace the interactive clipboard/focus/microphone checks above.
 
-## Memory smoke test
+## Dictionary and cleanup smoke test
 
-The owner deferred interactive device checks until the evening of 2026-09-18. When resuming validation:
+Interactive checks remain deferred to the evening of 2026-09-18. Use disposable data in the owner's normal signed app when resuming:
 
-1. Open **Memory → New Memory**, save a vocabulary entry and a project with aliases/notes, then relaunch and inspect them.
-2. Open a completed History Capture → **Save Memory…**. Save a selective term/project, then link another Capture to that existing memory and inspect both sources.
-3. Inspect History's related context with Chinese/English names and aliases. Archive a matched entry, then restore it; the related result should disappear/reappear.
-4. Replace an entry. The new active record links to its predecessor, the old one reads **Superseded**, and stale context is excluded.
-5. Confirm that duplicate names and invalid fields keep the editor open with an explanation. Cancel leaves saved records unchanged.
-6. Delete a disposable source Capture, then a disposable Memory; independently saved Memory and source Capture data are retained respectively, with missing-source feedback where applicable.
+1. Add spellings such as **Morie**, **Claude** and a Chinese technical term in **Dictionary**. Separately add an explicit **more e → Morie** alias. Relaunch and verify persistence; conflicts/invalid fields keep the editor open, and Cancel preserves saved values.
+2. Compare Speech recognition with/without a spelling hint. Then verify deterministic alias correction from actual recognized text, including when **Clean Up Voice Input** is off. A spelling hint alone must not create a broad replacement alias.
+3. With an empty Personal Memory profile and cleanup on, test [the cleanup examples](input-cleanup.md): fillers, repeats, clear self-correction, uncertainty, short replies and clear ordered items. No invented content, summary, translation, answer or executed request.
+4. Verify the target receives the exact saved **Final Text**. Inspect recognition, dictionary/Memory snapshots and accepted changes in **Recognition & Refinement**.
+5. Re-recognize the saved audio; the delivered final output and its old processing provenance remain available. Exercise cancellation, unavailable/slow AI and save recovery with disposable captures.
+6. Measure actual cleanup fidelity, hint benefit, timeout rate and final-to-delivery latency. The provisional two-second limit bounds model waiting, not storage/scheduling or the full input loop.
 
-See the full [Memory device checklist](./validation.md#m-004-memory-foundation). Offscreen rendering verifies layout only and does not complete these interaction checks.
+## Automatic personal Memory smoke test
 
-## Memory Candidate smoke test
+1. Dictate a disposable explicit personal fact/project through ordinary current-app input. Let Morie idle, then inspect **Personal Memory** and History's learning status. No manual confirmation should be needed.
+2. Confirm **Text Used for Learning** matches saved final text, including cleanup/dictionary changes. Recognition stays separate. Capture-only/active/cancelled/raw-only input is not automatically learned.
+3. Repeat supported information, test weaker evidence across distinct captures, then express a clear later change. Inspect merged sources and superseded history; an ambiguous/older claim must not overwrite current information.
+4. Test quotes, third-person/hypothetical/temporary statements and uncertain personal information. Inspect actual evidence rather than assuming model confidence guarantees correctness.
+5. Edit/archive/delete personal information. User edits take precedence and the same normalized deleted topic is not immediately relearned. Inspect source links; deleting a source removes analysis snapshots but retains independent Memory.
+6. Begin new input during analysis, then relaunch with pending work. New input remains responsive, late cancelled results cannot save, and unfinished work resumes during idle time. Opening/closing History does not govern background learning.
 
-When evening device validation resumes, use a disposable Capture containing an explicitly described vocabulary term or project:
+See [the Memory device checklist](validation.md#m-004-memory-foundation). Model selectivity, stable topic identity and energy use require actual evaluation.
 
-1. After completing a disposable input, inspect its automatically suggested candidates in History/Memory. If optional work was skipped, choose **Find Memory Candidates**. Review each supporting quote/**Text Used for Extraction**; it must match saved final text, including refined text when applied.
-2. Edit and Save one suggestion, dismiss another, relaunch, and verify the decisions and source snapshot persist. Pending suggestions also appear in Memory.
-3. Try a name already present in active Memory; validation must keep the sheet open so you can choose that existing entry. Linking adds provenance without replacing its notes.
-4. Change the saved source through re-recognition where applicable. Old pending suggestions must not save; re-extraction should retain a new snapshot. Already delivered final output remains authoritative when re-recognition changes only recognized text.
-5. Cancel during analysis, leave the detail, or begin voice input. A late model result must not create candidates; voice input must remain responsive.
-6. Verify an empty result, unsupported/oversized input and model unavailability. The saved Capture remains intact and manual Memory remains available.
-7. Delete the disposable Capture; its extraction snapshots disappear while separately confirmed Memory remains.
+## Word-correction suggestion smoke test
 
-Do not run these against production History automatically. M-005 saves refined `finalText` before extraction and retains `recognizedText`; this requirement is recorded in its [task criteria](./tasks/M-005-personalization.md).
+1. Verify **Suggest Words After I Correct Input** defaults off. Enable it explicitly, dictate into a supported disposable text field, correct a word, and pause for two seconds.
+2. The native **Remember / Not Now** prompt should appear without activating Morie or stealing typing focus. Remember saves only the corrected spelling; verify that no old-word alias was created.
+3. Repeat with Chinese, mixed words, added/deleted letters and joined terms. Appended sentences, numbers, punctuation, URLs/code and broad rewrites should not create word suggestions.
+4. Continue editing, undo, move outside the inserted text, change apps/fields, start new input or disable the setting. Observation/pending suggestions should stop. Not Now/expiry saves nothing; the same word should not repeatedly prompt in one process.
+5. Verify unsupported/secure fields, capture-only completion and clipboard fallback do not start observation. Check long words, save errors, fullscreen/multiple screens, keyboard/VoiceOver and panel dismissal.
 
-## Personalization smoke test
-
-When evening validation resumes, use disposable data in the normal Xcode-signed app:
-
-1. Save a project/vocabulary entry with an explicit recognition alias, for example **Morie** / **more e**. Enable **Settings → Use Memory to Refine Input**.
-2. Capture a short natural phrase containing that alias. Inspect actual recognition first: correction only has evidence when the saved canonical name or an explicit alias matches. Compare **Final Text**, **Recognition**, **Changes**, **Text Before Refinement** and **Memory Considered**. Preserve wording, negation, tone, numbers and technical content.
-3. Confirm the text delivered to a disposable target matches saved final text. Repeat via **Record Capture** and confirm no clipboard/focus/delivery change.
-4. Review candidates after input completion. Their extraction snapshot must equal the final text actually saved. No candidate becomes Memory without confirmation.
-5. Re-recognize the saved recording. Original refined final output and the refinement-input snapshot remain intact while the latest recognition changes independently.
-6. Archive/edit the matching memory and repeat input; stale context must stop applying. Disable refinement and confirm original text is retained/used with a **Skipped** reason.
-7. Recheck capabilities during refinement and immediately capture again afterward. There must be no late paste or stuck processing. Exercise timeout/unavailability and inspect the retained original; a draining model must not block a new recording.
-8. Compare final-to-delivery latency with refinement enabled/disabled, and record applied/unchanged/skipped/timed-out/failed outcomes on representative Chinese/English samples. The 2-second model-wait budget is provisional and excludes storage/scheduling overhead.
-
-These checks establish whether Memory improves input. Broader rewriting and correction/style learning remain follow-up rather than inferred success from deterministic tests.
+Use the [correction matrix](validation.md#m-009-correction-suggestions). Automated fixtures must never attach an AX watcher to the owner's applications.
 
 ## Management UI smoke test
 
 M-008 keeps development on macOS. Use the normal Xcode-signed app and disposable data when the deferred interactive checks resume:
 
-1. Open Morie and switch between History, Memory, Settings and Diagnostics. Resize the window and native split columns; confirm usable content at 960 × 600 and the default 1120 × 720.
+1. Open Morie and switch between History, Dictionary, Personal Memory, Settings and Diagnostics. Resize the window and native split columns; confirm usable content at 960 × 600 and the default 1120 × 720.
 2. Select History rows with keyboard and pointer. Search by text/app and change filters; a hidden/deleted record must no longer occupy the detail. Start playback/re-recognition, then change selection or leave History; old work must stop without changing another Capture.
 3. Read final text, open recognition/refinement and recording disclosures, use both copy actions, and follow a linked Memory. Selecting a different Capture resets the detail navigation. Long text remains scrollable and selectable.
-4. In Memory, review a suggestion and explicitly save/cancel/dismiss it. Check manual creation, validation errors, edit/archive/restore/replace/delete and sources. Pending suggestions are separate from confirmed context; changed/deleted/recording/refining sources cannot remain reviewable.
+4. Check dictionary and personal-Memory creation/edit/save/cancel, validation errors, lifecycle/deletion and sources. Personal Memory appears automatically; its editor contains personal information, while Dictionary owns spellings/aliases. Learning status must not become a required review task.
 5. Confirm Settings persistence from both entry points. Filter Diagnostics, select a long event, resize its detail, and check copy-all/reveal/clear actions with disposable logs.
 6. Verify keyboard focus, VoiceOver names, light/dark appearance, increased contrast and reduced motion. Native glass, selection colors and toolbar compositing require the real window.
 

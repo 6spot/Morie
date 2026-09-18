@@ -28,7 +28,9 @@ When implementation changes behavior, update the relevant documentation in the s
 - **Apple Native First**: the Apple system implementation is the default and required implementation path.
 - **Native UI Only**: product UI must use Apple system UI components and the native macOS 27 Liquid Glass design language. Do not replace a system component with a custom imitation.
 - **Private Mode first**: V0 has no Morie cloud backend.
-- **No Device Only mode**: Private Mode is Apple-native local intelligence plus iCloud/CloudKit once persistence ships.
+- **Single Mac first**: Private Mode currently uses Apple-native local intelligence and storage. iCloud/CloudKit belongs to a later, actual cross-device milestone; it is not a dependency of local persistence or this milestone. No separate Device Only product mode is introduced.
+- **Dictionary and Memory are different**: user-maintained dictionary entries specify spelling/explicit aliases; automatic personal Memory records durable information from daily communication. Ordinary input never requires candidate approval.
+- **Current scope**: finish Mac input, independent basic cleanup, custom dictionary and automatic local Memory. Inspiration capture/follow-up primarily belongs to the future mobile product and is not active work.
 - **Capture First**: intentional user input must be durably saved before AI enrichment once Phase 1 persistence exists.
 - **Expression First**: personalization must not make ordinary voice input slow or unreliable.
 - **Morie Architecture First**: architecture/design/task requirements are decided from Morie's documents first. Type4Me never overrides them.

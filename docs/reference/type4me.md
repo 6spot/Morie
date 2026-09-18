@@ -311,3 +311,12 @@ Morie requirement: use confirmed relevant Vocabulary/Project context to improve 
 - **ADAPT:** treat transcript/context as data rather than instructions; preserve technical tokens, negation, facts and tone; do not answer dictated requests; do not remove acknowledgments such as 嗯/OK/好的 through a filler-word list. Record the actual input and change provenance when refinement happens.
 - **DROP:** scene/provider routing, prompt-variable frameworks, clipboard/selection context reads, translation modes, generalized rewriting, old-build inference and Type4Me's lock/detached-AX timeout machinery. Morie uses one current native model session, bounded structured edits and a Swift-concurrency deadline owner; no source was copied.
 - **VERIFY:** real on-device terminology benefit, punctuation quality, mixed-language fidelity and latency versus unrefined input. A provisional 2-second model-wait deadline and deterministic cancellation tests establish a control-flow bound, not measured Foundation Models performance or a guarantee that punctuation always preserves meaning.
+
+## M-009 dictionary and automatic Memory amendment — 2026-09-18
+
+The earlier M-004/M-005 audits record the design at that time. The owner's current requirement separates user-maintained words from automatically learned personal information and removes required Memory candidate confirmation. [M-009](../tasks/M-009-macos-input-memory.md) and [the cleanup contract](../input-cleanup.md) supersede those earlier product rules.
+
+- **ADAPT:** existing prompt/data isolation, technical-content protection, provenance, save-error and duplicate-handling lessons; native Speech contextual strings supply bounded dictionary hints. Meaningful short replies and uncertainty remain content.
+- **DROP:** vocabulary stored as personal Memory, a required daily-input review inbox, narrow punctuation-only cleanup, provider-specific hotwords and any old-schema compatibility layer. Personal Memory analyzes committed final text in durable idle batches.
+- **ADAPT:** the owner-supplied [OpenLess behavior reference](openless.md) adds an independent opt-in confirmation after a user corrects a word. It creates a spelling hint, not an automatic global replacement or a personal fact. No OpenLess source is copied.
+- **VERIFY:** actual native Speech hint benefit, model fidelity and personal-evidence selection, input preemption, bounded AX reads/focus and native correction-prompt usability on macOS 27. Logic tests cannot establish those device results.

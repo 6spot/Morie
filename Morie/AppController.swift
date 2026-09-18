@@ -31,11 +31,13 @@ final class AppController: ObservableObject {
     @Published private(set) var captureShortcut: CaptureShortcut
     @Published private(set) var audioRetentionDays: Int
     @Published private(set) var inputRefinementEnabled: Bool
+    @Published private(set) var correctionSuggestionsEnabled: Bool
     @Published private(set) var recoverySettingsURL: URL?
 
     let history: CaptureHistoryController?
     let memory: MemoryStore?
-    let memoryCandidates: MemoryCandidateController?
+    let dictionary: DictionaryStore?
+    let memoryLearning: MemoryLearningController?
 
     private let capabilityGate = CapabilityGate()
     private let speech = SpeechPipeline()
@@ -43,6 +45,7 @@ final class AppController: ObservableObject {
     private let hud = CaptureHUDController()
     private let captureStore: CaptureStore?
     private let personalizer: CapturePersonalizer?
+    private let dictionaryCorrections: DictionaryCorrectionController?
     private let persistenceError: Error?
     private let speechLocale = Locale(identifier: "zh-CN")
 
@@ -65,21 +68,24 @@ final class AppController: ObservableObject {
         self.persistenceError = persistenceError
         history = captureStore.map { CaptureHistoryController(store: $0, locale: Locale(identifier: "zh-CN")) }
         memory = captureStore.map { MemoryStore(container: $0.container) }
+        dictionary = captureStore.map { DictionaryStore(container: $0.container) }
+        dictionaryCorrections = dictionary.map { DictionaryCorrectionController(dictionary: $0) }
         let personalizer: CapturePersonalizer?
-        if let captureStore, let memory {
-            personalizer = CapturePersonalizer(store: captureStore, memory: memory)
+        if let captureStore, let memory, let dictionary {
+            personalizer = CapturePersonalizer(store: captureStore, memory: memory, dictionary: dictionary)
         } else {
             personalizer = nil
         }
         self.personalizer = personalizer
-        memoryCandidates = memory.map {
-            MemoryCandidateController(store: $0, canUseModel: { personalizer?.isModelBusy != true })
+        memoryLearning = memory.map {
+            MemoryLearningController(store: $0, canUseModel: { personalizer?.isModelBusy != true })
         }
         let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
         audioRetentionDays = CaptureStore.audioRetentionDays
         inputRefinementEnabled = UserDefaults.standard.object(forKey: CapturePersonalizer.enabledDefaultsKey) as? Bool ?? true
+        correctionSuggestionsEnabled = UserDefaults.standard.bool(forKey: DictionaryCorrectionController.enabledDefaultsKey)
 
         hud.onCancel = { [weak self] in
             Task { @MainActor in
@@ -127,6 +133,12 @@ final class AppController: ObservableObject {
         UserDefaults.standard.set(enabled, forKey: CapturePersonalizer.enabledDefaultsKey)
     }
 
+    func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
+        correctionSuggestionsEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: DictionaryCorrectionController.enabledDefaultsKey)
+        if !enabled { dictionaryCorrections?.stop() }
+    }
+
     var statusDetail: String? {
         switch state {
         case .blocked(let reason), .failed(let reason): reason
@@ -159,6 +171,9 @@ final class AppController: ObservableObject {
 
         Diagnostics.record("App", "Bootstrap started")
         state = .checking
+        memoryLearning?.stop()
+        memoryLearning?.setInputActive(true)
+        dictionaryCorrections?.stop()
         hotkey?.invalidate()
         hotkey = nil
         hud.hide()
@@ -198,6 +213,8 @@ final class AppController: ObservableObject {
             lastPresentedFailure = nil
             recoverySettingsURL = nil
             state = .ready
+            memoryLearning?.setInputActive(false)
+            memoryLearning?.start()
             Diagnostics.record("App", "Bootstrap complete; Morie is Ready")
         } catch is CancellationError {
             Diagnostics.record("App", "Bootstrap cancelled", level: .warning)
@@ -338,7 +355,8 @@ final class AppController: ObservableObject {
         transcript = ""
         state = .recording
         history?.setInputActive(true)
-        memoryCandidates?.setInputActive(true)
+        dictionaryCorrections?.stop()
+        memoryLearning?.setInputActive(true)
 
         hotkey?.setCancellationEnabled(true)
         hud.showRecording()
@@ -408,6 +426,7 @@ final class AppController: ObservableObject {
                 sessionID: sessionID,
                 locale: speechLocale,
                 sourceAudioURL: sourceAudioURL,
+                dictionaryWords: (try? dictionary?.speechHints()) ?? [],
                 onTranscript: { [weak self] resultSessionID, text in
                     Task { @MainActor in
                         guard self?.activeCaptureID == resultSessionID,
@@ -516,7 +535,7 @@ final class AppController: ObservableObject {
                 state = .refining
                 finalText = try await personalizer.refine(
                     sessionID, enabled: inputRefinementEnabled,
-                    otherModelWorkActive: memoryCandidates?.extractingCaptureID != nil
+                    otherModelWorkActive: memoryLearning?.isModelBusy == true
                 )
                 // Cancellation/recheck may have taken over while the optional model was running.
                 try Task.checkCancellation()
@@ -541,6 +560,9 @@ final class AppController: ObservableObject {
                 originalWindowNumber: targetWindowNumber
             )
             Diagnostics.record("Delivery", "Injection completed for \(label(sessionID))")
+            if correctionSuggestionsEnabled, !Task.isCancelled, stoppingCaptureID == nil {
+                dictionaryCorrections?.observeInsertion(finalText, in: targetApplication)
+            }
             // Delivery may already have dispatched before cancellation arrived.
             // Record that outcome even when interruption now owns the UI.
             try captureStore.markDelivered(sessionID)
@@ -675,7 +697,6 @@ final class AppController: ObservableObject {
         lastPresentedFailure = nil
         state = .ready
         hud.showSuccess(deliveryMode: deliveryMode)
-        memoryCandidates?.findCandidates(for: sessionID, automatically: true)
     }
 
     private func failSession(_ sessionID: UUID, error: Error) {
@@ -705,7 +726,6 @@ final class AppController: ObservableObject {
                 "Delivery fallback reported in HUD; modal alert suppressed because transcript is preserved",
                 level: .warning
             )
-            memoryCandidates?.findCandidates(for: sessionID, automatically: true)
         } else {
             hud.showFailure()
             presentFailure(title: "Morie input failed", message: message)
@@ -722,7 +742,7 @@ final class AppController: ObservableObject {
         targetApplication = nil
         targetWindowNumber = nil
         history?.setInputActive(false)
-        memoryCandidates?.setInputActive(false)
+        memoryLearning?.setInputActive(false)
     }
 
     private func presentFailure(title: String, message: String) {

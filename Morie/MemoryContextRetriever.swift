@@ -1,5 +1,4 @@
 import Foundation
-import NaturalLanguage
 
 struct MemoryContextMatch: Codable, Equatable, Identifiable, Sendable {
     let memory: MemorySnapshot
@@ -9,53 +8,29 @@ struct MemoryContextMatch: Codable, Equatable, Identifiable, Sendable {
 
 enum MemoryContextRetriever {
     static func retrieve(for text: String, from memories: [MemorySnapshot], limit: Int = 8) -> [MemoryContextMatch] {
-        let query = MemoryText.normalized(text)
-        let words = wordRanges(in: query)
-        guard !words.isEmpty, limit > 0 else { return [] }
-
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, limit > 0 else { return [] }
+        let queryTerms = Set(terms(text))
         let matches: [(MemoryContextMatch, Int)] = memories.compactMap { memory in
-            guard memory.status == .active, memory.userConfirmed else { return nil }
-            var bestMatch: (MemoryContextMatch, Int)?
-            for (index, term) in ([memory.name] + memory.aliases).enumerated() {
-                let phrase = MemoryText.normalized(term)
-                let wordCount = wordRanges(in: phrase).count
-                guard wordCount > 0 else { continue }
-                var start = query.startIndex
-                while start < query.endIndex,
-                      let range = query.range(of: phrase, range: start..<query.endIndex) {
-                    let splitsWord = words.contains { word in
-                        (word.lowerBound < range.lowerBound && range.lowerBound < word.upperBound)
-                            || (word.lowerBound < range.upperBound && range.upperBound < word.upperBound)
-                    }
-                    if !splitsWord {
-                        // Stored names/aliases are limited to 120 characters.
-                        let score = (index == 0 ? 1_000 : 0) + wordCount
-                        if score > (bestMatch?.1 ?? 0) {
-                            bestMatch = (MemoryContextMatch(memory: memory, matchedTerm: term), score)
-                        }
-                        break
-                    }
-                    start = range.upperBound
-                }
+            guard memory.status == .active else { return nil }
+            if !InputText.literalRanges(of: memory.name, in: text).isEmpty {
+                return (MemoryContextMatch(memory: memory, matchedTerm: memory.name), 100 + memory.name.count)
             }
-            return bestMatch
+            let shared = Set(terms(memory.name + " " + memory.notes)).intersection(queryTerms)
+            guard !shared.isEmpty else { return nil }
+            return (MemoryContextMatch(memory: memory, matchedTerm: shared.sorted().joined(separator: ", ")), shared.count)
         }
-
-        return matches.sorted { lhs, rhs in
-            if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
-            if lhs.0.memory.updatedAt != rhs.0.memory.updatedAt { return lhs.0.memory.updatedAt > rhs.0.memory.updatedAt }
-            return lhs.0.id.uuidString < rhs.0.id.uuidString
+        return matches.sorted {
+            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            if $0.0.memory.updatedAt != $1.0.memory.updatedAt { return $0.0.memory.updatedAt > $1.0.memory.updatedAt }
+            return $0.0.id.uuidString < $1.0.id.uuidString
         }.prefix(min(limit, 8)).map(\.0)
     }
 
-    private static func wordRanges(in text: String) -> [Range<String.Index>] {
-        let tokenizer = NLTokenizer(unit: .word)
-        tokenizer.string = text
-        var words: [Range<String.Index>] = []
-        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
-            words.append(range)
-            return true
+    private static func terms(_ text: String) -> [String] {
+        let normalized = MemoryText.normalized(text)
+        let stopwords: Set<String> = ["this", "that", "with", "have", "from", "about", "your", "mine", "the", "and", "are", "was", "for", "you", "my", "our", "我们", "我的", "这个", "那个", "现在", "已经", "需要", "可以", "就是", "自己", "一个"]
+        return InputText.words(in: normalized).map { String(normalized[$0]) }.filter {
+            $0.count > 1 && !stopwords.contains($0) && $0.contains(where: \.isLetter)
         }
-        return words
     }
 }

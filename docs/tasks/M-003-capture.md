@@ -6,7 +6,7 @@
 - **Last updated:** 2026-09-18
 - **Phase:** Phase 1
 - **Starts after:** M-002 macOS Input Foundation reaches an acceptable stable baseline
-- **Owner sequencing decision (2026-09-18):** defer iCloud/CloudKit sync to the final integration stage. The owner has not enrolled in an Apple Developer account/program. Continue local development without waiting for a Team ID or container.
+- **Owner sequencing decision (2026-09-18):** finish the single-Mac input/dictionary/Memory loop before cross-device work. CloudKit is outside this task and the current milestone, not a local-persistence blocker. No Team ID or container is requested.
 
 ## Why
 
@@ -23,14 +23,12 @@ Planned:
 - delivery mode (`currentApp` / `captureOnly`);
 - basic History UI;
 - App Context persistence;
-- real iCloud/CloudKit container and entitlements;
-- CloudKit sync semantics;
-- iCloud/CloudKit capability check as part of full Private Mode readiness.
 - compressed source-audio preservation and re-recognition, defaulting to 7-day retention with a configurable day-based policy.
 
 Excluded:
 
-- full Memory extraction;
+- automatic Memory learning (owned by M-004/M-009);
+- iCloud/CloudKit provisioning, account gating and sync validation (later cross-device milestone);
 - knowledge graph;
 - iOS client;
 - Morie cloud backend.
@@ -40,18 +38,15 @@ Excluded:
 1. Intentional Capture is durably written before optional enrichment.
 2. AI/enrichment failure cannot lose the raw Capture.
 3. History can inspect saved captures.
-4. iCloud/CloudKit is configured against a real container, not a placeholder.
-5. Private Mode readiness includes the required iCloud/CloudKit availability state.
-6. Sync semantics are documented and tested for the macOS client.
-7. Retained source audio can be played and explicitly re-recognized from History using native Apple APIs/UI.
-8. Retry failure, empty output, cancellation, and late completion cannot erase saved text/audio or change an original delivery outcome.
-9. Starting live capture stops History playback and cancels pending re-recognition before microphone capture begins.
-10. Expiry removes the recording while preserving the History row and its metadata, including failed empty captures.
-11. The History window can start a `captureOnly` voice recording. Its mode is saved before Speech starts; successful completion saves text/audio without target-app focus restoration, injection or clipboard changes.
-12. Both entry points share finish/cancel, empty-result recovery and History preemption. An in-app capture reports “已保存”; a later global-shortcut capture still uses `currentApp` delivery.
-13. Capability recheck, shortcut loss, microphone interruption and Speech failure stop native recording and preserve available source audio/text as a failed Capture. Late results must not inject or override capability status.
-14. Explicit user cancellation closes native recording and awaits outstanding work before deleting the Capture and its file. New recording cannot begin during teardown.
-15. Speech conversion/flush failure still finalizes already-written AAC. Repeated teardown is idempotent, and an already-dispatched delivery keeps its actual durable outcome.
+4. Retained source audio can be played and explicitly re-recognized from History using native Apple APIs/UI.
+5. Retry failure, empty output, cancellation, and late completion cannot erase saved text/audio or change an original delivery outcome.
+6. Starting live capture stops History playback and cancels pending re-recognition before microphone capture begins.
+7. Expiry removes the recording while preserving the History row and its metadata, including failed empty captures.
+8. The History window can start a `captureOnly` voice recording. Its mode is saved before Speech starts; successful completion saves text/audio without target-app focus restoration, injection or clipboard changes.
+9. Both entry points share finish/cancel, empty-result recovery and History preemption. An in-app capture reports “已保存”; a later global-shortcut capture still uses `currentApp` delivery.
+10. Capability recheck, shortcut loss, microphone interruption and Speech failure stop native recording and preserve available source audio/text as a failed Capture. Late results must not inject or override capability status.
+11. Explicit user cancellation closes native recording and awaits outstanding work before deleting the Capture and its file. New recording cannot begin during teardown.
+12. Speech conversion/flush failure still finalizes already-written AAC. Repeated teardown is idempotent, and an already-dispatched delivery keeps its actual durable outcome.
 
 ## Progress
 
@@ -68,19 +63,18 @@ Excluded:
 | Empty-result classification | IN PROGRESS | Removed the amplitude-only “five buffers above −50 dB” speech decision. No input/zero signal can be discarded; nonzero uncertain audio is retained with an explicit failed-recognition state and History recovery actions. Quiet speech versus ambient noise still needs owner-device evidence. |
 | Audio retention | IMPLEMENTED / VERIFY | Default 7 days, configurable 1–365 days. Expiry preserves text, failed rows, duration and expiry metadata. Checks run on startup, capture, settings changes and History access, including an open detail's expiry deadline. |
 | Tests | IMPLEMENTED / PASS | 31 tests cover native AAC conversion/flush failure and immediate stop, restart preservation, explicit discard, persistence/modes, History retry/cancellation/preemption, expiry/missing files, and scoped deletion. Temporary databases/audio and a test-only diagnostics sink isolate the running app. |
-| iCloud/CloudKit | TODO | Owner explicitly deferred sync to the final integration stage on 2026-09-18 because the Apple Developer account/program is not yet set up. It does not block current local work. Later integration requires a real Development Team and container, entitlements, account/capability handling and sync validation. Local configuration remains `.none`. |
 
 Isolated macOS 27 Debug compilation passed using temporary DerivedData, without overwriting the owner's Xcode-run product. All five CaptureStore tests passed on 2026-09-17.
 
 ## Implementation notes
 
 - The persistent entity is `CaptureRecord`; voice is represented as a source of Capture rather than the domain root.
-- M-004 adds `MemoryRecord` to the same container schema and an explicit Save Memory/source-link action in History. Memory has a separate write context and cannot alter Capture text/delivery outcomes. The owner deferred interactive device validation until the evening of 2026-09-18 while independent development continues; existing M-003 acceptance remains open.
-- M-004 candidate extraction adds `MemoryExtractionRecord` snapshots to that schema. Deleting a Capture also deletes its candidate input snapshots while separately confirmed Memory remains. M-005 now saves refined `finalText` before extraction, retaining recognition, the exact refinement input/context and accepted edits. Running refinement blocks source mutation/extraction; recovery preserves its raw/final text and any actual delivery outcome. History re-recognition preserves completed refined output for capture-only entries too. See [M-005](M-005-personalization.md) for validation evidence and limits.
+- M-009's current schema adds `DictionaryEntry`, `MemoryRecord`, `MemoryAnalysisRecord` and `MemoryLearningBlock` to the Capture container. Dictionary and personal Memory write through separate contexts and cannot roll back Capture checkpoints. Current implementation is direct, with no migrations from the superseded candidate schema.
+- Final text and exact dictionary/context/cleanup provenance are saved before delivery and later idle analysis. `recognizedText` stays separate. Deleting a Capture removes its analysis source snapshots; separate Memory remains. History retries preserve completed final output and its actual earlier provenance. See [M-009](M-009-macos-input-memory.md) for current evidence and remaining model/device acceptance.
 - The authoritative session UUID is also the Capture UUID, avoiding a second identity mapping during the input loop.
 - Capture creation requires an explicit delivery mode. The shortcut supplies `currentApp`; History's **Record Capture** supplies `captureOnly` and records Morie as the source without reading another app's window identity. Recognition completion returns the persisted mode, so the controller's delivery decision does not depend on whichever app is frontmost at finish time.
 - Capture-only success is terminal at the recognition save. The same record becomes available to History playback/retry without a delivery step, and a late cancellation cannot discard it. The HUD reports saved versus inserted using the corresponding mode.
-- Local persistence uses SwiftData with an explicit non-CloudKit configuration until the real iCloud container exists.
+- Local persistence uses SwiftData with an explicit non-CloudKit configuration throughout this single-Mac milestone.
 - The first durable write occurs before `SpeechPipeline.start`. Progressive recognized text is checkpointed with a bounded 500 ms cadence to avoid a disk save for every character callback.
 - Delivery success/failure and operational failure are durable terminal states. User cancellation is an explicit discard and removes the active record.
 - Capability recheck and hotkey loss previously reused destructive cancellation. They now retain a failed Capture. The controller claims shutdown ownership before awaiting native work, cancels outstanding startup/finalization, closes the writer, accepts any final snapshot, and only then persists failure or explicit discard. Checking/blocked states cannot be replaced by a cancelled task's Ready transition.
@@ -88,7 +82,7 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 - `SpeechPipeline` observes live analyzer/result failures. AVFoundation runtime-error/interruption notifications fail the input stream and trigger controller cleanup. An ownership check after async converter creation prevents cancelled startup from opening a later source.
 - A result arriving during teardown is saved without initiating delivery. `TextInjector` checks cancellation before activation and after focus handoff; paste dispatch has no suspension point. A delivery already dispatched still records `delivered`, and later interruption cannot overwrite that terminal outcome.
 - `CaptureStore` accepts an explicit file URL for isolated restart testing; production continues to use SwiftData's default local application store.
-- The menu-bar panel remains compact. History, Memory, Settings and Diagnostics are organized in the standard sidebar of one Morie window.
+- The menu-bar panel remains compact. History, Dictionary, Personal Memory, Settings and Diagnostics are organized in the standard sidebar of one Morie window.
 - History retry is explicit and cancellable. It reads the saved file without microphone capture, changes the same Capture only after successful recognition, and never injects or changes the clipboard automatically.
 - Successful recovery of a failed Capture saves recognized/final text and changes its state to `recognized`. For previously delivered/delivery-failed Captures, only recognized text and retry metadata change; the original output and delivery state remain available.
 - Retry errors use the new optional `lastRecognitionAttemptAt` / `lastRecognitionErrorDescription` fields. Failed/empty/cancelled retries leave prior text and source audio intact.
@@ -125,7 +119,7 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 - Validate **Record Capture** with both HUD and shortcut finish, Escape cancellation, switching apps before finishing, repeated `captureOnly`/`currentApp` captures, and an unchanged clipboard/focus for capture-only completion.
 - Validate capability recheck/shortcut loss/microphone interruption during startup, recording and finalization, including rapid restart and interruption during focus handoff. Native AAC tests do not establish controller scheduling or device-notification behavior.
 - Unexpected process termination or storage failure may leave incomplete M4A files; History preserves them and reports playback/recognition errors rather than claiming every interrupted recording is decodable.
-- App Context remains partial. Per the owner's sequencing decision, resume CloudKit only at the final integration stage after Apple Developer enrollment and container setup. Do not request configuration IDs during the current local-development work.
+- App Context remains partial. CloudKit is deferred to a separately scheduled cross-device milestone after the Mac loop works; enrollment/container setup and sync acceptance are not requirements for completing local Capture work.
 
 ## Known design constraints
 

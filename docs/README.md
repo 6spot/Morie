@@ -7,7 +7,9 @@ This directory is the maintained engineering documentation for Morie.
 - [`design/apple-native-first-v0-baseline-v2.md`](./design/apple-native-first-v0-baseline-v2.md) — repository transcription of the project-owner supplied V0 design baseline, plus explicitly approved amendments.
 - [`product-architecture-baseline.md`](./product-architecture-baseline.md) — concise implementation baseline and hard constraints.
 - [`ui-design.md`](./ui-design.md) — macOS 27 Native UI Only / Liquid Glass rules and owner-approval gate.
-- [`reference/type4me.md`](./reference/type4me.md) — Type4Me input-foundation reference and selective migration boundary.
+- [`input-cleanup.md`](./input-cleanup.md) — approved meaning-preserving cleanup contract.
+- [`reference/type4me.md`](./reference/type4me.md) — input-foundation reference and selective adaptation boundary.
+- [`reference/openless.md`](./reference/openless.md) — opt-in correction-to-dictionary behavior reference; no source copied.
 - [`tasks.md`](./tasks.md) — master task plan and overall progress.
 - [`tasks/`](./tasks/README.md) — detailed task records and execution history.
 - [`architecture.md`](./architecture.md) — code/module boundaries and current technical architecture.
@@ -30,4 +32,6 @@ Documentation changes with the code. A behavior, architecture, UI rule, task sta
 
 ## Current product stage
 
-Morie is validating the macOS input/Capture/Memory foundation and the first **Phase 3 — Personalization** slice. Confirmed vocabulary/project context now supports bounded input refinement; final text is saved before delivery and candidate extraction, with original recognition and exact provenance retained. All 91 logic tests pass. The owner deferred interactive device and real-model checks until the evening of 2026-09-18, and CloudKit sync until final integration. Broader style learning, iOS and Morie Cloud remain later work.
+[M-009](tasks/M-009-macos-input-memory.md) is the active single-Mac milestone: independent cleanup, custom dictionary, automatic personal Memory and an opt-in native prompt after a word correction. Final text is saved before insertion and idle learning. Current implementation evidence and remaining acceptance are in the task record.
+
+Interactive device and real-model checks remain deferred to the evening of 2026-09-18, not waived. iCloud/CloudKit belongs to later cross-device work; iOS/mobile inspiration and Morie Cloud are unscheduled. No compatibility or migration layer is required during development.

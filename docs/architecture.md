@@ -2,9 +2,9 @@
 
 ## Current stage
 
-Morie is validating **Phase 0 — macOS Input Foundation**, **Phase 1 — Durable Capture**, **Phase 2 — Personal Memory** and the first **Phase 3 — Personalization** slice. The input loop now uses confirmed vocabulary/project context for bounded refinement, saves final text and then attempts candidate extraction with human review. Broader style learning, iOS and Morie Cloud remain subsequent work. The owner has deferred interactive device checks until the evening and sync until final integration.
+[M-009](tasks/M-009-macos-input-memory.md) integrates a useful single-Mac input loop: durable recognition, a separate custom dictionary, independent cleanup, durable final output, reliable insertion and automatic personal Memory during idle time. There is no required Memory candidate-review inbox. iOS, mobile inspiration/follow-up and cross-device sync are outside this milestone; interactive validation remains deferred, not waived.
 
-Type4Me is an experience/reference archive, not Morie's architecture or migration template. Every retained lesson is filtered through Morie's product design and the macOS 27-only platform boundary.
+Type4Me and the owner-supplied [OpenLess reference](reference/openless.md) supply bounded behavior lessons, not Morie's architecture or dependencies. Implement the current design directly without legacy schemas or compatibility adapters.
 
 ## Architectural principles
 
@@ -61,10 +61,14 @@ Morie/
 │   ├── MemoryStore.swift
 │   ├── MemoryContextRetriever.swift
 │   ├── MemoryView.swift
-│   ├── MemoryExtractionRecord.swift
-│   ├── MemoryCandidateExtractor.swift
-│   ├── MemoryCandidateController.swift
-│   ├── MemoryCandidatesView.swift
+│   ├── MemoryAnalysisRecord.swift
+│   ├── MemoryLearner.swift
+│   ├── MemoryLearningController.swift
+│   ├── MemoryLearningView.swift
+│   ├── DictionaryStore.swift
+│   ├── DictionaryView.swift
+│   ├── DictionaryCorrection.swift
+│   ├── DictionaryCorrectionController.swift
 │   ├── CaptureRefinement.swift
 │   ├── InputRefiner.swift
 │   ├── CapturePersonalizer.swift
@@ -79,7 +83,9 @@ Morie/
 │   ├── CaptureHistoryTests.swift
 │   ├── CaptureAudioStreamTests.swift
 │   ├── MemoryTests.swift
-│   ├── MemoryCandidateTests.swift
+│   ├── MemoryLearningTests.swift
+│   ├── DictionaryTests.swift
+│   ├── DictionaryCorrectionTests.swift
 │   ├── PersonalizationTests.swift
 │   └── TestDiagnostics.swift
 ├── .github/workflows/
@@ -100,7 +106,7 @@ Morie/
 
 Do not extract shared packages merely to match a future diagram. New modules need real ownership/reuse pressure first.
 
-## Phase 0 runtime flow
+## Current input runtime flow
 
 ```text
 bootstrap
@@ -117,9 +123,11 @@ solo configured shortcut activation (Fn / Globe release by default)
   ↓
 create authoritative capture UUID
   ↓
-capture original target application
+capture original target application; cancel optional learning/word observation
   ↓
-start Apple capture + Speech session for that UUID
+save Capture identity and audio destination
+  ↓
+start Apple capture + Speech with bounded dictionary hints
   ↓
 progressive / volatile transcript
   ↓
@@ -129,7 +137,11 @@ stop capture input
   ↓
 finish Speech analysis for consumed audio
   ↓
-final transcript
+durable recognized text
+  ↓
+dictionary corrections + bounded optional AI cleanup
+  ↓
+durable final text and processing provenance
   ↓
 restore original target
   ↓
@@ -137,7 +149,11 @@ safe synthetic Cmd+V using temporary clipboard value
   ↓
 restore clipboard only if user did not change it
   ↓
-clear session identity and return Ready
+save delivery outcome, clear session identity and return Ready
+  ↓
+optional verified-insertion correction observation
+  +
+idle batch learning from saved final input
 ```
 
 Releasing the shortcut never finishes a toggle capture. If finish or cancel is requested while asynchronous Speech setup is still in flight, that request remains attached to the same capture UUID; late setup cannot create an orphaned recording.
@@ -152,7 +168,7 @@ Two levels of state are intentional.
 
 `checking → ready → recording → finalizing → refining → delivering → ready`
 
-`captureOnly` completes after refinement without entering delivery. Refinement can be skipped or end with the saved original; it does not change the required capability gate or introduce another product mode.
+`captureOnly` retains its existing completion path after refinement without delivery or automatic personal learning. Refinement can be skipped or end with saved dictionary-corrected/original text; it does not change the required capability gate or introduce another product mode.
 
 `failed` and `blocked` represent recoverable operation failure and unavailable required capability respectively.
 Explicit cancellation uses `stopping` until native teardown and discard complete. Capability recheck enters `checking`, and shortcut loss enters `blocked`, before awaiting teardown; late capture work cannot replace these states with Ready.
@@ -181,7 +197,9 @@ Owns Phase 0 orchestration:
 - authoritative capture UUID;
 - original target-app capture;
 - start/finish/cancel coordination;
-- delivery transition;
+- dictionary hints, independent cleanup and durable final text;
+- delivery transition and opt-in correction observation;
+- idle Memory learner startup/preemption;
 - terminal success/cancel/failure cleanup.
 
 It specifically prevents finish/cancel-during-setup from becoming a late or orphaned recording session.
@@ -200,7 +218,7 @@ Checks the capabilities currently owned by Phase 0:
 
 ApplicationServices is imported through a Swift `@preconcurrency` boundary because its native C accessibility option-key global is not annotated for Swift 6 concurrency. This is an Apple-framework interop boundary, not a replacement dependency.
 
-CloudKit/iCloud gating belongs to M-003 where a real container and entitlements exist. Phase 0 therefore describes readiness as device/capability readiness, not full Private Mode readiness.
+CloudKit/iCloud gating belongs to a later scheduled cross-device milestone. The current capability gate has no account/container dependency and does not claim that sync is configured.
 
 ### `PushToTalkHotkey`
 
@@ -245,7 +263,7 @@ An actor owns the Apple-native speech session state:
 - stale-session rejection;
 - resource cleanup.
 
-Speech assets are prepared before Ready so a model download is not started inside an active capture.
+Speech assets are prepared before Ready so a model download is not started inside an active capture. `SpeechPipeline.start` receives up to 100 dictionary spellings / 2,000 characters and applies `AnalysisContext.contextualStrings[.general]` through `SpeechAnalyzer.setContext`. Hint failure does not prevent capture; session ownership is rechecked after that await.
 
 A finish action stops capture and lets already-captured analyzer input finish before finalization. Cancellation instead terminates analysis immediately. The most recent volatile segment is preserved because the current Speech result contract does not guarantee that each volatile result will later be emitted again as final.
 
@@ -304,7 +322,7 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 
 Every new voice Capture has an explicit, durably saved delivery mode. The global shortcut creates `currentApp`; History's **Record Capture** action creates `captureOnly`. Both use the same capture UUID, microphone session, Speech pipeline, cancellation and History preemption. An in-app capture records Morie as the source and has no external target/window. Recognition completion returns the saved mode: capture-only completion ends as `recognized` and releases recording/discard ownership; a running refinement separately blocks History mutation and extraction. Current-app completion retains ownership through delivery. Both modes refine the saved text before success. Capture-only success never enters `TextInjector` or the clipboard/focus path and reports “已保存” in the shared HUD.
 
-The local `ModelConfiguration` explicitly disables CloudKit. On 2026-09-18, the owner deferred synchronization to the final integration stage because Apple Developer enrollment is not yet set up. The intended destination remains each user's own iCloud private database within Morie's app container. This is an implementation stage, not a Device Only product mode.
+The local `ModelConfiguration` explicitly disables CloudKit. The single-Mac milestone does not depend on sync, enrollment or a container. A later scheduled cross-device milestone uses each user's own iCloud private database within Morie's app container; this is not a separate Device Only product mode. The current schema contains `CaptureRecord`, `DictionaryEntry`, `MemoryRecord`, `MemoryAnalysisRecord` and `MemoryLearningBlock`, with no old-schema migration.
 
 M-003's approved persistence direction is audio-first: the durable raw Capture is compressed source audio, recognized text is the Speech result, and final text is the later post-processing result. Source audio defaults to 7-day retention, Settings exposes a 1–365 day policy, and expiry removes audio without deleting text/history metadata. Encoding streams to disk rather than retaining a complete PCM recording in memory.
 
@@ -332,71 +350,77 @@ Audio playback uses AVKit's standard `AVPlayerView` controls. Open/close, expiry
 
 ### `MorieControlCenter`
 
-The primary management surface is one native SwiftUI `Window`, defaulting to 1120 × 720 with a 960 × 600 minimum. The sidebar groups History/Memory under Library and Settings/Diagnostics under App. Library sections use a native three-column `NavigationSplitView` (sidebar, selectable list, detail); app sections use the native two-column form with the same sidebar composition.
+The primary management surface is one native SwiftUI `Window`, defaulting to 1120 × 720 with a 960 × 600 minimum. The sidebar groups History/Dictionary/Personal Memory under Library and Settings/Diagnostics under App. Library sections use a native three-column `NavigationSplitView` (sidebar, selectable list, detail); app sections use the native two-column form with the same sidebar composition.
 
-The root owns independent Capture and Memory selections. Memory selection identifies either a confirmed entry or a pending candidate. Each selected detail gets a `NavigationStack` whose identity changes with that selection, so source/related links cannot leak navigation from another record. The SwiftData container is attached at the window root before `@Query` builds the initial content. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
+The root owns independent Capture, Dictionary and Personal Memory UUID selections. Each selected detail gets a `NavigationStack` whose identity changes with that selection, so source/related links cannot leak navigation from another record. The SwiftData container is attached at the window root before `@Query` builds the initial content. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
 
-`ManagementDetailContent` is a small composition of native ScrollView/VStack with 28-point padding and a readable maximum width of 760 points. It is shared by Capture, Memory and candidate reading surfaces. Actual settings and editing retain grouped Forms. There is no custom navigation, control library, material or persistence layer.
+`ManagementDetailContent` is a small composition of native ScrollView/VStack with 28-point padding and a readable maximum width of 760 points. It is shared by Capture, Dictionary and Personal Memory reading surfaces. Actual settings and editing retain grouped Forms. There is no custom navigation, control library, material or persistence layer.
 
 `MorieSettingsView` uses a flexible, centered grouped Form (maximum width 700 points) within management, and a separate 640 × 520 native Settings window. `DiagnosticLogView` uses a native Table with search/level filtering, selection and a resizable event-detail area for complete messages. Copy All Events, reveal-file and confirmed clear actions preserve the existing logger behavior.
 
-### `MemoryRecord` / `MemoryStore`
+### `DictionaryEntry` / `DictionaryStore`
 
-The Capture container now includes `MemoryRecord` for vocabulary and projects: name, aliases, notes, source Capture IDs, confirmation, optional model confidence, timestamps, lifecycle, and predecessor identity. New Memory is explicitly saved by the user from History or the Memory section. Manual confirmation leaves model confidence nil. Saving Capture itself does not create Memory.
+The custom dictionary owns canonical spellings and optional explicit always-replace aliases, separately from personal information. Its non-autosaving write context shares the Capture container without touching Capture checkpoints. Normalized spelling/alias collisions are rejected across entries; drafts validate lengths, line breaks and alias counts.
 
-`MemoryStore` uses its own non-autosaving `ModelContext` in that same container, so rolling back a failed Memory edit cannot roll back a live Capture's checkpoint. It publishes its saved records for native UI and reads source Captures from their authoritative main context. Memory operations never modify source transcript/delivery fields. Names and aliases are validated; active names are unique within their kind after case/width/whitespace normalization, and aliases are deduplicated.
-
-Editing keeps identity/provenance. Replacement atomically creates a new active record with the predecessor ID and source IDs, and marks the previous record superseded. Archived records can be restored if their name is available; superseded records cannot be edited or restored. Explicit deletion removes only that Memory. Deleting a source Capture retains independently confirmed Memory and its source ID, and the UI reports the source as deleted instead of fabricating provenance.
-
-### `MemoryContextRetriever`
-
-This pure Swift boundary consumes immutable snapshots. It selects only confirmed active records by normalized name/alias matching with NaturalLanguage's native word boundaries. Literal matching preserves significant punctuation in identifiers such as `C++`; boundaries prevent a term such as `Git` from matching inside `GitHub`. Canonical-name matches rank ahead of aliases, longer phrases ahead of shorter ones, then recency and UUID provide deterministic ordering. Results are capped at eight.
-
-History exposes related records and separately labels records saved from that Capture, including their lifecycle. The retriever is also used after durable recognition for input refinement. Retrieval itself uses no model/network call. It remains lexical matching, not semantic recall, Speech hotword configuration or a built-in dictionary; a misrecognition must be an explicitly confirmed alias to support correction.
+`DictionaryReplacer` applies whole-word literal case/width matches using native `NLTokenizer` boundaries. It normalizes saved spellings and explicit aliases, prefers longer matches at the same start, avoids overlapping/cascading substitutions and protects code/URLs/paths/technical spans. A spelling-only entry supplies Speech hints without inferring an alias from a previous recognition error. `DictionaryView` uses the shared native list/detail navigation and a system editor sheet.
 
 ### `CapturePersonalizer` / `InputRefiner`
 
-The current input sequence is:
+`Speech → durable recognized text → dictionary corrections → optional cleanup with related personal context → validation → durable final text → delivery`
 
-`Speech → durable recognized text → relevant confirmed Memory → bounded edit proposals → validation → durable final text → delivery/History completion → optional Memory Candidates`
+Basic cleanup runs with an empty or unavailable Memory store. `InputRefiner` creates a fresh Apple `LanguageModelSession`, supplies transcript/dictionary/context as JSON data under the [approved cleanup instructions](input-cleanup.md), and requests complete final text through greedy `@Generable` output. Native token accounting bounds the full prompt, instructions, schema and a response budget of 256–1,536 tokens. Oversized input is declined without truncating the saved text.
 
-`CapturePersonalizer` owns this persistence boundary for both capture modes. The current source and a separate committed context must agree before inference and final save. `CaptureRefinement` retains the exact input, context snapshots, accepted edits, outcome, fixed reason and elapsed time. Running refinement blocks playback/re-recognition/deletion and Memory extraction. Late Speech partials cannot overwrite a completed recognition. Restart clears interrupted refinement while preserving saved text/audio and any actual delivery outcome; it does not restart a model or deliver text automatically.
+`RefinementValidator` permits filler/repetition removal, clear local numerical self-correction and punctuation/paragraph/list formatting. It rejects added/reordered content units, changed numeric/technical spans, selected negation/uncertainty/emphasis loss and shortened complete acknowledgments. These conservative lexical checks complement the model instructions; they do not prove semantic equivalence or model accuracy. Uncertain output falls back to saved dictionary corrections.
 
-`InputRefiner` calls `SystemLanguageModel.default` through a fresh `LanguageModelSession` with greedy `@Generable` output. The full prompt/instructions/schema plus a 768-token response allowance must fit the native context limit. Transcript and context are data, never instructions. Up to eight anchored edits may correct an explicit confirmed name/alias to its exact canonical name, or tidy horizontal spacing/add a missing comma/period. `RefinementValidator` rejects missing/overlapping anchors, partial words, content deletion/expansion, changed existing punctuation, and edits to numeric/technical tokens or backtick code. Word tokens and content characters are retained for cleanup. This first slice does not rewrite style, remove fillers, infer aliases or perform fuzzy term recovery.
+`InputRefinementRunner` owns one model task, a deadline task and one continuation. The provisional model-wait budget is two seconds. Cancellation/deadline resolves input without joining model teardown; late results are ignored and optional model work skips while an old session drains. Idle learning and cleanup consult each other's activity. Storage/scheduling/validation overhead is outside the model budget and requires device measurement.
 
-`InputRefinementRunner` owns one model task, a deadline task and a single continuation. The provisional model-wait budget is 2 seconds. Timeout/caller cancellation resolves the caller without joining model teardown; a draining task stays owned, its late result is discarded, and new optional model work skips until it ends. Candidate extraction and refinement consult each other's activity so they do not overlap. Storage, validation and main-actor scheduling add overhead beyond the model budget; overall latency/energy remains to be measured on hardware.
+`CaptureRefinement` retains the exact input, dictionary/personal-context snapshots, accepted edits, status, fixed reason and duration. Current and separately committed source text must agree before inference and save. Source, dictionary and relevant Memory are rechecked after inference; stale model output cannot be delivered. Disabling/failing/timing out cleanup can still durably apply dictionary corrections. A changed dictionary or failed final save retains the verified durable original. No unsaved model result is returned for insertion.
 
-After inference, the source and retrieved Memory snapshots are checked again. Changed/archived/deleted Memory or invalid model edits keep the original. A changed/deleted source rejects stale delivery. Save failure rolls back unsaved AI output and returns only the verified durable original. If outcome metadata cannot be saved either, that outcome may be incomplete until a later terminal save/restart; existing text stays durable. Caller cancellation preserves the Capture and cannot resume a pending paste. Diagnostics record status/counts/time, never input/context/model text.
+Running refinement blocks History mutations/playback/re-recognition. Speech retries preserve completed final output and its earlier processing provenance. Restart clears current-version interrupted refinement without replaying delivery or restarting that model. Existing capture-only processing remains but is excluded from automatic personal learning.
 
-### `MemoryView`
+### `MemoryRecord` / `MemoryStore`
 
-A native selectable `List` supports name/alias/notes search and status filtering. Current pending suggestions appear separately from confirmed entries in the Active view. Search, status changes, review and deletion reconcile the selection against visible IDs. `MemoryDetailView` prioritizes the name, aliases and context; status/use is explicit and source/history metadata stays in a native disclosure. Edit is a primary toolbar action; archive/restore/replace/delete share a system menu.
+Personal Memory kinds are `project`, `person`, `preference`, `fact` and `decision`. Records hold topic/name, personal information, source Capture IDs, automatic/user origin, optional confidence, last evidence date, timestamps, lifecycle and predecessor identity. There are no vocabulary aliases or required confirmation fields.
 
-Grouped Forms, Pickers, TextFields, TextEditors, sheets and confirmation dialogs provide explicit editing/review. A History sheet can create a new entry or link its Capture to an existing active entry. Source links show the saved Capture's text and source app/date. The UI distinguishes manual creation, unavailable source Captures, archived records and superseded records.
+A separate non-autosaving Memory context protects active Capture checkpoints. Active normalized topics are unique within their kind. User editing keeps identity/provenance, marks user origin and clears model confidence. Replacement creates a successor and supersedes the prior record atomically; archive/restore respect active-topic conflicts. Automatic updates never overwrite user-edited records.
 
-### Memory Candidates
+`MemoryLearningBlock` retains a SHA-256 hash of kind + normalized topic when a memory is deleted (or renamed through editing). Automatic learning skips that topic; explicit manual creation removes its block. Deletion removes matching observation payloads while retaining the user's source Captures. This key is lexical, not a guarantee against a model inventing a different semantic label for the same fact; validate topic consistency on actual model output. Deleting a Capture removes its analysis snapshots while separate Memory retains its source ID and shows an unavailable source.
 
-`MemoryExtractionInput` prefers nonempty saved `finalText`, using `recognizedText` only when no final text exists. `MemoryStore` reads a separate committed context and compares it with the authoritative Capture context before extraction. Unsaved text, recording, running refinement and deleted sources are rejected. M-005 saves refined output before this boundary while preserving recognized text separately, implementing the owner's 2026-09-18 requirement. A skipped/failed refinement is identified as original text kept.
+### `MemoryContextRetriever`
 
-`MemoryCandidateExtractor` uses only `SystemLanguageModel.default`, a fresh `LanguageModelSession`, and `@Generable` output for up to three Vocabulary/Project suggestions. The current SDK's token-count/context-size APIs bound the complete prompt, instructions, schema and response; oversized input is refused rather than truncated. Default Apple guardrails remain enabled. The source is treated as data, not instructions. Each suggestion needs a literal supporting quote containing its name, explicitly present aliases and a finite model confidence estimate of at least 0.8. Invalid/duplicate suggestions are filtered. That estimate is not a calibrated accuracy guarantee; human review is required.
+Pure Swift retrieval consumes immutable active Memory snapshots from either origin. Native lexical name/content overlap ranks deterministic results capped at eight. History distinguishes source-linked Memory from related context. Retrieval is local, bounded and independent of a model call; it is not semantic recall or dictionary replacement. Context helps understand what was said and cannot insert unspoken background or rewrite the user's current preferences.
 
-`MemoryExtractionRecord` persists the exact text/type used, including saved refined final text, together with candidates and pending/accepted/dismissed decisions. A successful empty extraction is persisted too. Repeating analysis of the same saved text reuses its result and preserves review decisions. Changed input gets a separate result; stale pending candidates cannot be confirmed. Accepted Memory records retain source Capture IDs, the originating candidate ID and an optional unchanged suggestion confidence. User edits clear that model estimate. Linking to existing active Memory preserves its name/notes and confirmation metadata.
+### `MemoryAnalysisRecord` / `MemoryLearner` / `MemoryLearningController`
 
-Candidate confirmation and Memory changes share the Memory write context and one save. Source existence and current text are rechecked before committing either extraction or review. Deleting a Capture deletes all its extraction snapshots in the same store save, while independently confirmed Memory remains. Existing Capture/Memory schema is used directly, without migrations or legacy reconstruction.
+Completed `currentApp` Captures (`delivered` or `deliveryFailed`) with committed final text are queue sources. Active, cancelled, capture-only, running-refinement and raw-only inputs do not enter learning. `enqueueCompletedInputs` discovers unfinished work after restart, including a Capture saved immediately before queue creation. Each analysis retains exact final text/date/ID, context snapshots, observations, attempts, retry time and pending/completed/skipped status. No recognized-text fallback or historical reconstruction is used.
 
-`MemoryCandidateController` owns one cancellable optional extraction. M-005 requests best-effort analysis after successful delivery/capture-only completion, or after a delivery failure that kept the final text on the clipboard. It never awaits extraction on the delivery path. History's **Find Memory Candidates** remains an explicit recovery action. Leaving that Capture detail or starting live input cancels analysis. Live Speech does not wait for model cancellation, and a late result cannot commit. Busy optional model work causes a skip; there is no durable queue or automatic retry. Foundation Models failure messages are fixed strings so prompts/output are not exposed through debug descriptions or logs. Model quality and cancellation latency remain device acceptance items.
+`MemoryLearner` uses a fresh Apple Foundation Models session and native full-request context accounting to propose at most three personal observations. Learning context combines up to eight related memories with up to four recent fact/preference records, capped at twelve. Source text is data; fixed failure categories prevent raw framework/model text from entering logs.
 
-History exposes progress/cancel, review/dismiss and the exact source snapshot using standard SwiftUI controls. The Memory list and candidate reading detail use native `@Query` source changes to show only pending candidates whose text still matches a non-recording, non-cancelled source with no running refinement; rendering does not issue a database fetch per candidate. Selecting a candidate shows its proposed content and evidence; Review & Save opens the existing explicit editor sheet. Review can edit fields or link to an existing active entry. Confirmed AI-derived Memory also exposes the original extraction snapshot while the source Capture exists.
+Admission requires literal supporting evidence, notes contained in that evidence, an explicit personal connection and finite confidence. Temporary/uncertain/quoted suggestions are rejected, with additional quote/hypothetical checks. Person/project names require literal evidence unless updating identified context. Strong explicit personal evidence (at least 0.9) may create Memory automatically; weaker recurring evidence (at least 0.8) needs two distinct source Captures. These thresholds are engineering filters, not calibrated confidence guarantees.
+
+Repeated evidence merges idempotently. Explicit later updates require a current context ID/snapshot, an automatic record, newer evidence and an update marker before superseding it. Ambiguous, older or user-owned conflicts do not overwrite current information. Analysis completion and Memory mutations share one save; failures roll back the entire mutation, including intermediate fetch failures. The source is rechecked before commit so deleted/changed input cannot produce a late result.
+
+The controller waits 30 seconds of input idle time and processes at most three sources per batch. One owned worker/model runs at a time. New input cancels it immediately without awaiting an uncooperative model; unfinished work stays pending and late results cannot commit. Retryable unavailability/generation/invalid-result failures back off from 30 seconds to one hour. Nonretryable language/context/refusal/source-change outcomes are visible in History with an optional retry. A background model has no independent deadline in this slice; it retains ownership until it drains, while new input continues and cleanup can skip it.
+
+### Native Memory management
+
+`MemoryView` shows personal information directly in the shared searchable list/detail UI, with status filtering and optional native create/edit/archive/restore/replace/delete actions. There is no candidate inbox or review sheet. `MemoryLearningView` shows per-Capture learning progress/outcomes, linked memories and **Text Used for Learning**. Sources remain exact and inspectable; opening/closing a page does not start or cancel background learning.
+
+### `DictionaryCorrectionController`
+
+The independent **Suggest Words After I Correct Input** setting defaults off. After current-app paste dispatch, a short actor task verifies the exact inserted text at the caret; unsupported/secure fields and selected terminal/password-manager apps are excluded. No clipboard fallback or capture-only input starts observation.
+
+Accessibility IPC stays off the main actor with 50 ms native message timeouts. `AXStringForRange` reads a bounded insertion (at most 1,200 UTF-16 units, at most 64 units of length change); it never requests the whole document. PID, field identity, secure-input state and selection bounds are checked. Observation ends on departure, new capture, disabling the setting or 30 seconds. Character-count delta infers range length, so concurrent edits elsewhere and host range implementations remain device-validation risks.
+
+The pure detector aligns native word boundaries across both texts and waits two seconds for a stable small correction. It handles shared letters, added/deleted letters and word joins, while rejecting appended/deleted phrases, punctuation/numbers/technical edits and broad rewrites. A native nonactivating `NSPanel` offers **Remember / Not Now** for the spelling. Remember does not create an alias; the prompt expires after 20 seconds, dismisses on further edits/departure, and offers each normalized word at most once per process. External text is never sent to AI, logged or saved into Capture. See the [OpenLess audit](reference/openless.md).
 
 ### `MorieTests`
 
-The logic-only XCTest target compiles persistence, History recovery and the audio stream sources directly, without launching Morie or entering TCC. Tests use in-memory or unique temporary databases/audio directories. An explicit store URL defaults audio storage to the same temporary parent. A test-only diagnostics sink prevents tests from touching the running app's log. File recognition is replaced by an injected async closure for deterministic success/failure/cancellation tests. Audio stream tests write and decode real AAC using synthetic PCM and injected converter failures; native Speech, microphone lifecycle and playback interactions remain separate integration/device checks.
+The logic-only target compiles core persistence, audio, dictionary, cleanup and learning sources directly without launching Morie or entering TCC. In-memory/unique temporary stores and synthetic audio isolate production data; `TestDiagnostics.swift` isolates the running app's log. Native AAC encoding/decoding is exercised without opening a microphone.
 
-Memory tests use those isolated containers and native NaturalLanguage tokenization. They cover restart durability, explicit provenance, normalization/conflicts, source readiness, lifecycle exclusion, replacement, scoped deletion and deterministic bounded retrieval. No model inference or production data is used.
+Dictionary tests cover persistence, conflict rules, bounded hints, native word boundaries and noncascading corrections. Correction tests cover Chinese/mixed words, added/deleted/joined letters, excluded edits, settling and undo without reading Accessibility data or displaying a panel.
 
-Candidate tests inject model output and delayed results to cover final-text priority, committed snapshots/restart, explicit confirmation/dismissal, source evidence filtering, conflicts/linking, changed/deleted sources, cancellation, live-input preemption, empty-result reuse and failure privacy. The real Foundation Models implementation is compiled, but these deterministic tests do not establish inference quality or runtime availability.
-
-Personalization tests add grounded edit validation, durable input/final ordering, retained refinement provenance after Speech retry, source/Memory changes during inference, storage failures and interrupted recovery. A model stub that deliberately ignores cancellation proves caller deadlines/cancellation, no overlap and rejection of late results. Automatic candidates are verified to use saved final text and still require review. These tests do not invoke a real model or the target-app delivery path.
+Memory tests cover provenance, lifecycle and retrieval. Learning tests inject evidence/models to verify exact final-text snapshots, restart discovery, automatic admission/accumulation, deduplication, conflicts/updates, user changes, scoped deletion, atomic failure/retry, source validation and immediate input preemption. Personalization tests inject model output, including tasks that ignore cancellation, to establish durable ordering, dictionary fallback, cleanup guards, stale-context rejection, deadline/cancellation and recovery. Actual model fidelity, AX/cross-app behavior, UI interaction and latency remain device acceptance.
 
 ## Type4Me extraction boundary
 
@@ -456,38 +480,11 @@ Those remain real-device acceptance work.
 
 ## Future package direction
 
-As Phase 1+ introduces genuinely reusable logic, a likely direction is:
-
-```text
-Packages/
-├── PersonalCore/
-│   ├── Capture
-│   ├── Memory
-│   ├── Project
-│   ├── Person
-│   ├── Vocabulary
-│   └── Context
-├── AppleIntelligence/
-├── Persistence/
-│   ├── LocalStore
-│   └── CloudKit
-└── SharedUI/   # only shared compositions of native Apple UI
-
-macOSApp/
-├── GlobalHotkey
-├── AudioSpeech
-├── Accessibility
-├── AppContext
-├── FocusRestore
-├── TextInjection
-└── MenuBar
-```
-
-This is direction, not an instruction to create empty abstractions. `SharedUI` must never become a custom design system replacing Apple controls.
+Extract shared Swift packages only when a real second consumer requires them. The current macOS target keeps platform integration separate from testable product logic without creating an iOS shell, empty provider layers or speculative CloudKit packages. Any future shared UI must remain compositions of Apple system components.
 
 ## Data architecture direction
 
-The central durable object will be `Capture`, not `Voice`.
+The central durable object is `Capture`; voice is one source.
 
 ```text
 Capture
@@ -497,7 +494,10 @@ Capture
 ├── source: app / bundle / optional context
 ├── delivery: currentApp | captureOnly
 ├── context: project / topic / people / entities
-└── memory state: journal / candidate / memory
+└── personal analysis: separate source snapshot / pending / completed / skipped
+
+DictionaryEntry → spelling and explicit replacement aliases
+MemoryRecord → personal information and source provenance
 ```
 
 Voice is an input source, not the core domain object.
@@ -511,7 +511,7 @@ M-003 introduces the reliability boundary:
 3. enriched/final state updates the saved Capture;
 4. failures never delete the original intentional capture.
 
-Private Mode long-term persistence/sync uses iCloud/CloudKit. Morie does not provide Device Only mode.
+Private Mode eventual cross-device sync uses iCloud/CloudKit. It is outside the single-Mac milestone; local development is not a separate Device Only product mode.
 
 ## External dependency boundary
 

@@ -2,12 +2,31 @@ import Foundation
 import SwiftData
 
 enum MemoryKind: String, Codable, CaseIterable, Identifiable, Sendable {
-    case vocabulary
     case project
+    case person
+    case preference
+    case fact
+    case decision
 
     var id: Self { self }
-    var title: String { self == .vocabulary ? "Vocabulary" : "Project" }
-    var systemImage: String { self == .vocabulary ? "text.book.closed" : "folder" }
+    var title: String {
+        switch self {
+        case .project: "Project"
+        case .person: "Person"
+        case .preference: "Preference"
+        case .fact: "Personal Fact"
+        case .decision: "Decision"
+        }
+    }
+    var systemImage: String {
+        switch self {
+        case .project: "folder"
+        case .person: "person"
+        case .preference: "slider.horizontal.3"
+        case .fact: "person.text.rectangle"
+        case .decision: "checkmark.circle"
+        }
+    }
 }
 
 enum MemoryStatus: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -26,10 +45,14 @@ enum MemoryStatus: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 struct MemoryDraft: Codable, Equatable, Sendable {
-    var kind: MemoryKind = .vocabulary
+    var kind: MemoryKind = .fact
     var name = ""
-    var aliases: [String] = []
     var notes = ""
+}
+
+enum MemoryOrigin: String, Codable, Sendable {
+    case automatic, user
+    var title: String { self == .automatic ? "Learned from your input" : "Edited by you" }
 }
 
 @Model
@@ -37,41 +60,38 @@ final class MemoryRecord {
     var id: UUID = UUID()
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
-    var kindRawValue: String = MemoryKind.vocabulary.rawValue
+    var kindRawValue: String = MemoryKind.fact.rawValue
     var statusRawValue: String = MemoryStatus.active.rawValue
     var name: String = ""
-    var aliases: [String] = []
     var notes: String = ""
     var sourceCaptureIDs: [UUID] = []
-    var userConfirmed: Bool = false
-    // Manual confirmation is not an inferred model confidence score.
+    var originRawValue: String = MemoryOrigin.user.rawValue
+    var lastEvidenceAt: Date = Date()
     var confidence: Double?
-    var sourceCandidateID: UUID?
     var supersedesID: UUID?
 
     init(draft: MemoryDraft, sourceCaptureIDs: [UUID] = [], supersedesID: UUID? = nil) {
         kindRawValue = draft.kind.rawValue
         name = draft.name
-        aliases = draft.aliases
         notes = draft.notes
         self.sourceCaptureIDs = sourceCaptureIDs
         self.supersedesID = supersedesID
-        userConfirmed = true
     }
 
     var kind: MemoryKind? { MemoryKind(rawValue: kindRawValue) }
     var status: MemoryStatus? { MemoryStatus(rawValue: statusRawValue) }
+    var origin: MemoryOrigin? { MemoryOrigin(rawValue: originRawValue) }
 
     var draft: MemoryDraft? {
         guard let kind else { return nil }
-        return MemoryDraft(kind: kind, name: name, aliases: aliases, notes: notes)
+        return MemoryDraft(kind: kind, name: name, notes: notes)
     }
 
     var snapshot: MemorySnapshot? {
-        guard let kind, let status else { return nil }
+        guard let kind, let status, let origin else { return nil }
         return MemorySnapshot(
-            id: id, kind: kind, status: status, name: name, aliases: aliases,
-            notes: notes, userConfirmed: userConfirmed, updatedAt: updatedAt
+            id: id, kind: kind, status: status, name: name,
+            notes: notes, origin: origin, updatedAt: updatedAt
         )
     }
 }
@@ -81,9 +101,8 @@ struct MemorySnapshot: Codable, Equatable, Identifiable, Sendable {
     let kind: MemoryKind
     let status: MemoryStatus
     let name: String
-    let aliases: [String]
     let notes: String
-    let userConfirmed: Bool
+    let origin: MemoryOrigin
     let updatedAt: Date
 }
 

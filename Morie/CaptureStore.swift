@@ -46,7 +46,7 @@ final class CaptureStore {
         commitRefinement: @escaping (ModelContext) throws -> Void = { try $0.save() }
     ) throws {
         self.commitRefinement = commitRefinement
-        let schema = Schema([CaptureRecord.self, MemoryRecord.self, MemoryExtractionRecord.self])
+        let schema = Schema([CaptureRecord.self, DictionaryEntry.self, MemoryRecord.self, MemoryAnalysisRecord.self, MemoryLearningBlock.self])
         precondition(!(inMemory && storageURL != nil), "An in-memory store cannot also use a storage URL.")
 
         let configuration: ModelConfiguration
@@ -160,10 +160,10 @@ final class CaptureStore {
         return deliveryMode
     }
 
-    func refinementInput(for id: UUID, context: [MemoryContextMatch]) throws -> RefinementInput {
+    func refinementInput(for id: UUID, context: [MemoryContextMatch], dictionary: [DictionarySnapshot] = []) throws -> RefinementInput {
         let record = try capture(id)
         guard record.refinement == nil else { throw StoreError.refinementSourceChanged }
-        let input = RefinementInput(captureID: id, text: record.finalText, context: context)
+        let input = RefinementInput(captureID: id, text: record.finalText, context: context, dictionary: dictionary)
         try requireRefinementSource(input)
         return input
     }
@@ -182,14 +182,14 @@ final class CaptureStore {
         reason: RefinementReason? = nil, durationSeconds: Double
     ) throws -> String {
         let record = try requireRefinementSource(input)
-        guard (result != nil) != (reason != nil),
+        guard result != nil || reason != nil,
               record.refinement == nil || record.refinement?.status == .running,
-              result == nil || record.refinement?.status == .running else {
+              result?.edits.isEmpty != false || record.refinement?.status == .running else {
             throw StoreError.refinementSourceChanged
         }
         var refinement = record.refinement ?? CaptureRefinement(input: input, startedAt: Date())
         refinement.reason = reason
-        refinement.status = reason?.status ?? (result?.edits.isEmpty == false ? .applied : .unchanged)
+        refinement.status = result?.edits.isEmpty == false ? .applied : (reason?.status ?? .unchanged)
         refinement.edits = result?.edits ?? []
         refinement.durationSeconds = durationSeconds
         record.finalText = result?.text ?? input.text
@@ -331,7 +331,7 @@ final class CaptureStore {
     func deleteCapture(_ id: UUID) throws {
         let record = try capture(id)
         guard records[id] == nil, record.lifecycle != .capturing, record.refinement?.status != .running else { throw StoreError.captureInProgress }
-        let extractions = try container.mainContext.fetch(FetchDescriptor<MemoryExtractionRecord>(
+        let extractions = try container.mainContext.fetch(FetchDescriptor<MemoryAnalysisRecord>(
             predicate: #Predicate { $0.sourceCaptureID == id }
         ))
         let url = audioURL(for: record)

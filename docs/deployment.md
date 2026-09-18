@@ -100,13 +100,13 @@ When that decision is made, document:
 
 Do not introduce an updater framework before the distribution strategy requires it.
 
-## CloudKit deployment — Phase 1
+## CloudKit deployment — later cross-device milestone
 
-On 2026-09-18, the owner explicitly deferred iCloud/CloudKit sync to the final integration stage because Apple Developer enrollment is not yet set up. The repository has no configured iCloud container or Development Team. Continue local development now; establish those in Apple Developer/Xcode when the deferred integration resumes.
+On 2026-09-18, the owner corrected the delivery order: complete the single-Mac input/dictionary/Memory loop before cross-device sync. CloudKit is outside the current milestone, not a prerequisite for local persistence or task completion. Apple Developer enrollment/container setup is also not ready; do not request it until an actual cross-device milestone is scheduled.
 
 The intended storage is each user's own iCloud private database within Morie's app container. The developer team provisions the app's CloudKit capability and container once. End users use their own iCloud accounts and do not need developer accounts. Morie operates no shared cloud backend in V0.
 
-Phase 1 will add the actual iCloud/CloudKit environment. At that point this guide must include:
+That later milestone will add the actual iCloud/CloudKit environment. At that point this guide must include:
 
 - iCloud container identifier;
 - required entitlements;

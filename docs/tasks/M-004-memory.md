@@ -4,97 +4,56 @@
 
 - **State:** IN PROGRESS
 - **Last updated:** 2026-09-18
-- **Phase:** Phase 2
-- **Starts after:** M-003 establishes reliable Capture persistence
-- **Current branch:** `feature/m-004-memory-foundation`, based on M-003 commit `3ce05a4`.
-- **Owner sequencing decision:** continue development while M-002/M-003 device validation is deferred until the evening. Those acceptance items remain open; CloudKit remains deferred to final integration.
+- **Phase:** Phase 2 (task area, not delivery order)
+- **Active integration:** [M-009](M-009-macos-input-memory.md), branch `feature/m-009-input-dictionary-memory`.
+- **Owner decision:** learn personal information automatically from saved daily input. Dictionary words are separate. Single-Mac work precedes sync/iOS; deferred hardware/model acceptance remains open.
 
 ## Why
 
-Morie's long-term value comes from Personal Context that improves later input. This phase introduces restrained, provenance-aware Memory rather than a general knowledge graph.
+Morie should become more useful through ordinary communication without making users approve a queue of routine memories. Personal Memory retains selective, supported context about the user, with inspectable evidence and user control.
 
 ## Scope
 
-Planned first-class capabilities:
+- Projects, people/relationships, stable preferences, personal facts and decisions.
+- Automatic idle analysis of completed current-app input, using exact committed final text.
+- Durable queue/retry, cancellation and immediate priority for new voice input.
+- Grounded admission, weaker-evidence accumulation, idempotent merging and explicit later updates.
+- Source provenance, origin/confidence/evidence dates and active/superseded/archived lifecycle.
+- Relevant personal-context retrieval and native inspection/edit/archive/delete controls.
 
-- Vocabulary;
-- Project;
-- Relevant Context retrieval;
-- Memory Candidate flow;
-- provenance from source Capture IDs;
-- confidence and user-confirmed state;
-- active / superseded / archived lifecycle;
-- data-model support for Person, Topic, Decision, Preference, Fact, Open Thread, and Writing Style where useful.
-
-Excluded:
-
-- autonomous agents;
-- broad knowledge graph infrastructure;
-- cloud Memory service;
-- speculative long-running background intelligence.
+Excluded: custom dictionary spellings/aliases (M-009's separate dictionary), mandatory candidate review, inspiration follow-up, knowledge graphs, cloud services, iOS and compatibility/schema migrations.
 
 ## Acceptance criteria
 
-1. Captures can produce a small, high-signal set of Memory Candidates.
-2. Long-term Memory retains provenance and lifecycle state.
-3. Relevant Context retrieval can surface useful Vocabulary/Project context for a new capture.
-4. Superseded/archived facts stop polluting active context.
-5. Memory creation is selective rather than permanently storing every journal entry as knowledge.
+1. Completed daily input is analyzed automatically from saved final text; recognized text is not substituted when a processed final text exists.
+2. Memory is selective and evidence-backed. Quoted, temporary, hypothetical/uncertain and invented personal facts are not admitted.
+3. Repeated evidence merges without counting one Capture twice. Later explicit updates can supersede automatic information; ambiguous/older conflicts and user-edited records are preserved.
+4. New input never waits for background analysis, and cancelled/failed work remains recoverable across restart.
+5. Personal Memory is distinct from dictionary rules; relevant context must not add unspoken background to input.
+6. Native management offers optional corrections/deletion with exact sources, without a required confirmation inbox. Archive/delete prevent immediate relearning of the same normalized topic.
+7. Logic tests/build pass; real model selectivity, topic consistency, update behavior, performance and native interaction are validated before `DONE`.
 
 ## Progress
 
-The first slice established explicitly confirmed Memory and retrieval. The candidate slice added on-demand Apple AI extraction from History, input snapshots and review. M-005 now connects refinement and best-effort extraction after completed input; device and real-model acceptance remain open.
-
-| Subtask | State | Scope |
-| --- | --- | --- |
-| Memory schema and store | IMPLEMENTED / VERIFY | Vocabulary/Project, aliases, notes, provenance, confirmation and lifecycle in the existing SwiftData container. Separate Memory write context protects Capture checkpoints from rollback. |
-| Native Memory management | IMPLEMENTED / VERIFY | Standard searchable list, detail and editor sheet, unified by [M-008](./M-008-macos-management-ui.md); explicit saving/linking from History; source inspection and archive/restore/replace/delete. Interactive acceptance is deferred. |
-| Relevant Context retrieval | IMPLEMENTED / VERIFY | Native word boundaries and literal name/alias matching; only active confirmed records; deterministic ranking and eight-result cap. History distinguishes related context from linked provenance. |
-| Tests and documentation | IMPLEMENTED / PASS | All 65 tests pass: 18 candidate, 16 Memory and 31 Capture/History/audio tests. Native rendering checks layout; device interaction remains open. |
-| Automatic Memory Candidates | IMPLEMENTED / VERIFY | Apple on-device extraction from History and, through M-005, after completed input. Durable final-text snapshots, selective suggestions and explicit review. Real inference quality/latency remains unvalidated. |
-
-## Candidate-slice acceptance criteria
-
-1. History can request a small Vocabulary/Project candidate set through Apple Foundation Models. A successful empty result is valid; candidate extraction never silently creates long-term Memory.
-2. Extraction reads durably saved `finalText`, or saved recognized text when no final text exists, and persists the exact input text/type with its result. AI polishing is not implemented in this slice. The owner's 2026-09-18 requirement makes saving polished final text before extraction an explicit M-005 dependency.
-3. Candidates retain source evidence and review state across restart. Users can edit and confirm a suggestion, link it to an existing active memory, or dismiss it. Confirmation and Memory persistence are atomic.
-4. If the source is changed/deleted while extraction or review is open, stale candidates cannot be saved. Repeated analysis of the same saved text preserves previous review decisions. Deleting a Capture also removes its extraction snapshots; separately confirmed Memory remains.
-5. Model unavailability, context limits, failures and cancellation preserve Capture and existing Memory. Starting live input cancels optional extraction without waiting for it before Speech starts. No model content is logged.
-6. Use native forms, sheets, progress and review controls; keep real model quality, latency and interaction acceptance open for tonight.
-
-## First-slice acceptance criteria
-
-1. Explicitly saved Vocabulary/Project memory survives restart and never changes the source Capture's recognized/final text or delivery outcome.
-2. Source Capture IDs are saved at creation; manual entries are honestly identified as manual. Deleting a Capture does not delete an independently confirmed memory; unavailable sources are shown as such.
-3. Empty/invalid entries and duplicate active names within a kind are rejected without silently overwriting memory. Aliases are normalized and deduplicated.
-4. Only confirmed active entries participate in retrieval. Archive and replacement remove stale entries immediately, and replacement records its predecessor.
-5. Native Memory UI supports creation, editing, source inspection, archive/restore, replacement and explicit deletion. History exposes matching memory and an explicit Save Memory action.
-6. Name/alias matching works for Chinese and English, avoids partial Latin-word matches, has deterministic order and a bounded result count. This slice adds no model/network work to live capture or delivery.
+- [x] Replace vocabulary/candidate schema with personal Memory and durable analysis records.
+- [x] Implement final-text queue discovery, idle batches, retry/backoff and input preemption.
+- [x] Implement admission, evidence accumulation, conflict/update/lifecycle and deleted-topic handling.
+- [x] Preserve separate write contexts and atomic analysis/Memory saves.
+- [x] Connect automatic learning, native Personal Memory and History evidence/status.
+- [x] Update isolated tests and compile the real Foundation Models path.
+- [ ] Complete actual model, keyboard/VoiceOver and input-preemption acceptance on the signed app.
 
 ## Implementation notes
 
-- Use Apple SwiftData and repository-owned Swift with native SwiftUI controls. There is no schema migration, old-version compatibility layer or external dependency.
-- Type4Me's vocabulary command/store tests establish useful case-insensitive deduplication and surfaced-save-error behavior. Its file migration, built-in word lists, snippet routing, cloud hotword sync and external ASR reloads are outside Morie's requirement.
-- The explicit editor is a user decision, not an inferred AI confidence score. Candidate extraction is now implemented below; AI polishing and input personalization remain M-005 work.
-- Manual memory has `userConfirmed = true` and no model confidence score. Source IDs are checked when saved/linked; recording or empty Captures cannot become sources. Linking is idempotent and never overwrites a memory's name/notes.
-- Editing preserves identity and sources. Replacement creates a fresh active entry with the predecessor/source IDs and marks the old record superseded in one save. Archived entries can be restored if the name is available; superseded entries cannot be restored or edited.
-- Memory and Capture use the same `ModelContainer` but separate write contexts. Memory rollback cannot erase a pending live Capture checkpoint. No Memory operation changes the source transcript or delivery state.
-- Deleting a Capture retains separately confirmed Memory and its source ID; source inspection reports deletion explicitly. Deleting Memory leaves its source Captures and other memories intact.
-- Retrieval normalizes case/width/whitespace, respects native word boundaries, and retains meaningful punctuation. It matches Chinese/English names and aliases without matching `Git` inside `GitHub` or `C++` as bare `C`. Canonical matches rank before aliases, longer phrases before shorter ones, then recency/UUID break ties. This is lexical matching and does not infer unstated semantic relevance.
-- Related-context computation is skipped while the source Capture is recording. It adds no model/network step, built-in dictionary or speech-provider hotword configuration to live input.
+`MemoryStore` owns personal information and analysis state in a separate non-autosaving context. `MemoryAnalysisRecord` records final text/date/Capture ID and durable work outcomes. `MemoryLearningController` waits 30 seconds idle, processes at most three inputs, retries transient failures and ignores late cancelled results. No active/capture-only/raw-only input is learned.
 
-### Candidate implementation
+`MemoryLearner` uses Apple on-device generation with bounded source/context. Literal evidence and explicit personal connection are required. Confidence thresholds (0.9 explicit / 0.8 recurring with two distinct inputs) are filters, not calibrated accuracy. Normalized kind/topic identity and exact evidence consistency make merging/deletion predictable; broader semantic equivalence remains a real-model evaluation concern.
 
-- `MemoryExtractionInput` reads committed final text first; recognized text is used only when final text is empty. The owner's 2026-09-18 decision is recorded in the design/product baselines and M-005: persist AI-polished `finalText` before extraction, preserve `recognizedText`, and retain the actual extraction text. No polishing is claimed in M-004.
-- Foundation Models uses `SystemLanguageModel.default`, a fresh session, `@Generable` Vocabulary/Project output, greedy generation, native token/context accounting and a 1,024-token response cap. The complete source is analyzed or refused for size, never silently truncated. Apple guardrails remain enabled.
-- Up to three suggestions pass field validation, literal evidence/name checks, explicit-alias checks, deduplication and a finite confidence estimate of 0.8–1.0. The model score is not calibrated confidence in truth. Human review remains mandatory; bad suggestions are dropped and an empty successful result is retained.
-- `MemoryExtractionRecord` stores exact source text/type plus candidates and pending/accepted/dismissed states. Repeated analysis of identical saved text reuses the existing result. Changed input gets a separate snapshot; stale suggestions cannot be confirmed. Source deletion removes snapshots while confirmed Memory remains.
-- Confirmation, Memory creation/source-linking and the candidate decision use one Memory-context save. An edited proposal clears model confidence; linking never overwrites an existing memory's name/notes. Capture text/delivery is not changed.
-- History's explicit extraction action has native progress/cancel and review; current pending suggestions appear in Memory. The same native editor supports editing, linking, saving or dismissing. Both candidate review and saved AI-derived Memory can inspect the extraction snapshot.
-- One optional controller task owns inference. Leaving the detail or starting voice input cancels it, and late results recheck cancellation and saved source text. Voice startup does not wait for the model. M-005 adds best-effort automatic extraction after successful delivery/capture-only completion or clipboard-preserved delivery failure, using the saved final text. It does not await extraction, overlap a draining refinement, create a durable work queue, or log model content. History's explicit action remains recovery for skipped/cancelled work.
-- Running refinement is rejected as an extraction/review source. After final save, pending candidates based on older text become stale; new extraction retains the refined final text. The [M-005 record](M-005-personalization.md) contains this integration's tests and remaining acceptance work.
+User edits, archive and deletion take priority. Automatic updates require newer explicit evidence and a still-current automatic record. Deleting Capture removes its analysis snapshots but leaves independent Memory and a truthful missing-source link. Detailed component contracts are in [architecture.md](../architecture.md).
 
 ## Validation evidence
+
+The following dated results document earlier implementations. Their mandatory candidate-review/vocabulary rules are superseded by M-009; they are not current behavior or current acceptance. Current evidence is in [M-009](M-009-macos-input-memory.md#validation-evidence).
 
 - Isolated Xcode 27 Debug app build passed: `/tmp/morie-memory-build.SjRXpL/final-build.log`.
 - All **47 tests passed, 0 failed, 0 skipped**, confirmed with `xcresulttool get test-results summary` for `/tmp/morie-memory-tests.aceKML/FinalMemoryTests.xcresult`; log `/tmp/morie-memory-tests.aceKML/final-tests.log`. The 16 new Memory tests cover restart/provenance, no automatic promotion, name/alias validation and conflicts, source readiness/linking/deletion, edits, archive/restore/replacement, bounded Chinese/English retrieval and choosing the most specific matching alias. Existing 31 Capture/History/audio tests still pass with the expanded schema.
@@ -110,12 +69,17 @@ The first slice established explicitly confirmed Memory and retrieval. The candi
 
 ## Known issues / follow-up
 
-- Complete the deferred microphone, History and interruption checks from M-002/M-003 on the owner's signed build.
-- Validate Memory editor/navigation with keyboard, VoiceOver and real Chinese/English content.
-- Validate real Memory Candidate selectivity/evidence and cancellation behavior on disposable Chinese/English captures.
-- Validate M-005's refinement → final save → automatic candidate loop, including new input preemption and the retained original/rewritten text snapshots.
+- Validate actual evidence selectivity, consistency across different phrasing, personal updates and forgotten/archived topics with disposable Chinese/English input.
+- Measure background energy, cancellation/draining and responsiveness during repeated real voice input.
+- Complete deferred M-002/M-003 microphone, recovery and delivery checks and M-008/M-009 native interaction checks.
+- No current CloudKit enrollment/configuration requirement; future sync is a later milestone.
+
+## Issue / PR
+
+No new Issue/PR. Current integration branch is recorded in M-009; initial foundation work used `feature/m-004-memory-foundation`.
 
 ## References
 
-- [`../product-architecture-baseline.md`](../product-architecture-baseline.md)
-- predecessor: [`M-003-capture.md`](./M-003-capture.md)
+- [Product baseline](../product-architecture-baseline.md)
+- [M-003](M-003-capture.md)
+- [M-009](M-009-macos-input-memory.md)

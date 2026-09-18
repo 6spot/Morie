@@ -111,13 +111,22 @@ struct MorieSettingsView: View {
     var body: some View {
         Form {
             Section("Input Refinement") {
-                Toggle("Use Memory to Refine Input", isOn: Binding(
+                Toggle("Clean Up Voice Input", isOn: Binding(
                     get: { controller.inputRefinementEnabled },
                     set: { controller.setInputRefinementEnabled($0) }
                 ))
-                Text("Use confirmed names and light punctuation cleanup while preserving your wording. Original recognition stays in History.")
+                Text("Remove speech filler and organize punctuation, paragraphs and clear lists while preserving your meaning and tone. Your dictionary applies even when AI cleanup is off.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Dictionary Learning") {
+                Toggle("Suggest Words After I Correct Input", isOn: Binding(
+                    get: { controller.correctionSuggestionsEnabled },
+                    set: { controller.setCorrectionSuggestionsEnabled($0) }
+                ))
+                Text("For 30 seconds after Morie inserts text, check that text field for a word you correct. A small prompt lets you add its spelling to Dictionary. Observation stops when you leave the field or begin another input. Off by default.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Capture Shortcut") {
