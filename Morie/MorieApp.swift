@@ -109,6 +109,16 @@ struct MorieSettingsView: View {
 
     var body: some View {
         Form {
+            Section("Input Refinement") {
+                Toggle("Use Memory to Refine Input", isOn: Binding(
+                    get: { controller.inputRefinementEnabled },
+                    set: { controller.setInputRefinementEnabled($0) }
+                ))
+                Text("Use confirmed names and light punctuation cleanup while preserving your wording. Original recognition stays in History.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Capture Shortcut") {
                 Picker(
                     "Shortcut",

@@ -12,15 +12,27 @@ final class MemoryCandidateController: ObservableObject {
 
     private let store: MemoryStore
     private let extract: Extract
+    private let canUseModel: @MainActor () -> Bool
     private var extractionTask: Task<Void, Never>?
 
-    init(store: MemoryStore, extract: @escaping Extract = MemoryCandidateExtractor.extract) {
+    init(
+        store: MemoryStore, canUseModel: @escaping @MainActor () -> Bool = { true },
+        extract: @escaping Extract = MemoryCandidateExtractor.extract
+    ) {
         self.store = store
         self.extract = extract
+        self.canUseModel = canUseModel
     }
 
-    func findCandidates(for captureID: UUID) {
+    func findCandidates(for captureID: UUID, automatically: Bool = false) {
         guard !isInputActive, extractionTask == nil else { return }
+        guard canUseModel() else {
+            if !automatically {
+                messageCaptureID = captureID
+                message = "Earlier on-device analysis is still finishing. Your capture is saved; try again shortly."
+            }
+            return
+        }
         messageCaptureID = captureID
         message = nil
         let input: MemoryExtractionInput

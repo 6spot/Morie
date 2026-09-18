@@ -5,6 +5,7 @@
 - **State:** TODO
 - **Phase:** Phase 4
 - **Starts after:** the macOS Private product loop is validated
+- **Scheduling:** deferred, with no current iOS development plan. On 2026-09-18 the owner reiterated that current work is macOS-only; finish and validate its basic functions and improve the management UI before reconsidering iOS.
 
 ## Why
 
@@ -36,7 +37,7 @@ Excluded:
 
 ## Progress
 
-Not started. iOS is intentionally not developed in parallel with current macOS Phase 0 work.
+Not started and not scheduled. Completing one macOS task does not automatically start iOS; the current focus stays on the macOS product until its end-to-end behavior is proven.
 
 ## References
 

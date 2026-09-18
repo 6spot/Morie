@@ -107,6 +107,19 @@ private struct CaptureDetailView: View {
                 }
             }
 
+            if !capture.finalText.isEmpty {
+                Section("Final Text") {
+                    Text(capture.finalText).textSelection(.enabled)
+                    Button("Copy Final Text", systemImage: "doc.on.doc") {
+                        copy(capture.finalText)
+                    }
+                }
+            }
+
+            if let refinement = capture.refinement {
+                CaptureRefinementSection(refinement: refinement)
+            }
+
             Section("Recognition") {
                 if recognizedText.isEmpty {
                     Text(capture.lifecycle == .capturing
@@ -115,7 +128,7 @@ private struct CaptureDetailView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     Text(recognizedText).textSelection(.enabled)
-                    Button("Copy Text", systemImage: "doc.on.doc") {
+                    Button("Copy Recognition", systemImage: "doc.on.doc") {
                         copy(recognizedText)
                     }
                 }
@@ -125,15 +138,6 @@ private struct CaptureDetailView: View {
                 if let error = capture.lastRecognitionErrorDescription {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.secondary)
-                }
-            }
-
-            if !capture.finalText.isEmpty && capture.finalText != recognizedText {
-                Section("Original Output") {
-                    Text(capture.finalText).textSelection(.enabled)
-                    Button("Copy Original Output", systemImage: "doc.on.doc") {
-                        copy(capture.finalText)
-                    }
                 }
             }
 
@@ -176,7 +180,7 @@ private struct CaptureDetailView: View {
             Button("Delete Capture", systemImage: "trash", role: .destructive) {
                 confirmsDeletion = true
             }
-            .disabled(capture.lifecycle == .capturing)
+            .disabled(capture.lifecycle == .capturing || capture.refinement?.status == .running)
         }
         .confirmationDialog("Delete this capture?", isPresented: $confirmsDeletion, titleVisibility: .visible) {
             Button("Delete Capture", role: .destructive) {
@@ -206,6 +210,9 @@ private struct CaptureDetailView: View {
         .onChange(of: capture.sourceAudioRelativePath) { _, _ in
             history.refreshAudio(for: captureID)
         }
+        .onChange(of: capture.refinement?.status) { _, _ in
+            history.refreshAudio(for: captureID)
+        }
         .task(id: capture.sourceAudioExpiresAt) {
             guard let expiresAt = capture.sourceAudioExpiresAt else { return }
             do {
@@ -219,6 +226,60 @@ private struct CaptureDetailView: View {
     private func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+struct CaptureRefinementSection: View {
+    let refinement: CaptureRefinement
+
+    var body: some View {
+        Section("Input Refinement") {
+            LabeledContent("Result", value: refinement.status.title)
+            if let reason = refinement.reason {
+                Text(reason.message).foregroundStyle(.secondary)
+            }
+            if let seconds = refinement.durationSeconds {
+                LabeledContent("Time", value: "\(seconds.formatted(.number.precision(.fractionLength(2)))) s")
+            }
+            if !refinement.edits.isEmpty {
+                DisclosureGroup("Changes") {
+                    ForEach(Array(refinement.edits.enumerated()), id: \.offset) { _, edit in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(edit.proposal.original) → \(edit.proposal.replacement)")
+                                .textSelection(.enabled)
+                            Text(edit.memoryID == nil ? "Punctuation and spacing" : "Confirmed name")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            if refinement.status != .skipped {
+                DisclosureGroup("Text Before Refinement") {
+                    Text(refinement.input.text)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            if !refinement.input.context.isEmpty {
+                DisclosureGroup("Memory Considered") {
+                    ForEach(refinement.input.context) { match in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label(match.memory.name, systemImage: match.memory.kind.systemImage)
+                            if !match.memory.aliases.isEmpty {
+                                Text("Aliases: \(match.memory.aliases.joined(separator: ", "))")
+                            }
+                            if !match.memory.notes.isEmpty { Text(match.memory.notes) }
+                        }
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Text("These are the saved memory details considered for this input. Later memory edits do not change this record.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
     }
 }
 

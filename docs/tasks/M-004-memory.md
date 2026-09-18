@@ -43,7 +43,7 @@ Excluded:
 
 ## Progress
 
-The first slice established explicitly confirmed Memory and retrieval. The candidate slice now adds on-demand Apple AI extraction from History, input snapshots and a review loop. M-005 follows with polishing/personalization; device and real-model acceptance remain open.
+The first slice established explicitly confirmed Memory and retrieval. The candidate slice added on-demand Apple AI extraction from History, input snapshots and review. M-005 now connects refinement and best-effort extraction after completed input; device and real-model acceptance remain open.
 
 | Subtask | State | Scope |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ The first slice established explicitly confirmed Memory and retrieval. The candi
 | Native Memory management | IMPLEMENTED / VERIFY | Standard searchable list, detail and editor sheet; explicit saving/linking from History; source inspection and archive/restore/replace/delete. Interactive acceptance is deferred. |
 | Relevant Context retrieval | IMPLEMENTED / VERIFY | Native word boundaries and literal name/alias matching; only active confirmed records; deterministic ranking and eight-result cap. History distinguishes related context from linked provenance. |
 | Tests and documentation | IMPLEMENTED / PASS | All 65 tests pass: 18 candidate, 16 Memory and 31 Capture/History/audio tests. Native rendering checks layout; device interaction remains open. |
-| Automatic Memory Candidates | IMPLEMENTED / VERIFY | Apple on-device extraction requested from History, durable input snapshots, selective suggestions and explicit review. Final text takes precedence; M-005 polished output will feed this same boundary. Real inference quality/latency remains unvalidated. |
+| Automatic Memory Candidates | IMPLEMENTED / VERIFY | Apple on-device extraction from History and, through M-005, after completed input. Durable final-text snapshots, selective suggestions and explicit review. Real inference quality/latency remains unvalidated. |
 
 ## Candidate-slice acceptance criteria
 
@@ -91,7 +91,8 @@ The first slice established explicitly confirmed Memory and retrieval. The candi
 - `MemoryExtractionRecord` stores exact source text/type plus candidates and pending/accepted/dismissed states. Repeated analysis of identical saved text reuses the existing result. Changed input gets a separate snapshot; stale suggestions cannot be confirmed. Source deletion removes snapshots while confirmed Memory remains.
 - Confirmation, Memory creation/source-linking and the candidate decision use one Memory-context save. An edited proposal clears model confidence; linking never overwrites an existing memory's name/notes. Capture text/delivery is not changed.
 - History's explicit extraction action has native progress/cancel and review; current pending suggestions appear in Memory. The same native editor supports editing, linking, saving or dismissing. Both candidate review and saved AI-derived Memory can inspect the extraction snapshot.
-- One optional controller task owns inference. Leaving the detail or starting voice input cancels it, and late results recheck cancellation and saved source text. Voice startup does not wait for the model. There is no automatic background extraction in the recording/delivery loop, external service or logged model content.
+- One optional controller task owns inference. Leaving the detail or starting voice input cancels it, and late results recheck cancellation and saved source text. Voice startup does not wait for the model. M-005 adds best-effort automatic extraction after successful delivery/capture-only completion or clipboard-preserved delivery failure, using the saved final text. It does not await extraction, overlap a draining refinement, create a durable work queue, or log model content. History's explicit action remains recovery for skipped/cancelled work.
+- Running refinement is rejected as an extraction/review source. After final save, pending candidates based on older text become stale; new extraction retains the refined final text. The [M-005 record](M-005-personalization.md) contains this integration's tests and remaining acceptance work.
 
 ## Validation evidence
 
@@ -112,7 +113,7 @@ The first slice established explicitly confirmed Memory and retrieval. The candi
 - Complete the deferred microphone, History and interruption checks from M-002/M-003 on the owner's signed build.
 - Validate Memory editor/navigation with keyboard, VoiceOver and real Chinese/English content.
 - Validate real Memory Candidate selectivity/evidence and cancellation behavior on disposable Chinese/English captures.
-- Continue with M-005 polishing/personalization. Save polished final text before candidate extraction and retain the original recognized text and extraction snapshot.
+- Validate M-005's refinement → final save → automatic candidate loop, including new input preemption and the retained original/rewritten text snapshots.
 
 ## References
 

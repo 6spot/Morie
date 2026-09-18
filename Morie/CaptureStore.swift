@@ -11,6 +11,7 @@ final class CaptureStore {
         case audioUnavailable
         case emptyRecognition
         case invalidDeliveryMode
+        case refinementSourceChanged
 
         var errorDescription: String? {
             switch self {
@@ -20,6 +21,7 @@ final class CaptureStore {
             case .audioUnavailable: "The source recording is no longer available."
             case .emptyRecognition: "No speech was recognized. The saved text and recording have been kept."
             case .invalidDeliveryMode: "The capture has an invalid delivery mode."
+            case .refinementSourceChanged: "The saved capture changed during refinement. Its current text has been kept; no stale result was used."
             }
         }
     }
@@ -37,8 +39,13 @@ final class CaptureStore {
 
     private var records: [UUID: CaptureRecord] = [:]
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
+    private let commitRefinement: (ModelContext) throws -> Void
 
-    init(inMemory: Bool = false, storageURL: URL? = nil, audioDirectory: URL? = nil) throws {
+    init(
+        inMemory: Bool = false, storageURL: URL? = nil, audioDirectory: URL? = nil,
+        commitRefinement: @escaping (ModelContext) throws -> Void = { try $0.save() }
+    ) throws {
+        self.commitRefinement = commitRefinement
         let schema = Schema([CaptureRecord.self, MemoryRecord.self, MemoryExtractionRecord.self])
         precondition(!(inMemory && storageURL != nil), "An in-memory store cannot also use a storage URL.")
 
@@ -121,7 +128,7 @@ final class CaptureStore {
     }
 
     func updateRecognizedText(_ text: String, for id: UUID) throws {
-        guard let record = records[id] else { return }
+        guard let record = records[id], record.lifecycle == .capturing else { return }
         record.recognizedText = text
         record.updatedAt = Date()
 
@@ -151,6 +158,84 @@ final class CaptureStore {
         }
         Diagnostics.record("CaptureStore", "Capture \(label(id)) recognition saved; characters=\(text.count)")
         return deliveryMode
+    }
+
+    func refinementInput(for id: UUID, context: [MemoryContextMatch]) throws -> RefinementInput {
+        let record = try capture(id)
+        guard record.refinement == nil else { throw StoreError.refinementSourceChanged }
+        let input = RefinementInput(captureID: id, text: record.finalText, context: context)
+        try requireRefinementSource(input)
+        return input
+    }
+
+    func beginRefinement(_ input: RefinementInput) throws {
+        let record = try requireRefinementSource(input)
+        guard record.refinement == nil else { throw StoreError.refinementSourceChanged }
+        record.refinement = CaptureRefinement(input: input, startedAt: Date())
+        record.updatedAt = Date()
+        try saveRefinementChanges()
+    }
+
+    @discardableResult
+    func saveRefinement(
+        _ input: RefinementInput, result: ValidatedRefinement? = nil,
+        reason: RefinementReason? = nil, durationSeconds: Double
+    ) throws -> String {
+        let record = try requireRefinementSource(input)
+        guard (result != nil) != (reason != nil),
+              record.refinement == nil || record.refinement?.status == .running,
+              result == nil || record.refinement?.status == .running else {
+            throw StoreError.refinementSourceChanged
+        }
+        var refinement = record.refinement ?? CaptureRefinement(input: input, startedAt: Date())
+        refinement.reason = reason
+        refinement.status = reason?.status ?? (result?.edits.isEmpty == false ? .applied : .unchanged)
+        refinement.edits = result?.edits ?? []
+        refinement.durationSeconds = durationSeconds
+        record.finalText = result?.text ?? input.text
+        record.refinement = refinement
+        record.updatedAt = Date()
+        try saveRefinementChanges()
+        Diagnostics.record("Refinement", "Capture \(label(input.captureID)); status=\(refinement.status.rawValue); edits=\(refinement.edits.count); milliseconds=\(Int(durationSeconds * 1_000))")
+        return record.finalText
+    }
+
+    func interruptRefinement(_ input: RefinementInput) throws {
+        let record = try capture(input.captureID)
+        guard var refinement = record.refinement, refinement.input.id == input.id,
+              refinement.status == .running else { return }
+        refinement.status = .interrupted
+        refinement.reason = .interrupted
+        record.refinement = refinement
+        record.updatedAt = Date()
+        try saveRefinementChanges()
+    }
+
+    @discardableResult
+    func requireRefinementSource(_ input: RefinementInput) throws -> CaptureRecord {
+        let record = try capture(input.captureID)
+        let id = input.captureID
+        let reader = ModelContext(container)
+        let request = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
+        guard let saved = try reader.fetch(request).first,
+              record.lifecycle == .recognized, saved.lifecycle == .recognized,
+              !input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              record.recognizedText == input.text, saved.recognizedText == input.text,
+              record.finalText == input.text, saved.finalText == input.text,
+              record.refinement == saved.refinement,
+              record.refinement == nil || record.refinement?.input == input else {
+            throw StoreError.refinementSourceChanged
+        }
+        return record
+    }
+
+    private func saveRefinementChanges() throws {
+        do {
+            try commitRefinement(container.mainContext)
+        } catch {
+            container.mainContext.rollback()
+            throw error
+        }
     }
 
     func markDelivered(_ id: UUID) throws {
@@ -191,7 +276,7 @@ final class CaptureStore {
 
     func sourceAudioURL(for id: UUID, now: Date = Date()) throws -> URL {
         let record = try capture(id)
-        guard records[id] == nil, record.lifecycle != .capturing else {
+        guard records[id] == nil, record.lifecycle != .capturing, record.refinement?.status != .running else {
             throw StoreError.captureInProgress
         }
         if let expiresAt = record.sourceAudioExpiresAt, expiresAt <= now {
@@ -207,11 +292,12 @@ final class CaptureStore {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw StoreError.emptyRecognition }
         let record = try capture(id)
-        guard records[id] == nil, record.lifecycle != .capturing else { throw StoreError.captureInProgress }
+        guard records[id] == nil, record.lifecycle != .capturing, record.refinement?.status != .running else { throw StoreError.captureInProgress }
 
         record.recognizedText = text
-        // Keep the original output and delivery outcome for captures already sent to an app.
-        if record.lifecycle != .delivered && record.lifecycle != .deliveryFailed {
+        // Refined capture-only output is also a committed expression, independent of a later Speech retry.
+        if record.lifecycle != .delivered && record.lifecycle != .deliveryFailed
+            && record.refinement?.preservesFinalText != true {
             record.finalText = text
             record.lifecycle = .recognized
             record.deliveryErrorDescription = nil
@@ -230,7 +316,7 @@ final class CaptureStore {
 
     func recordReRecognitionFailure(_ message: String, for id: UUID) throws {
         let record = try capture(id)
-        guard records[id] == nil, record.lifecycle != .capturing else { throw StoreError.captureInProgress }
+        guard records[id] == nil, record.lifecycle != .capturing, record.refinement?.status != .running else { throw StoreError.captureInProgress }
         record.lastRecognitionAttemptAt = Date()
         record.lastRecognitionErrorDescription = message
         record.updatedAt = Date()
@@ -244,7 +330,7 @@ final class CaptureStore {
 
     func deleteCapture(_ id: UUID) throws {
         let record = try capture(id)
-        guard records[id] == nil, record.lifecycle != .capturing else { throw StoreError.captureInProgress }
+        guard records[id] == nil, record.lifecycle != .capturing, record.refinement?.status != .running else { throw StoreError.captureInProgress }
         let extractions = try container.mainContext.fetch(FetchDescriptor<MemoryExtractionRecord>(
             predicate: #Predicate { $0.sourceCaptureID == id }
         ))
@@ -270,6 +356,13 @@ final class CaptureStore {
 
     private func finish(_ id: UUID, lifecycle: CaptureLifecycle, error: String?) throws {
         guard let record = records[id] else { return }
+        if var refinement = record.refinement, refinement.status == .running {
+            // A refinement metadata save may have failed even though the durable original was usable.
+            let reason: RefinementReason = lifecycle == .delivered || lifecycle == .deliveryFailed ? .saveFailed : .interrupted
+            refinement.status = reason.status
+            refinement.reason = reason
+            record.refinement = refinement
+        }
         record.lifecycle = lifecycle
         record.deliveryErrorDescription = error
         record.updatedAt = Date()
@@ -283,6 +376,7 @@ final class CaptureStore {
         let descriptor = FetchDescriptor<CaptureRecord>()
         let expired = try container.mainContext.fetch(descriptor).filter {
             $0.sourceAudioRelativePath != nil && records[$0.id] == nil
+                && $0.refinement?.status != .running
                 && ($0.sourceAudioExpiresAt.map { $0 <= now } ?? false)
         }
         guard !expired.isEmpty else { return }
@@ -327,9 +421,23 @@ final class CaptureStore {
 
     private func recoverInterruptedCaptures() throws {
         let descriptor = FetchDescriptor<CaptureRecord>()
-        let interrupted = try container.mainContext.fetch(descriptor).filter { $0.lifecycle == .capturing }
+        let interrupted = try container.mainContext.fetch(descriptor).filter {
+            $0.lifecycle == .capturing || $0.refinement?.status == .running
+        }
         guard !interrupted.isEmpty else { return }
         for record in interrupted {
+            if var refinement = record.refinement, refinement.status == .running {
+                refinement.status = .interrupted
+                refinement.reason = .interrupted
+                record.refinement = refinement
+                if record.deliveryModeRawValue == CaptureDeliveryMode.currentApp.rawValue,
+                   record.lifecycle == .recognized {
+                    record.lifecycle = .failed
+                    record.deliveryErrorDescription = "Input processing was interrupted. Saved text and available audio have been kept."
+                }
+                record.updatedAt = Date()
+                continue
+            }
             let url = audioURL(for: record)
             let size = (try? url?.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             let hasText = !record.recognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

@@ -30,6 +30,9 @@
 		A10000000000000000000016 /* MemoryCandidateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* MemoryCandidateExtractor.swift */; };
 		A10000000000000000000017 /* MemoryCandidateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* MemoryCandidateController.swift */; };
 		A10000000000000000000018 /* MemoryCandidatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* MemoryCandidatesView.swift */; };
+		A10000000000000000000019 /* CaptureRefinement.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* CaptureRefinement.swift */; };
+		A1000000000000000000001A /* InputRefiner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* InputRefiner.swift */; };
+		A1000000000000000000001B /* CapturePersonalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000029 /* CapturePersonalizer.swift */; };
 		A20000000000000000000001 /* CaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* CaptureStoreTests.swift */; };
 		A20000000000000000000002 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* CaptureRecord.swift */; };
 		A20000000000000000000003 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
@@ -47,6 +50,10 @@
 		A2000000000000000000000F /* MemoryCandidateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* MemoryCandidateExtractor.swift */; };
 		A20000000000000000000010 /* MemoryCandidateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* MemoryCandidateController.swift */; };
 		A20000000000000000000011 /* MemoryCandidateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* MemoryCandidateTests.swift */; };
+		A20000000000000000000012 /* CaptureRefinement.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* CaptureRefinement.swift */; };
+		A20000000000000000000013 /* InputRefiner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* InputRefiner.swift */; };
+		A20000000000000000000014 /* CapturePersonalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000029 /* CapturePersonalizer.swift */; };
+		A20000000000000000000015 /* PersonalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* PersonalizationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -76,6 +83,9 @@
 		B10000000000000000000024 /* MemoryCandidateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCandidateExtractor.swift; sourceTree = "<group>"; };
 		B10000000000000000000025 /* MemoryCandidateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCandidateController.swift; sourceTree = "<group>"; };
 		B10000000000000000000026 /* MemoryCandidatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCandidatesView.swift; sourceTree = "<group>"; };
+		B10000000000000000000027 /* CaptureRefinement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRefinement.swift; sourceTree = "<group>"; };
+		B10000000000000000000028 /* InputRefiner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputRefiner.swift; sourceTree = "<group>"; };
+		B10000000000000000000029 /* CapturePersonalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePersonalizer.swift; sourceTree = "<group>"; };
 		B20000000000000000000001 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000002 /* MorieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000000000000000000003 /* CaptureHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryTests.swift; sourceTree = "<group>"; };
@@ -83,6 +93,7 @@
 		B20000000000000000000005 /* CaptureAudioStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAudioStreamTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000006 /* MemoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000007 /* MemoryCandidateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCandidateTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000008 /* PersonalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,6 +149,9 @@
 				B10000000000000000000024 /* MemoryCandidateExtractor.swift */,
 				B10000000000000000000025 /* MemoryCandidateController.swift */,
 				B10000000000000000000026 /* MemoryCandidatesView.swift */,
+				B10000000000000000000027 /* CaptureRefinement.swift */,
+				B10000000000000000000028 /* InputRefiner.swift */,
+				B10000000000000000000029 /* CapturePersonalizer.swift */,
 			);
 			path = Morie;
 			sourceTree = "<group>";
@@ -151,6 +165,7 @@
 				B20000000000000000000005 /* CaptureAudioStreamTests.swift */,
 				B20000000000000000000006 /* MemoryTests.swift */,
 				B20000000000000000000007 /* MemoryCandidateTests.swift */,
+				B20000000000000000000008 /* PersonalizationTests.swift */,
 			);
 			path = MorieTests;
 			sourceTree = "<group>";
@@ -271,6 +286,9 @@
 				A10000000000000000000016 /* MemoryCandidateExtractor.swift in Sources */,
 				A10000000000000000000017 /* MemoryCandidateController.swift in Sources */,
 				A10000000000000000000018 /* MemoryCandidatesView.swift in Sources */,
+				A10000000000000000000019 /* CaptureRefinement.swift in Sources */,
+				A1000000000000000000001A /* InputRefiner.swift in Sources */,
+				A1000000000000000000001B /* CapturePersonalizer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -295,6 +313,10 @@
 				A2000000000000000000000F /* MemoryCandidateExtractor.swift in Sources */,
 				A20000000000000000000010 /* MemoryCandidateController.swift in Sources */,
 				A20000000000000000000011 /* MemoryCandidateTests.swift in Sources */,
+				A20000000000000000000012 /* CaptureRefinement.swift in Sources */,
+				A20000000000000000000013 /* InputRefiner.swift in Sources */,
+				A20000000000000000000014 /* CapturePersonalizer.swift in Sources */,
+				A20000000000000000000015 /* PersonalizationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -2,7 +2,7 @@
 
 ## Current stage
 
-Morie is validating **Phase 0 — macOS Input Foundation** and **Phase 1 — Durable Capture** while implementing **Phase 2 — Personal Memory**. The current boundary includes the native input loop, local persistence, History recovery, explicit vocabulary/project memory, relevant-context inspection and on-demand Apple AI candidates with human review. Input personalization, iOS and Morie Cloud remain subsequent work. The owner has deferred interactive device checks until the evening and sync until final integration.
+Morie is validating **Phase 0 — macOS Input Foundation**, **Phase 1 — Durable Capture**, **Phase 2 — Personal Memory** and the first **Phase 3 — Personalization** slice. The input loop now uses confirmed vocabulary/project context for bounded refinement, saves final text and then attempts candidate extraction with human review. Broader style learning, iOS and Morie Cloud remain subsequent work. The owner has deferred interactive device checks until the evening and sync until final integration.
 
 Type4Me is an experience/reference archive, not Morie's architecture or migration template. Every retained lesson is filtered through Morie's product design and the macOS 27-only platform boundary.
 
@@ -65,6 +65,9 @@ Morie/
 │   ├── MemoryCandidateExtractor.swift
 │   ├── MemoryCandidateController.swift
 │   ├── MemoryCandidatesView.swift
+│   ├── CaptureRefinement.swift
+│   ├── InputRefiner.swift
+│   ├── CapturePersonalizer.swift
 │   ├── MorieControlCenter.swift
 │   ├── CaptureHUD.swift
 │   ├── Diagnostics.swift
@@ -77,6 +80,7 @@ Morie/
 │   ├── CaptureAudioStreamTests.swift
 │   ├── MemoryTests.swift
 │   ├── MemoryCandidateTests.swift
+│   ├── PersonalizationTests.swift
 │   └── TestDiagnostics.swift
 ├── .github/workflows/
 │   ├── macos-27-ci.yml
@@ -146,7 +150,9 @@ Two levels of state are intentional.
 
 `AppController` owns the small UI-facing state machine:
 
-`checking → ready → recording → finalizing → delivering → ready`
+`checking → ready → recording → finalizing → refining → delivering → ready`
+
+`captureOnly` completes after refinement without entering delivery. Refinement can be skipped or end with the saved original; it does not change the required capability gate or introduce another product mode.
 
 `failed` and `blocked` represent recoverable operation failure and unavailable required capability respectively.
 Explicit cancellation uses `stopping` until native teardown and discard complete. Capability recheck enters `checking`, and shortcut loss enters `blocked`, before awaiting teardown; late capture work cannot replace these states with Ready.
@@ -296,7 +302,7 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 - source-audio filenames are saved before recording, and interrupted records with audio or checkpointed text become recoverable failures when the store opens;
 - source application name, bundle identifier and original window identity are the current minimal App Context.
 
-Every new voice Capture has an explicit, durably saved delivery mode. The global shortcut creates `currentApp`; History's **Record Capture** action creates `captureOnly`. Both use the same capture UUID, microphone session, Speech pipeline, cancellation and History preemption. An in-app capture records Morie as the source and has no external target/window. Recognition completion returns the saved mode: capture-only completion ends as `recognized` and releases active-record ownership immediately; current-app completion retains ownership through delivery. Capture-only success never enters `TextInjector` or the clipboard/focus path and reports “已保存” in the shared HUD.
+Every new voice Capture has an explicit, durably saved delivery mode. The global shortcut creates `currentApp`; History's **Record Capture** action creates `captureOnly`. Both use the same capture UUID, microphone session, Speech pipeline, cancellation and History preemption. An in-app capture records Morie as the source and has no external target/window. Recognition completion returns the saved mode: capture-only completion ends as `recognized` and releases recording/discard ownership; a running refinement separately blocks History mutation and extraction. Current-app completion retains ownership through delivery. Both modes refine the saved text before success. Capture-only success never enters `TextInjector` or the clipboard/focus path and reports “已保存” in the shared HUD.
 
 The local `ModelConfiguration` explicitly disables CloudKit. On 2026-09-18, the owner deferred synchronization to the final integration stage because Apple Developer enrollment is not yet set up. The intended destination remains each user's own iCloud private database within Morie's app container. This is an implementation stage, not a Device Only product mode.
 
@@ -310,7 +316,7 @@ Source-audio evidence is conservative: `true` means Speech previously returned t
 
 Expiry clears the audio path but retains duration, expiry, recognition errors, and the History row, including failed captures with no text. Cleanup runs on startup, retention changes, new capture, and History audio access. An open detail view refreshes when its recording expires. Interrupted-capture recovery uses the filename saved by the current implementation; it does not reconstruct legacy metadata or migrate old formats.
 
-Re-recognition updates `recognizedText` only after successful file analysis. For a delivered/delivery-failed Capture, `finalText` and the original delivery outcome remain intact. Other successful recoveries become `recognized` and receive the recovered final text. Retry errors use separate optional metadata; failure, empty retry results, and cancellation never erase prior text or audio. Retry never injects into the original app or changes the clipboard; copying is an explicit History action.
+Re-recognition updates `recognizedText` only after successful file analysis. Delivered/delivery-failed output and output from a completed refinement (including unchanged/capture-only output) retain `finalText` and their actual refinement input/context. Other successful recoveries become `recognized` and receive the recovered final text. Retry errors use separate optional metadata; failure, empty retry results, and cancellation never erase prior text or audio. Retry never injects into the original app or changes the clipboard; copying is an explicit History action.
 
 ### `CaptureFileTranscriber` / `CaptureHistoryController`
 
@@ -320,7 +326,7 @@ Re-recognition updates `recognizedText` only after successful file analysis. For
 
 ### `CaptureHistoryView`
 
-Native SwiftUI/SwiftData History uses `List`, `NavigationStack`, `Form`, and `@Query` for a list and Capture detail. Audio playback uses AVKit's standard `AVPlayerView` controls. Details expose selectable recognized/original output text, explicit Copy buttons, retry progress/cancel, audio expiry/errors, and deletion with a system confirmation dialog. No replacement media controls are drawn, and recordings do not populate Now Playing metadata.
+Native SwiftUI/SwiftData History uses `List`, `NavigationStack`, `Form`, and `@Query` for a list and Capture detail. Audio playback uses AVKit's standard `AVPlayerView` controls. Details show final text first, original/latest recognition separately, refinement outcome/input/changes/context, explicit Copy buttons, retry progress/cancel, audio expiry/errors and deletion with a system confirmation dialog. No replacement media controls are drawn, and recordings do not populate Now Playing metadata.
 
 ### `MorieControlCenter`
 
@@ -338,7 +344,21 @@ Editing keeps identity/provenance. Replacement atomically creates a new active r
 
 This pure Swift boundary consumes immutable snapshots. It selects only confirmed active records by normalized name/alias matching with NaturalLanguage's native word boundaries. Literal matching preserves significant punctuation in identifiers such as `C++`; boundaries prevent a term such as `Git` from matching inside `GitHub`. Canonical-name matches rank ahead of aliases, longer phrases ahead of shorter ones, then recency and UUID provide deterministic ordering. Results are capped at eight.
 
-History exposes related records and separately labels records saved from that Capture, including their lifecycle. Retrieval does not run for an unfinished Capture and introduces no AI/network step in live recording or delivery. This is lexical context retrieval, not semantic recall, automatic ASR correction or a built-in dictionary.
+History exposes related records and separately labels records saved from that Capture, including their lifecycle. The retriever is also used after durable recognition for input refinement. Retrieval itself uses no model/network call. It remains lexical matching, not semantic recall, Speech hotword configuration or a built-in dictionary; a misrecognition must be an explicitly confirmed alias to support correction.
+
+### `CapturePersonalizer` / `InputRefiner`
+
+The current input sequence is:
+
+`Speech → durable recognized text → relevant confirmed Memory → bounded edit proposals → validation → durable final text → delivery/History completion → optional Memory Candidates`
+
+`CapturePersonalizer` owns this persistence boundary for both capture modes. The current source and a separate committed context must agree before inference and final save. `CaptureRefinement` retains the exact input, context snapshots, accepted edits, outcome, fixed reason and elapsed time. Running refinement blocks playback/re-recognition/deletion and Memory extraction. Late Speech partials cannot overwrite a completed recognition. Restart clears interrupted refinement while preserving saved text/audio and any actual delivery outcome; it does not restart a model or deliver text automatically.
+
+`InputRefiner` calls `SystemLanguageModel.default` through a fresh `LanguageModelSession` with greedy `@Generable` output. The full prompt/instructions/schema plus a 768-token response allowance must fit the native context limit. Transcript and context are data, never instructions. Up to eight anchored edits may correct an explicit confirmed name/alias to its exact canonical name, or tidy horizontal spacing/add a missing comma/period. `RefinementValidator` rejects missing/overlapping anchors, partial words, content deletion/expansion, changed existing punctuation, and edits to numeric/technical tokens or backtick code. Word tokens and content characters are retained for cleanup. This first slice does not rewrite style, remove fillers, infer aliases or perform fuzzy term recovery.
+
+`InputRefinementRunner` owns one model task, a deadline task and a single continuation. The provisional model-wait budget is 2 seconds. Timeout/caller cancellation resolves the caller without joining model teardown; a draining task stays owned, its late result is discarded, and new optional model work skips until it ends. Candidate extraction and refinement consult each other's activity so they do not overlap. Storage, validation and main-actor scheduling add overhead beyond the model budget; overall latency/energy remains to be measured on hardware.
+
+After inference, the source and retrieved Memory snapshots are checked again. Changed/archived/deleted Memory or invalid model edits keep the original. A changed/deleted source rejects stale delivery. Save failure rolls back unsaved AI output and returns only the verified durable original. If outcome metadata cannot be saved either, that outcome may be incomplete until a later terminal save/restart; existing text stays durable. Caller cancellation preserves the Capture and cannot resume a pending paste. Diagnostics record status/counts/time, never input/context/model text.
 
 ### `MemoryView`
 
@@ -346,15 +366,15 @@ Native `List`, `NavigationStack`, `Form`, `Picker`, `TextField`, `TextEditor`, s
 
 ### Memory Candidates
 
-`MemoryExtractionInput` prefers nonempty saved `finalText`, using `recognizedText` only when no final text exists. `MemoryStore` reads a separate committed context and compares it with the authoritative Capture context before extraction. Unsaved text, recording and deleted sources are rejected. The owner's 2026-09-18 decision requires M-005 to save polished final text before using this boundary, preserving recognized text separately. This slice does not perform polishing or label unprocessed final text as polished.
+`MemoryExtractionInput` prefers nonempty saved `finalText`, using `recognizedText` only when no final text exists. `MemoryStore` reads a separate committed context and compares it with the authoritative Capture context before extraction. Unsaved text, recording, running refinement and deleted sources are rejected. M-005 saves refined output before this boundary while preserving recognized text separately, implementing the owner's 2026-09-18 requirement. A skipped/failed refinement is identified as original text kept.
 
 `MemoryCandidateExtractor` uses only `SystemLanguageModel.default`, a fresh `LanguageModelSession`, and `@Generable` output for up to three Vocabulary/Project suggestions. The current SDK's token-count/context-size APIs bound the complete prompt, instructions, schema and response; oversized input is refused rather than truncated. Default Apple guardrails remain enabled. The source is treated as data, not instructions. Each suggestion needs a literal supporting quote containing its name, explicitly present aliases and a finite model confidence estimate of at least 0.8. Invalid/duplicate suggestions are filtered. That estimate is not a calibrated accuracy guarantee; human review is required.
 
-`MemoryExtractionRecord` persists the exact text/type used, including future polished final text, together with candidates and pending/accepted/dismissed decisions. A successful empty extraction is persisted too. Repeating analysis of the same saved text reuses its result and preserves review decisions. Changed input gets a separate result; stale pending candidates cannot be confirmed. Accepted Memory records retain source Capture IDs, the originating candidate ID and an optional unchanged suggestion confidence. User edits clear that model estimate. Linking to existing active Memory preserves its name/notes and confirmation metadata.
+`MemoryExtractionRecord` persists the exact text/type used, including saved refined final text, together with candidates and pending/accepted/dismissed decisions. A successful empty extraction is persisted too. Repeating analysis of the same saved text reuses its result and preserves review decisions. Changed input gets a separate result; stale pending candidates cannot be confirmed. Accepted Memory records retain source Capture IDs, the originating candidate ID and an optional unchanged suggestion confidence. User edits clear that model estimate. Linking to existing active Memory preserves its name/notes and confirmation metadata.
 
 Candidate confirmation and Memory changes share the Memory write context and one save. Source existence and current text are rechecked before committing either extraction or review. Deleting a Capture deletes all its extraction snapshots in the same store save, while independently confirmed Memory remains. Existing Capture/Memory schema is used directly, without migrations or legacy reconstruction.
 
-`MemoryCandidateController` owns one cancellable optional extraction. History explicitly requests analysis with **Find Memory Candidates**; recording/delivery does not schedule model work automatically. Leaving that Capture detail or starting live input cancels analysis. Live Speech does not wait for model cancellation, and a late result cannot commit. Foundation Models failure messages are fixed strings so prompts/output are not exposed through debug descriptions or logs. Model quality and cancellation latency remain device acceptance items.
+`MemoryCandidateController` owns one cancellable optional extraction. M-005 requests best-effort analysis after successful delivery/capture-only completion, or after a delivery failure that kept the final text on the clipboard. It never awaits extraction on the delivery path. History's **Find Memory Candidates** remains an explicit recovery action. Leaving that Capture detail or starting live input cancels analysis. Live Speech does not wait for model cancellation, and a late result cannot commit. Busy optional model work causes a skip; there is no durable queue or automatic retry. Foundation Models failure messages are fixed strings so prompts/output are not exposed through debug descriptions or logs. Model quality and cancellation latency remain device acceptance items.
 
 History exposes progress/cancel, review/dismiss and the exact source snapshot using standard SwiftUI controls. The Memory list uses native `@Query` source changes to show only pending candidates whose text still matches; rendering does not issue a database fetch per candidate. Review can edit fields or link to an existing active entry. Confirmed AI-derived Memory also exposes the original extraction snapshot while the source Capture exists.
 
@@ -365,6 +385,8 @@ The logic-only XCTest target compiles persistence, History recovery and the audi
 Memory tests use those isolated containers and native NaturalLanguage tokenization. They cover restart durability, explicit provenance, normalization/conflicts, source readiness, lifecycle exclusion, replacement, scoped deletion and deterministic bounded retrieval. No model inference or production data is used.
 
 Candidate tests inject model output and delayed results to cover final-text priority, committed snapshots/restart, explicit confirmation/dismissal, source evidence filtering, conflicts/linking, changed/deleted sources, cancellation, live-input preemption, empty-result reuse and failure privacy. The real Foundation Models implementation is compiled, but these deterministic tests do not establish inference quality or runtime availability.
+
+Personalization tests add grounded edit validation, durable input/final ordering, retained refinement provenance after Speech retry, source/Memory changes during inference, storage failures and interrupted recovery. A model stub that deliberately ignores cancellation proves caller deadlines/cancellation, no overlap and rejection of late results. Automatic candidates are verified to use saved final text and still require review. These tests do not invoke a real model or the target-app delivery path.
 
 ## Type4Me extraction boundary
 

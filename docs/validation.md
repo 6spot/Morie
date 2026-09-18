@@ -116,7 +116,7 @@ Use disposable Capture/Memory entries when interactive validation resumes tonigh
 ## M-004 Memory Candidates
 
 - [ ] In a disposable saved Capture, choose **Find Memory Candidates**; verify zero to three selective Vocabulary/Project suggestions with grounded Chinese/English names, aliases, notes and literal evidence.
-- [ ] Inspect **Text Used for Extraction**. It must match saved final text, or recognized text only when no final exists. Current final text is not described as AI-polished; M-005 must save and retain polished output here later.
+- [ ] Inspect **Text Used for Extraction**. It must match saved final text, including M-005's refined output when applied; recognized text is used only when no final exists. Failed/skipped refinement must not be described as polished.
 - [ ] Edit/save, link to an existing active memory, dismiss and cancel review. Confirmed Memory and review states survive relaunch; pending suggestions never participate in related context.
 - [ ] Inspect the source snapshot from saved AI-derived Memory. The exact extraction text remains available even after a later source-text change, until that source Capture is deleted.
 - [ ] Change the source during extraction or before review confirmation. Stale results must not save; re-extraction uses the updated text. Repeating an already analyzed text preserves decisions and does not rerun inference.
@@ -126,6 +126,24 @@ Use disposable Capture/Memory entries when interactive validation resumes tonigh
 - [ ] Verify Memory inbox/review/source disclosure/progress controls with keyboard, VoiceOver and long text; measure model latency/energy and live-input preemption.
 
 2026-09-18: all **65 isolated tests** pass, including 18 candidate tests with injected inference. The real macOS 27 Foundation Models path compiles. These results establish persistence and concurrency behavior, not AI quality; the real-model and interaction checks remain open for tonight. Evidence is in [M-004](./tasks/M-004-memory.md#candidate-slice-validation).
+
+## M-005 input personalization
+
+Use disposable captures in the owner's signed app when evening validation resumes:
+
+- [ ] With refinement enabled, confirm a canonical name/alias in Memory, speak naturally, and inspect actual recognition. A matching alias should support correction while wording, tone, negation, numbers and intent remain intact. Compare with refinement disabled and with the memory archived/changed.
+- [ ] Cover Chinese/English/mixed phrases, short 嗯/OK/好的 acknowledgments, uncertainty, questions, repeated names, technical commands, paths, URLs, identifiers, versions and numeric values. Decline uncertain changes rather than inventing facts or answering dictated requests.
+- [ ] Current-app input saves **Final Text** before delivery and the target receives that exact text. **Recognition**, **Text Before Refinement**, **Changes** and **Memory Considered** retain truthful provenance.
+- [ ] **Record Capture** follows the same refinement/save path and shows “已保存”, with no paste, clipboard mutation or external focus restore.
+- [ ] Re-recognize a refined recording, including capture-only output. The latest recognized text changes independently; final output and its actual earlier input/context remain intact.
+- [ ] Automatic candidates start only after completion and use saved final text. Review/edit/dismiss remains explicit; no suggestion silently becomes Memory. Re-extraction after a changed final text rejects old pending candidates.
+- [ ] Start new voice input while optional candidate work is running. It cancels without delaying Speech startup or committing late suggestions. A draining model causes optional refinement/extraction to skip and leaves ordinary input usable.
+- [ ] Exercise unavailability, refusal, overlong text, deadline and storage-error recovery with disposable data. Saved original text/audio remain; failure is not labelled as successful polishing, and an unsaved AI result never reaches delivery.
+- [ ] Recheck capabilities during refinement. Cancellation must end waiting promptly and prevent a late paste. Relaunch after interrupted processing; the Capture remains recoverable, no model/delivery starts automatically, and a previous actual delivery outcome remains intact.
+- [ ] Verify Settings toggle persistence and native History/disclosure/copy/review controls with keyboard, VoiceOver, long text and light/dark appearance.
+- [ ] Measure confirmed-term recovery, unintended changes, refinement result/status/time, final-to-delivery latency, timeout rate and CPU/energy versus unrefined input. The provisional 2-second limit bounds model waiting, not total end-to-end latency.
+
+2026-09-18: isolated compilation and all **91 tests** passed (26 personalization plus 65 regression tests, 0 failed/skipped). Controlled model stubs establish persistence/cancellation/timeout behavior, including models that ignore cancellation. They do not establish real-model output quality, hardware latency, focus/delivery or interactive UI acceptance. Evidence and the first-slice scope are in [M-005](./tasks/M-005-personalization.md#validation-evidence).
 
 ## Toggle-capture lifecycle
 

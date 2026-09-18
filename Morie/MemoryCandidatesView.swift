@@ -20,6 +20,7 @@ struct CaptureCandidatesSection: View {
                 }
                 .disabled(controller.isInputActive || controller.extractingCaptureID != nil
                           || capture.lifecycle == .capturing
+                          || capture.refinement?.status == .running
                           || input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 Text("Suggest vocabulary and projects from saved text, then choose what to keep.")
                     .foregroundStyle(.secondary)

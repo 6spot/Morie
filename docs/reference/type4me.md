@@ -303,3 +303,11 @@ Morie requirement: use saved final text for selective candidate extraction, reta
 - **ADAPT:** record the actual text/provenance at the action boundary; distinguish recognized text from final output and avoid attributing an AI transformation to another operation. Keep explicit review and duplicate/save-error behavior from the vocabulary audit above.
 - **DROP:** legacy provenance reconstruction, snippet/provider routing, translation modes and old-build inference. Morie has no released data contract and calls the macOS 27 on-device Foundation Models APIs directly. No Type4Me source was copied.
 - **VERIFY:** model selectivity, Chinese/English evidence fidelity, review usability and optional-model cancellation latency on owner hardware. Deterministic tests prove source-state handling, not AI quality.
+
+## M-005 restrained input refinement audit — 2026-09-18
+
+Morie requirement: use confirmed relevant Vocabulary/Project context to improve the next input while preserving the user's own wording and reliable delivery. Inspected `Type4MeTests/IntelliSensePromptAndGuardTests.swift`, `Type4Me/LLM/PromptContext.swift`, and the provenance lessons in `UI/Settings/CorrectionProvenance.swift` / its tests (#300).
+
+- **ADAPT:** treat transcript/context as data rather than instructions; preserve technical tokens, negation, facts and tone; do not answer dictated requests; do not remove acknowledgments such as 嗯/OK/好的 through a filler-word list. Record the actual input and change provenance when refinement happens.
+- **DROP:** scene/provider routing, prompt-variable frameworks, clipboard/selection context reads, translation modes, generalized rewriting, old-build inference and Type4Me's lock/detached-AX timeout machinery. Morie uses one current native model session, bounded structured edits and a Swift-concurrency deadline owner; no source was copied.
+- **VERIFY:** real on-device terminology benefit, punctuation quality, mixed-language fidelity and latency versus unrefined input. A provisional 2-second model-wait deadline and deterministic cancellation tests establish a control-flow bound, not measured Foundation Models performance or a guarantee that punctuation always preserves meaning.

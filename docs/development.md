@@ -69,6 +69,8 @@ Memory tests use isolated SwiftData containers and native NaturalLanguage word t
 
 Candidate tests inject structured suggestions or delayed async results. They exercise committed final-text snapshots, review decisions, filtering/conflicts, changed/deleted sources and cancellation without invoking Apple Intelligence. Product compilation includes the real Foundation Models structured-generation path. Model quality, context limits and latency must be exercised separately on disposable data.
 
+Personalization tests inject edit proposals and models that ignore cancellation. They verify grounded corrections, punctuation/content protection, committed original/final ordering, retained context/input snapshots, History retry, source/Memory changes, save failures, restart recovery, deadline/cancellation and no late/overlapping work. They also verify that automatic candidates use the saved final text and require review. No actual model inference or delivery occurs in these tests.
+
 ## CI compile gate
 
 `.github/workflows/macos-27-ci.yml` compiles product changes on GitHub's `xcode-27` hosted environment. `.github/workflows/macos-27-package.yml` creates the test artifact.
@@ -197,7 +199,7 @@ See the full [Memory device checklist](./validation.md#m-004-memory-foundation).
 
 When evening device validation resumes, use a disposable Capture containing an explicitly described vocabulary term or project:
 
-1. Open History → **Find Memory Candidates**. Review each proposed entry and its supporting quote/**Text Used for Extraction**; this uses saved final text, not necessarily AI-polished text yet.
+1. After completing a disposable input, inspect its automatically suggested candidates in History/Memory. If optional work was skipped, choose **Find Memory Candidates**. Review each supporting quote/**Text Used for Extraction**; it must match saved final text, including refined text when applied.
 2. Edit and Save one suggestion, dismiss another, relaunch, and verify the decisions and source snapshot persist. Pending suggestions also appear in Memory.
 3. Try a name already present in active Memory; validation must keep the sheet open so you can choose that existing entry. Linking adds provenance without replacing its notes.
 4. Change the saved source through re-recognition where applicable. Old pending suggestions must not save; re-extraction should retain a new snapshot. Already delivered final output remains authoritative when re-recognition changes only recognized text.
@@ -205,7 +207,22 @@ When evening device validation resumes, use a disposable Capture containing an e
 6. Verify an empty result, unsupported/oversized input and model unavailability. The saved Capture remains intact and manual Memory remains available.
 7. Delete the disposable Capture; its extraction snapshots disappear while separately confirmed Memory remains.
 
-Do not run these against production History automatically. M-005 must save polished `finalText` before extraction and retain `recognizedText`; this requirement is recorded in its [task criteria](./tasks/M-005-personalization.md).
+Do not run these against production History automatically. M-005 saves refined `finalText` before extraction and retains `recognizedText`; this requirement is recorded in its [task criteria](./tasks/M-005-personalization.md).
+
+## Personalization smoke test
+
+When evening validation resumes, use disposable data in the normal Xcode-signed app:
+
+1. Save a project/vocabulary entry with an explicit recognition alias, for example **Morie** / **more e**. Enable **Settings → Use Memory to Refine Input**.
+2. Capture a short natural phrase containing that alias. Inspect actual recognition first: correction only has evidence when the saved canonical name or an explicit alias matches. Compare **Final Text**, **Recognition**, **Changes**, **Text Before Refinement** and **Memory Considered**. Preserve wording, negation, tone, numbers and technical content.
+3. Confirm the text delivered to a disposable target matches saved final text. Repeat via **Record Capture** and confirm no clipboard/focus/delivery change.
+4. Review candidates after input completion. Their extraction snapshot must equal the final text actually saved. No candidate becomes Memory without confirmation.
+5. Re-recognize the saved recording. Original refined final output and the refinement-input snapshot remain intact while the latest recognition changes independently.
+6. Archive/edit the matching memory and repeat input; stale context must stop applying. Disable refinement and confirm original text is retained/used with a **Skipped** reason.
+7. Recheck capabilities during refinement and immediately capture again afterward. There must be no late paste or stuck processing. Exercise timeout/unavailability and inspect the retained original; a draining model must not block a new recording.
+8. Compare final-to-delivery latency with refinement enabled/disabled, and record applied/unchanged/skipped/timed-out/failed outcomes on representative Chinese/English samples. The 2-second model-wait budget is provisional and excludes storage/scheduling overhead.
+
+These checks establish whether Memory improves input. Broader rewriting and correction/style learning remain follow-up rather than inferred success from deterministic tests.
 
 ## Development rules
 

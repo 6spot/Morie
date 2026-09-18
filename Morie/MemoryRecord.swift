@@ -76,7 +76,7 @@ final class MemoryRecord {
     }
 }
 
-struct MemorySnapshot: Equatable, Identifiable, Sendable {
+struct MemorySnapshot: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let kind: MemoryKind
     let status: MemoryStatus

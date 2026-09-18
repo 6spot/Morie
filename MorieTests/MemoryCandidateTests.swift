@@ -202,7 +202,7 @@ final class MemoryCandidateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let source = try capture(in: captures)
         let pending = PendingExtraction()
-        let controller = MemoryCandidateController(store: memory) { input in try await pending.run(input) }
+        let controller = MemoryCandidateController(store: memory, extract: { input in try await pending.run(input) })
         controller.findCandidates(for: source)
         await pending.waitUntilStarted()
         controller.cancelExtraction()
@@ -219,7 +219,7 @@ final class MemoryCandidateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let source = try capture(in: captures)
         let pending = PendingExtraction()
-        let controller = MemoryCandidateController(store: memory) { input in try await pending.run(input) }
+        let controller = MemoryCandidateController(store: memory, extract: { input in try await pending.run(input) })
         controller.findCandidates(for: source)
         await pending.waitUntilStarted()
         controller.setInputActive(true)
@@ -236,7 +236,7 @@ final class MemoryCandidateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let source = try capture(in: captures)
         let pending = PendingExtraction()
-        let controller = MemoryCandidateController(store: memory) { input in try await pending.run(input) }
+        let controller = MemoryCandidateController(store: memory, extract: { input in try await pending.run(input) })
         controller.findCandidates(for: source)
         await pending.waitUntilStarted()
         try captures.saveReRecognition("Updated source text", for: source)
@@ -251,7 +251,7 @@ final class MemoryCandidateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let source = try capture(in: captures)
         let pending = PendingExtraction()
-        let controller = MemoryCandidateController(store: memory) { input in try await pending.run(input) }
+        let controller = MemoryCandidateController(store: memory, extract: { input in try await pending.run(input) })
         controller.findCandidates(for: source)
         await pending.waitUntilStarted()
         try captures.deleteCapture(source)
@@ -266,9 +266,9 @@ final class MemoryCandidateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let source = try capture(in: captures)
         _ = try memory.create(MemoryDraft(name: "Kept memory"))
-        let controller = MemoryCandidateController(store: memory) { _ in
+        let controller = MemoryCandidateController(store: memory, extract: { _ in
             throw NSError(domain: "Test", code: 1, userInfo: [NSLocalizedDescriptionKey: "private model prompt"])
-        }
+        })
         controller.findCandidates(for: source)
         await controller.waitForExtraction()
         XCTAssertFalse(controller.message?.contains("private model prompt") ?? true)
@@ -283,7 +283,7 @@ final class MemoryCandidateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let source = try capture(in: captures)
         let pending = PendingExtraction()
-        let controller = MemoryCandidateController(store: memory) { input in try await pending.run(input) }
+        let controller = MemoryCandidateController(store: memory, extract: { input in try await pending.run(input) })
         controller.findCandidates(for: source)
         await pending.waitUntilStarted()
         await pending.finish([])

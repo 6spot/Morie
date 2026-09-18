@@ -62,7 +62,8 @@ final class MemoryStore: ObservableObject {
         let reader = ModelContext(container)
         let request = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == captureID })
         guard let saved = try reader.fetch(request).first else { throw StoreError.sourceUnavailable }
-        guard saved.lifecycle != .capturing, saved.lifecycle != .cancelled else { throw StoreError.sourceNotReady }
+        guard saved.lifecycle != .capturing, saved.lifecycle != .cancelled,
+              saved.refinement?.status != .running else { throw StoreError.sourceNotReady }
         let input = MemoryExtractionInput(capture: saved)
         guard input == current else { throw StoreError.sourceChanged }
         return input
@@ -245,6 +246,7 @@ final class MemoryStore: ObservableObject {
         let request = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
         guard let capture = try container.mainContext.fetch(request).first else { throw StoreError.sourceUnavailable }
         guard capture.lifecycle != .capturing, capture.lifecycle != .cancelled,
+              capture.refinement?.status != .running,
               !(capture.finalText + capture.recognizedText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { throw StoreError.sourceNotReady }
         return capture

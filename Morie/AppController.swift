@@ -21,6 +21,7 @@ final class AppController: ObservableObject {
         case recording
         case stopping
         case finalizing
+        case refining
         case delivering
         case failed(String)
     }
@@ -29,6 +30,7 @@ final class AppController: ObservableObject {
     @Published private(set) var transcript = ""
     @Published private(set) var captureShortcut: CaptureShortcut
     @Published private(set) var audioRetentionDays: Int
+    @Published private(set) var inputRefinementEnabled: Bool
     @Published private(set) var recoverySettingsURL: URL?
 
     let history: CaptureHistoryController?
@@ -40,6 +42,7 @@ final class AppController: ObservableObject {
     private let injector = TextInjector()
     private let hud = CaptureHUDController()
     private let captureStore: CaptureStore?
+    private let personalizer: CapturePersonalizer?
     private let persistenceError: Error?
     private let speechLocale = Locale(identifier: "zh-CN")
 
@@ -62,11 +65,21 @@ final class AppController: ObservableObject {
         self.persistenceError = persistenceError
         history = captureStore.map { CaptureHistoryController(store: $0, locale: Locale(identifier: "zh-CN")) }
         memory = captureStore.map { MemoryStore(container: $0.container) }
-        memoryCandidates = memory.map { MemoryCandidateController(store: $0) }
+        let personalizer: CapturePersonalizer?
+        if let captureStore, let memory {
+            personalizer = CapturePersonalizer(store: captureStore, memory: memory)
+        } else {
+            personalizer = nil
+        }
+        self.personalizer = personalizer
+        memoryCandidates = memory.map {
+            MemoryCandidateController(store: $0, canUseModel: { personalizer?.isModelBusy != true })
+        }
         let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
         audioRetentionDays = CaptureStore.audioRetentionDays
+        inputRefinementEnabled = UserDefaults.standard.object(forKey: CapturePersonalizer.enabledDefaultsKey) as? Bool ?? true
 
         hud.onCancel = { [weak self] in
             Task { @MainActor in
@@ -93,6 +106,7 @@ final class AppController: ObservableObject {
         case .recording: "Listening…"
         case .stopping: "Stopping…"
         case .finalizing: "Finalizing…"
+        case .refining: "Refining…"
         case .delivering: "Delivering…"
         case .failed: "Input failed"
         }
@@ -106,6 +120,11 @@ final class AppController: ObservableObject {
         } catch {
             Diagnostics.record("CaptureStore", "Could not update audio retention: \(error.localizedDescription)", level: .error)
         }
+    }
+
+    func setInputRefinementEnabled(_ enabled: Bool) {
+        inputRefinementEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: CapturePersonalizer.enabledDefaultsKey)
     }
 
     var statusDetail: String? {
@@ -392,7 +411,8 @@ final class AppController: ObservableObject {
                 onTranscript: { [weak self] resultSessionID, text in
                     Task { @MainActor in
                         guard self?.activeCaptureID == resultSessionID,
-                              self?.stoppingCaptureID != resultSessionID else {
+                              self?.stoppingCaptureID != resultSessionID,
+                              self?.state == .recording || self?.state == .finalizing else {
                             Diagnostics.record("Speech", "Ignored stale transcript for \(String(resultSessionID.uuidString.prefix(8)))", level: .warning)
                             return
                         }
@@ -464,7 +484,7 @@ final class AppController: ObservableObject {
 
         do {
             let result = try await speech.stop(sessionID: sessionID)
-            let finalText = result.transcript
+            var finalText = result.transcript
             guard let captureStore else {
                 throw ControllerError.persistenceUnavailable("Capture store was not initialized.")
             }
@@ -492,6 +512,17 @@ final class AppController: ObservableObject {
             }
 
             let deliveryMode = try captureStore.completeRecognition(finalText, for: sessionID)
+            if let personalizer {
+                state = .refining
+                finalText = try await personalizer.refine(
+                    sessionID, enabled: inputRefinementEnabled,
+                    otherModelWorkActive: memoryCandidates?.extractingCaptureID != nil
+                )
+                // Cancellation/recheck may have taken over while the optional model was running.
+                try Task.checkCancellation()
+                guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
+                transcript = finalText
+            }
             if deliveryMode == .captureOnly {
                 completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
                 return
@@ -644,6 +675,7 @@ final class AppController: ObservableObject {
         lastPresentedFailure = nil
         state = .ready
         hud.showSuccess(deliveryMode: deliveryMode)
+        memoryCandidates?.findCandidates(for: sessionID, automatically: true)
     }
 
     private func failSession(_ sessionID: UUID, error: Error) {
@@ -673,6 +705,7 @@ final class AppController: ObservableObject {
                 "Delivery fallback reported in HUD; modal alert suppressed because transcript is preserved",
                 level: .warning
             )
+            memoryCandidates?.findCandidates(for: sessionID, automatically: true)
         } else {
             hud.showFailure()
             presentFailure(title: "Morie input failed", message: message)

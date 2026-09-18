@@ -49,6 +49,7 @@ final class CaptureRecord {
     var sourceAudioHasMeaningfulContent: Bool?
     var lastRecognitionAttemptAt: Date?
     var lastRecognitionErrorDescription: String?
+    var refinement: CaptureRefinement?
 
     init(
         id: UUID,

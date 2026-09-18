@@ -1,7 +1,7 @@
 import Foundation
 import NaturalLanguage
 
-struct MemoryContextMatch: Equatable, Identifiable, Sendable {
+struct MemoryContextMatch: Codable, Equatable, Identifiable, Sendable {
     let memory: MemorySnapshot
     let matchedTerm: String
     var id: UUID { memory.id }

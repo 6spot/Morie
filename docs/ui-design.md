@@ -100,7 +100,7 @@ The menu-bar panel is a compact status and launch surface, not the long-term pro
 
 History uses a system `List` and `NavigationStack` to open a Capture detail `Form`. The audio player is AVKit's native `AVPlayerView` with inline controls; Morie does not draw a replacement playback bar. Recording playback is user-initiated, stops when leaving the detail or starting a capture, and does not publish private recordings to Now Playing.
 
-Re-recognition has a standard button, `ProgressView`, and Cancel action. Saved text stays visible while work runs. A successful retry exposes recognized text separately from any different original output, with explicit system Copy buttons. Retry does not automatically paste into another app. Expired/missing audio and recognition failure have readable inline explanations. Deleting a Capture uses a destructive button and a system confirmation dialog.
+Re-recognition has a standard button, `ProgressView`, and Cancel action. Saved text stays visible while work runs. Details show **Final Text** first and **Recognition** separately, each with an explicit system Copy button. A Speech retry preserves previously delivered or refined final output, including capture-only output. Retry does not automatically paste into another app. Expired/missing audio and recognition failure have readable inline explanations. Deleting a Capture uses a destructive button and a system confirmation dialog.
 
 An empty recognition with retained audio shows “未识别，录音已保存” in the existing HUD and appears as “Not Recognized” in History. A discarded no-input capture hides the HUD; neither case reports “已输入”.
 
@@ -116,10 +116,18 @@ History offers **Save Memory…** with the source Capture visible. The user can 
 
 ## Candidate extraction and review
 
-History's **Find Memory Candidates** action runs Apple on-device analysis of the saved text. Standard `ProgressView` and **Cancel Extraction** controls reflect its lifecycle. Suggestions have explicit **Review Suggestion…**, saved and dismissed states; empty results remain visible and do not imply a failure. Starting voice input cancels this optional work.
+M-005 attempts candidate extraction after completing input. History's **Find Memory Candidates** action provides an explicit retry when analysis was skipped or cancelled. Standard `ProgressView` and **Cancel Extraction** controls reflect its lifecycle. Suggestions have explicit **Review Suggestion…**, saved and dismissed states; empty results remain visible and do not imply a failure. Starting voice input cancels this optional work.
 
-The native review sheet shows the supporting quote, a **Text Used for Extraction** disclosure, editable type/name/aliases/notes, an existing-memory picker and Save/Cancel/Dismiss actions. The source identifies saved final or recognized text; it does not claim polishing already exists. After M-005 saves polished final text, the same snapshot surface will retain it. Changed/deleted source text prevents confirmation, with a readable recovery message. Save validation leaves the sheet open.
+The native review sheet shows the supporting quote, a **Text Used for Extraction** disclosure, editable type/name/aliases/notes, an existing-memory picker and Save/Cancel/Dismiss actions. The source identifies saved final or recognized text, retaining M-005's refined final output when refinement succeeds. Failed/skipped refinement is not described as polished. Changed/deleted source text prevents confirmation, with a readable recovery message. Save validation leaves the sheet open.
 
 The Memory list includes current **Candidates to Review**, independent of confirmed active context. A saved AI-derived memory exposes its extraction snapshot in Sources. Deleting a Capture explicitly removes candidate snapshots as well as its text/audio, while confirmed Memory remains. All of these use the existing system list, form, sheet, picker, button and disclosure components; there is no custom review or AI-chat UI.
+
+## Input refinement
+
+Settings adds the system **Use Memory to Refine Input** toggle, enabled by default, with a short explanation that confirmed names and light punctuation cleanup preserve the user's wording. It is an optional input behavior within Private Mode.
+
+History's **Input Refinement** Form section shows the result, elapsed time and a readable reason when original text was kept. Standard disclosures show **Changes**, **Text Before Refinement** and immutable **Memory Considered** snapshots. Final text stays separate from later Speech retries so the text actually used remains inspectable. All status, copy and disclosure controls are native; this is provenance for input, not an AI chat or rewrite editor.
+
+While refinement runs, the existing processing HUD stays in use and the menu reports **Refining…**. History mutation/extraction is disabled for the running source. A failed/slow refinement completes using saved original text; capability/session cancellation cannot cause a late paste. Actual VoiceOver, keyboard, rendering and latency acceptance remain device checks.
 
 UI polish is not a reason to fork the product away from the system. Morie's differentiation is Capture, Personal Memory, and personalization—not a custom macOS widget toolkit.
