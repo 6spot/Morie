@@ -145,6 +145,20 @@ Use disposable captures in the owner's signed app when evening validation resume
 
 2026-09-18: isolated compilation and all **91 tests** passed (26 personalization plus 65 regression tests, 0 failed/skipped). Controlled model stubs establish persistence/cancellation/timeout behavior, including models that ignore cancellation. They do not establish real-model output quality, hardware latency, focus/delivery or interactive UI acceptance. Evidence and the first-slice scope are in [M-005](./tasks/M-005-personalization.md#validation-evidence).
 
+## M-008 unified macOS management UI
+
+Interactive acceptance remains deferred by the owner. Use the signed app and disposable data when validation resumes:
+
+- [ ] Sidebar groups, list/detail navigation and toolbars remain consistent across History, Memory, Settings and Diagnostics at 1120 × 720, 960 × 600 and resized column widths.
+- [ ] Native keyboard selection, search and filters update the correct detail. Hidden/deleted selections clear. Source/related navigation resets when selecting another record.
+- [ ] Switching records/sections during playback, file recognition or candidate extraction releases/cancels the previous work and cannot commit a late result into another record.
+- [ ] Final text is primary and copyable. Recognition/refinement/extraction snapshots and recording destination/expiry/retry remain accessible. Long text scrolls and stays selectable.
+- [ ] Candidates are distinct from confirmed memories. Review/save/cancel/dismiss, manual editing, save errors, archive/restore/replace/delete and deleted-source explanations work with native sheets/dialogs. Running refinement and stale source text remove pending reviewability.
+- [ ] Settings work from management and the native Settings scene. Diagnostics supports search/levels, complete selected messages, resizing, copy-all, file reveal and confirmed clear.
+- [ ] Check empty/populated/error states, VoiceOver, full keyboard access, light/dark appearance, increased contrast, reduced motion and system glass/selection/toolbar rendering.
+
+2026-09-18: isolated app compilation and **91 regression tests** passed (0 failed/skipped). Thirteen native offscreen fixture surfaces cover the main pages, minimum width, long text, empty states, candidate review, stale candidates, delivery failure and provenance. Fixtures use temporary stores, injected model/actions and a memory-only logger. Native glass/sidebar/selection layers are not fully reproduced by offscreen bitmap caching; these results establish compile/regression/layout evidence, not interactive or material acceptance. Detailed paths and remaining checks are in [M-008](./tasks/M-008-macos-management-ui.md#validation-evidence).
+
 ## Toggle-capture lifecycle
 
 Verify repeated sequences:

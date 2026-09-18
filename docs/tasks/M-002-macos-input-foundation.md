@@ -90,7 +90,7 @@ Explicitly excluded:
 | Type4Me injection/focus audit | DONE | Retained no-loss/clipboard/synthetic-event lessons; app-specific branches remain VERIFY-only. |
 | Type4Me Apple Speech audit | DONE | Used only as behavioral reference; implementation follows current Apple Speech APIs. |
 | Menu Bar shell | IN PROGRESS | Native `MenuBarExtra` with a stable waveform entry icon; runtime state remains in the HUD and textual menu content instead of changing the persistent system-bar icon. Real macOS 27 visual/interaction validation still required. |
-| Native Diagnostics surface | DONE / VERIFY | Native `List` within the Morie management window; Copy All/Clear/Show Log File; traces capability/hotkey/session/Speech/delivery paths and mirrors the current launch to `~/Library/Logs/Morie/morie-debug.log` without transcript content. Real-device log usefulness is being validated. |
+| Native Diagnostics surface | DONE / VERIFY | Native `Table` within the Morie management window (M-008); Copy All Events/confirmed Clear Diagnostics/Show Log File; traces capability/hotkey/session/Speech/delivery paths and mirrors the current launch to `~/Library/Logs/Morie/morie-debug.log` without transcript content. Real-device log usefulness is being validated. |
 | Foundation Models capability check | DONE | `SystemLanguageModel` availability + locale. |
 | Speech capability/locale check | DONE | `SpeechTranscriber` availability + locale. |
 | Microphone/Speech authorization | DONE / VERIFY | Native first-request prompts plus modal/menu System Settings recovery when macOS returns denial without presenting consent. Only Accessibility suppresses Morie's modal to avoid stacking it over Device Control and Data Access; microphone revoke/re-enable/recheck needs another real-device pass. |
@@ -232,13 +232,13 @@ The Swift 6 build exposed that `kAXTrustedCheckOptionPrompt` comes through the C
 
 ### 7. Native runtime diagnostics
 
-Real-device testing exposed that a silent shortcut failure is not diagnosable from the menu-bar status alone. M-002 now includes a native `Morie Debug` window.
+Real-device testing exposed that a silent shortcut failure is not diagnosable from the menu-bar status alone. M-002 introduced a native diagnostics surface. [M-008](./M-008-macos-management-ui.md) now presents it as **Diagnostics** in the management window, with a system Table, search/level filters and a selected-event detail.
 
 Implementation:
 
 - native SwiftUI `Window`;
-- native `List` for in-memory entries;
-- system **Copy All** and **Clear** buttons;
+- native `Table` for in-memory entries, with search and level filtering (M-008);
+- system **Copy All Events** and confirmed **Clear Diagnostics…** actions;
 - maximum 1,000 entries per process lifetime;
 - no third-party logging/UI dependency;
 - no full transcript content logged by default.

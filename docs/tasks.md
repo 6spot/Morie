@@ -20,6 +20,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-003 | Phase 1 | Durable Capture store, History, App Context and iCloud/CloudKit | IN PROGRESS | — | [`M-003`](./tasks/M-003-capture.md) |
 | M-004 | Phase 2 | Vocabulary, Project and Relevant Context retrieval | IN PROGRESS | — | [`M-004`](./tasks/M-004-memory.md) |
 | M-005 | Phase 3 | Context-aware correction, personalization and style learning | IN PROGRESS | — | [`M-005`](./tasks/M-005-personalization.md) |
+| M-008 | macOS UX | Unified native management navigation and page design | IN PROGRESS | — | [`M-008`](./tasks/M-008-macos-management-ui.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
@@ -36,6 +37,8 @@ Phase 0 remains `IN PROGRESS` until it has been built and exercised on a support
 M-003's local Capture-first slice now includes SwiftData History, App Context basics, compressed source audio with retention, native playback/re-recognition, capture-only recording, and preservation after operational interruption. It remains `IN PROGRESS`: History/capture-only/interruption interactions need device validation, and ambient-noise classification and App Context remain open. On 2026-09-18, the owner deferred iCloud/CloudKit sync to the final integration stage because Apple Developer enrollment is not yet set up; it does not block current local development. M-002 also remains open for the remaining runtime/performance validation matrix.
 
 The owner deferred device validation until the evening of 2026-09-18 and requested continued development. M-004 implements Vocabulary/Project memory and reviewed candidates. M-005 now connects confirmed Memory to bounded input refinement, durable final output and subsequent candidate extraction; all 91 logic tests pass. Original recognition and exact refinement/extraction snapshots remain available. Earlier device acceptance, real-model quality/latency and broader style learning remain open.
+
+The owner reaffirmed macOS-only development, with no current iOS start plan. M-008 now implements native list/detail browsing, readable Capture/Memory content, unified settings and a diagnostics table. Compilation, isolated regression tests and fixture layout checks accompany this slice; keyboard, accessibility and system-material acceptance remain open alongside the outstanding input/model checks.
 
 ## Maintenance rules
 

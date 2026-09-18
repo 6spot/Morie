@@ -3,80 +3,103 @@ import AVKit
 import SwiftData
 import SwiftUI
 
-struct CaptureHistoryView: View {
-    @ObservedObject var history: CaptureHistoryController
-    let memory: MemoryStore
-    let candidates: MemoryCandidateController
-    let canStartCapture: Bool
-    let onRecord: () -> Void
-    let onRecognize: (UUID) -> Void
+private enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
+    case all = "All Captures"
+    case captureOnly = "History Only"
+    case needsAttention = "Needs Attention"
 
-    @Query(sort: \CaptureRecord.createdAt, order: .reverse)
-    private var captures: [CaptureRecord]
-    @State private var path: [UUID] = []
+    var id: Self { self }
 
-    var body: some View {
-        NavigationStack(path: $path) {
-            List(captures) { capture in
-                NavigationLink(value: capture.id) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(capture.historySummary)
-                            .lineLimit(3)
-
-                        HStack(spacing: 8) {
-                            Text(capture.createdAt, format: .dateTime)
-                            if let applicationName = capture.sourceApplicationName {
-                                Text(applicationName)
-                            }
-                            Text(capture.historyStatus)
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-            .overlay {
-                if captures.isEmpty {
-                    ContentUnavailableView(
-                        "No Captures Yet",
-                        systemImage: "waveform",
-                        description: Text("Completed voice captures will appear here.")
-                    )
-                }
-            }
-            .navigationTitle("History")
-            .navigationDestination(for: UUID.self) { id in
-                if let capture = captures.first(where: { $0.id == id }) {
-                    CaptureDetailView(
-                        capture: capture,
-                        captureID: id,
-                        history: history,
-                        memory: memory,
-                        candidates: candidates,
-                        canRecognize: canStartCapture,
-                        onRecognize: onRecognize
-                    )
-                } else {
-                    ContentUnavailableView("Capture No Longer Available", systemImage: "waveform")
-                }
-            }
-        }
-        .frame(minWidth: 620, minHeight: 420)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Record Capture", systemImage: "mic") { onRecord() }
-                    .disabled(!canStartCapture)
-                    .help("Record an idea and save it to History.")
-            }
-        }
-        .onChange(of: captures.map(\.id)) { _, ids in
-            path.removeAll { !ids.contains($0) }
+    func includes(_ capture: CaptureRecord) -> Bool {
+        switch self {
+        case .all: true
+        case .captureOnly: capture.deliveryModeRawValue == CaptureDeliveryMode.captureOnly.rawValue
+        case .needsAttention: capture.lifecycle == .failed || capture.lifecycle == .deliveryFailed
         }
     }
 }
 
-private struct CaptureDetailView: View {
+struct CaptureHistoryView: View {
+    let captures: [CaptureRecord]
+    @Binding var selection: UUID?
+    let canStartCapture: Bool
+    let onRecord: () -> Void
+    @State private var search = ""
+    @State private var filter: CaptureHistoryFilter = .all
+
+    private var visibleCaptures: [CaptureRecord] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return captures.filter { capture in
+            filter.includes(capture) && (query.isEmpty || [
+                capture.finalText, capture.recognizedText, capture.sourceApplicationName ?? ""
+            ].contains { $0.localizedStandardContains(query) })
+        }
+    }
+
+    var body: some View {
+        List(visibleCaptures, selection: $selection) { capture in
+            VStack(alignment: .leading, spacing: 8) {
+                Text(capture.historySummary)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(capture.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    if let applicationName = capture.sourceApplicationName {
+                        Text(applicationName).lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    Text(capture.historyStatus)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 6)
+            .tag(capture.id)
+        }
+        .listStyle(.inset)
+        .overlay {
+            if visibleCaptures.isEmpty {
+                ContentUnavailableView {
+                    Label(captures.isEmpty ? "No Captures Yet" : "No Matching Captures", systemImage: "waveform")
+                } description: {
+                    Text(captures.isEmpty
+                         ? "Record an idea to keep your words here."
+                         : "Try another search or filter.")
+                } actions: {
+                    if captures.isEmpty {
+                        Button("Record Capture", systemImage: "mic", action: onRecord)
+                            .disabled(!canStartCapture)
+                    } else {
+                        Button("Show All Captures") { search = ""; filter = .all }
+                    }
+                }
+            }
+        }
+        .navigationTitle("History")
+        .navigationSubtitle("\(visibleCaptures.count) captures")
+        .searchable(text: $search, prompt: "Search captures")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu("Filter Captures", systemImage: "line.3.horizontal.decrease") {
+                    Picker("Captures", selection: $filter) {
+                        ForEach(CaptureHistoryFilter.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                }
+                .help(filter.rawValue)
+                Button("Record Capture", systemImage: "mic", action: onRecord)
+                    .disabled(!canStartCapture)
+                    .help("Record an idea and save it to History.")
+            }
+        }
+        .onChange(of: visibleCaptures.map(\.id), initial: true) { _, ids in
+            if let selection, !ids.contains(selection) { self.selection = nil }
+        }
+    }
+}
+
+struct CaptureDetailView: View {
     let capture: CaptureRecord
     let captureID: UUID
     @ObservedObject var history: CaptureHistoryController
@@ -85,113 +108,97 @@ private struct CaptureDetailView: View {
     let canRecognize: Bool
     let onRecognize: (UUID) -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var confirmsDeletion = false
     @State private var deletionError: String?
 
-    private var recognizedText: String {
-        capture.recognizedText.isEmpty ? capture.finalText : capture.recognizedText
-    }
-
     var body: some View {
-        Form {
-            Section("Capture") {
-                LabeledContent("Created", value: capture.createdAt.formatted(date: .abbreviated, time: .standard))
-                LabeledContent("Destination", value: capture.deliveryModeRawValue == CaptureDeliveryMode.captureOnly.rawValue ? "History" : "Current App")
-                if let app = capture.sourceApplicationName {
-                    LabeledContent("Source App", value: app)
+        ManagementDetailContent {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(capture.finalText.isEmpty ? "Recognized Text" : "Final Text")
+                    .font(.title)
+                Text(capture.createdAt, format: .dateTime.month(.wide).day().year().hour().minute())
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    Label(capture.historyStatus, systemImage: "waveform")
+                    if let app = capture.sourceApplicationName { Text(app) }
                 }
-                LabeledContent("Original Outcome", value: capture.historyStatus)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
                 if let issue = capture.deliveryErrorDescription {
-                    Text(issue).foregroundStyle(.secondary)
+                    Label(issue, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
                 }
             }
 
-            if !capture.finalText.isEmpty {
-                Section("Final Text") {
-                    Text(capture.finalText).textSelection(.enabled)
-                    Button("Copy Final Text", systemImage: "doc.on.doc") {
-                        copy(capture.finalText)
-                    }
-                }
-            }
-
-            if let refinement = capture.refinement {
-                CaptureRefinementSection(refinement: refinement)
-            }
-
-            Section("Recognition") {
-                if recognizedText.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                if capture.historyText.isEmpty {
                     Text(capture.lifecycle == .capturing
                          ? "Recording… Finish with the capture controls or your shortcut."
-                         : "No speech was recognized. You can listen to the recording and try again.")
+                         : "No speech was recognized. Listen to the recording and try again.")
                         .foregroundStyle(.secondary)
                 } else {
-                    Text(recognizedText).textSelection(.enabled)
-                    Button("Copy Recognition", systemImage: "doc.on.doc") {
-                        copy(recognizedText)
-                    }
-                }
-                if let date = capture.lastRecognitionAttemptAt {
-                    LabeledContent("Last Attempt", value: date.formatted(date: .abbreviated, time: .standard))
-                }
-                if let error = capture.lastRecognitionErrorDescription {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
+                    Text(capture.historyText)
+                        .font(.body)
+                        .lineSpacing(5)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
             CaptureCandidatesSection(store: memory, controller: candidates, capture: capture)
             CaptureMemorySection(store: memory, capture: capture)
 
-            Section("Source Recording") {
-                if let player = history.player {
-                    CaptureAudioPlayer(player: player)
-                        .frame(height: 64)
-                }
-                if let message = history.audioMessage {
-                    Text(message).foregroundStyle(.secondary)
-                }
-                if let duration = capture.sourceAudioDurationSeconds {
-                    LabeledContent("Duration", value: Duration.seconds(duration).formatted(.time(pattern: .minuteSecond)))
-                }
-                if let expiresAt = capture.sourceAudioExpiresAt {
-                    LabeledContent("Expires", value: expiresAt.formatted(date: .abbreviated, time: .shortened))
-                }
-                if history.recognizingCaptureID == captureID {
-                    HStack {
-                        ProgressView("Recognizing…").controlSize(.small)
-                        Button("Cancel", role: .cancel) { history.cancelRecognition() }
+            DisclosureGroup("Recognition & Refinement") {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recognition").font(.headline)
+                        Text(capture.recognizedText.isEmpty ? "No recognized text." : capture.recognizedText)
+                            .textSelection(.enabled)
+                        if let date = capture.lastRecognitionAttemptAt {
+                            LabeledContent("Last Attempt", value: date.formatted(date: .abbreviated, time: .shortened))
+                        }
+                        if let error = capture.lastRecognitionErrorDescription {
+                            Label(error, systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                } else {
-                    Button("Recognize Again", systemImage: "arrow.clockwise") {
-                        onRecognize(captureID)
+                    if let refinement = capture.refinement {
+                        Divider()
+                        CaptureRefinementSection(refinement: refinement)
                     }
-                    .disabled(!canRecognize || history.isInputActive || history.player == nil || history.recognizingCaptureID != nil)
                 }
-                if let message = history.recognitionMessage {
-                    Text(message).foregroundStyle(.secondary)
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 12)
+            }
+
+            DisclosureGroup("Source Recording") {
+                recording
+                    .padding(.top, 12)
             }
         }
-        .formStyle(.grouped)
         .navigationTitle("Capture")
         .toolbar {
-            Button("Delete Capture", systemImage: "trash", role: .destructive) {
-                confirmsDeletion = true
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button("Copy Final Text", systemImage: "doc.on.doc") { copy(capture.finalText) }
+                    .disabled(capture.finalText.isEmpty)
+                Menu("Capture Actions", systemImage: "ellipsis") {
+                    Button("Copy Recognition", systemImage: "doc.on.doc") { copy(capture.recognizedText) }
+                        .disabled(capture.recognizedText.isEmpty)
+                    Divider()
+                    Button("Delete Capture…", systemImage: "trash", role: .destructive) {
+                        confirmsDeletion = true
+                    }
+                    .disabled(capture.lifecycle == .capturing || capture.refinement?.status == .running)
+                }
             }
-            .disabled(capture.lifecycle == .capturing || capture.refinement?.status == .running)
         }
         .confirmationDialog("Delete this capture?", isPresented: $confirmsDeletion, titleVisibility: .visible) {
             Button("Delete Capture", role: .destructive) {
                 let id = captureID
                 Task {
-                    do {
-                        try await history.deleteCapture(id)
-                        dismiss()
-                    } catch {
-                        deletionError = error.localizedDescription
-                    }
+                    do { try await history.deleteCapture(id) }
+                    catch { deletionError = error.localizedDescription }
                 }
             }
         } message: {
@@ -207,12 +214,8 @@ private struct CaptureDetailView: View {
         }
         .onAppear { history.open(captureID) }
         .onDisappear { history.close(captureID) }
-        .onChange(of: capture.sourceAudioRelativePath) { _, _ in
-            history.refreshAudio(for: captureID)
-        }
-        .onChange(of: capture.refinement?.status) { _, _ in
-            history.refreshAudio(for: captureID)
-        }
+        .onChange(of: capture.sourceAudioRelativePath) { _, _ in history.refreshAudio(for: captureID) }
+        .onChange(of: capture.refinement?.status) { _, _ in history.refreshAudio(for: captureID) }
         .task(id: capture.sourceAudioExpiresAt) {
             guard let expiresAt = capture.sourceAudioExpiresAt else { return }
             do {
@@ -221,6 +224,33 @@ private struct CaptureDetailView: View {
                 history.refreshAudio(for: captureID)
             } catch { }
         }
+    }
+
+    private var recording: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            LabeledContent("Destination", value: capture.deliveryModeRawValue == CaptureDeliveryMode.captureOnly.rawValue ? "History" : "Current App")
+            if let player = history.player {
+                CaptureAudioPlayer(player: player).frame(height: 64)
+            }
+            if let message = history.audioMessage { Text(message).foregroundStyle(.secondary) }
+            if let duration = capture.sourceAudioDurationSeconds {
+                LabeledContent("Duration", value: Duration.seconds(duration).formatted(.time(pattern: .minuteSecond)))
+            }
+            if let expiresAt = capture.sourceAudioExpiresAt {
+                LabeledContent("Expires", value: expiresAt.formatted(date: .abbreviated, time: .shortened))
+            }
+            if history.recognizingCaptureID == captureID {
+                HStack {
+                    ProgressView("Recognizing…").controlSize(.small)
+                    Button("Cancel", role: .cancel) { history.cancelRecognition() }
+                }
+            } else {
+                Button("Recognize Again", systemImage: "arrow.clockwise") { onRecognize(captureID) }
+                    .disabled(!canRecognize || history.isInputActive || history.player == nil || history.recognizingCaptureID != nil)
+            }
+            if let message = history.recognitionMessage { Text(message).foregroundStyle(.secondary) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func copy(_ text: String) {
@@ -233,7 +263,8 @@ struct CaptureRefinementSection: View {
     let refinement: CaptureRefinement
 
     var body: some View {
-        Section("Input Refinement") {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Input Refinement").font(.headline)
             LabeledContent("Result", value: refinement.status.title)
             if let reason = refinement.reason {
                 Text(reason.message).foregroundStyle(.secondary)
@@ -312,7 +343,9 @@ private extension CaptureRecord {
     var historyText: String { finalText.isEmpty ? recognizedText : finalText }
 
     var historySummary: String {
-        if !historyText.isEmpty { return historyText }
+        if !historyText.isEmpty {
+            return historyText.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        }
         return lifecycle == .capturing ? "Recording…" : "No speech recognized"
     }
 

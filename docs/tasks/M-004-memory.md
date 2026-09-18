@@ -48,7 +48,7 @@ The first slice established explicitly confirmed Memory and retrieval. The candi
 | Subtask | State | Scope |
 | --- | --- | --- |
 | Memory schema and store | IMPLEMENTED / VERIFY | Vocabulary/Project, aliases, notes, provenance, confirmation and lifecycle in the existing SwiftData container. Separate Memory write context protects Capture checkpoints from rollback. |
-| Native Memory management | IMPLEMENTED / VERIFY | Standard searchable list, detail and editor sheet; explicit saving/linking from History; source inspection and archive/restore/replace/delete. Interactive acceptance is deferred. |
+| Native Memory management | IMPLEMENTED / VERIFY | Standard searchable list, detail and editor sheet, unified by [M-008](./M-008-macos-management-ui.md); explicit saving/linking from History; source inspection and archive/restore/replace/delete. Interactive acceptance is deferred. |
 | Relevant Context retrieval | IMPLEMENTED / VERIFY | Native word boundaries and literal name/alias matching; only active confirmed records; deterministic ranking and eight-result cap. History distinguishes related context from linked provenance. |
 | Tests and documentation | IMPLEMENTED / PASS | All 65 tests pass: 18 candidate, 16 Memory and 31 Capture/History/audio tests. Native rendering checks layout; device interaction remains open. |
 | Automatic Memory Candidates | IMPLEMENTED / VERIFY | Apple on-device extraction from History and, through M-005, after completed input. Durable final-text snapshots, selective suggestions and explicit review. Real inference quality/latency remains unvalidated. |

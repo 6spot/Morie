@@ -104,9 +104,9 @@ The menu-bar panel also keeps an **Open System Settings** recovery action visibl
 
 ## Native diagnostics surface
 
-Morie includes a native `Morie Debug` window for Phase 0 runtime diagnosis.
+Morie includes a native **Diagnostics** page in its management window.
 
-Open the Morie management window from the menu-bar panel, then choose **Diagnostics** in its sidebar. The diagnostics surface uses only system SwiftUI/macOS controls and records the current process lifetime in memory.
+Open the Morie management window from the menu-bar panel, then choose **Diagnostics** in its sidebar. The diagnostics surface uses a native Table with search and level filtering. Select an event to read its full message in the resizable detail area. It records the current process lifetime in memory.
 
 It currently traces:
 
@@ -122,21 +122,22 @@ It currently traces:
 
 Privacy rule: diagnostics do **not** record the full transcript by default. They record character counts and lifecycle/error metadata instead.
 
-Diagnostics are also persisted for the current app launch at `~/Library/Logs/Morie/morie-debug.log`. The file is recreated at launch, **Clear** truncates both the window and file, and **Show Log File** reveals it in Finder. This runtime file is outside the repository and must not be committed.
+Diagnostics are also persisted for the current app launch at `~/Library/Logs/Morie/morie-debug.log`. The file is recreated at launch, **Clear Diagnostics…** asks for confirmation before truncating both the table and file, and **Show Log File** reveals it in Finder. This runtime file is outside the repository and must not be committed.
 
 The window provides:
 
-- **Copy All** — copy the complete current in-memory diagnostic log for issue/debug sharing;
-- **Clear** — reset the current log before reproducing a defect.
+- **Copy All Events** — copy the complete current in-memory diagnostic log, including events outside the current search/filter;
+- **Diagnostic Actions → Clear Diagnostics…** — confirm resetting the current log before reproducing a defect;
+- **Diagnostic Actions → Show Log File** — reveal the current process log in Finder.
 
 Recommended defect reproduction flow:
 
 1. launch Morie;
-2. open **Morie Debug**;
-3. press **Clear** if necessary;
+2. open **Morie → Diagnostics**;
+3. use **Clear Diagnostics…** if necessary;
 4. focus the target text field in another app;
 5. activate the configured shortcut (solo Fn release by default), speak, then activate it again to finish;
-6. return to Morie → **Diagnostics** and use **Copy All**;
+6. return to Morie → **Diagnostics** and use **Copy All Events**;
 7. attach/paste the log with the observed behavior.
 
 If no accepted Hotkey entry appears after the configured shortcut, diagnose the event-tap/shortcut path before investigating Speech or text injection. For Fn, distinguish `press began`, `solo release accepted`, and `candidate cancelled` entries. If Speech entries appear but no Delivery entries do, diagnose finalization/session lifecycle.
@@ -145,7 +146,7 @@ If no accepted Hotkey entry appears after the configured shortcut, diagnose the 
 
 1. Launch Morie.
 2. Confirm the menu bar item reaches `Ready` on a supported system.
-3. Open `Morie Debug` and confirm bootstrap/capability/hotkey-install entries are present.
+3. Open **Morie → Diagnostics** and confirm bootstrap/capability/hotkey-install entries are present.
 4. Place the caret in another application.
 5. Press and release `Fn / Globe` once (or use the configured alternate binding).
 6. Speak a short phrase.
@@ -223,6 +224,19 @@ When evening validation resumes, use disposable data in the normal Xcode-signed 
 8. Compare final-to-delivery latency with refinement enabled/disabled, and record applied/unchanged/skipped/timed-out/failed outcomes on representative Chinese/English samples. The 2-second model-wait budget is provisional and excludes storage/scheduling overhead.
 
 These checks establish whether Memory improves input. Broader rewriting and correction/style learning remain follow-up rather than inferred success from deterministic tests.
+
+## Management UI smoke test
+
+M-008 keeps development on macOS. Use the normal Xcode-signed app and disposable data when the deferred interactive checks resume:
+
+1. Open Morie and switch between History, Memory, Settings and Diagnostics. Resize the window and native split columns; confirm usable content at 960 × 600 and the default 1120 × 720.
+2. Select History rows with keyboard and pointer. Search by text/app and change filters; a hidden/deleted record must no longer occupy the detail. Start playback/re-recognition, then change selection or leave History; old work must stop without changing another Capture.
+3. Read final text, open recognition/refinement and recording disclosures, use both copy actions, and follow a linked Memory. Selecting a different Capture resets the detail navigation. Long text remains scrollable and selectable.
+4. In Memory, review a suggestion and explicitly save/cancel/dismiss it. Check manual creation, validation errors, edit/archive/restore/replace/delete and sources. Pending suggestions are separate from confirmed context; changed/deleted/recording/refining sources cannot remain reviewable.
+5. Confirm Settings persistence from both entry points. Filter Diagnostics, select a long event, resize its detail, and check copy-all/reveal/clear actions with disposable logs.
+6. Verify keyboard focus, VoiceOver names, light/dark appearance, increased contrast and reduced motion. Native glass, selection colors and toolbar compositing require the real window.
+
+For automated layout work, use temporary NSHostingView/NSWindow fixtures with isolated SwiftData containers, injected controller actions and a memory-only diagnostic logger. Never launch AppController bootstrap or order the fixture window onscreen; use `.prohibited` activation policy. Do not access the microphone, model, clipboard, production History or product log. Keep generated binaries, images and stores under a unique `/tmp` directory. Offscreen bitmap caching can omit native glass/selection layers, so these images establish layout and content only. M-008's local evidence paths are in its [task record](./tasks/M-008-macos-management-ui.md#validation-evidence).
 
 ## Development rules
 

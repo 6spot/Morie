@@ -326,11 +326,19 @@ Re-recognition updates `recognizedText` only after successful file analysis. Del
 
 ### `CaptureHistoryView`
 
-Native SwiftUI/SwiftData History uses `List`, `NavigationStack`, `Form`, and `@Query` for a list and Capture detail. Audio playback uses AVKit's standard `AVPlayerView` controls. Details show final text first, original/latest recognition separately, refinement outcome/input/changes/context, explicit Copy buttons, retry progress/cancel, audio expiry/errors and deletion with a system confirmation dialog. No replacement media controls are drawn, and recordings do not populate Now Playing metadata.
+`CaptureHistoryView` receives the root's queried records and a Capture-ID selection binding. A native selectable `List` supports text/app search and All / History Only / Needs Attention filters. Filtering or deletion clears a selection that is no longer visible. `CaptureDetailView` presents saved final text on a reading surface; native disclosures retain recognition/refinement provenance and recording/retry details. Copy Final Text is a toolbar action; secondary copy/deletion actions use a system menu and deletion confirmation.
+
+Audio playback uses AVKit's standard `AVPlayerView` controls. Open/close, expiry and refinement-state hooks preserve the controller's existing cancellation/player ownership. No replacement media controls are drawn, and recordings do not populate Now Playing metadata.
 
 ### `MorieControlCenter`
 
-The primary management surface is one native SwiftUI `Window` with a standard `NavigationSplitView`. Its sidebar currently routes to History, Memory, Settings, and Diagnostics. The SwiftData container is attached at the window root before `@Query` builds the initial History detail, avoiding a different first-render environment. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
+The primary management surface is one native SwiftUI `Window`, defaulting to 1120 × 720 with a 960 × 600 minimum. The sidebar groups History/Memory under Library and Settings/Diagnostics under App. Library sections use a native three-column `NavigationSplitView` (sidebar, selectable list, detail); app sections use the native two-column form with the same sidebar composition.
+
+The root owns independent Capture and Memory selections. Memory selection identifies either a confirmed entry or a pending candidate. Each selected detail gets a `NavigationStack` whose identity changes with that selection, so source/related links cannot leak navigation from another record. The SwiftData container is attached at the window root before `@Query` builds the initial content. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
+
+`ManagementDetailContent` is a small composition of native ScrollView/VStack with 28-point padding and a readable maximum width of 760 points. It is shared by Capture, Memory and candidate reading surfaces. Actual settings and editing retain grouped Forms. There is no custom navigation, control library, material or persistence layer.
+
+`MorieSettingsView` uses a flexible, centered grouped Form (maximum width 700 points) within management, and a separate 640 × 520 native Settings window. `DiagnosticLogView` uses a native Table with search/level filtering, selection and a resizable event-detail area for complete messages. Copy All Events, reveal-file and confirmed clear actions preserve the existing logger behavior.
 
 ### `MemoryRecord` / `MemoryStore`
 
@@ -362,7 +370,9 @@ After inference, the source and retrieved Memory snapshots are checked again. Ch
 
 ### `MemoryView`
 
-Native `List`, `NavigationStack`, `Form`, `Picker`, `TextField`, `TextEditor`, sheets and confirmation dialogs provide Memory search, detail, editing and lifecycle actions. A History sheet can create a new entry or link its Capture to an existing active entry. Source links show the saved Capture's text and source app/date. The UI distinguishes manual creation, unavailable source Captures, archived records and superseded records.
+A native selectable `List` supports name/alias/notes search and status filtering. Current pending suggestions appear separately from confirmed entries in the Active view. Search, status changes, review and deletion reconcile the selection against visible IDs. `MemoryDetailView` prioritizes the name, aliases and context; status/use is explicit and source/history metadata stays in a native disclosure. Edit is a primary toolbar action; archive/restore/replace/delete share a system menu.
+
+Grouped Forms, Pickers, TextFields, TextEditors, sheets and confirmation dialogs provide explicit editing/review. A History sheet can create a new entry or link its Capture to an existing active entry. Source links show the saved Capture's text and source app/date. The UI distinguishes manual creation, unavailable source Captures, archived records and superseded records.
 
 ### Memory Candidates
 
@@ -376,7 +386,7 @@ Candidate confirmation and Memory changes share the Memory write context and one
 
 `MemoryCandidateController` owns one cancellable optional extraction. M-005 requests best-effort analysis after successful delivery/capture-only completion, or after a delivery failure that kept the final text on the clipboard. It never awaits extraction on the delivery path. History's **Find Memory Candidates** remains an explicit recovery action. Leaving that Capture detail or starting live input cancels analysis. Live Speech does not wait for model cancellation, and a late result cannot commit. Busy optional model work causes a skip; there is no durable queue or automatic retry. Foundation Models failure messages are fixed strings so prompts/output are not exposed through debug descriptions or logs. Model quality and cancellation latency remain device acceptance items.
 
-History exposes progress/cancel, review/dismiss and the exact source snapshot using standard SwiftUI controls. The Memory list uses native `@Query` source changes to show only pending candidates whose text still matches; rendering does not issue a database fetch per candidate. Review can edit fields or link to an existing active entry. Confirmed AI-derived Memory also exposes the original extraction snapshot while the source Capture exists.
+History exposes progress/cancel, review/dismiss and the exact source snapshot using standard SwiftUI controls. The Memory list and candidate reading detail use native `@Query` source changes to show only pending candidates whose text still matches a non-recording, non-cancelled source with no running refinement; rendering does not issue a database fetch per candidate. Selecting a candidate shows its proposed content and evidence; Review & Save opens the existing explicit editor sheet. Review can edit fields or link to an existing active entry. Confirmed AI-derived Memory also exposes the original extraction snapshot while the source Capture exists.
 
 ### `MorieTests`
 

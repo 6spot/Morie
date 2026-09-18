@@ -1,79 +1,113 @@
 import SwiftData
 import SwiftUI
 
+enum MemorySelection: Hashable {
+    case memory(UUID)
+    case candidate(UUID)
+}
+
 struct MemoryView: View {
     @ObservedObject var store: MemoryStore
+    @Binding var selection: MemorySelection?
     @Query private var captures: [CaptureRecord]
     @State private var search = ""
     @State private var status: MemoryStatus = .active
     @State private var editor: MemoryEditorMode?
     @State private var errorMessage: String?
 
+    private var query: String { search.trimmingCharacters(in: .whitespacesAndNewlines) }
+
     private var visibleEntries: [MemoryRecord] {
         store.entries.filter { entry in
-            entry.status == status && (search.isEmpty || ([entry.name, entry.notes] + entry.aliases).contains {
-                $0.localizedStandardContains(search)
+            entry.status == status && (query.isEmpty || ([entry.name, entry.notes] + entry.aliases).contains {
+                $0.localizedStandardContains(query)
             })
         }
     }
 
     private var visibleCandidates: [MemoryCandidate] {
+        guard status == .active else { return [] }
         let inputs = Dictionary(uniqueKeysWithValues: captures.filter {
-            $0.lifecycle != .capturing && $0.lifecycle != .cancelled
+            $0.lifecycle != .capturing && $0.lifecycle != .cancelled && $0.refinement?.status != .running
         }.map { ($0.id, MemoryExtractionInput(capture: $0)) })
         return store.extractions.filter { extraction in
             guard let input = inputs[extraction.sourceCaptureID] else { return false }
             return input == extraction.input
-        }.flatMap(\.candidates).filter {
-            $0.status == .pending && (search.isEmpty || $0.suggestion.draft.name.localizedStandardContains(search))
+        }.flatMap(\.candidates).filter { candidate in
+            let draft = candidate.suggestion.draft
+            return candidate.status == .pending && (query.isEmpty || ([draft.name, draft.notes] + draft.aliases).contains {
+                $0.localizedStandardContains(query)
+            })
         }
     }
 
+    private var visibleSelections: [MemorySelection] {
+        visibleCandidates.map { .candidate($0.id) } + visibleEntries.map { .memory($0.id) }
+    }
+
     var body: some View {
-        NavigationStack {
-            List {
-                if let errorMessage { Text(errorMessage).foregroundStyle(.secondary) }
-                if !visibleCandidates.isEmpty {
-                    Section("Candidates to Review") {
-                        ForEach(visibleCandidates) { candidate in
-                            Button { editor = .reviewCandidate(candidate.id) } label: {
-                                Label(candidate.suggestion.draft.name, systemImage: "sparkles")
-                            }
+        List(selection: $selection) {
+            if let errorMessage { Label(errorMessage, systemImage: "exclamationmark.triangle") }
+            if !visibleCandidates.isEmpty {
+                Section("Suggestions to Review") {
+                    ForEach(visibleCandidates) { candidate in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label(candidate.suggestion.draft.name, systemImage: "sparkles")
+                                .lineLimit(2)
+                            Text(candidate.suggestion.draft.kind.title + " · Not saved yet")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(candidate.suggestion.evidence)
+                                .font(.callout).foregroundStyle(.secondary).lineLimit(2)
                         }
-                    }
-                }
-                if !visibleEntries.isEmpty {
-                    Section("\(status.title) Memories") {
-                        ForEach(visibleEntries) { entry in
-                            NavigationLink {
-                                MemoryDetailView(store: store, memoryID: entry.id)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Label(entry.name, systemImage: entry.kind?.systemImage ?? "bookmark")
-                                    Text(entry.kind?.title ?? "Memory").font(.caption).foregroundStyle(.secondary)
-                                    if !entry.notes.isEmpty { Text(entry.notes).lineLimit(2).foregroundStyle(.secondary) }
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
+                        .padding(.vertical, 6)
+                        .tag(MemorySelection.candidate(candidate.id))
                     }
                 }
             }
-            .overlay {
-                if visibleEntries.isEmpty && visibleCandidates.isEmpty && errorMessage == nil {
-                    ContentUnavailableView(
-                        search.isEmpty ? "No \(status.title) Memories" : "No Matching Memories",
-                        systemImage: "text.book.closed",
-                        description: Text("Save vocabulary and projects here or from a Capture in History.")
-                    )
+            if !visibleEntries.isEmpty {
+                Section("\(status.title) Memories") {
+                    ForEach(visibleEntries) { entry in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label(entry.name, systemImage: entry.kind?.systemImage ?? "bookmark")
+                                .lineLimit(2)
+                            Text(entry.kind?.title ?? "Memory").font(.caption).foregroundStyle(.secondary)
+                            if !entry.notes.isEmpty {
+                                Text(entry.notes).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                        .tag(MemorySelection.memory(entry.id))
+                    }
                 }
             }
-            .navigationTitle("Memory")
-            .searchable(text: $search, prompt: "Search vocabulary and projects")
-            .toolbar {
-                Picker("Status", selection: $status) {
-                    ForEach(MemoryStatus.allCases) { Text($0.title).tag($0) }
+        }
+        .listStyle(.inset)
+        .overlay {
+            if visibleSelections.isEmpty && errorMessage == nil {
+                ContentUnavailableView {
+                    Label(query.isEmpty ? "No \(status.title) Memories" : "No Matching Memories", systemImage: "text.book.closed")
+                } description: {
+                    Text(query.isEmpty ? "Save names and projects to make future input more accurate." : "Try another search or filter.")
+                } actions: {
+                    if query.isEmpty && status == .active {
+                        Button("New Memory", systemImage: "plus") { editor = .create(sourceCaptureID: nil) }
+                    } else {
+                        Button("Show Active Memories") { search = ""; status = .active }
+                    }
                 }
+            }
+        }
+        .navigationTitle("Memory")
+        .navigationSubtitle("\(visibleEntries.count) memories")
+        .searchable(text: $search, prompt: "Search memories")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu("Filter Memories", systemImage: "line.3.horizontal.decrease") {
+                    Picker("Status", selection: $status) {
+                        ForEach(MemoryStatus.allCases) { Text($0.title).tag($0) }
+                    }
+                }
+                .help("\(status.title) memories")
                 Button("New Memory", systemImage: "plus") { editor = .create(sourceCaptureID: nil) }
             }
         }
@@ -82,12 +116,16 @@ struct MemoryView: View {
             do { try store.load(); errorMessage = nil }
             catch { errorMessage = error.localizedDescription }
         }
+        .onChange(of: visibleSelections, initial: true) { _, ids in
+            if let selection, !ids.contains(selection) { self.selection = nil }
+        }
     }
 }
 
 struct MemoryDetailView: View {
     @ObservedObject var store: MemoryStore
     let memoryID: UUID
+    var onDelete: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var editor: MemoryEditorMode?
     @State private var confirmsDeletion = false
@@ -96,63 +134,91 @@ struct MemoryDetailView: View {
     var body: some View {
         Group {
             if let memory = store.entries.first(where: { $0.id == memoryID }) {
-                Form {
-                    Section("Memory") {
-                        LabeledContent("Type", value: memory.kind?.title ?? "Unavailable")
-                        Text(memory.name).font(.headline).textSelection(.enabled)
-                        if !memory.aliases.isEmpty {
-                            LabeledContent("Aliases", value: memory.aliases.joined(separator: ", "))
-                        }
-                        if !memory.notes.isEmpty { Text(memory.notes).textSelection(.enabled) }
-                        LabeledContent("Status", value: memory.status?.title ?? "Unavailable")
-                        Text(memory.userConfirmed ? "Confirmed by you" : "Not confirmed")
-                            .foregroundStyle(.secondary)
+                ManagementDetailContent {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label(memory.kind?.title ?? "Memory", systemImage: memory.kind?.systemImage ?? "bookmark")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        Text(memory.name).font(.title).textSelection(.enabled)
+                        Label(memory.userConfirmed ? "Confirmed by you" : "Not confirmed",
+                              systemImage: memory.userConfirmed ? "checkmark.seal" : "questionmark.circle")
+                            .font(.subheadline).foregroundStyle(.secondary)
                     }
-                    Section("Sources") {
-                        if let candidateID = memory.sourceCandidateID,
-                           let extraction = store.extractions.first(where: { $0.candidates.contains(where: { $0.id == candidateID }) }) {
-                            Text("Saved from an AI suggestion you reviewed.").foregroundStyle(.secondary)
-                            MemoryExtractionSource(extraction: extraction)
-                        }
-                        if memory.sourceCaptureIDs.isEmpty {
-                            Text("Added manually").foregroundStyle(.secondary)
-                        }
-                        ForEach(Array(memory.sourceCaptureIDs.enumerated()), id: \.element) { index, id in
-                            NavigationLink("Source Capture \(index + 1)") {
-                                Form { CaptureMemorySource(captureID: id) }
-                                    .formStyle(.grouped)
-                                    .navigationTitle("Source Capture")
-                            }
-                        }
-                        if let previousID = memory.supersedesID {
-                            NavigationLink("Previous Memory") { MemoryDetailView(store: store, memoryID: previousID) }
-                        }
-                        if let replacement = store.entries.first(where: { $0.supersedesID == memory.id }) {
-                            NavigationLink("Replacement: \(replacement.name)") {
-                                MemoryDetailView(store: store, memoryID: replacement.id)
-                            }
+
+                    if !memory.aliases.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Also Recognized As").font(.headline)
+                            Text(memory.aliases.joined(separator: ", ")).textSelection(.enabled)
                         }
                     }
-                    Section("Manage") {
-                        LabeledContent("Created", value: memory.createdAt.formatted())
-                        LabeledContent("Updated", value: memory.updatedAt.formatted())
-                        if memory.status == .active {
-                            Button("Archive Memory") { perform { try store.archive(memoryID) } }
-                        } else if memory.status == .archived {
-                            Button("Restore Memory") { perform { try store.restore(memoryID) } }
+                    if !memory.notes.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Context").font(.headline)
+                            Text(memory.notes).lineSpacing(5).textSelection(.enabled)
                         }
-                        if memory.status != .superseded {
-                            Button("Replace Memory") { editor = .replace(memoryID) }
+                    }
+
+                    GroupBox {
+                        VStack(alignment: .leading, spacing: 8) {
+                            LabeledContent("Status", value: memory.status?.title ?? "Unavailable")
+                            Text(memory.status == .active && memory.userConfirmed
+                                 ? "Morie can use this memory to correct confirmed names in future input."
+                                 : "This memory is kept for reference and is not used to refine input.")
+                                .foregroundStyle(.secondary)
                         }
-                        if let errorMessage { Text(errorMessage).foregroundStyle(.secondary) }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } label: {
+                        Label("Personalization", systemImage: "text.bubble")
+                    }
+
+                    DisclosureGroup("Sources & History") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if let candidateID = memory.sourceCandidateID,
+                               let extraction = store.extractions.first(where: { $0.candidates.contains(where: { $0.id == candidateID }) }) {
+                                Text("Saved from a suggestion you reviewed.").foregroundStyle(.secondary)
+                                MemoryExtractionSource(extraction: extraction)
+                            }
+                            if memory.sourceCaptureIDs.isEmpty {
+                                Text("Added manually").foregroundStyle(.secondary)
+                            }
+                            ForEach(Array(memory.sourceCaptureIDs.enumerated()), id: \.element) { index, id in
+                                NavigationLink("Source Capture \(index + 1)") {
+                                    ManagementDetailContent { CaptureMemorySource(captureID: id) }
+                                        .navigationTitle("Source Capture")
+                                }
+                            }
+                            if let previousID = memory.supersedesID {
+                                NavigationLink("Previous Memory") { MemoryDetailView(store: store, memoryID: previousID) }
+                            }
+                            if let replacement = store.entries.first(where: { $0.supersedesID == memory.id }) {
+                                NavigationLink("Replacement: \(replacement.name)") {
+                                    MemoryDetailView(store: store, memoryID: replacement.id)
+                                }
+                            }
+                            LabeledContent("Created", value: memory.createdAt.formatted(date: .abbreviated, time: .shortened))
+                            LabeledContent("Updated", value: memory.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 12)
                     }
                 }
-                .formStyle(.grouped)
-                .navigationTitle(memory.name)
+                .navigationTitle("Memory")
                 .toolbar {
-                    Button("Edit", systemImage: "pencil") { editor = .edit(memoryID) }
-                        .disabled(memory.status == .superseded)
-                    Button("Delete Memory", systemImage: "trash", role: .destructive) { confirmsDeletion = true }
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button("Edit Memory", systemImage: "pencil") { editor = .edit(memoryID) }
+                            .disabled(memory.status == .superseded)
+                        Menu("Memory Actions", systemImage: "ellipsis") {
+                            if memory.status == .active {
+                                Button("Archive Memory", systemImage: "archivebox") { perform { try store.archive(memoryID) } }
+                            } else if memory.status == .archived {
+                                Button("Restore Memory", systemImage: "arrow.uturn.backward") { perform { try store.restore(memoryID) } }
+                            }
+                            if memory.status != .superseded {
+                                Button("Replace Memory…", systemImage: "arrow.triangle.2.circlepath") { editor = .replace(memoryID) }
+                            }
+                            Divider()
+                            Button("Delete Memory…", systemImage: "trash", role: .destructive) { confirmsDeletion = true }
+                        }
+                    }
                 }
             } else {
                 ContentUnavailableView("Memory No Longer Available", systemImage: "bookmark")
@@ -161,10 +227,21 @@ struct MemoryDetailView: View {
         .sheet(item: $editor) { MemoryEditorSheet(store: store, mode: $0) }
         .confirmationDialog("Delete this memory?", isPresented: $confirmsDeletion, titleVisibility: .visible) {
             Button("Delete Memory", role: .destructive) {
-                perform { try store.delete(memoryID); dismiss() }
+                perform {
+                    try store.delete(memoryID)
+                    if let onDelete { onDelete() } else { dismiss() }
+                }
             }
         } message: {
             Text("This memory will be permanently deleted. Source captures are kept.")
+        }
+        .alert("Couldn’t Update Memory", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 
@@ -276,7 +353,6 @@ struct MemoryEditorSheet: View {
             }
             .formStyle(.grouped)
             HStack {
-                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 if case .reviewCandidate(let id) = mode, candidate?.status == .pending {
                     Button("Dismiss Suggestion") {
                         do { try store.dismissCandidate(id); dismiss() }
@@ -284,11 +360,13 @@ struct MemoryEditorSheet: View {
                     }
                 }
                 Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Save") { save() }.keyboardShortcut(.defaultAction).disabled(!canSave)
             }
         }
-        .padding(20)
-        .frame(width: 560)
+        .padding(24)
+        .frame(width: 580)
+        .frame(minHeight: 500, idealHeight: 640, maxHeight: 760)
         .onAppear {
             do {
                 try store.load()
@@ -342,24 +420,35 @@ struct CaptureMemorySection: View {
     }
 
     var body: some View {
-        Section("Memory") {
-            Button("Save Memory…", systemImage: "bookmark") { editor = .create(sourceCaptureID: capture.id) }
-                .disabled(capture.lifecycle == .capturing || (capture.recognizedText + capture.finalText).isEmpty)
-            ForEach(linked) { entry in
-                NavigationLink {
-                    MemoryDetailView(store: store, memoryID: entry.id)
-                } label: {
-                    LabeledContent(entry.name, value: "Saved from this capture · \(entry.status?.title ?? "Unavailable")")
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                Button("Save Memory…", systemImage: "bookmark") { editor = .create(sourceCaptureID: capture.id) }
+                    .disabled(capture.lifecycle == .capturing || capture.refinement?.status == .running
+                              || (capture.recognizedText + capture.finalText).isEmpty)
+                ForEach(linked) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        NavigationLink(entry.name) {
+                            MemoryDetailView(store: store, memoryID: entry.id)
+                        }
+                        .buttonStyle(.link)
+                        Text("Saved from this capture · \(entry.status?.title ?? "Unavailable")")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-            }
-            ForEach(related) { match in
-                NavigationLink {
-                    MemoryDetailView(store: store, memoryID: match.id)
-                } label: {
-                    LabeledContent(match.memory.name, value: "Related · \(match.matchedTerm)")
+                ForEach(related) { match in
+                    VStack(alignment: .leading, spacing: 4) {
+                        NavigationLink(match.memory.name) {
+                            MemoryDetailView(store: store, memoryID: match.id)
+                        }
+                        .buttonStyle(.link)
+                        Text("Related · \(match.matchedTerm)").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
+                if let errorMessage { Text(errorMessage).foregroundStyle(.secondary) }
             }
-            if let errorMessage { Text(errorMessage).foregroundStyle(.secondary) }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Label("Memory", systemImage: "text.book.closed")
         }
         .sheet(item: $editor) { MemoryEditorSheet(store: store, mode: $0) }
         .onAppear {

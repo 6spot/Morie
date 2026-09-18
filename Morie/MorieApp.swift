@@ -37,10 +37,11 @@ struct MorieApp: App {
                 )
             }
         }
-        .defaultSize(width: 920, height: 600)
+        .defaultSize(width: 1120, height: 720)
 
         Settings {
             MorieSettingsView(controller: controller)
+                .frame(width: 640, height: 520)
         }
     }
 }
@@ -153,7 +154,9 @@ struct MorieSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .padding(20)
-        .frame(width: 460)
+        .frame(maxWidth: 700)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .navigationTitle("Settings")
     }
 }
