@@ -27,6 +27,7 @@ final class AppController: ObservableObject {
     @Published private(set) var state: State = .checking
     @Published private(set) var transcript = ""
     @Published private(set) var captureShortcut: CaptureShortcut
+    @Published private(set) var audioRetentionDays: Int
     @Published private(set) var recoverySettingsURL: URL?
 
     private let capabilityGate = CapabilityGate()
@@ -45,6 +46,7 @@ final class AppController: ObservableObject {
     private var finishRequestedCaptureID: UUID?
     private var captureStartTask: Task<Void, Never>?
     private var captureFinishTask: Task<Void, Never>?
+    private var activeSourceAudioURL: URL?
     private var lastPresentedFailure: String?
 
     init(captureStore: CaptureStore?, persistenceError: Error? = nil) {
@@ -53,6 +55,7 @@ final class AppController: ObservableObject {
         let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
+        audioRetentionDays = CaptureStore.audioRetentionDays
 
         hud.onCancel = { [weak self] in
             Task { @MainActor in
@@ -80,6 +83,16 @@ final class AppController: ObservableObject {
         case .finalizing: "Finalizing…"
         case .delivering: "Delivering…"
         case .failed: "Input failed"
+        }
+    }
+
+    func setAudioRetentionDays(_ days: Int) {
+        let value = min(max(days, 1), 365)
+        do {
+            try captureStore?.setAudioRetentionDays(value)
+            audioRetentionDays = value
+        } catch {
+            Diagnostics.record("CaptureStore", "Could not update audio retention: \(error.localizedDescription)", level: .error)
         }
     }
 
@@ -231,7 +244,7 @@ final class AppController: ObservableObject {
         targetWindowNumber = TextInjector.frontmostWindowNumber(for: targetApplication)
 
         do {
-            try captureStore?.beginVoiceCapture(
+            activeSourceAudioURL = try captureStore?.beginVoiceCapture(
                 id: sessionID,
                 applicationName: targetApplication?.localizedName,
                 bundleIdentifier: targetApplication?.bundleIdentifier,
@@ -307,9 +320,13 @@ final class AppController: ObservableObject {
         Diagnostics.record("Speech", "Starting Speech session \(label(sessionID))")
 
         do {
+            guard let sourceAudioURL = activeSourceAudioURL else {
+                throw ControllerError.persistenceUnavailable("Source-audio storage was not initialized.")
+            }
             try await speech.start(
                 sessionID: sessionID,
                 locale: speechLocale,
+                sourceAudioURL: sourceAudioURL,
                 onTranscript: { [weak self] resultSessionID, text in
                     Task { @MainActor in
                         guard self?.activeCaptureID == resultSessionID else {
@@ -383,7 +400,8 @@ final class AppController: ObservableObject {
         Diagnostics.record("Speech", "Finalizing Speech session \(label(sessionID))")
 
         do {
-            let finalText = try await speech.stop(sessionID: sessionID)
+            let result = try await speech.stop(sessionID: sessionID)
+            let finalText = result.transcript
             try Task.checkCancellation()
             guard activeCaptureID == sessionID else {
                 Diagnostics.record("Session", "Final result arrived after session ownership changed", level: .warning)
@@ -392,10 +410,11 @@ final class AppController: ObservableObject {
 
             transcript = finalText
             Diagnostics.record("Speech", "Final transcript ready; characters=\(finalText.count)")
+            try captureStore?.attachSourceAudio(result.sourceAudio, for: sessionID)
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                Diagnostics.record("CaptureStore", "Discarding empty Capture \(label(sessionID))", level: .warning)
-                try captureStore?.cancel(sessionID)
+                try captureStore?.markFailed(sessionID, error: "Speech returned no text. Source audio is available for retry.")
+                Diagnostics.record("CaptureStore", "Retaining empty recognition with source audio for \(label(sessionID))", level: .warning)
                 completeSuccessfulSession(sessionID)
                 return
             }
@@ -425,6 +444,13 @@ final class AppController: ObservableObject {
         } catch {
             Diagnostics.record("Session", "Capture \(label(sessionID)) failed: \(error.localizedDescription)", level: .error)
             await speech.cancel(sessionID: sessionID)
+            if case let SpeechPipeline.PipelineError.recognitionFailed(_, sourceAudio) = error {
+                do {
+                    try captureStore?.attachSourceAudio(sourceAudio, for: sessionID)
+                } catch {
+                    Diagnostics.record("CaptureStore", "Could not preserve failed recognition audio: \(error.localizedDescription)", level: .error)
+                }
+            }
             failSession(sessionID, error: error)
         }
     }
@@ -561,6 +587,7 @@ final class AppController: ObservableObject {
 
     private func resetSessionIdentity() {
         activeCaptureID = nil
+        activeSourceAudioURL = nil
         speechReadyCaptureID = nil
         finishRequestedCaptureID = nil
         captureStartTask = nil

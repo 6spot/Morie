@@ -254,3 +254,4 @@ M-003 source-audio evidence:
 - `DROP`: full uncompressed PCM accumulation in memory and provider/runtime complexity.
 - `REJECTED`: adding `AVCaptureAudioFileOutput` beside Apple's `CaptureInputSequenceProvider` data output. Although `canAddOutput` returned true, macOS 27 threw an Objective-C exception from `startRecording` and aborted Morie on owner hardware.
 - Morie's replacement must preserve the approved 7-day compressed-audio policy while using one proven data-output path; it must not start a second microphone session.
+- `ADAPT` implemented for verification: Morie now owns one data output and drains its callback queue before finishing. Each buffer is forwarded to Apple Speech and streamed to Apple's AAC encoder; unlike Type4Me, the complete PCM recording is never accumulated in memory.

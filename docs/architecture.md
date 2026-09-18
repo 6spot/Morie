@@ -273,6 +273,8 @@ M-003's approved persistence direction is audio-first: the durable raw Capture i
 
 The first attempted implementation using `AVCaptureAudioFileOutput` beside `CaptureInputSequenceProvider.captureAudioDataOutput` is rejected. On the owner's macOS 27 hardware, `canAddOutput` succeeded but `startRecording(to:outputFileType:recordingDelegate:)` raised an Objective-C exception inside AVFoundation and terminated Morie with `SIGABRT` (incident `F160F627-871F-4F35-A880-74BAFBE55D67`). Because this exception cannot be handled by Swift `throws`, that output must not be reintroduced without a proven Apple-supported configuration and real-device validation. The replacement must follow the proven single-`AVCaptureAudioDataOutput` ownership/lifecycle pattern and stream encoded samples without duplicating the microphone session.
 
+The replacement now owns one `AVCaptureSession` and one `AVCaptureAudioDataOutput`. Each 16 kHz mono PCM buffer is passed through Apple's `AnalyzerInputConverter` to `SpeechAnalyzer` and streamed into an Apple `AVAudioFile` AAC encoder targeting 32 kbps. This adapts Type4Me's proven single-output ownership and deterministic queue drain while dropping its complete in-memory PCM accumulation. Runtime acceptance remains open until owner-hardware validation confirms recognition, waveform response, playable M4A output, cancellation and repeated start/stop.
+
 ### `CaptureHistoryView`
 
 Native SwiftUI/SwiftData History surface using system `List`, `ContentUnavailableView`, and `@Query`. It is intentionally a basic inspection surface while M-003 persistence semantics are validated.

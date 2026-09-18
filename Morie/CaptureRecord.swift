@@ -2,6 +2,11 @@ import Foundation
 import CoreGraphics
 import SwiftData
 
+struct CapturedSourceAudio: Sendable {
+    let url: URL
+    let duration: TimeInterval
+}
+
 enum CaptureLifecycle: String, Codable, Sendable {
     case capturing
     case recognized
@@ -29,6 +34,10 @@ final class CaptureRecord {
     var sourceBundleIdentifier: String?
     var originalWindowNumber: Int64?
     var deliveryErrorDescription: String?
+    var sourceAudioRelativePath: String?
+    var sourceAudioDurationSeconds: Double?
+    var sourceAudioByteCount: Int64?
+    var sourceAudioExpiresAt: Date?
 
     init(
         id: UUID,

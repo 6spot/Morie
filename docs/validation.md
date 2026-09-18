@@ -38,7 +38,7 @@ Verify:
 
 CloudKit/iCloud is intentionally not part of the Phase 0 gate; M-003 adds it with the real container/entitlements.
 
-Source-audio persistence is not yet in the runtime validation matrix. The initial `AVCaptureAudioFileOutput` integration caused a confirmed AVFoundation `SIGABRT` on macOS 27 and was removed. Any replacement must first prove start, stop, cancellation, recognition failure, repeated capture, file playback, size, CPU and memory behavior on owner hardware before it can be marked implemented.
+The initial `AVCaptureAudioFileOutput` integration caused a confirmed AVFoundation `SIGABRT` on macOS 27 and was removed. Its single-data-output replacement is implemented but must prove start, stop, cancellation, recognition failure, repeated capture, M4A playback, size, CPU and memory behavior on owner hardware before acceptance.
 
 ## Toggle-capture lifecycle
 

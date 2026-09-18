@@ -9,6 +9,7 @@ actor SpeechPipeline {
         case noMicrophone
         case unsupportedLocale
         case notRunning
+        case recognitionFailed(String, CapturedSourceAudio)
 
         var errorDescription: String? {
             switch self {
@@ -16,16 +17,21 @@ actor SpeechPipeline {
             case .noMicrophone: "No audio capture device is available."
             case .unsupportedLocale: "The current locale is not supported by SpeechTranscriber."
             case .notRunning: "Speech capture is not running."
+            case .recognitionFailed(let reason, _): reason
             }
         }
     }
 
+    struct Result: Sendable {
+        let transcript: String
+        let sourceAudio: CapturedSourceAudio
+    }
+
     private var activeSessionID: UUID?
     private var analyzer: SpeechAnalyzer?
-    private var provider: CaptureInputSequenceProvider?
+    private var audioSource: CaptureAudioSource?
     private var resultTask: Task<Void, Error>?
     private var analysisTask: Task<CMTime?, Error>?
-    private var levelTask: Task<Void, Never>?
     private var finalizedText = ""
     private var volatileText = ""
 
@@ -51,6 +57,7 @@ actor SpeechPipeline {
     func start(
         sessionID: UUID,
         locale requestedLocale: Locale,
+        sourceAudioURL: URL,
         onTranscript: @escaping @Sendable (UUID, String) -> Void,
         onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
     ) async throws {
@@ -62,7 +69,7 @@ actor SpeechPipeline {
         let session = label(sessionID)
         Diagnostics.record("Speech", "Pipeline start requested for \(session)")
 
-        var preparedProvider: CaptureInputSequenceProvider?
+        var preparedSource: CaptureAudioSource?
         var preparedAnalyzer: SpeechAnalyzer?
 
         do {
@@ -78,20 +85,22 @@ actor SpeechPipeline {
             try requireActiveSession(sessionID)
             Diagnostics.record("Speech", "SpeechTranscriber created for \(session)")
 
-            let provider = try await CaptureInputSequenceProvider.providerWithSession(
-                from: microphone,
-                compatibleWith: [transcriber],
-                priority: .userInitiated
+            let inputConverter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
+            let source = try CaptureAudioSource(
+                device: microphone,
+                converter: inputConverter,
+                destinationURL: sourceAudioURL,
+                onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
-            preparedProvider = provider
+            preparedSource = source
             try requireActiveSession(sessionID)
-            Diagnostics.record("Speech", "CaptureInputSequenceProvider created for \(session)")
+            Diagnostics.record("Speech", "Single-output audio source created for \(session)")
 
             let analyzer = SpeechAnalyzer(modules: [transcriber])
             preparedAnalyzer = analyzer
-            let analyzerInputs = provider.analyzerInputs
+            let analyzerInputs = source.analyzerInputs
 
-            self.provider = provider
+            self.audioSource = source
             self.analyzer = analyzer
 
             resultTask = Task {
@@ -136,20 +145,12 @@ actor SpeechPipeline {
                 return lastSampleTime
             }
 
-            provider.captureSession.startRunning()
-            Diagnostics.record("Speech", "AVCaptureSession startRunning called for \(session)")
-            startAudioLevelPolling(
-                provider: provider,
-                sessionID: sessionID,
-                onAudioLevel: onAudioLevel
-            )
+            source.start()
+            Diagnostics.record("Speech", "Single-output AVCaptureSession started for \(session)")
             try requireActiveSession(sessionID)
         } catch {
             Diagnostics.record("Speech", "Pipeline start failed for \(session): \(error.localizedDescription)", level: .error)
-            preparedProvider?.captureSession.stopRunning()
-            levelTask?.cancel()
-            levelTask = nil
-
+            preparedSource?.cancel()
             if let preparedAnalyzer {
                 await preparedAnalyzer.cancelAndFinishNow()
             }
@@ -159,7 +160,7 @@ actor SpeechPipeline {
         }
     }
 
-    func stop(sessionID: UUID) async throws -> String {
+    func stop(sessionID: UUID) async throws -> Result {
         try requireActiveSession(sessionID)
         guard let analyzer, let analysisTask else {
             throw PipelineError.notRunning
@@ -168,11 +169,9 @@ actor SpeechPipeline {
         let session = label(sessionID)
         Diagnostics.record("Speech", "Normal stop started for \(session)")
 
-        levelTask?.cancel()
-        levelTask = nil
-        provider?.captureSession.stopRunning()
-        provider = nil
-        Diagnostics.record("Speech", "Capture session stopped and provider released for \(session)")
+        guard let sourceAudio = try audioSource?.finish() else { throw PipelineError.notRunning }
+        audioSource = nil
+        Diagnostics.record("Speech", "Capture session stopped and source audio finalized for \(session)")
 
         do {
             let lastSampleTime = try await analysisTask.value
@@ -195,12 +194,12 @@ actor SpeechPipeline {
             let final = join(finalizedText, volatileText)
             Diagnostics.record("Speech", "Normal stop completed for \(session); finalCharacters=\(final.count)")
             reset(sessionID: sessionID)
-            return final
+            return Result(transcript: final, sourceAudio: sourceAudio)
         } catch {
             Diagnostics.record("Speech", "Normal stop failed for \(session): \(error.localizedDescription)", level: .error)
             await analyzer.cancelAndFinishNow()
             reset(sessionID: sessionID)
-            throw error
+            throw PipelineError.recognitionFailed(error.localizedDescription, sourceAudio)
         }
     }
 
@@ -213,10 +212,8 @@ actor SpeechPipeline {
         let session = label(sessionID)
         Diagnostics.record("Speech", "Cancelling pipeline for \(session)", level: .warning)
 
-        levelTask?.cancel()
-        levelTask = nil
-        provider?.captureSession.stopRunning()
-        provider = nil
+        audioSource?.cancel()
+        audioSource = nil
         analysisTask?.cancel()
         resultTask?.cancel()
 
@@ -238,99 +235,6 @@ actor SpeechPipeline {
         return SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
     }
 
-    private func startAudioLevelPolling(
-        provider: CaptureInputSequenceProvider,
-        sessionID: UUID,
-        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
-    ) {
-        levelTask?.cancel()
-        let session = label(sessionID)
-
-        levelTask = Task {
-            Diagnostics.record("Speech", "Native microphone level polling started for \(session)")
-            var sampleCount = 0
-            var floorSampleCount = 0
-            var didReportMissingChannels = false
-            var didReportPinnedFloor = false
-
-            while !Task.isCancelled {
-                guard activeSessionID == sessionID else { return }
-
-                // Read the connection owned by the provider's audio output first.
-                // A capture session can contain connections that do not expose the
-                // live microphone channels used by SpeechAnalyzer.
-                let outputChannels = provider.captureAudioDataOutput
-                    .connection(with: .audio)?
-                    .audioChannels ?? []
-                let channels = outputChannels.isEmpty
-                    ? provider.captureSession.connections.flatMap(\.audioChannels)
-                    : outputChannels
-                let averagePower = channels.map(\.averagePowerLevel).max() ?? -60
-                let peakPower = channels.map(\.peakHoldLevel).max() ?? -60
-                let averageLevel = Self.normalizedPower(averagePower)
-                let peakLevel = Self.normalizedPower(peakPower)
-                // Average power carries the visible envelope. Peak-hold changes
-                // more slowly, so use only a small part of its excess as transient
-                // emphasis; taking max/most of peak pins ordinary speech near 1.
-                let peakAccent = max(0, peakLevel - averageLevel) * 0.15
-                let normalized = min(1, averageLevel + peakAccent)
-
-                // Keep the audio signal raw here. The HUD owns visual shaping/history;
-                // pre-smoothing at the capture layer makes normal speech look flat.
-                onAudioLevel(sessionID, normalized)
-
-                sampleCount += 1
-                if channels.isEmpty, !didReportMissingChannels, sampleCount >= 5 {
-                    didReportMissingChannels = true
-                    Diagnostics.record(
-                        "Audio",
-                        "Meter \(session) has no audio channels after capture started; HUD cannot receive microphone level",
-                        level: .warning
-                    )
-                }
-
-                if channels.isEmpty || (averagePower <= -59.9 && peakPower <= -59.9) {
-                    floorSampleCount += 1
-                } else {
-                    floorSampleCount = 0
-                }
-
-                if floorSampleCount >= 125, !didReportPinnedFloor {
-                    didReportPinnedFloor = true
-                    Diagnostics.record(
-                        "Audio",
-                        "Meter \(session) remained at its floor for 2 seconds while capture was running",
-                        level: .warning
-                    )
-                }
-
-                if sampleCount.isMultiple(of: 20) {
-                    let averageText = String(format: "%.1f", averagePower)
-                    let peakText = String(format: "%.1f", peakPower)
-                    let normalizedText = String(format: "%.3f", normalized)
-                    Diagnostics.record(
-                        "Audio",
-                        "Meter \(session): channels=\(channels.count), average=\(averageText)dB, peak=\(peakText)dB, normalized=\(normalizedText), captureRunning=\(provider.captureSession.isRunning)"
-                    )
-                }
-
-                // 60 Hz keeps short syllables and consonants visible without
-                // coupling rendering to every audio callback.
-                try? await Task.sleep(for: .milliseconds(16))
-            }
-        }
-    }
-
-    private static func normalizedPower(_ decibels: Float) -> Double {
-        // The built-in microphone reports ordinary speech roughly in this
-        // range. Reserving values below -42 dB for quiet and above -6 dB for
-        // loud speech gives the HUD useful travel instead of crowding it at 1.
-        let floor: Float = -42
-        let ceiling: Float = -6
-        let clamped = min(max(decibels, floor), ceiling)
-        return Double((clamped - floor) / (ceiling - floor))
-    }
-
     private func requireActiveSession(_ sessionID: UUID) throws {
         try Task.checkCancellation()
         guard activeSessionID == sessionID else {
@@ -341,13 +245,11 @@ actor SpeechPipeline {
     private func reset(sessionID: UUID) {
         guard activeSessionID == sessionID else { return }
 
-        levelTask?.cancel()
         analysisTask?.cancel()
         resultTask?.cancel()
-        levelTask = nil
         analysisTask = nil
         resultTask = nil
-        provider = nil
+        audioSource = nil
         analyzer = nil
         activeSessionID = nil
         finalizedText = ""

@@ -90,7 +90,7 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertEqual(record.sourceBundleIdentifier, "com.apple.dt.Xcode")
     }
 
-    func testStoreRecreationRemovesEmptyPersistedCapture() throws {
+    func testStoreRecreationPreservesEmptyCaptureForSourceAudioLifecycle() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieEmptyCaptureTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -105,7 +105,28 @@ final class CaptureStoreTests: XCTestCase {
         }
 
         let reopenedStore = try CaptureStore(storageURL: storeURL)
-        XCTAssertNil(try fetch(id, from: reopenedStore))
+        XCTAssertNotNil(try fetch(id, from: reopenedStore))
+    }
+
+    func testExpiredAudioIsRemovedWithoutDeletingCapture() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "MorieAudioExpiryTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = try CaptureStore(inMemory: true, audioDirectory: directory)
+        let id = UUID()
+        let audioURL = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        try Data("audio".utf8).write(to: audioURL)
+        try store.attachSourceAudio(CapturedSourceAudio(url: audioURL, duration: 1), for: id)
+
+        let record = try XCTUnwrap(fetch(id, from: store))
+        record.sourceAudioExpiresAt = .distantPast
+        try store.container.mainContext.save()
+        try store.pruneExpiredAudio()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: audioURL.path))
+        XCTAssertNil(try XCTUnwrap(fetch(id, from: store)).sourceAudioRelativePath)
     }
 
     private func fetch(_ id: UUID, from store: CaptureStore) throws -> CaptureRecord? {
