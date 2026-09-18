@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 
 @MainActor
@@ -9,7 +10,7 @@ final class AppController: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .persistenceUnavailable(let reason):
-                "Capture storage is unavailable: \(reason)"
+                "记录存储不可用：\(reason)"
             }
         }
     }
@@ -32,14 +33,19 @@ final class AppController: ObservableObject {
     @Published private(set) var audioRetentionDays: Int
     @Published private(set) var inputRefinementEnabled: Bool
     @Published private(set) var correctionSuggestionsEnabled: Bool
-    @Published private(set) var recoverySettingsURL: URL?
+    @Published private(set) var needsSetup = false
+    @Published private(set) var setupError: String?
+    @Published private(set) var isBootstrapping = false
 
     let history: CaptureHistoryController?
     let memory: MemoryStore?
     let dictionary: DictionaryStore?
     let memoryLearning: MemoryLearningController?
 
-    private let capabilityGate = CapabilityGate()
+    let setup = PermissionSetupController(locale: Locale(identifier: "zh-CN"))
+
+    private static let setupCompletedKey = "setup.completed"
+    private var setupObservation: AnyCancellable?
     private let speech = SpeechPipeline()
     private let injector = TextInjector()
     private let hud = CaptureHUDController()
@@ -59,7 +65,6 @@ final class AppController: ObservableObject {
     private var captureFinishTask: Task<Void, Never>?
     private var captureShutdownTask: Task<Void, Never>?
     private var stoppingCaptureID: UUID?
-    private var isBootstrapping = false
     private var activeSourceAudioURL: URL?
     private var lastPresentedFailure: String?
 
@@ -98,6 +103,9 @@ final class AppController: ObservableObject {
             }
         }
 
+        setupObservation = setup.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
         Diagnostics.record("App", "Morie controller initialized; launch bootstrap scheduled")
         Task { @MainActor [weak self] in
             await self?.bootstrap()
@@ -106,15 +114,15 @@ final class AppController: ObservableObject {
 
     var statusTitle: String {
         switch state {
-        case .checking: "Checking device capabilities"
-        case .blocked: "Required capability unavailable"
-        case .ready: "Ready"
-        case .recording: "Listening…"
-        case .stopping: "Stopping…"
-        case .finalizing: "Finalizing…"
-        case .refining: "Refining…"
-        case .delivering: "Delivering…"
-        case .failed: "Input failed"
+        case .checking: "正在准备 Morie"
+        case .blocked: "需要完成设置"
+        case .ready: setup.isReady ? "可以开始录音" : "需要完成设置"
+        case .recording: "正在聆听…"
+        case .stopping: "正在停止…"
+        case .finalizing: "正在完成识别…"
+        case .refining: "正在润色…"
+        case .delivering: "正在输入…"
+        case .failed: "输入失败"
         }
     }
 
@@ -142,13 +150,14 @@ final class AppController: ObservableObject {
     var statusDetail: String? {
         switch state {
         case .blocked(let reason), .failed(let reason): reason
+        case .ready: setup.firstIssue?.detail
         default: nil
         }
     }
 
     var canStartCapture: Bool {
         guard activeCaptureID == nil, captureShutdownTask == nil,
-              !isBootstrapping, captureStore != nil else { return false }
+              !isBootstrapping, setup.isReady, captureStore != nil else { return false }
         switch state {
         case .ready, .failed: return true
         default: return false
@@ -164,13 +173,23 @@ final class AppController: ObservableObject {
         startNewCapture(deliveryMode: .captureOnly)
     }
 
-    func bootstrap() async {
-        guard !isBootstrapping else { return }
+    var canCompleteSetup: Bool {
+        !isCaptureActive && !isBootstrapping && !setup.isBusy
+    }
+
+    var isCaptureActive: Bool { activeCaptureID != nil || captureShutdownTask != nil }
+
+    func bootstrap(completingSetup: Bool = false) async {
+        // A setup action must not tear down intentional input. Returning from
+        // System Settings calls setup.refresh(), never this startup routine.
+        guard activeCaptureID == nil, captureShutdownTask == nil,
+              !isBootstrapping, setup.activeRequest == nil else { return }
         isBootstrapping = true
         defer { isBootstrapping = false }
 
         Diagnostics.record("App", "Bootstrap started")
         state = .checking
+        setupError = nil
         memoryLearning?.stop()
         memoryLearning?.setInputActive(true)
         dictionaryCorrections?.stop()
@@ -178,74 +197,68 @@ final class AppController: ObservableObject {
         hotkey = nil
         hud.hide()
         history?.pausePlayback()
-        await stopActiveCapture(disposition: .interrupted(
-            "Recording stopped for a capability recheck. Saved text and available audio have been kept."
-        ))
         await history?.cancelRecognitionAndWait()
 
-        transcript = ""
-        recoverySettingsURL = nil
-
         do {
+            await setup.refresh()
             try Task.checkCancellation()
             guard state == .checking else { return }
             if let persistenceError {
                 throw ControllerError.persistenceUnavailable(persistenceError.localizedDescription)
             }
             guard captureStore != nil else {
-                throw ControllerError.persistenceUnavailable("Capture store was not initialized.")
+                throw ControllerError.persistenceUnavailable("记录存储尚未初始化。")
             }
 
-            try await capabilityGate.requirePrivateMode()
-            try Task.checkCancellation()
-            guard state == .checking else { return }
-            Diagnostics.record(
-                "App",
-                "Capability gate passed; preparing Speech assets for locale \(speechLocale.identifier)"
-            )
+            guard setup.isReady else {
+                let issue = setup.firstIssue
+                state = .blocked(issue?.detail ?? "请先完成使用引导中的设备与权限检查。")
+                needsSetup = true
+                return
+            }
+            guard completingSetup || UserDefaults.standard.bool(forKey: Self.setupCompletedKey) else {
+                state = .blocked("设备已就绪，请完成使用引导后开始录音。")
+                needsSetup = true
+                return
+            }
 
+            Diagnostics.record("App", "Capability gate passed; preparing Speech assets for locale \(speechLocale.identifier)")
             try await speech.prepare(locale: speechLocale)
             try Task.checkCancellation()
             guard state == .checking else { return }
-            Diagnostics.record("App", "Speech assets ready; installing global hotkey")
+
+            // Asset preparation can take time; permissions may change while
+            // the user is in System Settings. Recheck before enabling input.
+            await setup.refresh()
+            try Task.checkCancellation()
+            guard state == .checking else { return }
+            guard setup.isReady else {
+                state = .blocked(setup.firstIssue?.detail ?? "请先完成设备与权限检查。")
+                needsSetup = true
+                return
+            }
 
             try installHotkeyIfNeeded()
             lastPresentedFailure = nil
-            recoverySettingsURL = nil
+            UserDefaults.standard.set(true, forKey: Self.setupCompletedKey)
+            needsSetup = false
             state = .ready
             memoryLearning?.setInputActive(false)
             memoryLearning?.start()
             Diagnostics.record("App", "Bootstrap complete; Morie is Ready")
         } catch is CancellationError {
+            state = .blocked("准备已取消，可以在使用引导中重试。")
+            needsSetup = true
             Diagnostics.record("App", "Bootstrap cancelled", level: .warning)
         } catch {
             hotkey?.invalidate()
             hotkey = nil
-
             let message = error.localizedDescription
             state = .blocked(message)
+            setupError = message
+            needsSetup = true
             Diagnostics.record("App", "Bootstrap blocked: \(message)", level: .error)
-            if let gateError = error as? CapabilityGate.GateError {
-                recoverySettingsURL = gateError.settingsURL
-                if case .accessibilityDenied = gateError {
-                    Diagnostics.record(
-                        "UI",
-                        "Accessibility failure remains visible in app status; duplicate Morie alert suppressed",
-                        level: .warning
-                    )
-                } else {
-                    presentCapabilityFailure(gateError)
-                }
-            } else {
-                presentFailure(title: "Morie can't start", message: message)
-            }
         }
-    }
-
-    func openRecoverySettings() {
-        guard let recoverySettingsURL else { return }
-        Diagnostics.record("Permission", "Opening recovery System Settings from menu")
-        NSWorkspace.shared.open(recoverySettingsURL)
     }
 
     private func installHotkeyIfNeeded() throws {
@@ -289,6 +302,7 @@ final class AppController: ObservableObject {
         captureShortcut = shortcut
         UserDefaults.standard.set(shortcut.rawValue, forKey: CaptureShortcut.defaultsKey)
         Diagnostics.record("Hotkey", "Shortcut preference changed to \(shortcut.logName)")
+        guard canStartCapture else { return }
 
         hotkey?.invalidate()
         hotkey = nil
@@ -345,7 +359,7 @@ final class AppController: ObservableObject {
             let message = error.localizedDescription
             state = .failed(message)
             Diagnostics.record("CaptureStore", "Could not create Capture \(label(sessionID)): \(message)", level: .error)
-            presentFailure(title: "Morie couldn't save this capture", message: message)
+            presentFailure(title: "无法保存这次录音", message: message)
             return
         }
 
@@ -420,7 +434,7 @@ final class AppController: ObservableObject {
             try Task.checkCancellation()
             guard activeCaptureID == sessionID else { throw CancellationError() }
             guard let sourceAudioURL = activeSourceAudioURL else {
-                throw ControllerError.persistenceUnavailable("Source-audio storage was not initialized.")
+                throw ControllerError.persistenceUnavailable("原始录音存储尚未初始化。")
             }
             try await speech.start(
                 sessionID: sessionID,
@@ -505,7 +519,7 @@ final class AppController: ObservableObject {
             let result = try await speech.stop(sessionID: sessionID)
             var finalText = result.transcript
             guard let captureStore else {
-                throw ControllerError.persistenceUnavailable("Capture store was not initialized.")
+                throw ControllerError.persistenceUnavailable("记录存储尚未初始化。")
             }
             // Persist a late final result even if an interruption has taken over
             // UI/teardown ownership. Only the explicit discard path deletes it.
@@ -600,7 +614,12 @@ final class AppController: ObservableObject {
         hotkey = nil
         hud.hide()
         await stopActiveCapture(disposition: .interrupted(message))
-        if state == .blocked(message) { hud.showFailure() }
+        if state == .blocked(message) {
+            hud.showFailure()
+            setupError = message
+            needsSetup = true
+            await setup.refresh()
+        }
         Diagnostics.record(
             "UI",
             "Hotkey failure reported without a modal alert so keyboard and pointer interaction remain available",
@@ -728,7 +747,7 @@ final class AppController: ObservableObject {
             )
         } else {
             hud.showFailure()
-            presentFailure(title: "Morie input failed", message: message)
+            presentFailure(title: "Morie 输入失败", message: message)
         }
     }
 
@@ -754,37 +773,10 @@ final class AppController: ObservableObject {
         alert.alertStyle = .warning
         alert.messageText = title
         alert.informativeText = message
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "好")
 
         NSApplication.shared.activate(ignoringOtherApps: true)
         alert.runModal()
-    }
-
-    private func presentCapabilityFailure(_ error: CapabilityGate.GateError) {
-        let message = error.localizedDescription
-        guard lastPresentedFailure != message else { return }
-        lastPresentedFailure = message
-        Diagnostics.record("UI", "Presenting capability alert: \(message)", level: .warning)
-
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = "Morie can't start"
-        alert.informativeText = message
-
-        if let settingsURL = error.settingsURL {
-            alert.addButton(withTitle: "Open System Settings")
-            alert.addButton(withTitle: "Not Now")
-
-            NSApplication.shared.activate(ignoringOtherApps: true)
-            if alert.runModal() == .alertFirstButtonReturn {
-                Diagnostics.record("Permission", "Opening System Settings for \(String(describing: error))")
-                NSWorkspace.shared.open(settingsURL)
-            }
-        } else {
-            alert.addButton(withTitle: "OK")
-            NSApplication.shared.activate(ignoringOtherApps: true)
-            alert.runModal()
-        }
     }
 
     private func label(_ sessionID: UUID) -> String {

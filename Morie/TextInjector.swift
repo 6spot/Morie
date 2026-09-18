@@ -11,13 +11,13 @@ struct TextInjector {
         var errorDescription: String? {
             switch self {
             case .noTargetApplication:
-                "The original target application is unavailable. The transcript was copied to the clipboard."
+                "原来的目标应用已不可用，文字已复制到剪贴板。"
             case .targetWindowClosed:
-                "The original input window was closed. The transcript was copied to the clipboard."
+                "原来的输入窗口已关闭，文字已复制到剪贴板。"
             case .focusRestoreFailed:
-                "Could not restore focus to the original application. The transcript was copied to the clipboard."
+                "无法返回原来的应用，文字已复制到剪贴板。"
             case .pasteFailed:
-                "Could not inject the transcript. The transcript was left on the clipboard."
+                "无法自动输入文字，文字已保留在剪贴板中。"
             }
         }
     }

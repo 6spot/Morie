@@ -62,6 +62,11 @@
 		A20000000000000000000018 /* DictionaryCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000032 /* DictionaryCorrection.swift */; };
 		A1000000000000000000001F /* DictionaryCorrectionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000033 /* DictionaryCorrectionController.swift */; };
 		A20000000000000000000019 /* DictionaryCorrectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000010 /* DictionaryCorrectionTests.swift */; };
+		A10000000000000000000020 /* PermissionSetupController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* PermissionSetupController.swift */; };
+		A10000000000000000000021 /* MorieSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000035 /* MorieSetupView.swift */; };
+		A2000000000000000000001A /* PermissionSetupController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* PermissionSetupController.swift */; };
+		A2000000000000000000001B /* PermissionSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000011 /* PermissionSetupTests.swift */; };
+		A10000000000000000000022 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -108,6 +113,10 @@
 		B10000000000000000000032 /* DictionaryCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryCorrection.swift; sourceTree = "<group>"; };
 		B10000000000000000000033 /* DictionaryCorrectionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryCorrectionController.swift; sourceTree = "<group>"; };
 		B20000000000000000000010 /* DictionaryCorrectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryCorrectionTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000034 /* PermissionSetupController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSetupController.swift; sourceTree = "<group>"; };
+		B10000000000000000000035 /* MorieSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieSetupView.swift; sourceTree = "<group>"; };
+		B20000000000000000000011 /* PermissionSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSetupTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000036 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,6 +147,9 @@
 		D10000000000000000000002 /* Morie */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000034 /* PermissionSetupController.swift */,
+				B10000000000000000000035 /* MorieSetupView.swift */,
+				D10000000000000000000004 /* InfoPlist.strings */,
 				B10000000000000000000001 /* MorieApp.swift */,
 				B10000000000000000000002 /* AppController.swift */,
 				B10000000000000000000003 /* CapabilityGate.swift */,
@@ -177,6 +189,7 @@
 		D20000000000000000000001 /* MorieTests */ = {
 			isa = PBXGroup;
 			children = (
+				B20000000000000000000011 /* PermissionSetupTests.swift */,
 				B20000000000000000000001 /* CaptureStoreTests.swift */,
 				B20000000000000000000003 /* CaptureHistoryTests.swift */,
 				B20000000000000000000004 /* TestDiagnostics.swift */,
@@ -234,6 +247,17 @@
 		};
 /* End PBXNativeTarget section */
 
+/* Begin PBXVariantGroup section */
+		D10000000000000000000004 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B10000000000000000000036 /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin PBXProject section */
 		E10000000000000000000002 /* Project object */ = {
 			isa = PBXProject;
@@ -248,9 +272,9 @@
 			};
 			buildConfigurationList = F10000000000000000000001 /* Build configuration list for PBXProject "Morie" */;
 			compatibilityVersion = "Xcode 16.0";
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
-			knownRegions = (en, Base);
+			knownRegions = ("zh-Hans", Base);
 			mainGroup = D10000000000000000000001;
 			productRefGroup = D10000000000000000000003 /* Products */;
 			projectDirPath = "";
@@ -266,7 +290,9 @@
 		C10000000000000000000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				A10000000000000000000022 /* InfoPlist.strings in Resources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C20000000000000000000003 /* Resources */ = {
@@ -282,6 +308,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000020 /* PermissionSetupController.swift in Sources */,
+				A10000000000000000000021 /* MorieSetupView.swift in Sources */,
 				A10000000000000000000001 /* MorieApp.swift in Sources */,
 				A10000000000000000000002 /* AppController.swift in Sources */,
 				A10000000000000000000003 /* CapabilityGate.swift in Sources */,
@@ -320,6 +348,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2000000000000000000001A /* PermissionSetupController.swift in Sources */,
+				A2000000000000000000001B /* PermissionSetupTests.swift in Sources */,
 				A20000000000000000000001 /* CaptureStoreTests.swift in Sources */,
 				A20000000000000000000002 /* CaptureRecord.swift in Sources */,
 				A20000000000000000000003 /* CaptureStore.swift in Sources */,
@@ -381,8 +411,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morie needs microphone access for intentional toggle voice capture.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morie uses Apple Speech to transcribe your intentional voice captures on device.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morie 仅在你主动开始录音后使用麦克风，记录你的语音输入。";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morie 使用 Apple 本机语音识别，将你主动录制的内容转成文字。";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = me.morie.mac;
@@ -401,8 +431,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morie needs microphone access for intentional toggle voice capture.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morie uses Apple Speech to transcribe your intentional voice captures on device.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morie 仅在你主动开始录音后使用麦克风，记录你的语音输入。";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morie 使用 Apple 本机语音识别，将你主动录制的内容转成文字。";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = me.morie.mac;

@@ -10,15 +10,15 @@ final class MemoryStore: ObservableObject {
 
         var errorDescription: String? {
             switch self {
-            case .invalidName: "Enter a memory topic of 1–120 characters on one line."
-            case .invalidNotes: "Enter personal information of 1–2,000 characters."
-            case .duplicateName: "An active memory already has this topic. Edit the existing memory."
-            case .memoryUnavailable: "This memory is no longer available."
-            case .sourceUnavailable: "The source input is no longer available."
-            case .sourceNotReady: "Finish the input and save its final text before learning from it."
-            case .notEditable: "This memory has been superseded. Open its replacement."
-            case .sourceChanged: "The saved input changed. Its earlier analysis was not used."
-            case .invalidAnalysis: "Memory analysis returned invalid data. Your input is saved."
+            case .invalidName: "请填写 1–120 个字符的记忆主题，且不换行。"
+            case .invalidNotes: "请填写 1–2,000 个字符的个人信息。"
+            case .duplicateName: "已有相同主题的个人记忆正在使用，请编辑现有记忆。"
+            case .memoryUnavailable: "此个人记忆已不存在。"
+            case .sourceUnavailable: "来源输入已不存在。"
+            case .sourceNotReady: "请先完成输入并保存最终文字，再学习个人记忆。"
+            case .notEditable: "此个人记忆已被替代，请查看替代后的记忆。"
+            case .sourceChanged: "保存的输入已发生变化，此前的分析结果未被使用。"
+            case .invalidAnalysis: "个人记忆分析结果无效，你的输入已保存。"
             }
         }
     }

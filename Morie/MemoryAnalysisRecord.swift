@@ -59,12 +59,12 @@ enum MemoryAnalysisFailure: String, Codable, Error, Sendable {
     var retryable: Bool { self == .unavailable || self == .generationFailed }
     var message: String {
         switch self {
-        case .unavailable: "Apple Intelligence is unavailable. Memory learning will retry automatically."
-        case .unsupportedLanguage: "The on-device model could not analyze this language. Your input is saved."
-        case .textTooLong: "This input is too long for one on-device analysis. Its full text is saved."
-        case .declined: "Apple Intelligence could not analyze this input. Your input is saved."
-        case .generationFailed: "Memory learning could not finish. It will retry automatically."
-        case .sourceChanged: "The saved input changed. The previous analysis was not used."
+        case .unavailable: "Apple 智能暂不可用，个人记忆学习会自动重试。"
+        case .unsupportedLanguage: "本机模型暂不支持分析这种语言，你的输入已保存。"
+        case .textTooLong: "输入内容超过单次本机分析范围，完整文字已保存。"
+        case .declined: "Apple 智能未能分析这次输入，你的输入已保存。"
+        case .generationFailed: "个人记忆学习未能完成，稍后会自动重试。"
+        case .sourceChanged: "保存的输入已发生变化，此前的分析结果未被使用。"
         }
     }
 }

@@ -50,6 +50,9 @@ Morie/
 │   ├── MorieApp.swift
 │   ├── AppController.swift
 │   ├── CapabilityGate.swift
+│   ├── PermissionSetupController.swift
+│   ├── MorieSetupView.swift
+│   ├── zh-Hans.lproj/InfoPlist.strings
 │   ├── CaptureRecord.swift
 │   ├── CaptureStore.swift
 │   ├── CaptureHistoryView.swift
@@ -87,6 +90,7 @@ Morie/
 │   ├── DictionaryTests.swift
 │   ├── DictionaryCorrectionTests.swift
 │   ├── PersonalizationTests.swift
+│   ├── PermissionSetupTests.swift
 │   └── TestDiagnostics.swift
 ├── .github/workflows/
 │   ├── macos-27-ci.yml
@@ -111,9 +115,15 @@ Do not extract shared packages merely to match a future diagram. New modules nee
 ```text
 bootstrap
   ↓
-capability checks
+read-only capability/permission inspection
+  ↓
+first use or unmet requirement → native setup guide / explicit authorization
+  ↓
+all required checks pass + setup completion
   ↓
 prepare required Apple Speech assets
+  ↓
+recheck requirements after asset preparation
   ↓
 install minimal global toggle-capture event tap
   ↓
@@ -185,7 +195,9 @@ Morie does not introduce a generalized multi-provider session framework to solve
 
 ### `MorieApp`
 
-Thin native menu-bar application shell. It owns presentation composition only and uses Apple system components. Its menu-bar item uses one stable product-entry symbol; capture and delivery state belong to the HUD and textual menu content rather than repeatedly changing the persistent system-bar icon.
+Thin native menu-bar shell with a system `.menu` MenuBarExtra, a management Window, a dedicated setup Window and the native Settings scene. SettingsLink entries in the sidebar/menu and Command-comma share that Settings scene. SidebarCommands supplies the system visibility command; no new global shortcut tap is added. The menu-bar symbol stays stable while textual status changes.
+
+The primary bundle language and localized privacy descriptions are `zh-Hans`. App-owned UI/error/accessibility copy is Chinese; user input, dictionary spellings, prompts, technical log identifiers and persisted raw values remain unchanged. SwiftUI surfaces and formatted dates use a Chinese locale.
 
 ### `AppController`
 
@@ -204,17 +216,23 @@ Owns Phase 0 orchestration:
 
 It specifically prevents finish/cancel-during-setup from becoming a late or orphaned recording session.
 
-One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; capability recheck, shortcut failure, microphone interruption and Speech errors retain a failed Capture. New input waits until shutdown ends. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
+One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; shortcut failure, microphone interruption and Speech errors retain a failed Capture. Read-only setup refresh no longer interrupts capture. New input waits until shutdown ends. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
 
-### `CapabilityGate`
+### `CapabilityGate` / `PermissionSetupController`
 
-Checks the capabilities currently owned by Phase 0:
+Inspects all mandatory requirements without authorization side effects:
 
 - `SystemLanguageModel` availability and locale;
 - modern Speech availability and locale;
 - Microphone permission;
 - Speech authorization;
 - Accessibility trust.
+
+Checks use the actual Chinese Speech locale, rather than the UI/system locale. Microphone and Speech requests occur only after an explicit setup action and only for undetermined TCC status. Denied access opens the corresponding System Settings pane. Accessibility registration and its native settings link also require an explicit action; restricted and unsupported states remain blocked.
+
+`PermissionSetupController` owns immutable check snapshots, coalesces overlapping refreshes, serializes requests and rereads the current state before acting. Native-dialog activation cannot race a request's final inspection. Empty/partial snapshots cannot pass the gate. Its injected closures let logic tests exercise these transitions without touching TCC.
+
+`MorieSetupView` refreshes on presentation and app activation. It uses a grouped Form with device/permission rows, status labels, native buttons and preparation feedback. The first launch shows setup even if permissions already exist; `setup.completed` is saved only after asset preparation and hotkey installation succeed. Every launch rechecks actual requirements. Missing requirements and preparation errors reopen the guide instead of stacking startup alerts. Completing setup is disabled during active input; refreshing never calls bootstrap, prepares models or resets a capture. Requirements are rechecked after potentially lengthy Speech preparation.
 
 ApplicationServices is imported through a Swift `@preconcurrency` boundary because its native C accessibility option-key global is not annotated for Swift 6 concurrency. This is an Apple-framework interop boundary, not a replacement dependency.
 
@@ -237,7 +255,7 @@ Current behavior:
 - Morie-generated synthetic input is excluded;
 - Accessibility trust is checked in the event path and loss immediately releases the tap while passing the current event through;
 - a system-disabled or timed-out tap is released instead of automatically re-enabled, so a Morie failure cannot repeatedly block the system keyboard event chain;
-- recovery after a timeout is explicit through capability recheck.
+- recovery after a timeout is explicit through **使用引导与权限 → 重新检查 → 开始使用**.
 
 Not present by design:
 
@@ -350,13 +368,13 @@ Audio playback uses AVKit's standard `AVPlayerView` controls. Open/close, expiry
 
 ### `MorieControlCenter`
 
-The primary management surface is one native SwiftUI `Window`, defaulting to 1120 × 720 with a 960 × 600 minimum. The sidebar groups History/Dictionary/Personal Memory under Library and Settings/Diagnostics under App. Library sections use a native three-column `NavigationSplitView` (sidebar, selectable list, detail); app sections use the native two-column form with the same sidebar composition.
+The primary management surface is one native SwiftUI `Window`, defaulting to 1120 × 720 with a 960 × 600 minimum. The sidebar groups **历史记录 / 字典 / 个人记忆** under **资料库**, and **设置 / 使用引导与权限 / 诊断** under **应用**. Library pages use a three-column `NavigationSplitView`; Diagnostics uses two columns. Both map a shared sidebar-visibility choice to their native column states (`doubleColumn` versus `detailOnly` when hidden). Native expandable Section controls persist group expansion. Settings and setup entries open their shared native windows rather than duplicating embedded settings.
 
-The root owns independent Capture, Dictionary and Personal Memory UUID selections. Each selected detail gets a `NavigationStack` whose identity changes with that selection, so source/related links cannot leak navigation from another record. The SwiftData container is attached at the window root before `@Query` builds the initial content. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
+The root owns independent Capture, Dictionary and Personal Memory UUID selections. Each selected detail gets a `NavigationStack` whose identity changes with that selection, so source/related links cannot leak navigation from another record. The SwiftData container is attached at the window root before `@Query` builds the initial content. The native menu retains **打开 Morie**, **设置…**, **使用引导与权限…**, status/shortcut guidance and **退出 Morie**.
 
 `ManagementDetailContent` is a small composition of native ScrollView/VStack with 28-point padding and a readable maximum width of 760 points. It is shared by Capture, Dictionary and Personal Memory reading surfaces. Actual settings and editing retain grouped Forms. There is no custom navigation, control library, material or persistence layer.
 
-`MorieSettingsView` uses a flexible, centered grouped Form (maximum width 700 points) within management, and a separate 640 × 520 native Settings window. `DiagnosticLogView` uses a native Table with search/level filtering, selection and a resizable event-detail area for complete messages. Copy All Events, reveal-file and confirmed clear actions preserve the existing logger behavior.
+`MorieSettingsView` uses a flexible grouped Form in one 640 × 600 native Settings window. The setup window defaults to 700 × 740 and permits native resizing down to 640 × 680; long permission descriptions scroll inside the grouped Form. `DiagnosticLogView` uses a native Table with search/level filtering, selection and a resizable event-detail area for complete messages. Copy All Events, reveal-file and confirmed clear actions preserve the existing logger behavior.
 
 ### `DictionaryEntry` / `DictionaryStore`
 
@@ -404,19 +422,21 @@ The controller waits 30 seconds of input idle time and processes at most three s
 
 ### Native Memory management
 
-`MemoryView` shows personal information directly in the shared searchable list/detail UI, with status filtering and optional native create/edit/archive/restore/replace/delete actions. There is no candidate inbox or review sheet. `MemoryLearningView` shows per-Capture learning progress/outcomes, linked memories and **Text Used for Learning**. Sources remain exact and inspectable; opening/closing a page does not start or cancel background learning.
+`MemoryView` shows personal information directly in the shared searchable list/detail UI, with status filtering and optional native create/edit/archive/restore/replace/delete actions. There is no candidate inbox or review sheet. `MemoryLearningView` shows per-Capture learning progress/outcomes, linked memories and **用于学习的文字**. Sources remain exact and inspectable; opening/closing a page does not start or cancel background learning.
 
 ### `DictionaryCorrectionController`
 
-The independent **Suggest Words After I Correct Input** setting defaults off. After current-app paste dispatch, a short actor task verifies the exact inserted text at the caret; unsupported/secure fields and selected terminal/password-manager apps are excluded. No clipboard fallback or capture-only input starts observation.
+The independent **修改输入后建议加入字典** setting defaults off. After current-app paste dispatch, a short actor task verifies the exact inserted text at the caret; unsupported/secure fields and selected terminal/password-manager apps are excluded. No clipboard fallback or capture-only input starts observation.
 
 Accessibility IPC stays off the main actor with 50 ms native message timeouts. `AXStringForRange` reads a bounded insertion (at most 1,200 UTF-16 units, at most 64 units of length change); it never requests the whole document. PID, field identity, secure-input state and selection bounds are checked. Observation ends on departure, new capture, disabling the setting or 30 seconds. Character-count delta infers range length, so concurrent edits elsewhere and host range implementations remain device-validation risks.
 
-The pure detector aligns native word boundaries across both texts and waits two seconds for a stable small correction. It handles shared letters, added/deleted letters and word joins, while rejecting appended/deleted phrases, punctuation/numbers/technical edits and broad rewrites. A native nonactivating `NSPanel` offers **Remember / Not Now** for the spelling. Remember does not create an alias; the prompt expires after 20 seconds, dismisses on further edits/departure, and offers each normalized word at most once per process. External text is never sent to AI, logged or saved into Capture. See the [OpenLess audit](reference/openless.md).
+The pure detector aligns native word boundaries across both texts and waits two seconds for a stable small correction. It handles shared letters, added/deleted letters and word joins, while rejecting appended/deleted phrases, punctuation/numbers/technical edits and broad rewrites. A native nonactivating `NSPanel` offers **加入字典 / 暂不添加** for the spelling. Remember does not create an alias; the prompt expires after 20 seconds, dismisses on further edits/departure, and offers each normalized word at most once per process. External text is never sent to AI, logged or saved into Capture. See the [OpenLess audit](reference/openless.md).
 
 ### `MorieTests`
 
 The logic-only target compiles core persistence, audio, dictionary, cleanup and learning sources directly without launching Morie or entering TCC. In-memory/unique temporary stores and synthetic audio isolate production data; `TestDiagnostics.swift` isolates the running app's log. Native AAC encoding/decoding is exercised without opening a microphone.
+
+Permission setup tests cover mandatory complete snapshots, read-only revocation/recovery, explicit authorization, denied/restricted/unsupported states, stale buttons, coalesced refresh and duplicate/dialog-activation races. They link only the injected setup controller, never the live capability gate.
 
 Dictionary tests cover persistence, conflict rules, bounded hints, native word boundaries and noncascading corrections. Correction tests cover Chinese/mixed words, added/deleted/joined letters, excluded edits, settling and undo without reading Accessibility data or displaying a panel.
 

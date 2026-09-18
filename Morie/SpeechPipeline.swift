@@ -13,10 +13,10 @@ actor SpeechPipeline {
 
         var errorDescription: String? {
             switch self {
-            case .alreadyRunning: "Speech capture is already running."
-            case .noMicrophone: "No audio capture device is available."
-            case .unsupportedLocale: "The current locale is not supported by SpeechTranscriber."
-            case .notRunning: "Speech capture is not running."
+            case .alreadyRunning: "录音正在进行中。"
+            case .noMicrophone: "没有可用的麦克风。"
+            case .unsupportedLocale: "Apple 语音转写暂不支持当前输入语言。"
+            case .notRunning: "当前没有正在进行的录音。"
             case .recognitionFailed(let reason, _): reason
             }
         }

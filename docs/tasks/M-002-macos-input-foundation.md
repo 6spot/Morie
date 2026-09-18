@@ -8,6 +8,10 @@
 - **Pull Request:** https://github.com/6spot/Morie/pull/3
 - **Merged baseline:** `main` at `2cda9a3`; continue implementation on task branches
 
+## Current setup behavior — M-010, 2026-09-18
+
+[M-010](M-010-macos-native-setup.md) replaces the earlier automatic permission/modal flow with a Chinese native setup guide. Startup still begins in `AppController.init`; it inspects all mandatory requirements without prompting. Explicit guide actions authorize access, and **开始使用** prepares Speech/installs the shortcut. Read-only refresh leaves input running. Shortcut failure recovery now uses **使用引导与权限 → 重新检查 → 开始使用**. The dated investigation below remains historical evidence; signed-app acceptance follows the updated [validation matrix](../validation.md#m-010-chinese-ui-and-native-setup).
+
 ## Why
 
 Morie's first product dependency is a reliable macOS voice-input loop. Recording, transcription, session finalization, focus restoration, and text delivery must be dependable before persistence and Personal Memory have a stable product surface to improve.
@@ -127,7 +131,7 @@ Current behavior:
 - matched shortcut events are consumed;
 - Morie-generated synthetic delivery events are ignored;
 - Accessibility loss in the event path immediately releases the tap and passes the current event through;
-- tap-disabled/timeout events release the tap and block Morie until an explicit capability recheck, protecting system-wide keyboard availability.
+- tap-disabled/timeout events release the tap and block Morie until explicit setup completion, protecting system-wide keyboard availability.
 
 Intentionally not present:
 

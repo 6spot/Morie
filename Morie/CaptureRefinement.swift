@@ -21,13 +21,13 @@ enum RefinementStatus: String, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .running: "Refining…"
-        case .applied: "Refined"
-        case .unchanged: "Unchanged"
-        case .skipped: "Skipped"
-        case .timedOut: "Time Limit Reached"
-        case .failed: "Saved Text Kept"
-        case .interrupted: "Interrupted"
+        case .running: "正在润色…"
+        case .applied: "已润色"
+        case .unchanged: "无需修改"
+        case .skipped: "已跳过"
+        case .timedOut: "润色超时"
+        case .failed: "已保留原文字"
+        case .interrupted: "已中断"
         }
     }
 }
@@ -39,19 +39,19 @@ enum RefinementReason: String, Codable, Error, Sendable {
 
     var message: String {
         switch self {
-        case .disabled: "AI cleanup was turned off. Your dictionary still applies."
-        case .modelBusy: "Earlier on-device analysis was still finishing. Input continued with dictionary corrections."
-        case .unavailable: "Apple Intelligence was unavailable. Input continued with dictionary corrections."
-        case .unsupportedLanguage: "The on-device model could not clean up this language. Saved text was kept."
-        case .textTooLong: "The full input did not fit in one on-device request. Saved text was kept."
-        case .declined: "Apple Intelligence declined this cleanup. Saved text was kept."
-        case .generationFailed: "AI cleanup could not finish. Saved text was kept."
-        case .invalidEdits: "The proposed cleanup failed content checks. Input continued with dictionary corrections."
-        case .memoryChanged: "Personal context changed during cleanup. Input continued with dictionary corrections."
-        case .dictionaryChanged: "Your dictionary changed during cleanup. The recognized text was kept."
-        case .timeLimit: "AI cleanup reached its time limit. Input continued with dictionary corrections."
-        case .interrupted: "Input processing was interrupted. Saved text and audio were kept."
-        case .saveFailed: "The processed result could not be saved. The previously saved text was kept."
+        case .disabled: "AI 润色已关闭，自定义字典仍然生效。"
+        case .modelBusy: "前一次本机分析尚未结束，本次使用字典修正后的文字继续输入。"
+        case .unavailable: "Apple 智能暂不可用，本次使用字典修正后的文字继续输入。"
+        case .unsupportedLanguage: "本机模型暂不支持润色这种语言，已保留保存的文字。"
+        case .textTooLong: "输入内容超过单次本机处理范围，已保留完整文字。"
+        case .declined: "Apple 智能未能处理本次润色，已保留保存的文字。"
+        case .generationFailed: "AI 润色未能完成，已保留保存的文字。"
+        case .invalidEdits: "润色结果未通过内容检查，已使用字典修正后的文字继续输入。"
+        case .memoryChanged: "润色期间个人记忆发生变化，已使用字典修正后的文字继续输入。"
+        case .dictionaryChanged: "润色期间字典发生变化，已保留识别文字。"
+        case .timeLimit: "AI 润色超时，已使用字典修正后的文字继续输入。"
+        case .interrupted: "输入处理已中断，已保存的文字和录音均已保留。"
+        case .saveFailed: "无法保存处理结果，已保留此前保存的文字。"
         }
     }
 

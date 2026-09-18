@@ -95,7 +95,7 @@ final class DictionaryCorrectionController {
             }
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 370, height: 180),
                             styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.title = "Remember a Word"
+        panel.title = "加入字典"
         panel.isReleasedWhenClosed = false
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
@@ -132,16 +132,16 @@ struct DictionaryCorrectionPrompt: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Remember “\(correction.replacement)”?").font(.headline)
+            Text("将“\(correction.replacement)”加入字典？").font(.headline)
             Text("\(correction.original) → \(correction.replacement)").textSelection(.enabled)
-            Text("Use this spelling as a hint for future voice input.").font(.callout).foregroundStyle(.secondary)
+            Text("以后识别语音时，将这个词语作为拼写提示。").font(.callout).foregroundStyle(.secondary)
             if let error { Text(error).font(.caption).foregroundStyle(.secondary) }
             HStack {
                 Spacer()
-                Button("Not Now", action: dismiss)
-                Button("Remember") {
+                Button("暂不添加", action: dismiss)
+                Button("加入字典") {
                     do { try save() }
-                    catch { self.error = "Could not save the word. Please try again." }
+                    catch { self.error = "无法保存词语，请重试。" }
                 }
             }
         }

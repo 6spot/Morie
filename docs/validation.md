@@ -34,7 +34,7 @@ Verify:
 - denied microphone permission → blocked/recoverable;
 - denied Speech permission → blocked/recoverable;
 - missing Accessibility trust → blocked/recoverable;
-- rechecking after permission changes can reach Ready without adding a fallback implementation;
+- refreshing after permission changes updates the guide; **开始使用** can then reach Ready without a fallback implementation;
 - revoking Accessibility after startup does not leave a broken/stuck global shortcut session.
 - a system event-tap timeout disables Morie's shortcut and leaves ordinary keyboard input immediately usable; Morie must not automatically re-enable a repeatedly failing tap;
 
@@ -70,7 +70,7 @@ Automated persistence/History tests cover success, empty results, failure, cance
 
 ## M-003 capture-only voice entry
 
-- [ ] Choose **History → Record Capture**, speak and finish with the HUD; text/audio are saved with **Destination: History**, and feedback says “已保存”.
+- [ ] Choose **历史记录 → 开始录音**, speak and finish with the HUD; text/audio are saved with **保存位置：历史记录**, and feedback says “已保存”.
 - [ ] Finish another capture-only recording with the configured shortcut; the entry's saved destination remains authoritative.
 - [ ] Switch to another app before finishing; no paste, clipboard mutation or target-app activation occurs.
 - [ ] Cancel with Escape/HUD; the unfinished row and audio are removed, and a new capture starts normally.
@@ -83,11 +83,11 @@ Automated persistence/History tests cover success, empty results, failure, cance
 
 ## M-003 interruption and discard
 
-Use disposable captures from the normal Xcode-signed app. Repeat the relevant cases for both the shortcut and History's **Record Capture** entry:
+Use disposable captures from the normal Xcode-signed app. Repeat the relevant cases for both the shortcut and History's **开始录音** entry:
 
-- [ ] Start recording, speak, then choose **Recheck Capabilities**. The microphone stops, text/audio remain in a failed History record, and the capability flow completes without a late paste.
-- [ ] Recheck during Speech startup and normal finalization. No orphan microphone session, duplicate teardown, stale Ready transition, or late delivery occurs.
-- [ ] Reproduce shortcut unavailability/Accessibility revocation while recording. Ordinary keyboard input remains usable; the Capture is retained and status stays blocked until explicit recheck.
+- [ ] Start recording, speak, then open **使用引导与权限 → 重新检查**. Inspection leaves the recording running; normal finish retains/delivers the same text/audio exactly once. **开始使用** remains disabled during input.
+- [ ] Refresh setup during Speech startup and normal finalization. It does not restart bootstrap, tear down capture or create an orphan microphone session, duplicate completion or stale state.
+- [ ] Reproduce shortcut unavailability/Accessibility revocation while recording. Ordinary keyboard input remains usable; the Capture is retained and status stays blocked until setup is checked and **开始使用** succeeds.
 - [ ] Exercise a real microphone/capture-session interruption where practical. Failure ends capture without requiring the user to press Finish; retained audio can be played or shows an accurate native error.
 - [ ] Interrupt during focus handoff before paste. Saved text stays in History and no delayed clipboard staging/paste occurs. A paste already dispatched retains its actual delivery outcome.
 - [ ] Cancel with Escape/HUD during startup and recording. Native recording closes before the row/file disappear; a subsequent capture starts normally.
@@ -102,7 +102,7 @@ Automated AAC tests establish finalization and data preservation for controlled 
 Current acceptance follows [M-009](tasks/M-009-macos-input-memory.md), which supersedes mandatory candidate review. Use disposable records in the signed app when deferred evening validation resumes:
 
 - [ ] Completed ordinary input creates selective personal Memory during idle time without a confirmation inbox. Empty Memory does not prevent useful input/cleanup.
-- [ ] History's **Text Used for Learning** is the exact committed final text, including dictionary/cleanup output; recognized text remains separate.
+- [ ] History's **用于学习的文字** is the exact committed final text, including dictionary/cleanup output; recognized text remains separate.
 - [ ] Active, cancelled, capture-only, raw-only and running-refinement sources are excluded. Changed/deleted/unsaved sources cannot produce stale results.
 - [ ] Check actual Chinese/English personal projects, people, stable preferences, facts and decisions. Quoted, third-person, hypothetical, temporary and uncertain statements are not asserted as personal facts.
 - [ ] Repeat evidence and weaker recurring evidence across distinct inputs; sources merge without duplicate Memory or double-counting one Capture.
@@ -123,7 +123,7 @@ Historical foundation/candidate build and fixture evidence remains in [M-004](ta
 - [ ] Final text is saved before insertion; the target receives exactly that output. Original recognition, actual input, dictionary/Memory snapshots, changes, outcome and duration remain truthful.
 - [ ] Speech retry preserves completed final output and its old processing evidence, including existing capture-only records. Capture-only completion still does not paste/copy or restore another app.
 - [ ] Dictionary/Memory/source changes during inference invalidate stale results. Exercise unavailable/declined/oversized/slow models and save errors; unsaved AI text never reaches delivery.
-- [ ] Recheck capabilities/cancel during refinement and resume recording. No late paste, overlapping optional models or stuck processing. Relaunch recovers saved Capture without replaying a paste; pending personal analysis may resume separately.
+- [ ] Refresh setup during refinement without interrupting normal completion. Separately exercise cancellation and resume recording: no late paste, overlapping optional models or stuck processing. Relaunch recovers saved Capture without replaying a paste; pending personal analysis may resume separately.
 - [ ] Measure spelling-hint benefit, unintended edits, applied/skipped/timeout rates, real model time and final-to-delivery latency with cleanup on/off. Two seconds is a provisional model-wait budget, not an end-to-end guarantee.
 - [ ] Validate Settings persistence and native History/provenance/copy controls with keyboard, VoiceOver, long text and system appearance.
 
@@ -152,10 +152,28 @@ This is an independent opt-in dictionary behavior, not personal-Memory approval.
 - [ ] Moving between History records stops playback/re-recognition without affecting another Capture. Background personal learning follows input-idle lifecycle, not page selection.
 - [ ] Final text is primary; recognition/refinement/learning snapshots and recording destination/expiry/retry remain accessible. Long text scrolls/selects correctly.
 - [ ] Dictionary editor validates spellings/aliases; Personal Memory editor handles personal information/lifecycle. Save/cancel/error/delete flows use native controls and system confirmations. No routine review inbox remains.
-- [ ] Settings work in management and the native Settings scene. Diagnostics supports filters, complete selected messages, resizing, copy-all, file reveal and confirmed clear.
+- [ ] Sidebar/menu/Command-comma Settings entries reuse one native Settings scene. Diagnostics supports filters, complete selected messages, resizing, copy-all, file reveal and confirmed clear.
 - [ ] Verify empty/populated/error states, keyboard/VoiceOver, light/dark appearance, increased contrast, reduced motion and native glass/selection/toolbar rendering.
 
 Earlier M-008 compilation/tests/layout fixtures are documented in [its task record](tasks/M-008-macos-management-ui.md#validation-evidence). Current M-009 fixtures cover the changed pages. Offscreen bitmap caching omits some native material/selection layers and cannot complete interactive acceptance.
+
+## M-010 Chinese UI and native setup
+
+These signed-app checks remain open; isolated logic/layout evidence does not establish permission or keyboard behavior.
+
+- [ ] On first use, the native guide opens without any permission prompt. On a subsequent permitted launch, Morie prepares normally; a missing required capability or startup error reopens the guide.
+- [ ] Review all five requirements together. Microphone/Speech consent occurs only after **允许访问**. Repeated clicks and returning from a native consent dialog do not produce duplicate requests.
+- [ ] Denied access opens the corresponding native privacy pane. Accessibility opens its pane with Morie's signed identity registered. Returning updates status without a second Morie consent alert or a relaunch workaround.
+- [ ] Restricted permissions, unsupported hardware/language and unready Apple Intelligence remain blocked with useful Chinese explanations. No required check can be skipped.
+- [ ] **稍后设置** closes the guide without enabling recording; menu/sidebar/Settings can reopen it. Completing setup prepares Speech assets and enables input only after a fresh complete check. Test revocation during asset preparation with disposable permission state.
+- [ ] During recording/startup/refinement, opening or refreshing setup leaves input intact and disables **开始使用**. Explicit failure/cancellation still preserves the existing Capture-first semantics.
+- [ ] **⌘,**, sidebar **设置** and menu **设置…** reuse one native Settings window. The shortcut is app-scoped and does not replace the global recording shortcut or intercept another app's Settings command.
+- [ ] The system sidebar toolbar/View command hides and restores navigation across library/Diagnostics switches. Native **资料库 / 应用** headers fold/unfold and remember their state.
+- [ ] The menu-bar extra is a system menu. Management, Settings, setup and Quit actions work with pointer/keyboard and VoiceOver.
+- [ ] With English first in macOS language preferences, app-owned labels/status/errors/privacy text and dates are Chinese. User input, dictionary names, model prompts and technical diagnostic identifiers retain their content.
+- [ ] At default/minimum sizes, scroll the setup and Settings Forms to the bottom. Long explanations, save/preparation errors and correction-word prompts remain readable and actionable; verify light/dark, native materials and VoiceOver in the actual windows.
+
+Evidence and remaining limits are tracked in [M-010](tasks/M-010-macos-native-setup.md).
 
 ## Toggle-capture lifecycle
 
@@ -189,7 +207,7 @@ Also test:
 
 Record any stuck hotkey, duplicate start/stop, orphan microphone indicator, or event that leaks unexpectedly into the target application.
 
-Safety invariant: a hotkey failure may disable Morie, but must never leave normal system keyboard input blocked. Recovery after a timeout is explicit through **Recheck Capabilities**.
+Safety invariant: a hotkey failure may disable Morie, but must never leave normal system keyboard input blocked. Recovery after a timeout is explicit through **使用引导与权限 → 重新检查 → 开始使用**.
 
 ## Session identity / stale result checks
 

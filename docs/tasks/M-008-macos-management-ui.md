@@ -14,6 +14,8 @@ Morie is a personal voice-input tool. Its management window should make saved ex
 
 ## Scope
 
+M-010 adds Simplified Chinese, native sidebar visibility/group expansion, a system menu and a permission guide. Settings entry points now share the native Command-comma Settings window. Its [task record](M-010-macos-native-setup.md) holds current layout evidence; M-008's earlier dated screenshots describe the former arrangement.
+
 M-009 extends this native navigation to Dictionary and automatic Personal Memory. Its current rules supersede candidate-review surfaces; the dated M-008 validation below remains historical evidence for that earlier UI.
 
 - A shared native sidebar and consistent list/detail browsing for History, Dictionary and Personal Memory.
@@ -30,7 +32,7 @@ Excluded: iOS, CloudKit integration, model behavior changes, new runtimes/depend
 1. History, Dictionary and Personal Memory share a predictable sidebar → list → detail structure. Selection/search/filter changes do not show another record's data or keep stale media/model work alive.
 2. Final text, dictionary spellings and personal information are the primary reading content. Recognition/refinement/learning provenance remains available without dominating the page.
 3. Equivalent actions occupy equivalent native toolbar positions; destructive actions retain system confirmation. Optional editing and dictionary-word confirmation keep save errors visible; routine personal Memory has no review inbox.
-4. Settings and Diagnostics use the same window hierarchy, system typography, spacing and semantic colors. Diagnostics uses the system table rather than manual column imitations.
+4. Settings uses the shared native Settings scene, reached through Command-comma and sidebar/menu links. Diagnostics remains in management; both use system typography, spacing and semantic colors. Diagnostics uses the system table.
 5. All controls/presentation primitives use SwiftUI/AppKit system components. No decorative glass, custom navigation/control library or external dependency is introduced.
 6. Empty, populated, long-content, learning status and error states have clear layouts. Isolated compilation and offscreen layout checks pass; keyboard/VoiceOver/material/interaction acceptance remains open until real-device validation.
 

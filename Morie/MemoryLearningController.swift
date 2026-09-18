@@ -44,7 +44,7 @@ final class MemoryLearningController: ObservableObject {
     /// Optional explicit retry; ordinary input uses the same durable queue automatically.
     func retry(_ source: MemoryAnalysisSource) {
         do { try store.retry(source); message = nil; schedule() }
-        catch { message = "Memory learning could not be scheduled. Your input is saved." }
+        catch { message = "无法安排个人记忆学习，你的输入已保存。" }
     }
 
     // The input path never awaits this. Tests/shutdown can observe draining model work.
@@ -91,7 +91,7 @@ final class MemoryLearningController: ObservableObject {
             }
         } catch {
             if !Task.isCancelled && !(error is CancellationError) {
-                message = "Memory learning could not finish. Saved input will be retried during idle time."
+                message = "个人记忆学习未能完成，将在空闲时自动重试。"
             }
         }
     }

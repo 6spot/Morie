@@ -37,6 +37,8 @@ For macOS 27:
 
 If system UI cannot satisfy a product requirement, the gap must be documented and the owner must explicitly approve any exception before implementation.
 
+The owner-requested M-010 usability slice makes Simplified Chinese the current primary interface language. Settings uses the native scene and Command-comma; sidebar controls, permission setup and the menu-bar menu use system components. Setup inspects all requirements together, prompts only through explicit actions, and refreshes without restarting an active input session. No storage schema or cross-device scope is added.
+
 See [`ui-design.md`](./ui-design.md).
 
 ## External dependency approval boundary

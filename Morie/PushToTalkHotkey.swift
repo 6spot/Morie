@@ -15,10 +15,10 @@ enum CaptureShortcut: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .functionKey: "Fn / Globe"
-        case .controlSpace: "Control + Space"
-        case .optionSpace: "Option + Space"
-        case .commandShiftSpace: "Command + Shift + Space"
+        case .functionKey: "Fn / 地球仪"
+        case .controlSpace: "⌃ 空格"
+        case .optionSpace: "⌥ 空格"
+        case .commandShiftSpace: "⇧⌘ 空格"
         }
     }
 
@@ -55,11 +55,11 @@ final class PushToTalkHotkey {
         var errorDescription: String? {
             switch self {
             case .accessibilityUnavailable:
-                "Accessibility permission is required for the global voice-capture shortcut."
+                "使用全局录音快捷键需要辅助功能权限。"
             case .eventTapCreationFailed:
-                "Morie could not install the global voice-capture shortcut."
+                "无法启用全局录音快捷键，请在使用引导中检查权限后重试。"
             case .eventTapTimedOut:
-                "Morie disabled its global shortcut because the keyboard event handler timed out. Recheck capabilities to restore the shortcut."
+                "键盘响应超时，Morie 已停用全局快捷键。请打开使用引导，重新检查并点击“开始使用”以恢复。"
             }
         }
     }

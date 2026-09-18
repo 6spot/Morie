@@ -39,7 +39,7 @@ For Phase 0 testing:
 2. select the Morie target;
 3. configure a valid Development Team;
 4. run directly from Xcode on a supported Mac;
-5. grant required Microphone, Speech Recognition, and Accessibility permissions;
+5. complete **使用引导与权限**, explicitly authorize Microphone/Speech/Accessibility, then choose **开始使用**;
 6. execute the validation matrix in [`validation.md`](./validation.md).
 
 This remains the preferred path for debugging because Xcode exposes runtime diagnostics directly.
@@ -64,7 +64,7 @@ To test it:
 1. download the latest successful `Morie-macOS27-test-*` Actions artifact;
 2. extract the artifact archive, then extract `Morie-macOS27-test.zip`;
 3. move `Morie.app` to `/Applications` if desired;
-4. open Morie and grant Microphone, Speech Recognition, and Accessibility permissions when required;
+4. open Morie, complete **使用引导与权限** through its explicit native authorization actions, then choose **开始使用**;
 5. if Gatekeeper blocks the ad-hoc test build because it is not notarized, use the normal macOS Privacy & Security **Open Anyway** flow. For development-only troubleshooting, the downloaded app's quarantine attribute may also be removed explicitly before launching;
 6. execute the Phase 0 checks in [`validation.md`](./validation.md).
 
@@ -99,6 +99,10 @@ When that decision is made, document:
 - update mechanism if direct distribution is used.
 
 Do not introduce an updater framework before the distribution strategy requires it.
+
+## Language and setup packaging
+
+Keep `CFBundleDevelopmentRegion = zh-Hans` and the bundled `zh-Hans.lproj/InfoPlist.strings` in both Debug and Release artifacts. Privacy descriptions must match the Chinese setup page. A packaged first launch must inspect requirements without automatically prompting, and all Settings entry points must open the native Command-comma Settings scene. Validate these using the signed test artifact; unsigned compile output must not replace the owner's installed app.
 
 ## CloudKit deployment — later cross-device milestone
 

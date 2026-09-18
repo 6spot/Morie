@@ -18,26 +18,29 @@ Morie is an Apple-native voice-input product that learns useful personal context
 
 `record → durable recognition → dictionary + optional AI cleanup → durable final text → insertion → idle personal-Memory learning`
 
-The app includes native toggle capture, Apple Speech, focus restoration, clipboard/paste delivery, source-audio recovery and a system management window for **History / Dictionary / Personal Memory / Settings / Diagnostics**. Dictionary spellings supply native Speech hints; explicitly configured aliases also apply when AI cleanup is off. Basic cleanup works with an empty Memory store.
+The app includes native toggle capture, Apple Speech, focus restoration, clipboard/paste delivery, source-audio recovery and a system management window for **历史记录 / 字典 / 个人记忆 / 诊断**, plus a shared native **设置** window. Dictionary spellings supply native Speech hints; explicitly configured aliases also apply when AI cleanup is off. Basic cleanup works with an empty Memory store.
 
 Personal Memory analyzes saved final input during idle time, retains exact source snapshots and retries unfinished work. New voice input takes priority. Memories appear automatically; users can inspect, correct, archive or delete them without processing a confirmation inbox.
 
-An independent, default-off setting offers to remember a word after the user corrects recently inserted Morie text. A native nonactivating prompt saves the correct spelling only after **Remember**; an automatic global replacement alias is never created. See the [OpenLess behavior reference](docs/reference/openless.md).
+An independent, default-off setting offers to remember a word after the user corrects recently inserted Morie text. A native nonactivating prompt saves the correct spelling only after **加入字典**; an automatic global replacement alias is never created. See the [OpenLess behavior reference](docs/reference/openless.md).
 
-Isolated logic tests and compilation cover the implementation. Real-model quality/latency, cross-app correction prompts, microphone/recovery interactions, keyboard/VoiceOver and system-material acceptance remain open. The owner deferred interactive validation until the evening of 2026-09-18; it has not been waived. M-002/M-003/M-004/M-005/M-008/M-009 remain `IN PROGRESS` for their outstanding acceptance items.
+Isolated logic tests and compilation cover the implementation. Real-model quality/latency, cross-app correction prompts, microphone/recovery interactions, keyboard/VoiceOver and system-material acceptance remain open. The owner deferred interactive validation until the evening of 2026-09-18; it has not been waived. M-002/M-003/M-004/M-005/M-008/M-009/M-010 remain `IN PROGRESS` for their outstanding acceptance items.
+
+[M-010](docs/tasks/M-010-macos-native-setup.md) adds Simplified Chinese as the primary interface language, a native menu-bar menu, Command-comma Settings, native sidebar visibility/group folding, and a device/permission setup window. First use opens the guide; permission prompts require explicit actions. Returning from System Settings only refreshes status and never interrupts capture.
 
 ## Run locally
 
-1. Use macOS 27+ with Apple Intelligence enabled and open `Morie.xcodeproj` in the current Xcode.
-2. Configure signing if Xcode requests it, run Morie, and grant Microphone, Speech Recognition and Accessibility permissions.
-3. Place the caret in another app, press and release **Fn / Globe**, speak, then release Fn again to finish. **Escape** cancels; Settings offers alternate shortcuts.
-4. Open **Morie → Dictionary → Add Word** to save names and terms. Add an **Always Replace** alias only when it should always become the specified word.
-5. **Settings → Clean Up Voice Input** controls AI cleanup and defaults to on. The [cleanup contract](docs/input-cleanup.md) preserves intent, meaningful emphasis and uncertainty while removing speech redundancy and organizing clear structure.
-6. Inspect **History → Final Text** and **Recognition & Refinement** for the actual saved output, original input and processing context. **Source Recording** offers native playback and explicit re-recognition.
-7. **Personal Memory** fills automatically from completed current-app input. History shows learning status and the final-text snapshot; management actions remain optional.
-8. To try correction learning, enable **Settings → Suggest Words After I Correct Input**. Correct a word in recently inserted text and pause. Supported fields can show **Remember / Not Now** without interrupting typing.
+1. Use macOS 27+ on an Apple Intelligence-capable Mac and open `Morie.xcodeproj` in the current Xcode.
+2. Configure signing if Xcode requests it and run Morie. In **使用引导与权限**, review device capabilities and authorize **麦克风 / 语音识别 / 辅助功能**. Click **开始使用** after every requirement passes; Morie then prepares Speech assets and enables recording.
+3. Place the caret in another app, press and release **Fn / 地球仪**, speak, then release Fn again to finish. **Esc** cancels. **⌘,** opens native **设置**, where alternate recording shortcuts are available.
+4. Open **字典 → 添加词语** to save names and terms. Add an **自动替换的别名** only when it should always become the specified word.
+5. **设置 → 自动润色语音输入** defaults to on. The [cleanup contract](docs/input-cleanup.md) preserves intent, meaningful emphasis and uncertainty while removing speech redundancy and organizing clear structure.
+6. Inspect **历史记录 → 最终文字 / 识别与润色** for saved output, original input and processing context. **原始录音** offers native playback and explicit re-recognition.
+7. **个人记忆** fills automatically from completed current-app input. History shows learning status and the final-text snapshot; management actions remain optional.
+8. To try correction learning, enable **设置 → 修改输入后建议加入字典**. Correct a word in recently inserted text and pause. Supported fields can show **加入字典 / 暂不添加** without interrupting typing.
+9. Use the system sidebar toolbar/View command to show or hide navigation, and the **资料库 / 应用** disclosure controls to fold groups. The native menu-bar menu provides **打开 Morie / 设置… / 使用引导与权限… / 退出 Morie**.
 
-The existing **History → Record Capture** action remains available for saved-only recordings; its inspiration/follow-up experience is not being expanded in this milestone.
+The existing **历史记录 → 开始录音** action remains available for saved-only recordings; its inspiration/follow-up experience is not being expanded in this milestone.
 
 ## Documentation
 

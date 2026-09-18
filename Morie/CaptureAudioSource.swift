@@ -12,10 +12,10 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
 
         var errorDescription: String? {
             switch self {
-            case .inputUnavailable: "The microphone input cannot be attached to the capture session."
-            case .outputUnavailable: "The microphone data output cannot be attached to the capture session."
-            case .invalidAudioBuffer: "The microphone returned an unsupported audio buffer."
-            case .interrupted(let reason): "Audio capture was interrupted: \(reason)"
+            case .inputUnavailable: "无法连接麦克风输入。"
+            case .outputUnavailable: "无法连接麦克风音频输出。"
+            case .invalidAudioBuffer: "麦克风返回了不支持的音频数据。"
+            case .interrupted(let reason): "录音已中断：\(reason)"
             }
         }
     }
@@ -64,13 +64,13 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
             forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: nil
         ) { [weak self] notification in
             let reason = (notification.userInfo?[AVCaptureSessionErrorKey] as? NSError)?.localizedDescription
-                ?? "The microphone session stopped unexpectedly."
+                ?? "麦克风录音意外停止。"
             self?.reportFailure(SourceError.interrupted(reason))
         })
         notificationObservers.append(NotificationCenter.default.addObserver(
             forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: nil
         ) { [weak self] _ in
-            self?.reportFailure(SourceError.interrupted("The microphone became unavailable."))
+            self?.reportFailure(SourceError.interrupted("麦克风已不可用。"))
         })
     }
 

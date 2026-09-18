@@ -21,7 +21,7 @@ struct DictionaryView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(entry.name).lineLimit(2)
                     if !entry.aliases.isEmpty {
-                        Text(entry.aliases.joined(separator: ", ")).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                        Text(entry.aliases.joined(separator: "、")).font(.callout).foregroundStyle(.secondary).lineLimit(2)
                     }
                 }
                 .padding(.vertical, 6).tag(entry.id)
@@ -31,22 +31,22 @@ struct DictionaryView: View {
         .overlay {
             if visibleEntries.isEmpty && errorMessage == nil {
                 ContentUnavailableView {
-                    Label(search.isEmpty ? "Your Dictionary" : "No Matching Words", systemImage: "character.book.closed")
+                    Label(search.isEmpty ? "你的字典" : "没有匹配的词语", systemImage: "character.book.closed")
                 } description: {
-                    Text(search.isEmpty ? "Add names, products and technical terms so Morie recognizes your words." : "Try another search.")
+                    Text(search.isEmpty ? "添加人名、产品名和专业术语，帮助 Morie 正确识别。" : "试试其他搜索词。")
                 } actions: {
-                    if search.isEmpty { Button("Add Word", systemImage: "plus") { showingEditor = true } }
+                    if search.isEmpty { Button("添加词语", systemImage: "plus") { showingEditor = true } }
                 }
             }
         }
-        .navigationTitle("Dictionary")
-        .navigationSubtitle(visibleEntries.count == 1 ? "1 word" : "\(visibleEntries.count) words")
-        .searchable(text: $search, prompt: "Search words and aliases")
-        .toolbar { Button("Add Word", systemImage: "plus") { showingEditor = true } }
+        .navigationTitle("字典")
+        .navigationSubtitle("\(visibleEntries.count) 个词语")
+        .searchable(text: $search, prompt: "搜索词语和别名")
+        .toolbar { Button("添加词语", systemImage: "plus") { showingEditor = true } }
         .sheet(isPresented: $showingEditor) { DictionaryEditorSheet(store: store) }
         .onAppear {
             do { try store.load(); errorMessage = nil }
-            catch { errorMessage = "Could not load the dictionary." }
+            catch { errorMessage = "无法加载字典。" }
         }
         .onChange(of: visibleEntries.map(\.id), initial: true) { _, ids in
             if let selection, !ids.contains(selection) { self.selection = nil }
@@ -66,36 +66,36 @@ struct DictionaryDetailView: View {
         Group {
             if let entry = store.entries.first(where: { $0.id == entryID }) {
                 ManagementDetailContent {
-                    Label("Custom Word", systemImage: "character.book.closed").foregroundStyle(.secondary)
+                    Label("自定义词语", systemImage: "character.book.closed").foregroundStyle(.secondary)
                     Text(entry.name).font(.title).textSelection(.enabled)
-                    Text("Used as a spelling hint during speech recognition.").foregroundStyle(.secondary)
+                    Text("识别语音时，会将此词语作为拼写提示。").foregroundStyle(.secondary)
                     if !entry.aliases.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Always Replace These Aliases").font(.headline)
+                            Text("自动替换以下别名").font(.headline)
                             ForEach(entry.aliases, id: \.self) { Text("\($0) → \(entry.name)").textSelection(.enabled) }
-                            Text("Only add an alias when it should always become this word.").foregroundStyle(.secondary)
+                            Text("仅在某个别名始终应该替换为此词语时添加。").foregroundStyle(.secondary)
                         }
                     }
-                    LabeledContent("Updated", value: entry.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                    LabeledContent("更新时间", value: entry.updatedAt.formatted(.dateTime.locale(Locale(identifier: "zh-Hans")).year().month().day().hour().minute()))
                 }
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
-                        Button("Edit Word", systemImage: "pencil") { showingEditor = true }
-                        Button("Delete Word…", systemImage: "trash", role: .destructive) { confirmsDeletion = true }
+                        Button("编辑词语", systemImage: "pencil") { showingEditor = true }
+                        Button("删除词语…", systemImage: "trash", role: .destructive) { confirmsDeletion = true }
                     }
                 }
-            } else { ContentUnavailableView("Word No Longer Available", systemImage: "character.book.closed") }
+            } else { ContentUnavailableView("此词语已不存在", systemImage: "character.book.closed") }
         }
-        .navigationTitle("Dictionary")
+        .navigationTitle("字典")
         .sheet(isPresented: $showingEditor) { DictionaryEditorSheet(store: store, entryID: entryID) }
-        .confirmationDialog("Delete this dictionary word?", isPresented: $confirmsDeletion, titleVisibility: .visible) {
-            Button("Delete Word", role: .destructive) {
+        .confirmationDialog("删除这个字典词语？", isPresented: $confirmsDeletion, titleVisibility: .visible) {
+            Button("删除词语", role: .destructive) {
                 do { try store.delete(entryID); onDelete() }
                 catch { errorMessage = error.localizedDescription }
             }
-        } message: { Text("Saved input and personal memories are kept.") }
-        .alert("Couldn’t Update Dictionary", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: { Text("已保存的输入和个人记忆会保留。") }
+        .alert("无法更新字典", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("好", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
     }
 }
@@ -110,21 +110,21 @@ struct DictionaryEditorSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text(entryID == nil ? "Add Dictionary Word" : "Edit Dictionary Word").font(.headline)
+            Text(entryID == nil ? "添加字典词语" : "编辑字典词语").font(.headline)
             Form {
-                TextField("Correct Spelling", text: $name)
-                LabeledContent("Always Replace (Optional)") {
-                    TextEditor(text: $aliases).frame(height: 100).accessibilityLabel("Aliases, one per line")
+                TextField("正确写法", text: $name)
+                LabeledContent("自动替换的别名（选填）") {
+                    TextEditor(text: $aliases).frame(height: 100).accessibilityLabel("别名，每行一个")
                 }
-                Text("Add one alias per line only when it should always be replaced. Leave this empty for a spelling hint.")
+                Text("每行填写一个始终需要替换的别名。留空则仅作为拼写提示。")
                     .foregroundStyle(.secondary)
                 if let errorMessage { Text(errorMessage).foregroundStyle(.secondary) }
             }
             .formStyle(.grouped)
             HStack {
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save") {
+                Button("取消", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("保存") {
                     do {
                         let draft = DictionaryDraft(name: name, aliases: aliases.split(whereSeparator: \.isNewline).map(String.init))
                         if let entryID { try store.update(entryID, draft: draft) }

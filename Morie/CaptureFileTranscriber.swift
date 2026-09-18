@@ -9,8 +9,8 @@ enum CaptureFileTranscriber {
 
         var errorDescription: String? {
             switch self {
-            case .unsupportedLocale: "The capture language is not supported by Apple Speech."
-            case .emptyRecognition: "No speech was recognized. The saved text and recording have been kept."
+            case .unsupportedLocale: "Apple 语音识别暂不支持这段录音的语言。"
+            case .emptyRecognition: "未识别到语音，已保存的文字和录音均已保留。"
             }
         }
     }

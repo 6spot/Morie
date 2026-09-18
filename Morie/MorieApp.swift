@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct MorieApp: App {
     @StateObject private var controller: AppController
+    @Environment(\.openWindow) private var openWindow
     private let captureStore: CaptureStore?
 
     init() {
@@ -23,25 +24,61 @@ struct MorieApp: App {
         MenuBarExtra("Morie", systemImage: "waveform") {
             MorieMenuContent(controller: controller)
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
 
         Window("Morie", id: "control-center") {
-            if let captureStore {
-                MorieControlCenter(controller: controller)
-                    .modelContainer(captureStore.container)
-            } else {
-                ContentUnavailableView(
-                    "Morie Unavailable",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("Morie could not open Capture storage.")
-                )
+            Group {
+                if let captureStore {
+                    MorieControlCenter(controller: controller)
+                        .modelContainer(captureStore.container)
+                } else {
+                    ContentUnavailableView(
+                        "Morie 暂不可用",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text("无法打开记录存储，请在使用引导中查看详情。")
+                    )
+                }
             }
+            .environment(\.locale, Locale(identifier: "zh-Hans"))
         }
         .defaultSize(width: 1120, height: 720)
+        .commands {
+            SidebarCommands()
+            MorieCommands()
+        }
+        .onChange(of: controller.needsSetup, initial: true) { _, needsSetup in
+            if needsSetup {
+                openWindow(id: "setup")
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
+        }
+
+        Window("使用引导与权限", id: "setup") {
+            MorieSetupView(controller: controller)
+                .environment(\.locale, Locale(identifier: "zh-Hans"))
+        }
+        .defaultSize(width: 700, height: 740)
+        .defaultPosition(.center)
+        .windowResizability(.contentMinSize)
+        .defaultLaunchBehavior(.suppressed)
 
         Settings {
             MorieSettingsView(controller: controller)
-                .frame(width: 640, height: 520)
+                .environment(\.locale, Locale(identifier: "zh-Hans"))
+                .frame(width: 640, height: 600)
+        }
+    }
+}
+
+private struct MorieCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .appSettings) {
+            Button("使用引导与权限…") {
+                openWindow(id: "setup")
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
         }
     }
 }
@@ -52,86 +89,69 @@ private struct MorieMenuContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(controller.statusTitle)
-                .font(.headline)
+        Text(controller.statusTitle)
 
-            if let detail = controller.statusDetail {
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        Divider()
 
-            Divider()
-
-            Text("Press \(controller.captureShortcut.displayName) to start / finish")
-                .font(.caption)
-
-            Text("Esc cancels while recording")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            if !controller.transcript.isEmpty {
-                Text(controller.transcript)
-                    .font(.callout)
-                    .lineLimit(4)
-            }
-
-            Divider()
-
-            Button("Open Morie", systemImage: "macwindow") {
-                openWindow(id: "control-center")
-                NSApplication.shared.activate(ignoringOtherApps: true)
-            }
-
-            Button("Recheck Capabilities", systemImage: "arrow.clockwise") {
-                Task { await controller.bootstrap() }
-            }
-
-            if controller.recoverySettingsURL != nil {
-                Button("Open System Settings", systemImage: "gearshape.arrow.triangle.2.circlepath") {
-                    controller.openRecoverySettings()
-                }
-            }
-
-            Button("Quit Morie", systemImage: "power") {
-                NSApplication.shared.terminate(nil)
-            }
+        Button("打开 Morie", systemImage: "macwindow") {
+            openWindow(id: "control-center")
+            NSApplication.shared.activate(ignoringOtherApps: true)
         }
-        .padding(14)
-        .frame(width: 320)
+
+        SettingsLink {
+            Label("设置…", systemImage: "gearshape")
+        }
+        .keyboardShortcut(",", modifiers: .command)
+
+        Button("使用引导与权限…", systemImage: "checklist") {
+            openWindow(id: "setup")
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
+
+        Divider()
+
+        Text("录音快捷键：\(controller.captureShortcut.displayName)")
+        Text("录音中按 Esc 取消")
+
+        Divider()
+
+        Button("退出 Morie") {
+            NSApplication.shared.terminate(nil)
+        }
+        .keyboardShortcut("q", modifiers: .command)
     }
 }
 
 @MainActor
 struct MorieSettingsView: View {
     @ObservedObject var controller: AppController
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Form {
-            Section("Input Refinement") {
-                Toggle("Clean Up Voice Input", isOn: Binding(
+            Section("输入润色") {
+                Toggle("自动润色语音输入", isOn: Binding(
                     get: { controller.inputRefinementEnabled },
                     set: { controller.setInputRefinementEnabled($0) }
                 ))
-                Text("Remove speech filler and organize punctuation, paragraphs and clear lists while preserving your meaning and tone. Your dictionary applies even when AI cleanup is off.")
+                Text("保留原意和语气，删除口头语，整理标点、段落和结构明确的列表。关闭 AI 润色后，字典仍然生效。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Dictionary Learning") {
-                Toggle("Suggest Words After I Correct Input", isOn: Binding(
+            Section("字典学习") {
+                Toggle("修改输入后建议加入字典", isOn: Binding(
                     get: { controller.correctionSuggestionsEnabled },
                     set: { controller.setCorrectionSuggestionsEnabled($0) }
                 ))
-                Text("For 30 seconds after Morie inserts text, check that text field for a word you correct. A small prompt lets you add its spelling to Dictionary. Observation stops when you leave the field or begin another input. Off by default.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("输入完成后的 30 秒内，检查当前文本框中的词语修改，并询问是否加入字典。离开文本框或开始下一次输入即停止检查。默认关闭。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
-            Section("Capture Shortcut") {
+            Section("快捷键") {
                 Picker(
-                    "Shortcut",
+                    "开始或结束录音",
                     selection: Binding(
                         get: { controller.captureShortcut },
                         set: { controller.setCaptureShortcut($0) }
@@ -142,30 +162,36 @@ struct MorieSettingsView: View {
                     }
                 }
 
-                Text("Fn / Globe toggles capture only after a solo press is released. Fn combined with another key passes through without triggering Morie.")
+                Text("单独按下并松开 Fn / 地球仪键可切换录音状态。Fn 与其他按键组合使用时不会触发 Morie。录音中按 Esc 取消。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                LabeledContent("打开设置", value: "⌘,")
             }
 
-            Section("Source Audio") {
+            Section("原始录音") {
                 Stepper(
-                    "Keep recordings for \(controller.audioRetentionDays) days",
+                    "录音保留 \(controller.audioRetentionDays) 天",
                     value: Binding(
                         get: { controller.audioRetentionDays },
                         set: { controller.setAudioRetentionDays($0) }
                     ),
                     in: 1...365
                 )
-
-                Text("Compressed source audio stays on this Mac for recognition retry. Expiration removes only audio; text and History remain.")
+                Text("录音保存在这台 Mac 上，可用于重新识别。到期仅删除录音，保留文字和历史记录。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("使用引导与权限") {
+                Button("查看设备与权限状态", systemImage: "checklist") {
+                    openWindow(id: "setup")
+                }
             }
         }
         .formStyle(.grouped)
         .frame(maxWidth: 700)
-        .padding(24)
+        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .navigationTitle("Settings")
+        .navigationTitle("设置")
     }
 }

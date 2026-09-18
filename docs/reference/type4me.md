@@ -185,6 +185,15 @@ Type4Me can provide evidence about practical macOS permission flows, but Morie m
 
 Only current requirements for Microphone, Speech Recognition, Accessibility/event handling, and recovery after Settings changes should be retained.
 
+M-010 audit, 2026-09-18: inspected `PermissionManager.swift`, `PermissionGuideModel.swift` and `Type4MeTests/PermissionGuideModelTests.swift` at upstream `cc56207b46a30c4c6bf7af0c04b48cc44d06ffc4`. Reviewed permission history `092f71e` (denial/settings return and old signing identity), `5fce88f` (#281: setup bypass, overlay polling CPU and revocation handling) and `bfa487e` (guide/settings consistency).
+
+- **ADAPT:** separate read-only inspection from explicit requests; denied Microphone/Speech access goes to System Settings; refresh on app activation; give setup and recovery one clear native guide.
+- **ADAPT:** mandatory completion checks cannot be bypassed. Morie additionally requires Apple Intelligence, modern Chinese Speech availability and Speech authorization, regardless of another product's optional-provider rules. Tests inject all status/actions and never query real TCC.
+- **DROP:** custom permission-drag overlays, System Settings window polling, provider selection, optional Apple Speech, signature migration recovery and automatic relaunch/probe systems. These do not follow Morie's current native-only, no-legacy requirement.
+- **VERIFY:** any current macOS 27 event-tap/permission restart issue must be reproduced before adding recovery logic. Existing event-tap failure remains explicit and preserves ordinary keyboard input; this UI task does not add a platform workaround.
+
+The implementation is Morie-owned snapshot/controller logic plus native Apple permission APIs and SwiftUI Form/Window controls. No Type4Me implementation or external dependency was imported.
+
 ### 7. Later-phase reusable lessons
 
 When later phases start, inspect Type4Me only after reading that phase's Morie design/task document. Potential reference areas include:

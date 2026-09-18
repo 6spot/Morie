@@ -5,18 +5,16 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
     case history
     case memory
     case dictionary
-    case settings
     case diagnostics
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .history: "History"
-        case .memory: "Personal Memory"
-        case .dictionary: "Dictionary"
-        case .settings: "Settings"
-        case .diagnostics: "Diagnostics"
+        case .history: "历史记录"
+        case .memory: "个人记忆"
+        case .dictionary: "字典"
+        case .diagnostics: "诊断"
         }
     }
 
@@ -25,7 +23,6 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         case .history: "clock.arrow.circlepath"
         case .memory: "person.text.rectangle"
         case .dictionary: "character.book.closed"
-        case .settings: "gearshape"
         case .diagnostics: "ladybug"
         }
     }
@@ -41,11 +38,15 @@ struct MorieControlCenter: View {
     @State private var selectedCaptureID: UUID?
     @State private var selectedMemory: UUID?
     @State private var selectedDictionaryEntry: UUID?
+    @State private var isSidebarVisible = true
+    @AppStorage("sidebar.libraryExpanded") private var libraryExpanded = true
+    @AppStorage("sidebar.appExpanded") private var appExpanded = true
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
             if (selection ?? .history).isLibrary {
-                NavigationSplitView {
+                NavigationSplitView(columnVisibility: columnVisibility(isLibrary: true)) {
                     sidebar
                 } content: {
                     libraryList
@@ -55,12 +56,10 @@ struct MorieControlCenter: View {
                         .navigationSplitViewColumnWidth(min: 420, ideal: 600)
                 }
             } else {
-                NavigationSplitView {
+                NavigationSplitView(columnVisibility: columnVisibility(isLibrary: false)) {
                     sidebar
                 } detail: {
                     switch selection {
-                    case .settings:
-                        MorieSettingsView(controller: controller)
                     case .diagnostics:
                         DiagnosticLogView()
                     default:
@@ -71,17 +70,43 @@ struct MorieControlCenter: View {
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
+        .toolbar {
+            if controller.needsSetup {
+                Button("完成使用引导", systemImage: "checklist") {
+                    openWindow(id: "setup")
+                }
+            }
+        }
+    }
+
+    private func columnVisibility(isLibrary: Bool) -> Binding<NavigationSplitViewVisibility> {
+        // Hiding a sidebar means two columns in the library, but detail-only
+        // in Diagnostics. Preserve one user choice across both native layouts.
+        Binding(
+            get: { isSidebarVisible ? .all : (isLibrary ? .doubleColumn : .detailOnly) },
+            set: { visibility in
+                isSidebarVisible = visibility == .all || visibility == .automatic
+                    || (!isLibrary && visibility == .doubleColumn)
+            }
+        )
     }
 
     private var sidebar: some View {
         List(selection: $selection) {
-            Section("Library") {
+            Section("资料库", isExpanded: $libraryExpanded) {
                 sidebarItem(.history)
                 sidebarItem(.dictionary)
                 sidebarItem(.memory)
             }
-            Section("App") {
-                sidebarItem(.settings)
+            Section("应用", isExpanded: $appExpanded) {
+                SettingsLink { Label("设置", systemImage: "gearshape") }
+                    .buttonStyle(.plain)
+                Button {
+                    openWindow(id: "setup")
+                } label: {
+                    Label("使用引导与权限", systemImage: "checklist")
+                }
+                .buttonStyle(.plain)
                 sidebarItem(.diagnostics)
             }
         }
@@ -138,9 +163,9 @@ struct MorieControlCenter: View {
                     )
                 } else {
                     ContentUnavailableView(
-                        "Select a Capture",
+                        "选择一条记录",
                         systemImage: "waveform",
-                        description: Text("Your saved words, recordings and memories appear here.")
+                        description: Text("在这里查看保存的文字、录音和相关个人记忆。")
                     )
                 }
             }
@@ -151,9 +176,9 @@ struct MorieControlCenter: View {
                     MemoryDetailView(store: memory, memoryID: selectedMemory, onDelete: { self.selectedMemory = nil })
                 } else {
                     ContentUnavailableView(
-                        "Select a Memory",
+                        "选择一条个人记忆",
                         systemImage: "text.book.closed",
-                        description: Text("Personal information learned from your everyday input appears here.")
+                        description: Text("在这里查看从日常输入中自动学习的个人信息。")
                     )
                 }
             }
@@ -163,8 +188,8 @@ struct MorieControlCenter: View {
                 if let dictionary = controller.dictionary, let id = selectedDictionaryEntry {
                     DictionaryDetailView(store: dictionary, entryID: id, onDelete: { selectedDictionaryEntry = nil })
                 } else {
-                    ContentUnavailableView("Select a Word", systemImage: "character.book.closed",
-                                           description: Text("Your names, products and technical terms."))
+                    ContentUnavailableView("选择一个词语", systemImage: "character.book.closed",
+                                           description: Text("在这里管理人名、产品名和专业术语。"))
                 }
             }
             .id(selectedDictionaryEntry)

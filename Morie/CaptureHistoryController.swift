@@ -49,7 +49,7 @@ final class CaptureHistoryController: ObservableObject {
         guard selectedCaptureID == id else { return }
         releasePlayer()
         guard !isInputActive else {
-            audioMessage = "Playback is available after the current capture finishes."
+            audioMessage = "本次录音结束后即可播放。"
             return
         }
         do {
@@ -64,7 +64,7 @@ final class CaptureHistoryController: ObservableObject {
                           self.selectedCaptureID == id, self.player?.currentItem === item,
                           item.status == .failed
                     else { return }
-                    self.audioMessage = "This recording could not be played. \(item.error?.localizedDescription ?? "")"
+                    self.audioMessage = "无法播放这段录音。\(item.error?.localizedDescription ?? "")"
                 }
             }
         } catch {
@@ -109,7 +109,7 @@ final class CaptureHistoryController: ObservableObject {
                 guard !self.isInputActive else { throw CancellationError() }
                 try self.store.saveReRecognition(text, for: id)
                 if self.selectedCaptureID == id {
-                    self.recognitionMessage = "Recognition saved. Copy the text to use it in another app."
+                    self.recognitionMessage = "识别结果已保存，可复制文字到其他应用使用。"
                 }
             } catch {
                 // Native cancellation can arrive as a framework error, not just CancellationError.

@@ -15,13 +15,13 @@ final class CaptureStore {
 
         var errorDescription: String? {
             switch self {
-            case .captureNotFound: "This capture is no longer available."
-            case .captureInProgress: "Wait for this recording to finish."
-            case .audioExpired: "The source recording has expired. Saved text is still available."
-            case .audioUnavailable: "The source recording is no longer available."
-            case .emptyRecognition: "No speech was recognized. The saved text and recording have been kept."
-            case .invalidDeliveryMode: "The capture has an invalid delivery mode."
-            case .refinementSourceChanged: "The saved capture changed during refinement. Its current text has been kept; no stale result was used."
+            case .captureNotFound: "此记录已不存在。"
+            case .captureInProgress: "请等待这次录音结束。"
+            case .audioExpired: "原始录音已到期，保存的文字仍可查看。"
+            case .audioUnavailable: "原始录音已不存在。"
+            case .emptyRecognition: "未识别到语音，已保存的文字和录音均已保留。"
+            case .invalidDeliveryMode: "此记录的输入方式无效。"
+            case .refinementSourceChanged: "润色期间记录发生变化，已保留当前文字，未使用过期的润色结果。"
             }
         }
     }
@@ -261,7 +261,7 @@ final class CaptureStore {
             return .discarded
         }
 
-        try markFailed(id, error: "No speech was recognized. Play the recording or recognize it again from History.")
+        try markFailed(id, error: "未识别到语音，可以在历史记录中播放录音或重新识别。")
         return .retainedForRetry
     }
 
@@ -433,7 +433,7 @@ final class CaptureStore {
                 if record.deliveryModeRawValue == CaptureDeliveryMode.currentApp.rawValue,
                    record.lifecycle == .recognized {
                     record.lifecycle = .failed
-                    record.deliveryErrorDescription = "Input processing was interrupted. Saved text and available audio have been kept."
+                    record.deliveryErrorDescription = "输入处理已中断，已保存的文字和可用录音均已保留。"
                 }
                 record.updatedAt = Date()
                 continue
@@ -451,7 +451,7 @@ final class CaptureStore {
                 record.sourceAudioByteCount = Int64(size)
             }
             record.lifecycle = .failed
-            record.deliveryErrorDescription = "Recording was interrupted. Saved text and available audio have been kept."
+            record.deliveryErrorDescription = "录音已中断，已保存的文字和可用录音均已保留。"
             record.updatedAt = Date()
         }
         try container.mainContext.save()

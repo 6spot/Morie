@@ -36,10 +36,10 @@ final class DictionaryStore: ObservableObject {
 
         var errorDescription: String? {
             switch self {
-            case .invalidName: "Enter a word or name of 1–120 characters on one line."
-            case .invalidAliases: "Use up to 20 aliases, each with 1–120 characters on one line."
-            case .conflictingTerm: "This spelling or alias already belongs to another dictionary entry. Edit that entry first."
-            case .unavailable: "This dictionary entry is no longer available."
+            case .invalidName: "请填写 1–120 个字符的词语或名称，且不换行。"
+            case .invalidAliases: "最多可添加 20 个别名，每行一个，每个 1–120 个字符。"
+            case .conflictingTerm: "此写法或别名已属于其他字典词语，请先编辑该词语。"
+            case .unavailable: "此字典词语已不存在。"
             }
         }
     }

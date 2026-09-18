@@ -26,6 +26,8 @@ The following owner decisions are now hard requirements:
 
 14. **Correction-to-dictionary behavior (2026-09-18):** the owner supplied [OpenLess](../reference/openless.md) as a reference for suggesting a dictionary word after manual correction. Use an independent opt-in, stable-edit detection and native nonactivating confirmation. Remember saves the spelling only, never an inferred unconditional alias or a personal fact. This does not change automatic personal-Memory learning.
 
+15. **Chinese interface and native setup (2026-09-18):** use Simplified Chinese for the current Mac interface, the system Settings scene with Command-comma, native sidebar visibility and collapsible groups, a native permission/capability guide, and a system menu-bar menu. Inspect status without prompting; request permissions only through explicit guide actions. Returning from System Settings must not interrupt input.
+
 The source document below is historical product direction. These amendments supersede its phase order, immediate iCloud requirement, mandatory confirmation and inspiration scope.
 
 See also:

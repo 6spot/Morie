@@ -94,55 +94,69 @@ Then wait for explicit project-owner approval. Do not implement the exception fi
 
 The current menu-bar shell should stay system-native. As Phase 0 adds visible recording/permission/status experiences, they must be designed with macOS 27 native components and Liquid Glass behavior from the start rather than being retrofitted later.
 
-The menu-bar panel is a compact status and launch surface, not the long-term product navigation hierarchy. History, Dictionary, Personal Memory, Settings and Diagnostics belong in Morie's native management window, organized with a system `NavigationSplitView`; the panel exposes one **Open Morie** action instead of one action per section.
+The menu-bar extra uses the system `.menu` presentation. It contains textual status, **打开 Morie**, a native **设置…** link, **使用引导与权限…**, recording-shortcut guidance and **退出 Morie**. Navigation belongs in the management window. Settings and setup each have one native window shared by all entry points; the menu does not embed a custom panel or transcript preview.
+
+## Language and system conventions
+
+The current app's primary language is Simplified Chinese (`zh-Hans`), including app-owned controls, errors, accessibility descriptions and privacy usage strings. Keep user input, dictionary spelling, prompts, persisted raw values, external application names and technical diagnostics intact. Format display dates in Chinese while retaining the user's time zone.
+
+Use the system Settings scene and **⌘,**. Sidebar and menu SettingsLink controls open that same scene. These are app-scoped commands; the global recording shortcut retains its existing behavior. NavigationSplitView and SidebarCommands own show/hide-sidebar controls. Native expandable Section headers fold **资料库 / 应用**, with saved expansion state. Do not build a replacement toggle, title bar, menu or shortcut listener.
+
+## Permission and capability guide
+
+M-010 uses a native Window, default 700 × 740, minimum 640 × 680. A grouped Form separates **设备能力** (Apple 智能, 中文语音转写) from **使用权限** (麦克风, 语音识别, 辅助功能). Every row includes its purpose, textual status and an appropriate native action. Green readiness also has a checkmark and label. Long explanations scroll inside the system Form; the bottom refresh/completion actions remain visible.
+
+First use and startup failures show this guide instead of a sequence of Morie modal alerts. Initial inspection and **重新检查** never prompt. **允许访问** requests an undetermined permission; denied access offers **打开系统设置**. Restricted/unavailable requirements remain explicit. Returning from System Settings refreshes without resetting input. **开始使用** is enabled only after every requirement passes and no capture/preparation/request is active. It prepares Speech assets and installs the shortcut before completing setup. **稍后设置** closes the guide without enabling recording.
+
+Permission check/authorization state and bootstrap preparation feedback remain distinct. A model download or startup/storage error is displayed in the guide, and the native setup entry remains accessible from management, Settings and the menu. No CloudKit enrollment step appears in this milestone.
 
 ## Management window
 
-M-008 uses one navigation language across the management window. A native sidebar groups **Library** (History, Dictionary, Personal Memory) and **App** (Settings, Diagnostics). History, Dictionary and Personal Memory show a selectable list beside the detail in a three-column split view. Settings and Diagnostics use the same sidebar with a full-width detail in a two-column split view. The default window is 1120 × 720; the minimum is 960 × 600. System split dividers control column resizing.
+M-008/M-010 use one native navigation language. The sidebar groups **资料库** (历史记录, 字典, 个人记忆) and **应用** (设置, 使用引导与权限, 诊断). Library pages show list and detail in three columns; Diagnostics uses a full-width detail beside the sidebar. Settings/setup rows open their native windows. Both split configurations share visibility state so switching sections preserves the sidebar preference. The default management window is 1120 × 720; the minimum is 960 × 600. System split dividers control resizing.
 
 Lists use standard search, filter menus containing native Pickers, system selection and meaningful empty states. Search/filter/deletion clear hidden selections. Reading a source or linked memory uses the selected detail's NavigationStack; selecting a different record resets that stack. Creation/recording and filter controls belong to the list toolbar; copy/edit and the secondary action menu belong to the detail toolbar.
 
 Capture, Dictionary and Personal Memory details use the same native ScrollView composition, 28-point padding and a readable maximum width of 760 points. Text is selectable, system typography establishes hierarchy, and native GroupBoxes/disclosures organize supporting information. Settings and editing use grouped Forms. Do not add custom cards, selection highlights, navigation bars or glass effects to reproduce these system surfaces.
 
-Settings has a centered, flexible grouped Form with a 700-point maximum content width. Diagnostics uses the native Table with Time, Level, Category and Message columns, search and a level filter. Selecting an event reveals its full selectable message below a native split divider. Severity has a word/icon as well as semantic color. Copy All Events copies the whole current log; the action menu reveals the file or clears it after system confirmation.
+Settings has a centered, flexible grouped Form in a 640 × 600 native window, with scrolling for smaller visible areas. Diagnostics uses the native Table with Time, Level, Category and Message columns, search and a level filter. Selecting an event reveals its full selectable message below a native split divider. Severity has a word/icon as well as semantic color. Copy All Events copies the whole current log; the action menu reveals the file or clears it after system confirmation.
 
 ## History recovery
 
 History uses a system selectable `List` and a simultaneous reading detail. Search covers final/recognized text and the source app; filters provide All Captures, History Only and Needs Attention. The audio player is AVKit's native `AVPlayerView` with inline controls; Morie does not draw a replacement playback bar. Recording playback is user-initiated, stops when leaving the detail or starting a capture, and does not publish private recordings to Now Playing.
 
-Re-recognition has a standard button, `ProgressView`, and Cancel action. Saved text stays visible while work runs. Details show **Final Text** first. **Copy Final Text** is in the toolbar and **Copy Recognition** is in its action menu. **Recognition & Refinement** discloses the separate recognized text and retained refinement record; **Source Recording** contains playback and retry controls. A Speech retry preserves previously delivered or refined final output, including capture-only output. Retry does not automatically paste into another app. Expired/missing audio and recognition failure have readable inline explanations. Deleting a Capture uses a destructive button and a system confirmation dialog.
+Re-recognition has a standard button, `ProgressView`, and Cancel action. Saved text stays visible while work runs. Details show **最终文字** first. **复制最终文字** is in the toolbar and **复制识别文字** is in its action menu. **识别与润色** discloses the separate recognized text and retained refinement record; **原始录音** contains playback and retry controls. A Speech retry preserves previously delivered or refined final output, including capture-only output. Retry does not automatically paste into another app. Expired/missing audio and recognition failure have readable inline explanations. Deleting a Capture uses a destructive button and a system confirmation dialog.
 
-An empty recognition with retained audio shows “未识别，录音已保存” in the existing HUD and appears as “Not Recognized” in History. A discarded no-input capture hides the HUD; neither case reports “已输入”.
+An empty recognition with retained audio shows “未识别，录音已保存” in the existing HUD and appears as “未能识别” in History. A discarded no-input capture hides the HUD; neither case reports “已输入”.
 
-History's native **Record Capture** toolbar button starts an intentional voice capture saved to History. It is disabled while another capture is active or capabilities are unavailable. Recording uses the existing HUD finish/cancel controls and shortcut; successful completion reports “已保存”. The **Source Recording** disclosure shows **Destination: History** or **Current App**, and an unfinished record reads “Recording…”. This entry point does not restore another app's focus, inject text or copy text automatically.
+History's native **开始录音** toolbar button starts an intentional voice capture saved to History. It is disabled while another capture is active or capabilities are unavailable. Recording uses the existing HUD finish/cancel controls and shortcut; successful completion reports “已保存”. The **原始录音** disclosure shows **保存位置：历史记录** or **当前应用**, and an unfinished record reads “正在录音…”. This entry point does not restore another app's focus, inject text or copy text automatically.
 
-Explicit cancellation shows the existing status surface as “Stopping…” until capture closes and the unfinished record is discarded. Operational interruption retains available audio/text in History as a failed Capture. Shortcut loss keeps the blocked status until capability recheck; asynchronous cleanup must not report Ready or successful delivery over it. These states use the existing native status/HUD and History controls.
+Explicit cancellation shows the existing status surface as “正在停止…” until capture closes and the unfinished record is discarded. Operational interruption retains available audio/text in History as a failed Capture. Shortcut loss keeps the blocked status until setup is checked and **开始使用** succeeds; asynchronous cleanup must not report Ready or successful delivery over it. These states use the existing native status/HUD and History controls.
 
 ## Dictionary
 
-The **Dictionary** library uses native searchable list/detail navigation, **Add Word / Edit Word** sheets and system deletion confirmation. The correct spelling is primary. Optional **Always Replace** aliases appear separately, with clear language that users should add them only for unconditional replacement. A spelling hint does not imply a global alias. Save errors stay in the native editor and Cancel leaves saved data intact.
+The **字典** library uses native searchable list/detail navigation, **添加词语 / 编辑词语** sheets and system deletion confirmation. The correct spelling is primary. Optional **自动替换的别名** aliases appear separately, with clear language that users should add them only for unconditional replacement. A spelling hint does not imply a global alias. Save errors stay in the native editor and Cancel leaves saved data intact.
 
 ## Personal Memory
 
-**Personal Memory** shows active, archived and superseded personal projects, people, preferences, facts and decisions. Topics and personal information are the primary reading content. Automatic/user origin and current use are visible; **Sources & History** discloses provenance, dates, exact learning snapshots and predecessor links.
+**个人记忆** shows active, archived and superseded personal projects, people, preferences, facts and decisions. Topics and personal information are the primary reading content. Automatic/user origin and current use are visible; **来源与历史** discloses provenance, dates, exact learning snapshots and predecessor links.
 
 Entries appear automatically from completed daily input. There is no candidate inbox or mandatory review. Optional native creation/editing, archive/restore/replace and system-confirmed deletion remain available to correct the profile. The editor uses a grouped Form with a kind Picker, topic TextField and multiline personal-information TextEditor. Dictionary aliases never appear in this editor.
 
-History's **Personal Memory** section shows idle scheduling, learning progress, outcomes, linked memories and **Text Used for Learning**. Failed nonretryable analysis offers an optional retry. Opening/closing details does not control the background learner. Deleting a Capture explains that its analysis snapshots are removed while separate personal Memory remains; missing sources are labelled explicitly.
+History's **个人记忆** section shows idle scheduling, learning progress, outcomes, linked memories and **用于学习的文字**. Failed nonretryable analysis offers an optional retry. Opening/closing details does not control the background learner. Deleting a Capture explains that its analysis snapshots are removed while separate personal Memory remains; missing sources are labelled explicitly.
 
 ## Input cleanup
 
-Settings exposes **Clean Up Voice Input**, on by default. Its explanation describes filler/redundancy removal and appropriate punctuation, paragraphs and clear lists while preserving meaning and tone. The dictionary applies independently of the toggle; Memory is not a prerequisite for cleanup.
+Settings exposes **自动润色语音输入**, on by default. Its explanation describes filler/redundancy removal and appropriate punctuation, paragraphs and clear lists while preserving meaning and tone. The dictionary applies independently of the toggle; Memory is not a prerequisite for cleanup.
 
-History's **Input Refinement** inside **Recognition & Refinement** shows status, duration and a readable fallback reason. Standard disclosures show **Changes**, **Text Before Refinement**, **Dictionary Used** and **Memory Considered**, retaining immutable snapshots. Recognition can change after a Speech retry while saved final output and its actual earlier provenance stay intact.
+History's **输入润色** inside **识别与润色** shows status, duration and a readable fallback reason. Standard disclosures show **修改内容**, **润色前的文字**, **本次使用的字典** and **本次参考的个人记忆**, retaining immutable snapshots. Recognition can change after a Speech retry while saved final output and its actual earlier provenance stay intact.
 
-The existing processing HUD remains visible during cleanup and the menu reports **Refining…**. Running-source mutation/retry is disabled. Slow/failed AI processing retains saved dictionary-corrected/original text, and session cancellation prevents a late paste. Actual model fidelity, VoiceOver and latency require device checks.
+The existing processing HUD remains visible during cleanup and the menu reports **正在润色…**. Running-source mutation/retry is disabled. Slow/failed AI processing retains saved dictionary-corrected/original text, and session cancellation prevents a late paste. Actual model fidelity, VoiceOver and latency require device checks.
 
 ## Word-correction suggestion
 
-**Suggest Words After I Correct Input** is a separate default-off Settings toggle. Explain the short observation of recently inserted text and the explicit spelling confirmation. It is dictionary learning; personal Memory does not inherit this confirmation requirement.
+**修改输入后建议加入字典** is a separate default-off Settings toggle. Explain the short observation of recently inserted text and the explicit spelling confirmation. It is dictionary learning; personal Memory does not inherit this confirmation requirement.
 
-After a stable eligible correction, show a native nonactivating utility `NSPanel` with standard Text and **Remember / Not Now** buttons. Present the old and corrected spellings and explain that the new spelling helps future input. Size the native panel to its content, including long words and save errors, without truncating the spelling being confirmed. Use system panel/control appearance, with no custom bubble, blur stack, overlay or imitation glass. Appearing must not activate Morie or steal the target's typing focus.
+After a stable eligible correction, show a native nonactivating utility `NSPanel` with standard Text and **加入字典 / 暂不添加** buttons. Present the old and corrected spellings and explain that the new spelling helps future input. Size the native panel to its content, including long words and save errors, without truncating the spelling being confirmed. Use system panel/control appearance, with no custom bubble, blur stack, overlay or imitation glass. Appearing must not activate Morie or steal the target's typing focus.
 
 Remember saves the spelling only; saving can display an inline error. Not Now, expiry, changing the text again, leaving the observed field, starting input or disabling the setting dismisses it. Unsupported or secure fields do not show a suggestion. Keep the same word from repeatedly interrupting a session. Validate focus, keyboard/VoiceOver, long words, failure layout and fullscreen/multiple-screen behavior in the signed app; an offscreen image cannot establish those interactions.
 

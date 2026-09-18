@@ -86,6 +86,8 @@ Dictionary tests cover spelling/alias persistence, conflicts, bounded Speech hin
 
 Learning tests inject structured evidence and delayed models. They verify exact committed final-text sources, idle queue/restart discovery, automatic admission/accumulation, merging/updates, user edits/archive/delete, atomic failure/backoff and input preemption. A cancelled model cannot create late Memory. Personalization tests inject full final text and uncooperative models to check independent cleanup, dictionary fallback, original/final save ordering, provenance, stale source/context, History retry, deadline/cancellation and current-version recovery.
 
+Permission setup tests inject read-only snapshots and authorization/settings actions. They verify complete mandatory checks, explicit actions, denied/restricted/unsupported states, revocation/recovery, stale buttons and concurrent refresh/request behavior without linking the live TCC gate.
+
 The actual Foundation Models and native Speech-hint paths compile. Logic tests never invoke a real model, microphone, clipboard or product app, and cannot establish semantic quality or cross-app acceptance.
 
 ## CI compile gate
@@ -105,25 +107,25 @@ CI is **not** runtime acceptance. A hosted build cannot prove real microphone/TC
 
 ## Required permissions
 
-Phase 0 may require:
+The current input loop requires Apple Intelligence, Chinese Speech transcription, Microphone authorization, Speech Recognition authorization and Accessibility trust.
 
-- Microphone
-- Speech Recognition
-- Accessibility
+The first launch opens **使用引导与权限** and inspects every requirement without prompting. Use each permission's explicit **允许访问** action for undetermined Microphone/Speech authorization. Denied access links to its native privacy pane. **辅助功能 → 打开系统设置** registers the signed app with TCC and opens its native pane; Morie does not add a second consent alert. Restricted or unavailable capabilities keep input blocked.
 
-The app should surface capability failures rather than silently degrading to a third-party or legacy implementation.
+Return from System Settings to refresh status automatically, or choose **重新检查**. Refresh never calls bootstrap, stops recording, prepares a model or installs a hotkey. Once all requirements pass, click **开始使用** to prepare Speech assets and enable the shortcut. The completion action is disabled during recording/requests/preparation, and requirements are rechecked after asset preparation. Closing the guide with **稍后设置** does not complete setup. Subsequent launches still inspect actual permissions, regardless of the saved setup-completed preference.
 
-If permissions were denied during development, use macOS System Settings to restore access before retesting. When testing permission onboarding behavior itself, reset the relevant app permission state using normal macOS developer/test procedures.
+Use the normal signed app for TCC validation; compile/test/preview tools must not reset the owner's permissions or replace that app. Intentional permission-reset testing belongs in a separately authorized disposable test setup. CloudKit and Apple Developer enrollment are not part of this guide.
 
-Accessibility uses the macOS-owned consent prompt only; Morie does not stack a second modal over the system's Device Control and Data Access prompt. Microphone and Speech show native consent prompts while their TCC status is undetermined. If macOS returns denial without presenting consent, Morie shows one recovery alert with **Open System Settings**; after denial, macOS requires the user to re-enable access there. Denied permissions also remain visible in the menu-bar status. After changing a permission, choose **Recheck Capabilities** from the menu-bar panel.
+## Chinese UI and native navigation
 
-The menu-bar panel also keeps an **Open System Settings** recovery action visible while a permission-backed capability is blocked; **Recheck Capabilities** cannot itself re-prompt a permission whose TCC status is already denied.
+The app bundle's development language and localized privacy resources are `zh-Hans`. App-owned strings and display dates use Simplified Chinese, including on a Mac with English first in its system language list. User data, prompts, raw enum values and diagnostic identifiers are not translated.
+
+**⌘,**, the sidebar's **设置** entry and the native menu's **设置…** link all open one native Settings scene. The standard sidebar command and toolbar toggle show/hide navigation; **资料库 / 应用** headers use native expansion controls. The menu-bar extra uses a system menu with management, Settings, setup and Quit entries. The recording shortcut is unchanged.
 
 ## Native diagnostics surface
 
-Morie includes a native **Diagnostics** page in its management window.
+Morie includes a native **诊断** page in its management window.
 
-Open the Morie management window from the menu-bar panel, then choose **Diagnostics** in its sidebar. The diagnostics surface uses a native Table with search and level filtering. Select an event to read its full message in the resizable detail area. It records the current process lifetime in memory.
+Open the Morie management window from the native menu, then choose **诊断** in its sidebar. The diagnostics surface uses a native Table with search and level filtering. Select an event to read its full message in the resizable detail area. It records the current process lifetime in memory.
 
 It currently traces:
 
@@ -150,7 +152,7 @@ The window provides:
 Recommended defect reproduction flow:
 
 1. launch Morie;
-2. open **Morie → Diagnostics**;
+2. open **Morie → 诊断**;
 3. use **Clear Diagnostics…** if necessary;
 4. focus the target text field in another app;
 5. activate the configured shortcut (solo Fn release by default), speak, then activate it again to finish;
@@ -162,8 +164,8 @@ If no accepted Hotkey entry appears after the configured shortcut, diagnose the 
 ## Current manual smoke test
 
 1. Launch Morie.
-2. Confirm the menu bar item reaches `Ready` on a supported system.
-3. Open **Morie → Diagnostics** and confirm bootstrap/capability/hotkey-install entries are present.
+2. Complete **使用引导与权限**, then confirm the native menu reports **可以开始录音**. A later launch with unchanged permissions should become ready without another setup completion.
+3. Open **Morie → 诊断** and confirm bootstrap/capability/hotkey-install entries are present.
 4. Place the caret in another application.
 5. Press and release `Fn / Globe` once (or use the configured alternate binding).
 6. Speak a short phrase.
@@ -179,10 +181,10 @@ A successful smoke test is not the full acceptance test. Complete [`validation.m
 
 ## History recovery smoke test
 
-From the normal Xcode-signed app, open **Morie → History** and select a Capture with unexpired audio:
+From the normal Xcode-signed app, open **Morie → 历史记录** and select a Capture with unexpired audio:
 
 1. Play, pause, and seek with the native recording controls; opening a detail must not autoplay.
-2. Choose **Recognize Again**, then verify the saved recognition. Any original delivered output and delivery status remain visible; paste only occurs after an explicit Copy action and the user's paste.
+2. Choose **重新识别**, then verify the saved recognition. Any original delivered output and delivery status remain visible; paste only occurs after an explicit Copy action and the user's paste.
 3. Cancel a retry and immediately start a new Fn capture. History playback/retry must stop and the live capture must remain usable.
 4. Try a failed/empty Capture. Empty or failed re-recognition preserves its previous text/audio and shows the failure; success makes recovered text available.
 5. Switch sections/close the window during playback and retry. Check cleanup, then reopen and retry again.
@@ -192,7 +194,7 @@ Use generated fixture audio and temporary stores for automated API checks. Never
 
 ## Capture-only voice smoke test
 
-1. From **Open Morie → History**, choose **Record Capture** and speak an idea. Complete it with the HUD; verify “已保存”, **Destination: History**, saved text and playable audio.
+1. From **打开 Morie → 历史记录**, choose **开始录音** and speak an idea. Complete it with the HUD; verify “已保存”, **保存位置：历史记录**, saved text and playable audio.
 2. Repeat with shortcut finish and Escape cancellation. Cancellation removes the unfinished Capture and audio.
 3. Start in History, switch to another app and finish there. The saved idea must not be pasted, focus must not be restored elsewhere, and the clipboard must remain unchanged.
 4. Alternate this entry with normal shortcut input into a disposable document. Each new shortcut capture must still deliver to its original app and report “已输入”.
@@ -204,17 +206,17 @@ Mode persistence, terminal capture-only storage, cancellation and retry are cove
 
 Interactive checks remain deferred to the evening of 2026-09-18. Use disposable data in the owner's normal signed app when resuming:
 
-1. Add spellings such as **Morie**, **Claude** and a Chinese technical term in **Dictionary**. Separately add an explicit **more e → Morie** alias. Relaunch and verify persistence; conflicts/invalid fields keep the editor open, and Cancel preserves saved values.
-2. Compare Speech recognition with/without a spelling hint. Then verify deterministic alias correction from actual recognized text, including when **Clean Up Voice Input** is off. A spelling hint alone must not create a broad replacement alias.
+1. Add spellings such as **Morie**, **Claude** and a Chinese technical term in **字典**. Separately add an explicit **more e → Morie** alias. Relaunch and verify persistence; conflicts/invalid fields keep the editor open, and Cancel preserves saved values.
+2. Compare Speech recognition with/without a spelling hint. Then verify deterministic alias correction from actual recognized text, including when **自动润色语音输入** is off. A spelling hint alone must not create a broad replacement alias.
 3. With an empty Personal Memory profile and cleanup on, test [the cleanup examples](input-cleanup.md): fillers, repeats, clear self-correction, uncertainty, short replies and clear ordered items. No invented content, summary, translation, answer or executed request.
-4. Verify the target receives the exact saved **Final Text**. Inspect recognition, dictionary/Memory snapshots and accepted changes in **Recognition & Refinement**.
+4. Verify the target receives the exact saved **最终文字**. Inspect recognition, dictionary/Memory snapshots and accepted changes in **识别与润色**.
 5. Re-recognize the saved audio; the delivered final output and its old processing provenance remain available. Exercise cancellation, unavailable/slow AI and save recovery with disposable captures.
 6. Measure actual cleanup fidelity, hint benefit, timeout rate and final-to-delivery latency. The provisional two-second limit bounds model waiting, not storage/scheduling or the full input loop.
 
 ## Automatic personal Memory smoke test
 
-1. Dictate a disposable explicit personal fact/project through ordinary current-app input. Let Morie idle, then inspect **Personal Memory** and History's learning status. No manual confirmation should be needed.
-2. Confirm **Text Used for Learning** matches saved final text, including cleanup/dictionary changes. Recognition stays separate. Capture-only/active/cancelled/raw-only input is not automatically learned.
+1. Dictate a disposable explicit personal fact/project through ordinary current-app input. Let Morie idle, then inspect **个人记忆** and History's learning status. No manual confirmation should be needed.
+2. Confirm **用于学习的文字** matches saved final text, including cleanup/dictionary changes. Recognition stays separate. Capture-only/active/cancelled/raw-only input is not automatically learned.
 3. Repeat supported information, test weaker evidence across distinct captures, then express a clear later change. Inspect merged sources and superseded history; an ambiguous/older claim must not overwrite current information.
 4. Test quotes, third-person/hypothetical/temporary statements and uncertain personal information. Inspect actual evidence rather than assuming model confidence guarantees correctness.
 5. Edit/archive/delete personal information. User edits take precedence and the same normalized deleted topic is not immediately relearned. Inspect source links; deleting a source removes analysis snapshots but retains independent Memory.
@@ -224,8 +226,8 @@ See [the Memory device checklist](validation.md#m-004-memory-foundation). Model 
 
 ## Word-correction suggestion smoke test
 
-1. Verify **Suggest Words After I Correct Input** defaults off. Enable it explicitly, dictate into a supported disposable text field, correct a word, and pause for two seconds.
-2. The native **Remember / Not Now** prompt should appear without activating Morie or stealing typing focus. Remember saves only the corrected spelling; verify that no old-word alias was created.
+1. Verify **修改输入后建议加入字典** defaults off. Enable it explicitly, dictate into a supported disposable text field, correct a word, and pause for two seconds.
+2. The native **加入字典 / 暂不添加** prompt should appear without activating Morie or stealing typing focus. Remember saves only the corrected spelling; verify that no old-word alias was created.
 3. Repeat with Chinese, mixed words, added/deleted letters and joined terms. Appended sentences, numbers, punctuation, URLs/code and broad rewrites should not create word suggestions.
 4. Continue editing, undo, move outside the inserted text, change apps/fields, start new input or disable the setting. Observation/pending suggestions should stop. Not Now/expiry saves nothing; the same word should not repeatedly prompt in one process.
 5. Verify unsupported/secure fields, capture-only completion and clipboard fallback do not start observation. Check long words, save errors, fullscreen/multiple screens, keyboard/VoiceOver and panel dismissal.
@@ -236,12 +238,14 @@ Use the [correction matrix](validation.md#m-009-correction-suggestions). Automat
 
 M-008 keeps development on macOS. Use the normal Xcode-signed app and disposable data when the deferred interactive checks resume:
 
-1. Open Morie and switch between History, Dictionary, Personal Memory, Settings and Diagnostics. Resize the window and native split columns; confirm usable content at 960 × 600 and the default 1120 × 720.
+1. Switch between **历史记录 / 字典 / 个人记忆 / 诊断**. Resize the window and native split columns at 960 × 600 and 1120 × 720; use the system sidebar toggle/command and fold **资料库 / 应用**.
 2. Select History rows with keyboard and pointer. Search by text/app and change filters; a hidden/deleted record must no longer occupy the detail. Start playback/re-recognition, then change selection or leave History; old work must stop without changing another Capture.
 3. Read final text, open recognition/refinement and recording disclosures, use both copy actions, and follow a linked Memory. Selecting a different Capture resets the detail navigation. Long text remains scrollable and selectable.
 4. Check dictionary and personal-Memory creation/edit/save/cancel, validation errors, lifecycle/deletion and sources. Personal Memory appears automatically; its editor contains personal information, while Dictionary owns spellings/aliases. Learning status must not become a required review task.
-5. Confirm Settings persistence from both entry points. Filter Diagnostics, select a long event, resize its detail, and check copy-all/reveal/clear actions with disposable logs.
+5. Open **设置** through the sidebar, native menu and **⌘,**; all must reuse the same Settings scene and persist changes. Filter Diagnostics, select a long event, resize its detail, and check copy-all/reveal/clear actions with disposable logs.
 6. Verify keyboard focus, VoiceOver names, light/dark appearance, increased contrast and reduced motion. Native glass, selection colors and toolbar compositing require the real window.
+
+Also run the [M-010 native setup checklist](validation.md#m-010-chinese-ui-and-native-setup) for first use, denied permission recovery, setup deferral and app-scoped shortcuts.
 
 For automated layout work, use temporary NSHostingView/NSWindow fixtures with isolated SwiftData containers, injected controller actions and a memory-only diagnostic logger. Never launch AppController bootstrap or order the fixture window onscreen; use `.prohibited` activation policy. Do not access the microphone, model, clipboard, production History or product log. Keep generated binaries, images and stores under a unique `/tmp` directory. Offscreen bitmap caching can omit native glass/selection layers, so these images establish layout and content only. M-008's local evidence paths are in its [task record](./tasks/M-008-macos-management-ui.md#validation-evidence).
 

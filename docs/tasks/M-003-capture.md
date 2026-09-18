@@ -8,6 +8,10 @@
 - **Starts after:** M-002 macOS Input Foundation reaches an acceptable stable baseline
 - **Owner sequencing decision (2026-09-18):** finish the single-Mac input/dictionary/Memory loop before cross-device work. CloudKit is outside this task and the current milestone, not a local-persistence blocker. No Team ID or container is requested.
 
+## Current UI/setup behavior — M-010, 2026-09-18
+
+[M-010](M-010-macos-native-setup.md) translates History/recovery copy and adds read-only setup inspection. Refresh no longer interrupts a Capture; explicit setup completion is blocked during input. No persisted model, database path or retention rule changes. The completed owner-approved development reset and verified backup below remain unchanged.
+
 ## Why
 
 Morie must make every intentional user expression durable before optional AI processing. Phase 1 establishes the persistence boundary that later Memory and personalization depend on.
@@ -82,7 +86,7 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 - `SpeechPipeline` observes live analyzer/result failures. AVFoundation runtime-error/interruption notifications fail the input stream and trigger controller cleanup. An ownership check after async converter creation prevents cancelled startup from opening a later source.
 - A result arriving during teardown is saved without initiating delivery. `TextInjector` checks cancellation before activation and after focus handoff; paste dispatch has no suspension point. A delivery already dispatched still records `delivered`, and later interruption cannot overwrite that terminal outcome.
 - `CaptureStore` accepts an explicit file URL for isolated restart testing; production continues to use SwiftData's default local application store.
-- The menu-bar panel remains compact. History, Dictionary, Personal Memory, Settings and Diagnostics are organized in the standard sidebar of one Morie window.
+- M-010 uses a native menu-bar menu and Chinese management labels. History, Dictionary, Personal Memory and Diagnostics share the management sidebar; Settings and permission setup open their native windows.
 - History retry is explicit and cancellable. It reads the saved file without microphone capture, changes the same Capture only after successful recognition, and never injects or changes the clipboard automatically.
 - Successful recovery of a failed Capture saves recognized/final text and changes its state to `recognized`. For previously delivered/delivery-failed Captures, only recognized text and retry metadata change; the original output and delivery state remain available.
 - Retry errors use the new optional `lastRecognitionAttemptAt` / `lastRecognitionErrorDescription` fields. Failed/empty/cancelled retries leave prior text and source audio intact.
@@ -117,7 +121,7 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 - Quiet-room silence versus audible recognition failure remains unvalidated. Current automatic discard only covers no input/zero signal without prior transcript evidence. Uncertain recordings stay available for playback, re-recognition or explicit deletion; do not claim the ambient-noise false-positive cases are fixed.
 - Validate the History playback/seek, native retry/cancel, live-capture preemption, navigation/window cleanup, expiry and deletion flows from the normal Xcode-signed app. Logic tests are not device UI/ASR acceptance.
 - Validate **Record Capture** with both HUD and shortcut finish, Escape cancellation, switching apps before finishing, repeated `captureOnly`/`currentApp` captures, and an unchanged clipboard/focus for capture-only completion.
-- Validate capability recheck/shortcut loss/microphone interruption during startup, recording and finalization, including rapid restart and interruption during focus handoff. Native AAC tests do not establish controller scheduling or device-notification behavior.
+- Validate read-only setup refresh during startup, recording and finalization: it must leave input intact. Separately validate shortcut loss/microphone interruption, rapid restart and focus-handoff interruption. M-010 removes the former recheck-driven interruption; native AAC tests do not establish controller scheduling or device-notification behavior. See the updated [M-003 matrix](../validation.md#m-003-interruption-and-discard).
 - Unexpected process termination or storage failure may leave incomplete M4A files; History preserves them and reports playback/recognition errors rather than claiming every interrupted recording is decodable.
 - App Context remains partial. CloudKit is deferred to a separately scheduled cross-device milestone after the Mac loop works; enrollment/container setup and sync acceptance are not requirements for completing local Capture work.
 

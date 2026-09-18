@@ -11,11 +11,11 @@ enum MemoryKind: String, Codable, CaseIterable, Identifiable, Sendable {
     var id: Self { self }
     var title: String {
         switch self {
-        case .project: "Project"
-        case .person: "Person"
-        case .preference: "Preference"
-        case .fact: "Personal Fact"
-        case .decision: "Decision"
+        case .project: "项目"
+        case .person: "人物"
+        case .preference: "偏好"
+        case .fact: "个人信息"
+        case .decision: "决定"
         }
     }
     var systemImage: String {
@@ -37,9 +37,9 @@ enum MemoryStatus: String, Codable, CaseIterable, Identifiable, Sendable {
     var id: Self { self }
     var title: String {
         switch self {
-        case .active: "Active"
-        case .archived: "Archived"
-        case .superseded: "Superseded"
+        case .active: "使用中"
+        case .archived: "已归档"
+        case .superseded: "已替代"
         }
     }
 }
@@ -52,7 +52,7 @@ struct MemoryDraft: Codable, Equatable, Sendable {
 
 enum MemoryOrigin: String, Codable, Sendable {
     case automatic, user
-    var title: String { self == .automatic ? "Learned from your input" : "Edited by you" }
+    var title: String { self == .automatic ? "从日常输入中自动学习" : "由你手动编辑" }
 }
 
 @Model
