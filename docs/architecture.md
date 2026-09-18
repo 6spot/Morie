@@ -275,6 +275,8 @@ The first attempted implementation using `AVCaptureAudioFileOutput` beside `Capt
 
 The replacement now owns one `AVCaptureSession` and one `AVCaptureAudioDataOutput`. Each 16 kHz mono PCM buffer is passed through Apple's `AnalyzerInputConverter` to `SpeechAnalyzer` and streamed into an Apple `AVAudioFile` AAC encoder targeting 32 kbps. This adapts Type4Me's proven single-output ownership and deterministic queue drain while dropping its complete in-memory PCM accumulation. Runtime acceptance remains open until owner-hardware validation confirms recognition, waveform response, playable M4A output, cancellation and repeated start/stop.
 
+An empty Speech result is retained only when the capture contains meaningful audio frames, because that represents a retryable recognition failure. Silence/no-input with empty text is discarded together with its audio file. Existing empty rows created before meaningful-audio metadata existed are pruned on store startup.
+
 ### `CaptureHistoryView`
 
 Native SwiftUI/SwiftData History surface using system `List`, `ContentUnavailableView`, and `@Query`. It is intentionally a basic inspection surface while M-003 persistence semantics are validated.

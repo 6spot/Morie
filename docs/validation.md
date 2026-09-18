@@ -40,6 +40,8 @@ CloudKit/iCloud is intentionally not part of the Phase 0 gate; M-003 adds it wit
 
 The initial `AVCaptureAudioFileOutput` integration caused a confirmed AVFoundation `SIGABRT` on macOS 27 and was removed. Its single-data-output replacement is implemented but must prove start, stop, cancellation, recognition failure, repeated capture, M4A playback, size, CPU and memory behavior on owner hardware before acceptance.
 
+Verify the empty-result split explicitly: a silent start/stop must create neither a History row nor a retained M4A, while audible speech that produces no transcript must retain both the failed Capture and its retryable source audio.
+
 ## Toggle-capture lifecycle
 
 Verify repeated sequences:

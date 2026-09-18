@@ -90,7 +90,7 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertEqual(record.sourceBundleIdentifier, "com.apple.dt.Xcode")
     }
 
-    func testStoreRecreationPreservesEmptyCaptureForSourceAudioLifecycle() throws {
+    func testStoreRecreationRemovesEmptyCaptureWithoutMeaningfulAudio() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieEmptyCaptureTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -105,7 +105,7 @@ final class CaptureStoreTests: XCTestCase {
         }
 
         let reopenedStore = try CaptureStore(storageURL: storeURL)
-        XCTAssertNotNil(try fetch(id, from: reopenedStore))
+        XCTAssertNil(try fetch(id, from: reopenedStore))
     }
 
     func testExpiredAudioIsRemovedWithoutDeletingCapture() throws {
@@ -127,6 +127,30 @@ final class CaptureStoreTests: XCTestCase {
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: audioURL.path))
         XCTAssertNil(try XCTUnwrap(fetch(id, from: store)).sourceAudioRelativePath)
+    }
+
+    func testMeaningfulAudioPreservesEmptyFailedCaptureAcrossRecreation() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "MorieMeaningfulAudioTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let storeURL = directory.appending(path: "captures.store")
+        let audioDirectory = directory.appending(path: "audio", directoryHint: .isDirectory)
+        let id = UUID()
+        do {
+            let store = try CaptureStore(storageURL: storeURL, audioDirectory: audioDirectory)
+            let audioURL = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+            try Data("audio".utf8).write(to: audioURL)
+            try store.attachSourceAudio(
+                CapturedSourceAudio(url: audioURL, duration: 1, hasMeaningfulAudio: true),
+                for: id
+            )
+            try store.markFailed(id, error: "Recognition returned no text")
+        }
+
+        let reopened = try CaptureStore(storageURL: storeURL, audioDirectory: audioDirectory)
+        XCTAssertEqual(try XCTUnwrap(fetch(id, from: reopened)).sourceAudioHasMeaningfulContent, true)
     }
 
     private func fetch(_ id: UUID, from store: CaptureStore) throws -> CaptureRecord? {

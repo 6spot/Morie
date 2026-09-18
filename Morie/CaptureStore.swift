@@ -48,6 +48,7 @@ final class CaptureStore {
             ).appending(path: "Morie/CaptureAudio", directoryHint: .isDirectory)
         }
         try FileManager.default.createDirectory(at: self.audioDirectory, withIntermediateDirectories: true)
+        try removeUnusableEmptyRecords()
         try pruneExpiredAudio()
     }
 
@@ -78,6 +79,7 @@ final class CaptureStore {
         record.sourceAudioDurationSeconds = source.duration
         record.sourceAudioByteCount = Int64(size)
         record.sourceAudioExpiresAt = Calendar.current.date(byAdding: .day, value: Self.audioRetentionDays, to: Date())
+        record.sourceAudioHasMeaningfulContent = source.hasMeaningfulAudio
         record.updatedAt = Date()
         try container.mainContext.save()
         Diagnostics.record("CaptureStore", "Source audio saved for \(label(id)); bytes=\(size)")
@@ -154,6 +156,7 @@ final class CaptureStore {
             record.sourceAudioDurationSeconds = nil
             record.sourceAudioByteCount = nil
             record.sourceAudioExpiresAt = nil
+            record.sourceAudioHasMeaningfulContent = nil
         }
         try container.mainContext.save()
         Diagnostics.record("CaptureStore", "Expired source audio for \(expired.count) Capture(s)")
@@ -178,6 +181,22 @@ final class CaptureStore {
     private func deleteAudio(for record: CaptureRecord) {
         guard let path = record.sourceAudioRelativePath else { return }
         try? FileManager.default.removeItem(at: audioDirectory.appending(path: path))
+    }
+
+    private func removeUnusableEmptyRecords() throws {
+        let descriptor = FetchDescriptor<CaptureRecord>()
+        let unusable = try container.mainContext.fetch(descriptor).filter {
+            $0.recognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && $0.finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && $0.sourceAudioHasMeaningfulContent != true
+        }
+        guard !unusable.isEmpty else { return }
+        for record in unusable {
+            deleteAudio(for: record)
+            container.mainContext.delete(record)
+        }
+        try container.mainContext.save()
+        Diagnostics.record("CaptureStore", "Removed \(unusable.count) empty Capture(s) without meaningful audio")
     }
 
     private func label(_ id: UUID) -> String {

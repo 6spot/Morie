@@ -413,8 +413,13 @@ final class AppController: ObservableObject {
             try captureStore?.attachSourceAudio(result.sourceAudio, for: sessionID)
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                try captureStore?.markFailed(sessionID, error: "Speech returned no text. Source audio is available for retry.")
-                Diagnostics.record("CaptureStore", "Retaining empty recognition with source audio for \(label(sessionID))", level: .warning)
+                if result.sourceAudio.hasMeaningfulAudio {
+                    try captureStore?.markFailed(sessionID, error: "Speech returned no text. Source audio is available for retry.")
+                    Diagnostics.record("CaptureStore", "Retaining empty recognition with meaningful source audio for \(label(sessionID))", level: .warning)
+                } else {
+                    try captureStore?.cancel(sessionID)
+                    Diagnostics.record("CaptureStore", "Discarded silent empty Capture \(label(sessionID))")
+                }
                 completeSuccessfulSession(sessionID)
                 return
             }

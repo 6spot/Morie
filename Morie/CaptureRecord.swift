@@ -5,6 +5,13 @@ import SwiftData
 struct CapturedSourceAudio: Sendable {
     let url: URL
     let duration: TimeInterval
+    let hasMeaningfulAudio: Bool
+
+    init(url: URL, duration: TimeInterval, hasMeaningfulAudio: Bool = true) {
+        self.url = url
+        self.duration = duration
+        self.hasMeaningfulAudio = hasMeaningfulAudio
+    }
 }
 
 enum CaptureLifecycle: String, Codable, Sendable {
@@ -38,6 +45,7 @@ final class CaptureRecord {
     var sourceAudioDurationSeconds: Double?
     var sourceAudioByteCount: Int64?
     var sourceAudioExpiresAt: Date?
+    var sourceAudioHasMeaningfulContent: Bool?
 
     init(
         id: UUID,

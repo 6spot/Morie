@@ -34,6 +34,7 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
     private let onAudioLevel: @Sendable (Double) -> Void
     private var writtenFrames: AVAudioFramePosition = 0
     private var callbackCount = 0
+    private var voicedFrameCount = 0
     private var terminal = false
 
     init(
@@ -97,7 +98,11 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         output.setSampleBufferDelegate(nil, queue: nil)
         audioFile = nil
         let duration = Double(writtenFrames) / 16_000
-        return CapturedSourceAudio(url: destinationURL, duration: duration)
+        return CapturedSourceAudio(
+            url: destinationURL,
+            duration: duration,
+            hasMeaningfulAudio: voicedFrameCount >= 5
+        )
     }
 
     func cancel() {
@@ -126,9 +131,14 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
             for input in try converter.convert(pcmBuffer, at: nil) {
                 continuation.yield(input)
             }
+            let decibels = Self.signalDecibels(pcmBuffer)
+            let level = Self.normalizedLevel(decibels)
+            if decibels > -50 {
+                voicedFrameCount += 1
+            }
             callbackCount += 1
             if callbackCount.isMultiple(of: 3) {
-                onAudioLevel(Self.normalizedLevel(pcmBuffer))
+                onAudioLevel(level)
             }
         } catch {
             terminal = true
@@ -136,15 +146,18 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         }
     }
 
-    private static func normalizedLevel(_ buffer: AVAudioPCMBuffer) -> Double {
-        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return 0 }
+    private static func signalDecibels(_ buffer: AVAudioPCMBuffer) -> Float {
+        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return -60 }
         var sum: Float = 0
         for index in 0..<Int(buffer.frameLength) {
             let sample = channel[index]
             sum += sample * sample
         }
         let rms = sqrt(sum / Float(buffer.frameLength))
-        let decibels = rms > 0 ? 20 * log10(rms) : -60
+        return rms > 0 ? 20 * log10(rms) : -60
+    }
+
+    private static func normalizedLevel(_ decibels: Float) -> Double {
         return Double((min(max(decibels, -42), -6) + 42) / 36)
     }
 }
