@@ -75,6 +75,7 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 ## Implementation notes
 
 - The persistent entity is `CaptureRecord`; voice is represented as a source of Capture rather than the domain root.
+- M-004 adds `MemoryRecord` to the same container schema and an explicit Save Memory/source-link action in History. Memory has a separate write context and cannot alter Capture text/delivery outcomes. The owner deferred interactive device validation until the evening of 2026-09-18 while independent development continues; existing M-003 acceptance remains open.
 - The authoritative session UUID is also the Capture UUID, avoiding a second identity mapping during the input loop.
 - Capture creation requires an explicit delivery mode. The shortcut supplies `currentApp`; History's **Record Capture** supplies `captureOnly` and records Morie as the source without reading another app's window identity. Recognition completion returns the persisted mode, so the controller's delivery decision does not depend on whichever app is frontmost at finish time.
 - Capture-only success is terminal at the recognition save. The same record becomes available to History playback/retry without a delivery step, and a late cancellation cannot discard it. The HUD reports saved versus inserted using the corresponding mode.

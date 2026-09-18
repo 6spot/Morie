@@ -30,4 +30,4 @@ Documentation changes with the code. A behavior, architecture, UI rule, task sta
 
 ## Current product stage
 
-Morie is currently in **Phase 0 — macOS Input Foundation**. iOS, Personal Memory implementation, and Morie Cloud are intentionally not in the active implementation scope.
+Morie is validating **Phase 0 — macOS Input Foundation**, extending **Phase 1 — Durable Capture**, and implementing the first **Phase 2 — Personal Memory** slice. The owner deferred interactive device checks until the evening of 2026-09-18 and CloudKit sync until final integration. Current Memory work covers explicit vocabulary/project storage, provenance and relevant-context retrieval; iOS and Morie Cloud remain later work.

@@ -39,7 +39,7 @@ final class CaptureStore {
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
 
     init(inMemory: Bool = false, storageURL: URL? = nil, audioDirectory: URL? = nil) throws {
-        let schema = Schema([CaptureRecord.self])
+        let schema = Schema([CaptureRecord.self, MemoryRecord.self])
         precondition(!(inMemory && storageURL != nil), "An in-memory store cannot also use a storage URL.")
 
         let configuration: ModelConfiguration

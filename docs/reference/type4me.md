@@ -287,3 +287,11 @@ Inspected explicit cancellation and terminal-error handling in `Type4Me/Session/
 - **ADAPT:** authoritative session identity, deterministic teardown, preservation of prior text/audio after operational error, explicit discard semantics, and recording delivery outcome at paste dispatch.
 - **DROP:** provider/network recovery, automatic partial-text injection, broad device workarounds, and complete PCM replay storage. No Type4Me source was copied.
 - **VERIFY:** actual macOS 27 microphone interruptions, startup/finalization cancellation timing and immediate subsequent capture. Apple AAC encode/decode tests now prove readable files for controlled converter/flush errors and immediate stop; they do not replace those device checks.
+
+## M-004 explicit Memory foundation audit — 2026-09-18
+
+Morie requirement: selectively save user-confirmed vocabulary/project memory with source IDs and lifecycle, then retrieve active context. Inspected `Services/VocabularyCommands.swift`, `Services/HotwordStorage.swift`, `Type4MeTests/VocabularyCommandsTests.swift`, and the provenance distinction in `UI/Settings/CorrectionProvenance.swift` (#300).
+
+- **ADAPT:** case-insensitive duplicate detection, surfacing save failures, explicit user choice before vocabulary writes, and recording provenance when an action occurs rather than reconstructing it later.
+- **DROP:** UserDefaults/file migration, built-in dictionaries, snippet replacement rules, URL/automation commands, cloud hotword tables and external ASR restarts. Morie uses the current SwiftData schema directly and has no compatibility contract.
+- **VERIFY:** native editor/navigation/accessibility and the usefulness of real Chinese/English names/aliases. Native NaturalLanguage matching is tested on synthetic examples; no Type4Me source or dictionary is copied.

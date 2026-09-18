@@ -32,6 +32,7 @@ final class AppController: ObservableObject {
     @Published private(set) var recoverySettingsURL: URL?
 
     let history: CaptureHistoryController?
+    let memory: MemoryStore?
 
     private let capabilityGate = CapabilityGate()
     private let speech = SpeechPipeline()
@@ -59,6 +60,7 @@ final class AppController: ObservableObject {
         self.captureStore = captureStore
         self.persistenceError = persistenceError
         history = captureStore.map { CaptureHistoryController(store: $0, locale: Locale(identifier: "zh-CN")) }
+        memory = captureStore.map { MemoryStore(container: $0.container) }
         let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue

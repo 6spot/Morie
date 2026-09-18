@@ -2,7 +2,7 @@
 
 ## Current stage
 
-Morie is validating **Phase 0 — macOS Input Foundation** while implementing **Phase 1 — Durable Capture**. The current boundary includes the native input loop, local persistence, and History recovery; Memory, iOS, and Morie Cloud remain later work.
+Morie is validating **Phase 0 — macOS Input Foundation** and **Phase 1 — Durable Capture** while implementing the first **Phase 2 — Personal Memory** slice. The current boundary includes the native input loop, local persistence, History recovery, explicit vocabulary/project memory and relevant-context inspection. Automatic Memory Candidates, input personalization, iOS and Morie Cloud remain subsequent work. The owner has deferred interactive device checks until the evening and sync until final integration.
 
 Type4Me is an experience/reference archive, not Morie's architecture or migration template. Every retained lesson is filtered through Morie's product design and the macOS 27-only platform boundary.
 
@@ -57,6 +57,10 @@ Morie/
 │   ├── CaptureFileTranscriber.swift
 │   ├── CaptureAudioSource.swift
 │   ├── CaptureAudioStream.swift
+│   ├── MemoryRecord.swift
+│   ├── MemoryStore.swift
+│   ├── MemoryContextRetriever.swift
+│   ├── MemoryView.swift
 │   ├── MorieControlCenter.swift
 │   ├── CaptureHUD.swift
 │   ├── Diagnostics.swift
@@ -67,6 +71,7 @@ Morie/
 │   ├── CaptureStoreTests.swift
 │   ├── CaptureHistoryTests.swift
 │   ├── CaptureAudioStreamTests.swift
+│   ├── MemoryTests.swift
 │   └── TestDiagnostics.swift
 ├── .github/workflows/
 │   ├── macos-27-ci.yml
@@ -314,11 +319,31 @@ Native SwiftUI/SwiftData History uses `List`, `NavigationStack`, `Form`, and `@Q
 
 ### `MorieControlCenter`
 
-The primary management surface is one native SwiftUI `Window` with a standard `NavigationSplitView`. Its sidebar currently routes to History, Settings, and Diagnostics so product-management surfaces can grow without accumulating separate actions in the menu-bar panel. The SwiftData container is attached at the window root before `@Query` builds the initial History detail, avoiding a different first-render environment. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
+The primary management surface is one native SwiftUI `Window` with a standard `NavigationSplitView`. Its sidebar currently routes to History, Memory, Settings, and Diagnostics. The SwiftData container is attached at the window root before `@Query` builds the initial History detail, avoiding a different first-render environment. The panel retains one **Open Morie** action plus capture status and essential recovery/quit actions.
+
+### `MemoryRecord` / `MemoryStore`
+
+The Capture container now includes `MemoryRecord` for vocabulary and projects: name, aliases, notes, source Capture IDs, confirmation, optional model confidence, timestamps, lifecycle, and predecessor identity. New Memory is explicitly saved by the user from History or the Memory section. Manual confirmation leaves model confidence nil. Saving Capture itself does not create Memory.
+
+`MemoryStore` uses its own non-autosaving `ModelContext` in that same container, so rolling back a failed Memory edit cannot roll back a live Capture's checkpoint. It publishes its saved records for native UI and reads source Captures from their authoritative main context. Memory operations never modify source transcript/delivery fields. Names and aliases are validated; active names are unique within their kind after case/width/whitespace normalization, and aliases are deduplicated.
+
+Editing keeps identity/provenance. Replacement atomically creates a new active record with the predecessor ID and source IDs, and marks the previous record superseded. Archived records can be restored if their name is available; superseded records cannot be edited or restored. Explicit deletion removes only that Memory. Deleting a source Capture retains independently confirmed Memory and its source ID, and the UI reports the source as deleted instead of fabricating provenance.
+
+### `MemoryContextRetriever`
+
+This pure Swift boundary consumes immutable snapshots. It selects only confirmed active records by normalized name/alias matching with NaturalLanguage's native word boundaries. Literal matching preserves significant punctuation in identifiers such as `C++`; boundaries prevent a term such as `Git` from matching inside `GitHub`. Canonical-name matches rank ahead of aliases, longer phrases ahead of shorter ones, then recency and UUID provide deterministic ordering. Results are capped at eight.
+
+History exposes related records and separately labels records saved from that Capture, including their lifecycle. Retrieval does not run for an unfinished Capture and introduces no AI/network step in live recording or delivery. This is lexical context retrieval, not semantic recall, automatic ASR correction or a built-in dictionary.
+
+### `MemoryView`
+
+Native `List`, `NavigationStack`, `Form`, `Picker`, `TextField`, `TextEditor`, sheets and confirmation dialogs provide Memory search, detail, editing and lifecycle actions. A History sheet can create a new entry or link its Capture to an existing active entry. Source links show the saved Capture's text and source app/date. The UI distinguishes manual creation, unavailable source Captures, archived records and superseded records.
 
 ### `MorieTests`
 
 The logic-only XCTest target compiles persistence, History recovery and the audio stream sources directly, without launching Morie or entering TCC. Tests use in-memory or unique temporary databases/audio directories. An explicit store URL defaults audio storage to the same temporary parent. A test-only diagnostics sink prevents tests from touching the running app's log. File recognition is replaced by an injected async closure for deterministic success/failure/cancellation tests. Audio stream tests write and decode real AAC using synthetic PCM and injected converter failures; native Speech, microphone lifecycle and playback interactions remain separate integration/device checks.
+
+Memory tests use those isolated containers and native NaturalLanguage tokenization. They cover restart durability, explicit provenance, normalization/conflicts, source readiness, lifecycle exclusion, replacement, scoped deletion and deterministic bounded retrieval. No model inference or production data is used.
 
 ## Type4Me extraction boundary
 

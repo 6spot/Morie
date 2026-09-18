@@ -4,6 +4,8 @@ This document defines the real-device acceptance checks for **M-002 — macOS In
 
 Phase 0 cannot be marked `DONE` solely from static review or compilation. Global keyboard capture, microphone behavior, permission lifecycle, focus restoration, Accessibility APIs, and editor insertion must be exercised on a supported Mac.
 
+Owner scheduling decision, 2026-09-18: defer interactive device validation until the evening and continue independent development now. Keep the checklist open; no device result is inferred from this deferral.
+
 ## Compile gate
 
 Product/Xcode-project changes must first pass `.github/workflows/macos-27-ci.yml` on the hosted macOS 27 / Xcode 27 environment.
@@ -94,6 +96,22 @@ Use disposable captures from the normal Xcode-signed app. Repeat the relevant ca
 Automated AAC tests establish finalization and data preservation for controlled conversion/flush errors, immediate stop and repeated completion. They do not establish real session-notification timing, controller scheduling, microphone release, or decodability after a force quit/storage failure. Those checks remain open.
 
 2026-09-18: final isolated Debug compilation and all **31 tests** passed on macOS 27 / Xcode 27 (0 failed/skipped). The seven new tests use real Apple AAC encoding/decoding plus temporary storage, without opening a microphone or launching Morie. Paths and limits are recorded in [M-003](./tasks/M-003-capture.md#validation-evidence).
+
+## M-004 Memory foundation
+
+Use disposable Capture/Memory entries when interactive validation resumes tonight:
+
+- [ ] Create vocabulary and projects from **Memory → New Memory** with Chinese/English names, multiline aliases and notes; relaunch and inspect the saved entries.
+- [ ] Save a selective memory from History, link another Capture to it, and inspect both sources without changing the original transcript or delivery outcome.
+- [ ] Cancel a new/edit sheet; saved data remains unchanged. Invalid input and duplicate active names keep the sheet open with a readable error.
+- [ ] Edit a memory and inspect updated matching context in History. Canonical names and aliases work without partial Latin-word matches.
+- [ ] Archive/restore a matching entry; it disappears/reappears in related context. Restoring a conflicting active name is refused.
+- [ ] Replace a memory; the new entry links to the old one, old status becomes **Superseded**, and old content no longer appears as relevant context.
+- [ ] Delete a disposable source Capture; separately confirmed Memory remains and the source is labelled deleted. Delete one memory; its sources and other memories remain.
+- [ ] Verify list/search/filter, source navigation, editor/save/cancel, lifecycle and delete controls with keyboard/VoiceOver and long text.
+- [ ] Open History/Memory while using voice capture; no automatic memory save, new model task, paste, or clipboard change occurs.
+
+2026-09-18: all **47 isolated tests** passed, including 16 Memory tests and the 31 Capture/History/audio regression tests. Offscreen native rendering checked list/detail/editor/context layout with synthetic data. Evidence is in [M-004](./tasks/M-004-memory.md#validation-evidence); interactive acceptance remains open.
 
 ## Toggle-capture lifecycle
 

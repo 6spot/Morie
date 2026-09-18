@@ -108,4 +108,10 @@ History's native **Record Capture** toolbar button starts an intentional voice c
 
 Explicit cancellation shows the existing status surface as “Stopping…” until capture closes and the unfinished record is discarded. Operational interruption retains available audio/text in History as a failed Capture. Shortcut loss keeps the blocked status until capability recheck; asynchronous cleanup must not report Ready or successful delivery over it. These states use the existing native status/HUD and History controls.
 
+## Memory foundation
+
+The management sidebar adds **Memory** using the existing system navigation. A native searchable list and status picker show active, archived and superseded vocabulary/projects. Details use a grouped Form for names, aliases, notes, confirmation, provenance and lifecycle actions. The editor is a system sheet with standard type/name controls, multiline TextEditors for aliases/notes, inline validation, and Save/Cancel actions. Permanent deletion uses a system confirmation dialog; archive remains reversible.
+
+History offers **Save Memory…** with the source Capture visible. The user can enter a new term/project or link that Capture to an existing active entry. Matching active context and explicitly linked memories are labelled separately. Source inspection does not monitor another app or read the clipboard. Deleting a Capture explains that separately saved memories remain; missing sources are identified explicitly. Automatic candidate extraction and input correction are not presented as available in this slice.
+
 UI polish is not a reason to fork the product away from the system. Morie's differentiation is Capture, Personal Memory, and personalization—not a custom macOS widget toolkit.

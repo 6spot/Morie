@@ -2,6 +2,7 @@ import SwiftUI
 
 private enum ControlCenterSection: String, CaseIterable, Identifiable {
     case history
+    case memory
     case settings
     case diagnostics
 
@@ -10,6 +11,7 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .history: "History"
+        case .memory: "Memory"
         case .settings: "Settings"
         case .diagnostics: "Diagnostics"
         }
@@ -18,6 +20,7 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .history: "clock.arrow.circlepath"
+        case .memory: "text.book.closed"
         case .settings: "gearshape"
         case .diagnostics: "ladybug"
         }
@@ -41,14 +44,17 @@ struct MorieControlCenter: View {
         } detail: {
             switch selection ?? .history {
             case .history:
-                if let history = controller.history {
+                if let history = controller.history, let memory = controller.memory {
                     CaptureHistoryView(
                         history: history,
+                        memory: memory,
                         canStartCapture: controller.canStartCapture,
                         onRecord: controller.startCaptureOnly,
                         onRecognize: controller.recognizeHistoryCapture
                     )
                 }
+            case .memory:
+                if let memory = controller.memory { MemoryView(store: memory) }
             case .settings:
                 MorieSettingsView(controller: controller)
             case .diagnostics:

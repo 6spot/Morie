@@ -5,6 +5,7 @@ import SwiftUI
 
 struct CaptureHistoryView: View {
     @ObservedObject var history: CaptureHistoryController
+    let memory: MemoryStore
     let canStartCapture: Bool
     let onRecord: () -> Void
     let onRecognize: (UUID) -> Void
@@ -50,6 +51,7 @@ struct CaptureHistoryView: View {
                         capture: capture,
                         captureID: id,
                         history: history,
+                        memory: memory,
                         canRecognize: canStartCapture,
                         onRecognize: onRecognize
                     )
@@ -76,6 +78,7 @@ private struct CaptureDetailView: View {
     let capture: CaptureRecord
     let captureID: UUID
     @ObservedObject var history: CaptureHistoryController
+    let memory: MemoryStore
     let canRecognize: Bool
     let onRecognize: (UUID) -> Void
 
@@ -131,6 +134,8 @@ private struct CaptureDetailView: View {
                 }
             }
 
+            CaptureMemorySection(store: memory, capture: capture)
+
             Section("Source Recording") {
                 if let player = history.player {
                     CaptureAudioPlayer(player: player)
@@ -182,7 +187,7 @@ private struct CaptureDetailView: View {
                 }
             }
         } message: {
-            Text("The saved text and source recording will be permanently deleted.")
+            Text("The saved text and source recording will be permanently deleted. Memories you saved separately remain.")
         }
         .alert("Couldn’t Delete Capture", isPresented: Binding(
             get: { deletionError != nil },

@@ -65,6 +65,8 @@ xcodebuild \
 
 Audio stream tests use synthetic 16 kHz mono PCM and Apple's real AAC writer/decoder. They verify readable audio after conversion/flush failure, immediate stop, repeated finalization, restart preservation and explicit discard. Controller timing, capture-session notifications, microphone release and cross-app delivery still need the signed-app interruption checks in [`validation.md`](./validation.md#m-003-interruption-and-discard).
 
+Memory tests use isolated SwiftData containers and native NaturalLanguage word tokenization to check explicit persistence, provenance, deduplication, lifecycle and bounded retrieval. Memory shares the container schema with Capture but writes through a separate `ModelContext`; there is no migration/legacy-store setup step.
+
 ## CI compile gate
 
 `.github/workflows/macos-27-ci.yml` compiles product changes on GitHub's `xcode-27` hosted environment. `.github/workflows/macos-27-package.yml` creates the test artifact.
@@ -175,6 +177,19 @@ Use generated fixture audio and temporary stores for automated API checks. Never
 5. Start while a History recording is playing or being re-recognized. The existing live-capture preemption must apply, and no second microphone session may start.
 
 Mode persistence, terminal capture-only storage, cancellation and retry are covered by isolated logic tests. These checks do not replace the interactive clipboard/focus/microphone checks above.
+
+## Memory smoke test
+
+The owner deferred interactive device checks until the evening of 2026-09-18. When resuming validation:
+
+1. Open **Memory → New Memory**, save a vocabulary entry and a project with aliases/notes, then relaunch and inspect them.
+2. Open a completed History Capture → **Save Memory…**. Save a selective term/project, then link another Capture to that existing memory and inspect both sources.
+3. Inspect History's related context with Chinese/English names and aliases. Archive a matched entry, then restore it; the related result should disappear/reappear.
+4. Replace an entry. The new active record links to its predecessor, the old one reads **Superseded**, and stale context is excluded.
+5. Confirm that duplicate names and invalid fields keep the editor open with an explanation. Cancel leaves saved records unchanged.
+6. Delete a disposable source Capture, then a disposable Memory; independently saved Memory and source Capture data are retained respectively, with missing-source feedback where applicable.
+
+See the full [Memory device checklist](./validation.md#m-004-memory-foundation). Offscreen rendering verifies layout only and does not complete these interaction checks.
 
 ## Development rules
 

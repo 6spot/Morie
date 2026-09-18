@@ -18,7 +18,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-001 | Bootstrap | Initialize Morie repository and product baseline | DONE | — | [`M-001`](./tasks/M-001-repository-bootstrap.md) |
 | M-002 | Phase 0 | macOS input foundation | IN PROGRESS | [#2](https://github.com/6spot/Morie/issues/2) / [PR #3](https://github.com/6spot/Morie/pull/3) | [`M-002`](./tasks/M-002-macos-input-foundation.md) |
 | M-003 | Phase 1 | Durable Capture store, History, App Context and iCloud/CloudKit | IN PROGRESS | — | [`M-003`](./tasks/M-003-capture.md) |
-| M-004 | Phase 2 | Vocabulary, Project and Relevant Context retrieval | TODO | — | [`M-004`](./tasks/M-004-memory.md) |
+| M-004 | Phase 2 | Vocabulary, Project and Relevant Context retrieval | IN PROGRESS | — | [`M-004`](./tasks/M-004-memory.md) |
 | M-005 | Phase 3 | Context-aware correction, personalization and style learning | TODO | — | [`M-005`](./tasks/M-005-personalization.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
@@ -34,6 +34,8 @@ The current priority is the reliable daily input loop:
 Phase 0 remains `IN PROGRESS` until it has been built and exercised on a supported macOS 27 Apple Intelligence-capable Mac and the target-app compatibility matrix has been completed.
 
 M-003's local Capture-first slice now includes SwiftData History, App Context basics, compressed source audio with retention, native playback/re-recognition, capture-only recording, and preservation after operational interruption. It remains `IN PROGRESS`: History/capture-only/interruption interactions need device validation, and ambient-noise classification and App Context remain open. On 2026-09-18, the owner deferred iCloud/CloudKit sync to the final integration stage because Apple Developer enrollment is not yet set up; it does not block current local development. M-002 also remains open for the remaining runtime/performance validation matrix.
+
+The owner deferred device validation until the evening of 2026-09-18 and requested continued development. M-004's first slice implements explicitly saved Vocabulary/Project memory, provenance, native management and relevant-context retrieval; all 47 tests pass. Automatic Memory Candidate extraction is next. Earlier device acceptance is still open; this does not authorize merging unvalidated work.
 
 ## Maintenance rules
 

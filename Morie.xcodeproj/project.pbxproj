@@ -22,6 +22,10 @@
 		A1000000000000000000000E /* CaptureFileTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* CaptureFileTranscriber.swift */; };
 		A1000000000000000000000F /* CaptureHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* CaptureHistoryController.swift */; };
 		A10000000000000000000010 /* CaptureAudioStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* CaptureAudioStream.swift */; };
+		A10000000000000000000011 /* MemoryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* MemoryRecord.swift */; };
+		A10000000000000000000012 /* MemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* MemoryStore.swift */; };
+		A10000000000000000000013 /* MemoryContextRetriever.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* MemoryContextRetriever.swift */; };
+		A10000000000000000000014 /* MemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* MemoryView.swift */; };
 		A20000000000000000000001 /* CaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* CaptureStoreTests.swift */; };
 		A20000000000000000000002 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* CaptureRecord.swift */; };
 		A20000000000000000000003 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
@@ -31,6 +35,10 @@
 		A20000000000000000000007 /* CaptureHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* CaptureHistoryTests.swift */; };
 		A20000000000000000000008 /* CaptureAudioStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* CaptureAudioStream.swift */; };
 		A20000000000000000000009 /* CaptureAudioStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* CaptureAudioStreamTests.swift */; };
+		A2000000000000000000000A /* MemoryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* MemoryRecord.swift */; };
+		A2000000000000000000000B /* MemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* MemoryStore.swift */; };
+		A2000000000000000000000C /* MemoryContextRetriever.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* MemoryContextRetriever.swift */; };
+		A2000000000000000000000D /* MemoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000006 /* MemoryTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -52,11 +60,16 @@
 		B10000000000000000000016 /* CaptureFileTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFileTranscriber.swift; sourceTree = "<group>"; };
 		B10000000000000000000017 /* CaptureHistoryController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryController.swift; sourceTree = "<group>"; };
 		B10000000000000000000018 /* CaptureAudioStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAudioStream.swift; sourceTree = "<group>"; };
+		B10000000000000000000019 /* MemoryRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryRecord.swift; sourceTree = "<group>"; };
+		B10000000000000000000020 /* MemoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryStore.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* MemoryContextRetriever.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryContextRetriever.swift; sourceTree = "<group>"; };
+		B10000000000000000000022 /* MemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryView.swift; sourceTree = "<group>"; };
 		B20000000000000000000001 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000002 /* MorieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000000000000000000003 /* CaptureHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000004 /* TestDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestDiagnostics.swift; sourceTree = "<group>"; };
 		B20000000000000000000005 /* CaptureAudioStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAudioStreamTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000006 /* MemoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,6 +117,10 @@
 				B10000000000000000000016 /* CaptureFileTranscriber.swift */,
 				B10000000000000000000017 /* CaptureHistoryController.swift */,
 				B10000000000000000000018 /* CaptureAudioStream.swift */,
+				B10000000000000000000019 /* MemoryRecord.swift */,
+				B10000000000000000000020 /* MemoryStore.swift */,
+				B10000000000000000000021 /* MemoryContextRetriever.swift */,
+				B10000000000000000000022 /* MemoryView.swift */,
 			);
 			path = Morie;
 			sourceTree = "<group>";
@@ -115,6 +132,7 @@
 				B20000000000000000000003 /* CaptureHistoryTests.swift */,
 				B20000000000000000000004 /* TestDiagnostics.swift */,
 				B20000000000000000000005 /* CaptureAudioStreamTests.swift */,
+				B20000000000000000000006 /* MemoryTests.swift */,
 			);
 			path = MorieTests;
 			sourceTree = "<group>";
@@ -227,6 +245,10 @@
 				A1000000000000000000000E /* CaptureFileTranscriber.swift in Sources */,
 				A1000000000000000000000F /* CaptureHistoryController.swift in Sources */,
 				A10000000000000000000010 /* CaptureAudioStream.swift in Sources */,
+				A10000000000000000000011 /* MemoryRecord.swift in Sources */,
+				A10000000000000000000012 /* MemoryStore.swift in Sources */,
+				A10000000000000000000013 /* MemoryContextRetriever.swift in Sources */,
+				A10000000000000000000014 /* MemoryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,6 +265,10 @@
 				A20000000000000000000007 /* CaptureHistoryTests.swift in Sources */,
 				A20000000000000000000008 /* CaptureAudioStream.swift in Sources */,
 				A20000000000000000000009 /* CaptureAudioStreamTests.swift in Sources */,
+				A2000000000000000000000A /* MemoryRecord.swift in Sources */,
+				A2000000000000000000000B /* MemoryStore.swift in Sources */,
+				A2000000000000000000000C /* MemoryContextRetriever.swift in Sources */,
+				A2000000000000000000000D /* MemoryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
