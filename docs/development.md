@@ -42,6 +42,21 @@ xcodebuild \
 
 Disabling signing here is for compile validation only; normal local launch/distribution follows the appropriate signing path. Never direct this unsigned build into the repository `build/Debug/Morie.app` while Xcode is running it, because changing the executable's signing identity can invalidate TCC permissions and make microphone behavior impossible to interpret.
 
+### Development data after schema changes
+
+Only the current data structure is supported. When changing a persisted structure, verify writing and reading a fresh temporary store in separate processes. Recreating a `ModelContainer` in the same test process is useful coverage but does not establish a cold launch. Compilation also cannot establish that an existing development database is readable.
+
+SwiftData can add a column while leaving it null in existing rows. In particular, adding a nonoptional array inside a persisted Codable value can make reading an older value abort inside SwiftData, even though the container opened successfully. Do not add legacy decoding defaults, schema migrations or automatic data deletion to hide this development-data mismatch.
+
+If existing development data needs a reset, make the data change explicit to the owner:
+
+1. Back up the database consistently, including committed WAL contents, and copy the source recordings. Verify database integrity, record counts and recording checksums.
+2. Obtain confirmation before clearing the owner's active History. Preserve the verified backup.
+3. Stop the app in Xcode, archive the active database and its `-wal` / `-shm` sidecars together, and initialize an empty store using the current model.
+4. Verify a cold store open before resuming the owner's signed app. Keep the reset outside product startup; a storage error must never silently erase intentional input.
+
+The current default database is `~/Library/Application Support/MorieCaptures.store`; recordings are under `~/Library/Application Support/Morie/CaptureAudio`. A complete backup is required even when the data was created during development. This is an explicit local development operation, not a compatibility path in Morie.
+
 iCloud/CloudKit is outside the current single-Mac milestone. Complete input, dictionary, cleanup and automatic personal Memory before scheduling cross-device work. The local store explicitly disables sync; no enrollment/container configuration is requested now. Eventual sync uses each user's own private database, without a Morie backend. See [deployment.md](deployment.md#cloudkit-deployment--later-cross-device-milestone).
 
 ## Unit tests
