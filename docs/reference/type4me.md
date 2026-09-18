@@ -255,3 +255,15 @@ M-003 source-audio evidence:
 - `REJECTED`: adding `AVCaptureAudioFileOutput` beside Apple's `CaptureInputSequenceProvider` data output. Although `canAddOutput` returned true, macOS 27 threw an Objective-C exception from `startRecording` and aborted Morie on owner hardware.
 - Morie's replacement must preserve the approved 7-day compressed-audio policy while using one proven data-output path; it must not start a second microphone session.
 - `ADAPT` implemented for verification: Morie now owns one data output and drains its callback queue before finishing. Each buffer is forwarded to Apple Speech and streamed to Apple's AAC encoder; unlike Type4Me, the complete PCM recording is never accumulated in memory.
+
+## M-003 History recovery audit — 2026-09-18
+
+Morie requirement: play retained audio and explicitly re-recognize it without losing the original Capture, altering a previous delivery, or delaying a new live input session.
+
+Inspected `Type4Me/UI/Settings/HistoryTab.swift`, the finalization/retry portions of `Type4Me/Session/RecognitionSession.swift`, and `Type4MeTests/RecordingCancellationTests.swift` in fix [#311](https://github.com/joewongjc/type4me/pull/311) (`cc56207b`). The relevant history also includes [#303](https://github.com/joewongjc/type4me/pull/303), which records why recognized and delivered text must remain distinguishable.
+
+- **ADAPT:** preserve earlier nonempty transcript evidence even if a later result becomes empty; distinguish explicit cancellation from failed recognition; reject late results after cancellation; retain original delivered output separately from a new recognition.
+- **DROP:** automatic multi-provider/batch retry, network finalization grace periods, full PCM replay buffers, custom History styling, and provider/usage analytics.
+- **VERIFY:** quiet speech versus ambient noise and native file-recognition/playback behavior on macOS 27. No new audio threshold is accepted as a proven speech detector.
+
+Apple's current [`SpeechDetector`](https://developer.apple.com/documentation/speech/speechdetector) documentation says it gates transcription and may discard real speech. Morie therefore keeps the live `SpeechTranscriber` path and performs explicit History retry through `SpeechAnalyzer.analyzeSequence(from:)`. Uncertain empty recordings remain recoverable. No Type4Me source was copied.

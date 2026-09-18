@@ -2,7 +2,7 @@
 
 ## Current stage
 
-Morie is in **Phase 0 — macOS Input Foundation**. The architecture is intentionally narrow: establish a reliable Apple-native input loop before persistence, Memory, iOS, or cloud complexity is introduced.
+Morie is validating **Phase 0 — macOS Input Foundation** while implementing **Phase 1 — Durable Capture**. The current boundary includes the native input loop, local persistence, and History recovery; Memory, iOS, and Morie Cloud remain later work.
 
 Type4Me is an experience/reference archive, not Morie's architecture or migration template. Every retained lesson is filtered through Morie's product design and the macOS 27-only platform boundary.
 
@@ -53,6 +53,9 @@ Morie/
 │   ├── CaptureRecord.swift
 │   ├── CaptureStore.swift
 │   ├── CaptureHistoryView.swift
+│   ├── CaptureHistoryController.swift
+│   ├── CaptureFileTranscriber.swift
+│   ├── CaptureAudioSource.swift
 │   ├── MorieControlCenter.swift
 │   ├── CaptureHUD.swift
 │   ├── Diagnostics.swift
@@ -60,7 +63,9 @@ Morie/
 │   ├── SpeechPipeline.swift
 │   └── TextInjector.swift
 ├── MorieTests/
-│   └── CaptureStoreTests.swift
+│   ├── CaptureStoreTests.swift
+│   ├── CaptureHistoryTests.swift
+│   └── TestDiagnostics.swift
 ├── .github/workflows/
 │   ├── macos-27-ci.yml
 │   └── macos-27-package.yml
@@ -212,7 +217,7 @@ An actor owns the Apple-native speech session state:
 - unique active capture UUID;
 - `SpeechTranscriber` with progressive transcription;
 - `AssetInventory` preparation;
-- `CaptureInputSequenceProvider`;
+- one `CaptureAudioSource` owning an AVFoundation data output and `AnalyzerInputConverter`;
 - `SpeechAnalyzer`;
 - final + volatile transcript accumulation;
 - normal finalization versus cancellation;
@@ -264,22 +269,33 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 - an intentional voice Capture is saved before Speech startup;
 - progressive recognition checkpoints update the same record with a bounded save cadence;
 - final recognition, delivery success, clipboard-preserved delivery failure, and operational failure become explicit durable lifecycle states;
-- explicit user cancellation and an empty final transcript discard the in-progress record; empty leftovers from an interrupted earlier build are removed when the store opens;
+- explicit user cancellation discards the in-progress record; an empty transcript only discards audio confirmed to contain no signal/no input, while uncertain audio remains retryable;
+- source-audio filenames are saved before recording, and interrupted records with audio or checkpointed text become recoverable failures when the store opens;
 - source application name, bundle identifier and original window identity are the current minimal App Context.
 
 The local `ModelConfiguration` explicitly disables CloudKit until a real container and entitlements are configured. This is an implementation stage, not a Device Only product mode.
 
-M-003's approved persistence direction is audio-first: the durable raw Capture is compressed source audio, recognized text is the Speech result, and final text is the later post-processing result. Source audio defaults to 7-day retention, Settings will expose a day-based policy, and expiry removes audio without deleting text/history metadata. Encoding must stream to disk rather than retain a complete PCM recording in memory.
+M-003's approved persistence direction is audio-first: the durable raw Capture is compressed source audio, recognized text is the Speech result, and final text is the later post-processing result. Source audio defaults to 7-day retention, Settings exposes a 1–365 day policy, and expiry removes audio without deleting text/history metadata. Encoding streams to disk rather than retaining a complete PCM recording in memory.
 
 The first attempted implementation using `AVCaptureAudioFileOutput` beside `CaptureInputSequenceProvider.captureAudioDataOutput` is rejected. On the owner's macOS 27 hardware, `canAddOutput` succeeded but `startRecording(to:outputFileType:recordingDelegate:)` raised an Objective-C exception inside AVFoundation and terminated Morie with `SIGABRT` (incident `F160F627-871F-4F35-A880-74BAFBE55D67`). Because this exception cannot be handled by Swift `throws`, that output must not be reintroduced without a proven Apple-supported configuration and real-device validation. The replacement must follow the proven single-`AVCaptureAudioDataOutput` ownership/lifecycle pattern and stream encoded samples without duplicating the microphone session.
 
 The replacement now owns one `AVCaptureSession` and one `AVCaptureAudioDataOutput`. Each 16 kHz mono PCM buffer is passed through Apple's `AnalyzerInputConverter` to `SpeechAnalyzer` and streamed into an Apple `AVAudioFile` AAC encoder targeting 32 kbps. This adapts Type4Me's proven single-output ownership and deterministic queue drain while dropping its complete in-memory PCM accumulation. Runtime acceptance remains open until owner-hardware validation confirms recognition, waveform response, playable M4A output, cancellation and repeated start/stop.
 
-An empty Speech result is retained only when the capture contains meaningful audio frames, because that represents a retryable recognition failure. Silence/no-input with empty text is discarded together with its audio file. Existing empty rows created before meaningful-audio metadata existed are pruned on store startup.
+Source-audio evidence is conservative: `true` means Speech previously returned text, `false` means the captured PCM contained no signal, and `nil` means nonzero signal has not been established as speech or silence. Empty results with unknown audio stay as failed Captures. The former “five buffers above −50 dB” heuristic could mistake ambient noise for speech and is removed. Apple documents that `SpeechDetector` gates transcription and may drop speech; it is not added to the live path without validating that trade-off on owner hardware.
+
+Expiry clears the audio path but retains duration, expiry, recognition errors, and the History row, including failed captures with no text. Cleanup runs on startup, retention changes, new capture, and History audio access. An open detail view refreshes when its recording expires. Interrupted-capture recovery uses the filename saved by the current implementation; it does not reconstruct legacy metadata or migrate old formats.
+
+Re-recognition updates `recognizedText` only after successful file analysis. For a delivered/delivery-failed Capture, `finalText` and the original delivery outcome remain intact. Other successful recoveries become `recognized` and receive the recovered final text. Retry errors use separate optional metadata; failure, empty retry results, and cancellation never erase prior text or audio. Retry never injects into the original app or changes the clipboard; copying is an explicit History action.
+
+### `CaptureFileTranscriber` / `CaptureHistoryController`
+
+`CaptureFileTranscriber` reads an existing `AVAudioFile` with `SpeechAnalyzer.analyzeSequence(from:)` and a final-result `SpeechTranscriber`, finalizes through the consumed audio, and closes native analysis on cancellation or failure. It creates no microphone session and uses the Speech assets prepared by bootstrap.
+
+`CaptureHistoryController` owns one selected recording's `AVPlayer` and one cancellable file-recognition task. Selection changes or leaving the detail cancel that task and release playback. Starting a live Capture pauses playback, cancels the retry, and awaits its termination before starting Speech. Every result checks task cancellation before persistence so a late retry cannot overwrite a newer interaction.
 
 ### `CaptureHistoryView`
 
-Native SwiftUI/SwiftData History surface using system `List`, `ContentUnavailableView`, and `@Query`. It is intentionally a basic inspection surface while M-003 persistence semantics are validated.
+Native SwiftUI/SwiftData History uses `List`, `NavigationStack`, `Form`, and `@Query` for a list and Capture detail. Audio playback uses AVKit's standard `AVPlayerView` controls. Details expose selectable recognized/original output text, explicit Copy buttons, retry progress/cancel, audio expiry/errors, and deletion with a system confirmation dialog. No replacement media controls are drawn, and recordings do not populate Now Playing metadata.
 
 ### `MorieControlCenter`
 
@@ -287,7 +303,7 @@ The primary management surface is one native SwiftUI `Window` with a standard `N
 
 ### `MorieTests`
 
-The first logic-only XCTest target compiles the Capture persistence sources directly so tests can run without launching the menu-bar app or entering its permission/capability lifecycle. It uses in-memory stores for lifecycle transitions and a unique temporary file URL for store-recreation coverage; it never opens the production Capture database.
+The logic-only XCTest target compiles persistence and History recovery sources directly, without launching Morie or entering TCC. Tests use in-memory or unique temporary databases/audio directories. An explicit store URL defaults audio storage to the same temporary parent. A test-only diagnostics sink prevents tests from touching the running app's log. File recognition is replaced by an injected async closure for deterministic success/failure/cancellation tests; native Speech and playback remain separate integration/device checks.
 
 ## Type4Me extraction boundary
 

@@ -4,6 +4,29 @@ import SwiftData
 
 @MainActor
 final class CaptureStore {
+    enum StoreError: LocalizedError {
+        case captureNotFound
+        case captureInProgress
+        case audioExpired
+        case audioUnavailable
+        case emptyRecognition
+
+        var errorDescription: String? {
+            switch self {
+            case .captureNotFound: "This capture is no longer available."
+            case .captureInProgress: "Wait for this recording to finish."
+            case .audioExpired: "The source recording has expired. Saved text is still available."
+            case .audioUnavailable: "The source recording is no longer available."
+            case .emptyRecognition: "No speech was recognized. The saved text and recording have been kept."
+            }
+        }
+    }
+
+    enum EmptyRecognitionDisposition {
+        case discarded
+        case retainedForRetry
+    }
+
     static let audioRetentionDaysDefaultsKey = "captureAudioRetentionDays"
     static let defaultAudioRetentionDays = 7
 
@@ -36,6 +59,9 @@ final class CaptureStore {
         container = try ModelContainer(for: schema, configurations: [configuration])
         if let audioDirectory {
             self.audioDirectory = audioDirectory
+        } else if let storageURL {
+            self.audioDirectory = storageURL.deletingLastPathComponent()
+                .appending(path: "CaptureAudio", directoryHint: .isDirectory)
         } else if inMemory {
             self.audioDirectory = FileManager.default.temporaryDirectory
                 .appending(path: "MorieCaptureAudio-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -48,7 +74,7 @@ final class CaptureStore {
             ).appending(path: "Morie/CaptureAudio", directoryHint: .isDirectory)
         }
         try FileManager.default.createDirectory(at: self.audioDirectory, withIntermediateDirectories: true)
-        try removeUnusableEmptyRecords()
+        try recoverInterruptedCaptures()
         try pruneExpiredAudio()
     }
 
@@ -58,11 +84,16 @@ final class CaptureStore {
         bundleIdentifier: String?,
         windowNumber: CGWindowID?
     ) throws -> URL {
+        try pruneExpiredAudio()
         let record = CaptureRecord(
             id: id,
             sourceApplicationName: applicationName,
             sourceBundleIdentifier: bundleIdentifier,
             originalWindowNumber: windowNumber
+        )
+        record.sourceAudioRelativePath = "\(id.uuidString).m4a"
+        record.sourceAudioExpiresAt = Calendar.current.date(
+            byAdding: .day, value: Self.audioRetentionDays, to: record.createdAt
         )
         container.mainContext.insert(record)
         records[id] = record
@@ -122,13 +153,102 @@ final class CaptureStore {
         try finish(id, lifecycle: .failed, error: error)
     }
 
+    func finishEmptyRecognition(
+        for id: UUID,
+        sourceAudio: CapturedSourceAudio
+    ) throws -> EmptyRecognitionDisposition {
+        guard records[id] != nil else { throw StoreError.captureNotFound }
+        if sourceAudio.hasMeaningfulAudio == false
+            || (sourceAudio.duration == 0 && sourceAudio.hasMeaningfulAudio != true) {
+            try cancel(id)
+            return .discarded
+        }
+
+        try markFailed(id, error: "No speech was recognized. Play the recording or recognize it again from History.")
+        return .retainedForRetry
+    }
+
+    func capture(_ id: UUID) throws -> CaptureRecord {
+        var descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let record = try container.mainContext.fetch(descriptor).first else {
+            throw StoreError.captureNotFound
+        }
+        return record
+    }
+
+    func sourceAudioURL(for id: UUID, now: Date = Date()) throws -> URL {
+        let record = try capture(id)
+        guard records[id] == nil, record.lifecycle != .capturing else {
+            throw StoreError.captureInProgress
+        }
+        if let expiresAt = record.sourceAudioExpiresAt, expiresAt <= now {
+            throw StoreError.audioExpired
+        }
+        guard let url = audioURL(for: record), FileManager.default.isReadableFile(atPath: url.path) else {
+            throw StoreError.audioUnavailable
+        }
+        return url
+    }
+
+    func saveReRecognition(_ text: String, for id: UUID) throws {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { throw StoreError.emptyRecognition }
+        let record = try capture(id)
+        guard records[id] == nil, record.lifecycle != .capturing else { throw StoreError.captureInProgress }
+
+        record.recognizedText = text
+        // Keep the original output and delivery outcome for captures already sent to an app.
+        if record.lifecycle != .delivered && record.lifecycle != .deliveryFailed {
+            record.finalText = text
+            record.lifecycle = .recognized
+            record.deliveryErrorDescription = nil
+        }
+        record.lastRecognitionAttemptAt = Date()
+        record.lastRecognitionErrorDescription = nil
+        record.updatedAt = Date()
+        do {
+            try container.mainContext.save()
+        } catch {
+            container.mainContext.rollback()
+            throw error
+        }
+        Diagnostics.record("History", "Recognition updated for \(label(id)); characters=\(text.count)")
+    }
+
+    func recordReRecognitionFailure(_ message: String, for id: UUID) throws {
+        let record = try capture(id)
+        guard records[id] == nil, record.lifecycle != .capturing else { throw StoreError.captureInProgress }
+        record.lastRecognitionAttemptAt = Date()
+        record.lastRecognitionErrorDescription = message
+        record.updatedAt = Date()
+        do {
+            try container.mainContext.save()
+        } catch {
+            container.mainContext.rollback()
+            throw error
+        }
+    }
+
+    func deleteCapture(_ id: UUID) throws {
+        let record = try capture(id)
+        guard records[id] == nil, record.lifecycle != .capturing else { throw StoreError.captureInProgress }
+        let url = audioURL(for: record)
+        if let url, FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+        container.mainContext.delete(record)
+        try container.mainContext.save()
+        Diagnostics.record("History", "Deleted Capture \(label(id))")
+    }
+
     func cancel(_ id: UUID) throws {
-        guard let record = records.removeValue(forKey: id) else { return }
-        deleteAudio(for: record)
-        try? FileManager.default.removeItem(at: audioDirectory.appending(path: "\(id.uuidString).m4a"))
+        guard let record = records[id] else { return }
+        try deleteAudio(for: record)
         lastProgressiveSave[id] = nil
         container.mainContext.delete(record)
         try container.mainContext.save()
+        records[id] = nil
         Diagnostics.record("CaptureStore", "Cancelled Capture \(label(id)) removed")
     }
 
@@ -146,17 +266,14 @@ final class CaptureStore {
     func pruneExpiredAudio(now: Date = Date()) throws {
         let descriptor = FetchDescriptor<CaptureRecord>()
         let expired = try container.mainContext.fetch(descriptor).filter {
-            $0.sourceAudioExpiresAt.map { $0 <= now } ?? false
+            $0.sourceAudioRelativePath != nil && records[$0.id] == nil
+                && ($0.sourceAudioExpiresAt.map { $0 <= now } ?? false)
         }
         guard !expired.isEmpty else { return }
 
         for record in expired {
-            deleteAudio(for: record)
+            try deleteAudio(for: record)
             record.sourceAudioRelativePath = nil
-            record.sourceAudioDurationSeconds = nil
-            record.sourceAudioByteCount = nil
-            record.sourceAudioExpiresAt = nil
-            record.sourceAudioHasMeaningfulContent = nil
         }
         try container.mainContext.save()
         Diagnostics.record("CaptureStore", "Expired source audio for \(expired.count) Capture(s)")
@@ -178,25 +295,43 @@ final class CaptureStore {
         return saved > 0 ? saved : defaultAudioRetentionDays
     }
 
-    private func deleteAudio(for record: CaptureRecord) {
-        guard let path = record.sourceAudioRelativePath else { return }
-        try? FileManager.default.removeItem(at: audioDirectory.appending(path: path))
+    private func deleteAudio(for record: CaptureRecord) throws {
+        guard let url = audioURL(for: record) else { return }
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
     }
 
-    private func removeUnusableEmptyRecords() throws {
+    private func audioURL(for record: CaptureRecord) -> URL? {
+        guard let path = record.sourceAudioRelativePath,
+              path == "\(record.id.uuidString).m4a"
+        else { return nil }
+        return audioDirectory.appending(path: path)
+    }
+
+    private func recoverInterruptedCaptures() throws {
         let descriptor = FetchDescriptor<CaptureRecord>()
-        let unusable = try container.mainContext.fetch(descriptor).filter {
-            $0.recognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && $0.finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && $0.sourceAudioHasMeaningfulContent != true
-        }
-        guard !unusable.isEmpty else { return }
-        for record in unusable {
-            deleteAudio(for: record)
-            container.mainContext.delete(record)
+        let interrupted = try container.mainContext.fetch(descriptor).filter { $0.lifecycle == .capturing }
+        guard !interrupted.isEmpty else { return }
+        for record in interrupted {
+            let url = audioURL(for: record)
+            let size = (try? url?.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            let hasText = !record.recognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !record.finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if size == 0 && !hasText {
+                try deleteAudio(for: record)
+                container.mainContext.delete(record)
+                continue
+            }
+            if size > 0 {
+                record.sourceAudioByteCount = Int64(size)
+            }
+            record.lifecycle = .failed
+            record.deliveryErrorDescription = "Recording was interrupted. Saved text and available audio have been kept."
+            record.updatedAt = Date()
         }
         try container.mainContext.save()
-        Diagnostics.record("CaptureStore", "Removed \(unusable.count) empty Capture(s) without meaningful audio")
+        Diagnostics.record("CaptureStore", "Recovered \(interrupted.count) interrupted Capture(s)")
     }
 
     private func label(_ id: UUID) -> String {

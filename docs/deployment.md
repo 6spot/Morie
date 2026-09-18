@@ -108,7 +108,7 @@ Phase 1 will add the actual iCloud/CloudKit environment. At that point this guid
 - required entitlements;
 - Development vs Production CloudKit environment handling;
 - schema/container initialization and promotion procedure;
-- compatibility/migration rules for persisted Capture data;
+- current Capture schema and conflict/deletion semantics;
 - release validation for cross-device synchronization.
 
 Do not hard-code fake container identifiers or declare CloudKit ready before the actual Apple Developer configuration exists.

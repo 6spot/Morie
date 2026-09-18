@@ -19,12 +19,13 @@ The first implementation includes:
 
 - native SwiftUI menu bar shell;
 - Private Mode capability gate for Apple Intelligence, Speech, locale, microphone, Speech permission, and Accessibility;
-- latest Apple Speech pipeline using `SpeechAnalyzer`, `SpeechTranscriber`, `AssetInventory`, and `CaptureInputSequenceProvider`;
+- latest Apple Speech pipeline using `SpeechAnalyzer`, `SpeechTranscriber`, `AssetInventory`, and a single AVFoundation audio data output;
 - configurable global toggle-capture shortcut, defaulting to a solo **Fn / Globe release** to start and finish; Fn chords pass through and **Escape** cancels;
 - frontmost-app capture before recording;
 - focus restoration and universal clipboard + synthetic paste delivery;
 - a native macOS 27 Liquid Glass capture HUD with cancel, live level, and finish controls;
-- the first local SwiftData Capture-first persistence slice and native Morie management window for History, Settings, and Diagnostics.
+- local SwiftData Capture-first persistence and a native Morie management window for History, Settings, and Diagnostics;
+- History recording playback, cancellable file re-recognition, explicit text copying, and Capture deletion with native confirmation.
 
 Phase 0 runtime validation and Phase 1 Capture persistence development are both in progress. CloudKit is not yet configured.
 

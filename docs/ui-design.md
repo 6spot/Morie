@@ -96,4 +96,12 @@ The current menu-bar shell should stay system-native. As Phase 0 adds visible re
 
 The menu-bar panel is a compact status and launch surface, not the long-term product navigation hierarchy. History, Settings, Diagnostics, and future management sections belong in Morie's native management window, organized with a system `NavigationSplitView`; the panel exposes one **Open Morie** action instead of one action per section.
 
+## History recovery
+
+History uses a system `List` and `NavigationStack` to open a Capture detail `Form`. The audio player is AVKit's native `AVPlayerView` with inline controls; Morie does not draw a replacement playback bar. Recording playback is user-initiated, stops when leaving the detail or starting a capture, and does not publish private recordings to Now Playing.
+
+Re-recognition has a standard button, `ProgressView`, and Cancel action. Saved text stays visible while work runs. A successful retry exposes recognized text separately from any different original output, with explicit system Copy buttons. Retry does not automatically paste into another app. Expired/missing audio and recognition failure have readable inline explanations. Deleting a Capture uses a destructive button and a system confirmation dialog.
+
+An empty recognition with retained audio shows “未识别，录音已保存” in the existing HUD and appears as “Not Recognized” in History. A discarded no-input capture hides the HUD; neither case reports “已输入”.
+
 UI polish is not a reason to fork the product away from the system. Morie's differentiation is Capture, Personal Memory, and personalization—not a custom macOS widget toolkit.

@@ -24,6 +24,7 @@ When implementation changes behavior, update the relevant documentation in the s
 
 - **macOS First**: finish the macOS input loop before building iOS.
 - **Latest Apple Only**: start at macOS 27+ and Apple Intelligence-capable Macs. Do not add old-platform or old-API compatibility layers.
+- **Development Stage, No Legacy Contract**: implement the current design directly. Do not add old-schema migrations, legacy data reconstruction, version routing, compatibility shims, or speculative upgrade paths. Current-version crash recovery and Capture-first data protection remain required.
 - **Apple Native First**: the Apple system implementation is the default and required implementation path.
 - **Native UI Only**: product UI must use Apple system UI components and the native macOS 27 Liquid Glass design language. Do not replace a system component with a custom imitation.
 - **Private Mode first**: V0 has no Morie cloud backend.

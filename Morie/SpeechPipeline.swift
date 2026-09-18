@@ -34,6 +34,7 @@ actor SpeechPipeline {
     private var analysisTask: Task<CMTime?, Error>?
     private var finalizedText = ""
     private var volatileText = ""
+    private var hasTranscriptEvidence = false
 
     func prepare(locale requestedLocale: Locale) async throws {
         guard activeSessionID == nil else { throw PipelineError.alreadyRunning }
@@ -65,6 +66,7 @@ actor SpeechPipeline {
         activeSessionID = sessionID
         finalizedText = ""
         volatileText = ""
+        hasTranscriptEvidence = false
 
         let session = label(sessionID)
         Diagnostics.record("Speech", "Pipeline start requested for \(session)")
@@ -109,6 +111,9 @@ actor SpeechPipeline {
                     guard activeSessionID == sessionID else { return }
 
                     let text = String(result.text.characters)
+                    if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        hasTranscriptEvidence = true
+                    }
                     if result.isFinal {
                         finalizedText = join(finalizedText, text)
                         volatileText = ""
@@ -192,9 +197,15 @@ actor SpeechPipeline {
             try requireActiveSession(sessionID)
 
             let final = join(finalizedText, volatileText)
+            let classifiedAudio = CapturedSourceAudio(
+                url: sourceAudio.url,
+                duration: sourceAudio.duration,
+                hasMeaningfulAudio: hasTranscriptEvidence ? true : sourceAudio.hasMeaningfulAudio
+            )
             Diagnostics.record("Speech", "Normal stop completed for \(session); finalCharacters=\(final.count)")
+            Diagnostics.record("Speech", "Speech presence for \(session): \(String(describing: classifiedAudio.hasMeaningfulAudio)); duration=\(sourceAudio.duration)")
             reset(sessionID: sessionID)
-            return Result(transcript: final, sourceAudio: sourceAudio)
+            return Result(transcript: final, sourceAudio: classifiedAudio)
         } catch {
             Diagnostics.record("Speech", "Normal stop failed for \(session): \(error.localizedDescription)", level: .error)
             await analyzer.cancelAndFinishNow()
@@ -254,6 +265,7 @@ actor SpeechPipeline {
         activeSessionID = nil
         finalizedText = ""
         volatileText = ""
+        hasTranscriptEvidence = false
     }
 
     private func join(_ lhs: String, _ rhs: String) -> String {

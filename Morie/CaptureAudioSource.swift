@@ -34,7 +34,7 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
     private let onAudioLevel: @Sendable (Double) -> Void
     private var writtenFrames: AVAudioFramePosition = 0
     private var callbackCount = 0
-    private var voicedFrameCount = 0
+    private var hasAudioSignal = false
     private var terminal = false
 
     init(
@@ -101,7 +101,7 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         return CapturedSourceAudio(
             url: destinationURL,
             duration: duration,
-            hasMeaningfulAudio: voicedFrameCount >= 5
+            hasMeaningfulAudio: hasAudioSignal ? nil : false
         )
     }
 
@@ -132,10 +132,9 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
                 continuation.yield(input)
             }
             let decibels = Self.signalDecibels(pcmBuffer)
+            // Nonzero signal alone cannot distinguish quiet speech from ambient noise.
+            if decibels != -.infinity { hasAudioSignal = true }
             let level = Self.normalizedLevel(decibels)
-            if decibels > -50 {
-                voicedFrameCount += 1
-            }
             callbackCount += 1
             if callbackCount.isMultiple(of: 3) {
                 onAudioLevel(level)
@@ -147,17 +146,18 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
     }
 
     private static func signalDecibels(_ buffer: AVAudioPCMBuffer) -> Float {
-        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return -60 }
+        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return .nan }
         var sum: Float = 0
         for index in 0..<Int(buffer.frameLength) {
             let sample = channel[index]
             sum += sample * sample
         }
         let rms = sqrt(sum / Float(buffer.frameLength))
-        return rms > 0 ? 20 * log10(rms) : -60
+        return rms == 0 ? -.infinity : 20 * log10(rms)
     }
 
     private static func normalizedLevel(_ decibels: Float) -> Double {
+        guard decibels.isFinite else { return 0 }
         return Double((min(max(decibels, -42), -6) + 42) / 36)
     }
 }

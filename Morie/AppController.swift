@@ -30,6 +30,8 @@ final class AppController: ObservableObject {
     @Published private(set) var audioRetentionDays: Int
     @Published private(set) var recoverySettingsURL: URL?
 
+    let history: CaptureHistoryController?
+
     private let capabilityGate = CapabilityGate()
     private let speech = SpeechPipeline()
     private let injector = TextInjector()
@@ -52,6 +54,7 @@ final class AppController: ObservableObject {
     init(captureStore: CaptureStore?, persistenceError: Error? = nil) {
         self.captureStore = captureStore
         self.persistenceError = persistenceError
+        history = captureStore.map { CaptureHistoryController(store: $0, locale: Locale(identifier: "zh-CN")) }
         let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
@@ -103,8 +106,23 @@ final class AppController: ObservableObject {
         }
     }
 
+    var canRecognizeHistory: Bool {
+        guard activeCaptureID == nil else { return false }
+        switch state {
+        case .ready, .failed: return true
+        default: return false
+        }
+    }
+
+    func recognizeHistoryCapture(_ id: UUID) {
+        guard canRecognizeHistory else { return }
+        history?.recognizeAgain(id)
+    }
+
     func bootstrap() async {
         Diagnostics.record("App", "Bootstrap started")
+        history?.pausePlayback()
+        await history?.cancelRecognitionAndWait()
         await cancelActiveCapture(transitionToReady: false)
         hotkey?.invalidate()
         hotkey = nil
@@ -263,6 +281,7 @@ final class AppController: ObservableObject {
         finishRequestedCaptureID = nil
         transcript = ""
         state = .recording
+        history?.setInputActive(true)
 
         hotkey?.setCancellationEnabled(true)
         hud.showRecording()
@@ -320,6 +339,9 @@ final class AppController: ObservableObject {
         Diagnostics.record("Speech", "Starting Speech session \(label(sessionID))")
 
         do {
+            await history?.cancelRecognitionAndWait()
+            try Task.checkCancellation()
+            guard activeCaptureID == sessionID else { throw CancellationError() }
             guard let sourceAudioURL = activeSourceAudioURL else {
                 throw ControllerError.persistenceUnavailable("Source-audio storage was not initialized.")
             }
@@ -413,14 +435,15 @@ final class AppController: ObservableObject {
             try captureStore?.attachSourceAudio(result.sourceAudio, for: sessionID)
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                if result.sourceAudio.hasMeaningfulAudio {
-                    try captureStore?.markFailed(sessionID, error: "Speech returned no text. Source audio is available for retry.")
-                    Diagnostics.record("CaptureStore", "Retaining empty recognition with meaningful source audio for \(label(sessionID))", level: .warning)
+                let disposition = try captureStore?.finishEmptyRecognition(for: sessionID, sourceAudio: result.sourceAudio)
+                hotkey?.setCancellationEnabled(false)
+                resetSessionIdentity()
+                state = .ready
+                if disposition == .retainedForRetry {
+                    hud.showRecognitionFailure()
                 } else {
-                    try captureStore?.cancel(sessionID)
-                    Diagnostics.record("CaptureStore", "Discarded silent empty Capture \(label(sessionID))")
+                    hud.hide()
                 }
-                completeSuccessfulSession(sessionID)
                 return
             }
 
@@ -599,6 +622,7 @@ final class AppController: ObservableObject {
         captureFinishTask = nil
         targetApplication = nil
         targetWindowNumber = nil
+        history?.setInputActive(false)
     }
 
     private func presentFailure(title: String, message: String) {

@@ -42,7 +42,29 @@ The initial `AVCaptureAudioFileOutput` integration caused a confirmed AVFoundati
 
 Verify the empty-result split explicitly: a silent start/stop must create neither a History row nor a retained M4A, while audible speech that produces no transcript must retain both the failed Capture and its retryable source audio.
 
-2026-09-18 owner validation confirmed normal Chinese input and M4A creation, but the empty-result split did not pass: captures `CBCA4A24` and `5B073CAE` produced empty transcripts and were retained because ambient/input energy crossed the current meaningful-audio threshold. Keep this item open; it is deferred to the History retry/failed-recognition follow-up rather than treated as an audio persistence failure.
+2026-09-18 owner validation confirmed normal Chinese input and M4A creation, but the empty-result split did not pass: captures `CBCA4A24` and `5B073CAE` produced empty transcripts and were retained because ambient/input energy crossed the former meaningful-audio threshold. The History follow-up removes that amplitude-only decision and retains uncertain audio with explicit recovery actions. Automatic discard currently covers no input/zero signal only. **The quiet-room silence versus audible recognition failure acceptance item remains open.**
+
+## M-003 History playback and recovery
+
+Run from the owner's normal Xcode-signed build using disposable test Captures:
+
+- [ ] Open a Capture and play, pause and seek using the native audio controls; opening alone must not play it.
+- [ ] Leave the detail, switch sections, close the window, or start Fn recording while playback is active; playback must stop.
+- [ ] Re-recognize a completed Capture; recovered text is saved to the same record and survives relaunch.
+- [ ] Original delivered text/outcome remain visible when new recognition differs; retry itself must not paste or change the clipboard.
+- [ ] Cancel retry during file analysis/finalization; prior text and audio remain intact, including when a late result arrives.
+- [ ] Start live Fn capture during retry; the retry stops, the new microphone session starts once, and ordinary input remains usable.
+- [ ] Repeatedly retry, cancel, navigate away and retry another Capture without a stuck progress indicator or incorrect-row update.
+- [ ] Empty or failed re-recognition has readable recovery feedback and keeps the prior content. A later successful retry clears the retry error.
+- [ ] An expired, missing or unplayable recording has useful feedback, with saved text still available.
+- [ ] Let an open detail's recording expire and change retention while a recording is selected; playback/retry must not keep an expired recording usable.
+- [ ] Relaunch with an empty failed Capture whose audio expired; the History row/error/duration remain.
+- [ ] Delete one disposable Capture through confirmation; its row and audio disappear, and other Captures remain.
+- [ ] Confirm native player/Copy/retry/cancel/delete controls with keyboard and VoiceOver, long text, and light/dark appearance.
+
+Automated persistence/History tests cover success, empty results, failure, cancellation, input preemption, missing/expired audio, interrupted recovery and scoped deletion. These tests use temporary storage and injected file recognition, so they do not establish native playback, ASR accuracy, microphone behavior or visual acceptance.
+
+2026-09-18: the final isolated app build and all **20 logic tests** passed on macOS 27 / Xcode 27, with no failures or skipped tests. A separate native `CaptureFileTranscriber` check recognized generated Chinese AAC audio, reported empty recognition for a silent M4A, and rejected a missing file. Offscreen rendering checked the Capture detail layout only. Evidence paths are recorded in [`M-003-capture.md`](./tasks/M-003-capture.md); the interactive checks above remain open.
 
 ## Toggle-capture lifecycle
 

@@ -78,6 +78,17 @@ final class CaptureHUDController {
         }
     }
 
+    func showRecognitionFailure() {
+        hideTask?.cancel()
+        model.phase = .recognitionFailure
+        showPanel()
+        hideTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            self?.hide()
+        }
+    }
+
     func showFailure() {
         hideTask?.cancel()
         model.phase = .failure
@@ -198,6 +209,7 @@ private final class CaptureHUDModel: ObservableObject {
         case processing
         case success
         case clipboardFallback
+        case recognitionFailure
         case failure
     }
 
@@ -344,6 +356,12 @@ private struct CaptureHUDView: View {
                 .symbolEffect(.bounce, value: model.feedbackGeneration)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel("输入位置不可用，文字已复制到剪贴板")
+
+        case .recognitionFailure:
+            Label("未识别，录音已保存", systemImage: "waveform.badge.exclamationmark")
+                .font(.system(size: 10, weight: .medium))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityLabel("未识别出文字，录音已保存，可在历史记录中重新识别")
 
         case .failure:
             Image(systemName: "exclamationmark")

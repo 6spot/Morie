@@ -59,7 +59,7 @@ xcodebuild \
   test
 ```
 
-`MorieTests` is a logic-only target: it does not launch the menu-bar app or exercise TCC. Capture persistence tests use in-memory storage or a unique temporary file and do not access the production SwiftData store.
+`MorieTests` is a logic-only target: it does not launch the menu-bar app or exercise TCC. Capture persistence tests use in-memory storage or a unique temporary file and audio directory. History tests inject file-recognition results to exercise recovery and cancellation without models or microphone access. The target uses `TestDiagnostics.swift` rather than the product logger, so tests cannot truncate an active Xcode-run app's diagnostic log.
 
 ## CI compile gate
 
@@ -149,6 +149,19 @@ Also request finish and cancellation during startup/session setup: neither may a
 
 A successful smoke test is not the full acceptance test. Complete [`validation.md`](./validation.md) before Phase 0 is considered done.
 
+## History recovery smoke test
+
+From the normal Xcode-signed app, open **Morie → History** and select a Capture with unexpired audio:
+
+1. Play, pause, and seek with the native recording controls; opening a detail must not autoplay.
+2. Choose **Recognize Again**, then verify the saved recognition. Any original delivered output and delivery status remain visible; paste only occurs after an explicit Copy action and the user's paste.
+3. Cancel a retry and immediately start a new Fn capture. History playback/retry must stop and the live capture must remain usable.
+4. Try a failed/empty Capture. Empty or failed re-recognition preserves its previous text/audio and shows the failure; success makes recovered text available.
+5. Switch sections/close the window during playback and retry. Check cleanup, then reopen and retry again.
+6. Exercise expired/missing audio, change retention, and confirm that only the audio expires. Delete a disposable test Capture through the native confirmation dialog.
+
+Use generated fixture audio and temporary stores for automated API checks. Never transcribe or delete production History as part of an automated smoke test.
+
 ## Development rules
 
 ### Work from tasks
@@ -160,6 +173,10 @@ Before implementation:
 - connect the task to a GitHub Issue/PR when applicable.
 
 After implementation, update code and task documentation together.
+
+### Development-stage scope
+
+Morie has no released compatibility contract. Implement the current schema and current Apple APIs directly; do not add old-schema migration, legacy metadata reconstruction, version routing or speculative upgrade paths. Current-version crash recovery and protection of intentional captures are still required.
 
 ### Branching
 
@@ -189,7 +206,8 @@ For current Speech work, the intended path is:
 - `SpeechAnalyzer`
 - `SpeechTranscriber`
 - `AssetInventory`
-- `CaptureInputSequenceProvider`
+- one `AVCaptureAudioDataOutput` shared by streamed source-audio encoding and `AnalyzerInputConverter`
+- `SpeechAnalyzer.analyzeSequence(from:)` for explicit History file re-recognition
 
 Do not implement recognition using `SFSpeechRecognizer` as a fallback. Its presence is currently limited to authorization where the current SDK exposes that permission path.
 

@@ -3,7 +3,7 @@
 ## Status
 
 - **State:** IN PROGRESS
-- **Last updated:** 2026-09-17
+- **Last updated:** 2026-09-18
 - **GitHub Issue:** https://github.com/6spot/Morie/issues/2
 - **Pull Request:** https://github.com/6spot/Morie/pull/3
 - **Merged baseline:** `main` at `2cda9a3`; continue implementation on task branches
@@ -98,7 +98,7 @@ Explicitly excluded:
 | iCloud/CloudKit capability check | DEFERRED | M-003 owns the real container/entitlements and Private Mode persistence gate. |
 | Global toggle-capture hotkey | IMPLEMENTED / VERIFY | Owner-approved default is solo `Fn / Globe` release: first release starts, second finishes, Fn chords do not trigger, and `Escape` cancels. A timed-out event tap now fails open and is released instead of entering an automatic re-enable loop that can block keyboard input. Native Settings provides alternate combinations; real-device timeout recovery and Fn/system-conflict validation remain. |
 | Reliable recording/session layer | IMPLEMENTED / VERIFY | Unique session IDs, setup cancellation, stale-result rejection, deterministic terminal cleanup. |
-| Modern Apple Speech pipeline | IMPLEMENTED / VERIFY | `SpeechAnalyzer` + `SpeechTranscriber` + `CaptureInputSequenceProvider`; runtime finalization still needs device proof. |
+| Modern Apple Speech pipeline | IMPLEMENTED / VERIFY | `SpeechAnalyzer` + `SpeechTranscriber` + one `AVCaptureAudioDataOutput`/`AnalyzerInputConverter`; M-003 shares its buffers with streamed source-audio encoding. Remaining runtime finalization cases still need device proof. |
 | Original-app capture/focus restore | IMPLEMENTED / VERIFY | App and original on-screen window identity are captured before recording; a closed original window now blocks false-success paste and preserves the transcript on the ordinary clipboard. Remaining timing/alternate-window behavior requires validation. |
 | Text injection / clipboard fallback | IMPLEMENTED / VERIFY | Universal synthetic Cmd+V delivery, change-count-aware restore (including an originally empty clipboard), and transient markers for Raycast/clipboard-history exclusion; no app-specific compatibility branch. |
 | Cancellation/stale-result hardening | IMPLEMENTED / VERIFY | Finish/cancel during in-flight setup stays bound to its session; per-session identity protects new sessions. |
@@ -166,7 +166,7 @@ The current Speech path uses:
 
 - `SpeechTranscriber(locale:preset:.progressiveTranscription)`;
 - `AssetInventory`;
-- `CaptureInputSequenceProvider`;
+- one `AVCaptureAudioDataOutput` feeding `AnalyzerInputConverter` and M-003's streamed source-audio encoder;
 - `SpeechAnalyzer`.
 
 There is no legacy recognition fallback.
@@ -193,6 +193,8 @@ Cancellation:
 4. reset the matching session.
 
 The latest volatile segment is retained when producing Morie's final string because the current Speech result contract does not guarantee that every volatile result is emitted again as a final result.
+
+M-003's History follow-up keeps earlier nonempty transcript evidence when classifying an empty final result. The single capture output distinguishes no input/zero signal from unclassified nonzero audio; the latter remains retryable in History. An empty retained result shows “未识别，录音已保存”, while a discarded no-input capture hides the HUD. Neither reports successful text insertion. Live capture also stops History playback and cancels file re-recognition before Speech startup. These additions require the corresponding runtime checks in `validation.md`; they do not close M-002.
 
 ### 5. Text delivery
 

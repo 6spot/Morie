@@ -5,9 +5,10 @@ import SwiftData
 struct CapturedSourceAudio: Sendable {
     let url: URL
     let duration: TimeInterval
-    let hasMeaningfulAudio: Bool
+    // nil means the signal has not been confirmed as speech or silence; keep it for retry.
+    let hasMeaningfulAudio: Bool?
 
-    init(url: URL, duration: TimeInterval, hasMeaningfulAudio: Bool = true) {
+    init(url: URL, duration: TimeInterval, hasMeaningfulAudio: Bool? = nil) {
         self.url = url
         self.duration = duration
         self.hasMeaningfulAudio = hasMeaningfulAudio
@@ -46,6 +47,8 @@ final class CaptureRecord {
     var sourceAudioByteCount: Int64?
     var sourceAudioExpiresAt: Date?
     var sourceAudioHasMeaningfulContent: Bool?
+    var lastRecognitionAttemptAt: Date?
+    var lastRecognitionErrorDescription: String?
 
     init(
         id: UUID,

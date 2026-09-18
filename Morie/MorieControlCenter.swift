@@ -41,7 +41,13 @@ struct MorieControlCenter: View {
         } detail: {
             switch selection ?? .history {
             case .history:
-                CaptureHistoryView()
+                if let history = controller.history {
+                    CaptureHistoryView(
+                        history: history,
+                        canRecognize: controller.canRecognizeHistory,
+                        onRecognize: controller.recognizeHistoryCapture
+                    )
+                }
             case .settings:
                 MorieSettingsView(controller: controller)
             case .diagnostics:

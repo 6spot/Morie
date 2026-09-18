@@ -19,10 +19,15 @@
 		A1000000000000000000000B /* CaptureHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* CaptureHistoryView.swift */; };
 		A1000000000000000000000C /* MorieControlCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* MorieControlCenter.swift */; };
 		A1000000000000000000000D /* CaptureAudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* CaptureAudioSource.swift */; };
+		A1000000000000000000000E /* CaptureFileTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* CaptureFileTranscriber.swift */; };
+		A1000000000000000000000F /* CaptureHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* CaptureHistoryController.swift */; };
 		A20000000000000000000001 /* CaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* CaptureStoreTests.swift */; };
 		A20000000000000000000002 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* CaptureRecord.swift */; };
 		A20000000000000000000003 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
-		A20000000000000000000004 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* Diagnostics.swift */; };
+		A20000000000000000000004 /* TestDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* TestDiagnostics.swift */; };
+		A20000000000000000000005 /* CaptureFileTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* CaptureFileTranscriber.swift */; };
+		A20000000000000000000006 /* CaptureHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* CaptureHistoryController.swift */; };
+		A20000000000000000000007 /* CaptureHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* CaptureHistoryTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,8 +46,12 @@
 		B10000000000000000000013 /* MorieControlCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieControlCenter.swift; sourceTree = "<group>"; };
 		B10000000000000000000014 /* Morie.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Morie.entitlements; sourceTree = "<group>"; };
 		B10000000000000000000015 /* CaptureAudioSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAudioSource.swift; sourceTree = "<group>"; };
+		B10000000000000000000016 /* CaptureFileTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFileTranscriber.swift; sourceTree = "<group>"; };
+		B10000000000000000000017 /* CaptureHistoryController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryController.swift; sourceTree = "<group>"; };
 		B20000000000000000000001 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000002 /* MorieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000003 /* CaptureHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000004 /* TestDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestDiagnostics.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,6 +96,8 @@
 				B10000000000000000000013 /* MorieControlCenter.swift */,
 				B10000000000000000000014 /* Morie.entitlements */,
 				B10000000000000000000015 /* CaptureAudioSource.swift */,
+				B10000000000000000000016 /* CaptureFileTranscriber.swift */,
+				B10000000000000000000017 /* CaptureHistoryController.swift */,
 			);
 			path = Morie;
 			sourceTree = "<group>";
@@ -95,6 +106,8 @@
 			isa = PBXGroup;
 			children = (
 				B20000000000000000000001 /* CaptureStoreTests.swift */,
+				B20000000000000000000003 /* CaptureHistoryTests.swift */,
+				B20000000000000000000004 /* TestDiagnostics.swift */,
 			);
 			path = MorieTests;
 			sourceTree = "<group>";
@@ -204,6 +217,8 @@
 				A1000000000000000000000B /* CaptureHistoryView.swift in Sources */,
 				A1000000000000000000000C /* MorieControlCenter.swift in Sources */,
 				A1000000000000000000000D /* CaptureAudioSource.swift in Sources */,
+				A1000000000000000000000E /* CaptureFileTranscriber.swift in Sources */,
+				A1000000000000000000000F /* CaptureHistoryController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -214,7 +229,10 @@
 				A20000000000000000000001 /* CaptureStoreTests.swift in Sources */,
 				A20000000000000000000002 /* CaptureRecord.swift in Sources */,
 				A20000000000000000000003 /* CaptureStore.swift in Sources */,
-				A20000000000000000000004 /* Diagnostics.swift in Sources */,
+				A20000000000000000000004 /* TestDiagnostics.swift in Sources */,
+				A20000000000000000000005 /* CaptureFileTranscriber.swift in Sources */,
+				A20000000000000000000006 /* CaptureHistoryController.swift in Sources */,
+				A20000000000000000000007 /* CaptureHistoryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

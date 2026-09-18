@@ -19,6 +19,7 @@ Morie is an Apple-native voice input and intentional capture product that gradua
 6. **Native UI Only** — all product UI must use Apple system components and the current macOS 27 Liquid Glass design language. Morie does not introduce a parallel/custom UI system.
 7. **No unapproved external dependencies** — if Apple-native capabilities cannot meet a requirement, implementation stops until the project owner explicitly approves an exception.
 8. **Reuse proven input infrastructure** — Phase 0 is not a from-scratch voice-input rewrite. Type4Me is the reference implementation for mature recording/session/hotkey/focus/injection/Apple Speech behavior; Morie selectively reuses/adapts that behavior while discarding legacy/provider/runtime complexity.
+9. **Development stage, no legacy contract** — implement the current design directly; no old-schema migration, legacy data reconstruction, version routing or speculative compatibility layer. Preserve current-version Capture-first and crash-recovery guarantees.
 
 ## Native UI boundary
 
