@@ -116,7 +116,7 @@ M-008/M-010 use one native navigation language. The sidebar groups **资料库**
 
 Lists use standard search, filter menus containing native Pickers, system selection and meaningful empty states. Search/filter/deletion clear hidden selections. Reading a source or linked memory uses the selected detail's NavigationStack; selecting a different record resets that stack. Creation/recording and filter controls belong to the list toolbar; copy/edit and the secondary action menu belong to the detail toolbar.
 
-Capture, Dictionary and Personal Memory details use the same native ScrollView composition, 28-point padding and a readable maximum width of 760 points. Text is selectable, system typography establishes hierarchy, and native GroupBoxes/disclosures organize supporting information. Settings and editing use grouped Forms. Do not add custom cards, selection highlights, navigation bars or glass effects to reproduce these system surfaces.
+Capture, Dictionary and Personal Memory details use the same native ScrollView composition, 28-point padding and a readable maximum width of 760 points. Text is selectable, system typography establishes hierarchy, and native GroupBoxes/disclosures organize supporting information. Settings and multi-field editing use grouped Forms; the single-word dictionary sheet uses a compact native columns Form. Do not add custom cards, selection highlights, navigation bars or glass effects to reproduce these system surfaces.
 
 Settings has a centered, flexible grouped Form in a 640 × 600 native window, with scrolling for smaller visible areas. Diagnostics uses the native Table with Time, Level, Category and Message columns, search and a level filter. Selecting an event reveals its full selectable message below a native split divider. Severity has a word/icon as well as semantic color. Copy All Events copies the whole current log; the action menu reveals the file or clears it after system confirmation.
 
@@ -134,13 +134,15 @@ Explicit cancellation shows the existing status surface as “正在停止…”
 
 ## Dictionary
 
-The **字典** library uses native searchable list/detail navigation, **添加词语 / 编辑词语** sheets and system deletion confirmation. The correct spelling is primary. Optional **自动替换的别名** aliases appear separately, with clear language that users should add them only for unconditional replacement. A spelling hint does not imply a global alias. Save errors stay in the native editor and Cancel leaves saved data intact.
+The **字典** library uses native searchable list/detail navigation, **添加词语 / 编辑词语** sheets and system deletion confirmation. Each entry is just one word: no aliases, replacement pairs or additional configuration. Search and list rows show words; detail shows the saved word, its role in recognition and its update date.
+
+The sheet is 420 points wide and fits its content, with one **词语** TextField, a brief purpose description and **取消 / 添加** (or **保存**) buttons. The word field receives initial focus. Return invokes the default action and Escape cancels; empty input disables saving. Duplicate/invalid/save errors remain inline without closing the editor, and editing clears stale error feedback. Cancel leaves saved data intact. Use the native columns Form and ordinary system controls.
 
 ## Personal Memory
 
 **个人记忆** shows active, archived and superseded personal projects, people, preferences, facts and decisions. Topics and personal information are the primary reading content. Automatic/user origin and current use are visible; **来源与历史** discloses provenance, dates, exact learning snapshots and predecessor links.
 
-Entries appear automatically from completed daily input. There is no candidate inbox or mandatory review. Optional native creation/editing, archive/restore/replace and system-confirmed deletion remain available to correct the profile. The editor uses a grouped Form with a kind Picker, topic TextField and multiline personal-information TextEditor. Dictionary aliases never appear in this editor.
+Entries appear automatically from completed daily input. There is no candidate inbox or mandatory review. Optional native creation/editing, archive/restore/replace and system-confirmed deletion remain available to correct the profile. The editor uses a grouped Form with a kind Picker, topic TextField and multiline personal-information TextEditor. Dictionary words belong to their separate single-field editor.
 
 History's **个人记忆** section shows idle scheduling, learning progress, outcomes, linked memories and **用于学习的文字**. Failed nonretryable analysis offers an optional retry. Opening/closing details does not control the background learner. Deleting a Capture explains that its analysis snapshots are removed while separate personal Memory remains; missing sources are labelled explicitly.
 
@@ -148,7 +150,7 @@ History's **个人记忆** section shows idle scheduling, learning progress, out
 
 Settings exposes **自动润色语音输入**, on by default. Its explanation describes filler/redundancy removal and appropriate punctuation, paragraphs and clear lists while preserving meaning and tone. The dictionary applies independently of the toggle; Memory is not a prerequisite for cleanup.
 
-History's **输入润色** inside **识别与润色** shows status, duration and a readable fallback reason. Standard disclosures show **修改内容**, **润色前的文字**, **本次使用的字典** and **本次参考的个人记忆**, retaining immutable snapshots. Recognition can change after a Speech retry while saved final output and its actual earlier provenance stay intact.
+History's **输入润色** inside **识别与润色** shows status, duration and a readable fallback reason. Standard disclosures show **修改内容**, **润色前的文字**, **本次使用的字典** (saved words only) and **本次参考的个人记忆**, retaining immutable snapshots. Recognition can change after a Speech retry while saved final output and its actual earlier provenance stay intact.
 
 The existing processing HUD remains visible during cleanup and the menu reports **正在润色…**. Running-source mutation/retry is disabled. Slow/failed AI processing retains saved dictionary-corrected/original text, and session cancellation prevents a late paste. Actual model fidelity, VoiceOver and latency require device checks.
 

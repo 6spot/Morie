@@ -7,7 +7,7 @@ struct RefinementInput: Codable, Equatable, Sendable {
     var context: [MemoryContextMatch] = []
     var dictionary: [DictionarySnapshot] = []
 
-    var prepared: ValidatedRefinement { DictionaryReplacer.replace(text, using: dictionary) }
+    var prepared: ValidatedRefinement { DictionarySpelling.normalize(text, using: dictionary) }
 }
 
 struct RefinementEdit: Codable, Equatable, Sendable {

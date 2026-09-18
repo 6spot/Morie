@@ -21,7 +21,7 @@ Morie should become more useful through ordinary communication without making us
 - Source provenance, origin/confidence/evidence dates and active/superseded/archived lifecycle.
 - Relevant personal-context retrieval and native inspection/edit/archive/delete controls.
 
-Excluded: custom dictionary spellings/aliases (M-009's separate dictionary), mandatory candidate review, inspiration follow-up, knowledge graphs, cloud services, iOS and compatibility/schema migrations.
+Excluded: custom dictionary words (M-009/M-011's separate dictionary), mandatory candidate review, inspiration follow-up, knowledge graphs, cloud services, iOS and compatibility/schema migrations.
 
 ## Acceptance criteria
 

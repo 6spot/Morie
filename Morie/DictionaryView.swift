@@ -10,7 +10,7 @@ struct DictionaryView: View {
     private var visibleEntries: [DictionaryEntry] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return store.entries.filter { entry in
-            query.isEmpty || ([entry.name] + entry.aliases).contains { $0.localizedStandardContains(query) }
+            query.isEmpty || entry.name.localizedStandardContains(query)
         }
     }
 
@@ -18,13 +18,7 @@ struct DictionaryView: View {
         List(selection: $selection) {
             if let errorMessage { Label(errorMessage, systemImage: "exclamationmark.triangle") }
             ForEach(visibleEntries) { entry in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(entry.name).lineLimit(2)
-                    if !entry.aliases.isEmpty {
-                        Text(entry.aliases.joined(separator: "、")).font(.callout).foregroundStyle(.secondary).lineLimit(2)
-                    }
-                }
-                .padding(.vertical, 6).tag(entry.id)
+                Text(entry.name).lineLimit(2).padding(.vertical, 6).tag(entry.id)
             }
         }
         .listStyle(.inset)
@@ -41,7 +35,7 @@ struct DictionaryView: View {
         }
         .navigationTitle("字典")
         .navigationSubtitle("\(visibleEntries.count) 个词语")
-        .searchable(text: $search, prompt: "搜索词语和别名")
+        .searchable(text: $search, prompt: "搜索词语")
         .toolbar { Button("添加词语", systemImage: "plus") { showingEditor = true } }
         .sheet(isPresented: $showingEditor) { DictionaryEditorSheet(store: store) }
         .onAppear {
@@ -68,14 +62,7 @@ struct DictionaryDetailView: View {
                 ManagementDetailContent {
                     Label("自定义词语", systemImage: "character.book.closed").foregroundStyle(.secondary)
                     Text(entry.name).font(.title).textSelection(.enabled)
-                    Text("识别语音时，会将此词语作为拼写提示。").foregroundStyle(.secondary)
-                    if !entry.aliases.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("自动替换以下别名").font(.headline)
-                            ForEach(entry.aliases, id: \.self) { Text("\($0) → \(entry.name)").textSelection(.enabled) }
-                            Text("仅在某个别名始终应该替换为此词语时添加。").foregroundStyle(.secondary)
-                        }
-                    }
+                    Text("Morie 会在语音识别时参考这个词语。").foregroundStyle(.secondary)
                     LabeledContent("更新时间", value: entry.updatedAt.formatted(.dateTime.locale(Locale(identifier: "zh-Hans")).year().month().day().hour().minute()))
                 }
                 .toolbar {
@@ -105,42 +92,45 @@ struct DictionaryEditorSheet: View {
     var entryID: UUID?
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
-    @State private var aliases = ""
     @State private var errorMessage: String?
+    @FocusState private var isWordFocused: Bool
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text(entryID == nil ? "添加字典词语" : "编辑字典词语").font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            Text(entryID == nil ? "添加词语" : "编辑词语").font(.headline)
             Form {
-                TextField("正确写法", text: $name)
-                LabeledContent("自动替换的别名（选填）") {
-                    TextEditor(text: $aliases).frame(height: 100).accessibilityLabel("别名，每行一个")
-                }
-                Text("每行填写一个始终需要替换的别名。留空则仅作为拼写提示。")
-                    .foregroundStyle(.secondary)
-                if let errorMessage { Text(errorMessage).foregroundStyle(.secondary) }
+                TextField("词语", text: $name, prompt: Text("例如：Morie"))
+                    .focused($isWordFocused)
             }
-            .formStyle(.grouped)
+            .formStyle(.columns)
+            Text("添加人名、产品名或专业术语，帮助语音识别。")
+                .font(.callout).foregroundStyle(.secondary)
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             HStack {
                 Spacer()
                 Button("取消", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("保存") {
+                Button(entryID == nil ? "添加" : "保存") {
                     do {
-                        let draft = DictionaryDraft(name: name, aliases: aliases.split(whereSeparator: \.isNewline).map(String.init))
+                        let draft = DictionaryDraft(name: name)
                         if let entryID { try store.update(entryID, draft: draft) }
                         else { try store.create(draft) }
                         dismiss()
                     } catch { errorMessage = error.localizedDescription }
                 }
                 .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
-        .padding(24).frame(width: 540, height: 400)
+        .padding(24).frame(width: 420).fixedSize(horizontal: false, vertical: true)
         .onAppear {
             if let entryID, let entry = store.entries.first(where: { $0.id == entryID }) {
                 name = entry.name
-                aliases = entry.aliases.joined(separator: "\n")
             }
+            isWordFocused = true
         }
+        .onChange(of: name) { errorMessage = nil }
     }
 }

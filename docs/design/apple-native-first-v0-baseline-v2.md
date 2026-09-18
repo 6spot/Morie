@@ -28,6 +28,8 @@ The following owner decisions are now hard requirements:
 
 15. **Chinese interface and native setup (2026-09-18):** use Simplified Chinese for the current Mac interface, the system Settings scene with Command-comma, native sidebar visibility and collapsible groups, a native permission/capability guide, and a system menu-bar menu. Inspect status without prompting; request permissions only through explicit guide actions. Returning from System Settings must not interrupt input.
 
+16. **One-word dictionary (2026-09-18):** the owner simplified dictionary entry to saving one word. This supersedes the explicit-alias portion of amendment 12: remove aliases and replacement-rule configuration from storage, processing and UI. Saved words supply native Speech hints; only case/width variants of the same word normalize to its spelling. Manual-correction confirmation saves just the new word. Do not infer substitutions or add compatibility machinery for the removed design.
+
 The source document below is historical product direction. These amendments supersede its phase order, immediate iCloud requirement, mandatory confirmation and inspiration scope.
 
 See also:

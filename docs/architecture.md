@@ -372,15 +372,15 @@ The primary management surface is one native SwiftUI `Window`, defaulting to 112
 
 The root owns independent Capture, Dictionary and Personal Memory UUID selections. Each selected detail gets a `NavigationStack` whose identity changes with that selection, so source/related links cannot leak navigation from another record. The SwiftData container is attached at the window root before `@Query` builds the initial content. The native menu retains **打开 Morie**, **设置…**, **使用引导与权限…**, status/shortcut guidance and **退出 Morie**.
 
-`ManagementDetailContent` is a small composition of native ScrollView/VStack with 28-point padding and a readable maximum width of 760 points. It is shared by Capture, Dictionary and Personal Memory reading surfaces. Actual settings and editing retain grouped Forms. There is no custom navigation, control library, material or persistence layer.
+`ManagementDetailContent` is a small composition of native ScrollView/VStack with 28-point padding and a readable maximum width of 760 points. It is shared by Capture, Dictionary and Personal Memory reading surfaces. Settings and multi-field editing retain grouped Forms; the single-word dictionary sheet uses a compact native columns Form. There is no custom navigation, control library, material or persistence layer.
 
 `MorieSettingsView` uses a flexible grouped Form in one 640 × 600 native Settings window. The setup window defaults to 700 × 740 and permits native resizing down to 640 × 680; long permission descriptions scroll inside the grouped Form. `DiagnosticLogView` uses a native Table with search/level filtering, selection and a resizable event-detail area for complete messages. Copy All Events, reveal-file and confirmed clear actions preserve the existing logger behavior.
 
 ### `DictionaryEntry` / `DictionaryStore`
 
-The custom dictionary owns canonical spellings and optional explicit always-replace aliases, separately from personal information. Its non-autosaving write context shares the Capture container without touching Capture checkpoints. Normalized spelling/alias collisions are rejected across entries; drafts validate lengths, line breaks and alias counts.
+The custom dictionary saves one word per entry, separately from personal information. The owner's M-011 amendment removes alias fields from drafts, records and processing snapshots. Its non-autosaving write context shares the Capture container without touching Capture checkpoints. Normalized duplicate words are rejected; a word is trimmed, 1–120 characters long and contains no internal control characters or line breaks.
 
-`DictionaryReplacer` applies whole-word literal case/width matches using native `NLTokenizer` boundaries. It normalizes saved spellings and explicit aliases, prefers longer matches at the same start, avoids overlapping/cascading substitutions and protects code/URLs/paths/technical spans. A spelling-only entry supplies Speech hints without inferring an alias from a previous recognition error. `DictionaryView` uses the shared native list/detail navigation and a system editor sheet.
+Saved words supply up to 100 native Speech hints within a 2,000-character budget, newest first. `DictionarySpelling` normalizes only case/width variants of the same whole word using native `NLTokenizer` boundaries. It prefers longer terms even when already correctly spelled, avoids overlaps and protects code/URLs/paths/technical spans. It never substitutes another word based on a previous recognition error. `DictionaryView` uses shared native list/detail navigation and a content-sized system sheet with one **词语** field. History retains just the words used by each refinement, alongside the actual edits.
 
 ### `CapturePersonalizer` / `InputRefiner`
 
@@ -438,7 +438,7 @@ The logic-only target compiles core persistence, audio, dictionary, cleanup and 
 
 Permission setup tests cover mandatory complete snapshots, read-only revocation/recovery, explicit authorization, denied/restricted/unsupported states, stale buttons, coalesced refresh and duplicate/dialog-activation races. They link only the injected setup controller, never the live capability gate.
 
-Dictionary tests cover persistence, conflict rules, bounded hints, native word boundaries and noncascading corrections. Correction tests cover Chinese/mixed words, added/deleted/joined letters, excluded edits, settling and undo without reading Accessibility data or displaying a panel.
+Dictionary tests cover word-only persistence, normalized duplicates, invalid-input protection, bounded hints, native word boundaries, overlapping names and technical-content protection. Correction tests cover Chinese/mixed words, added/deleted/joined letters, excluded edits, settling and undo without reading Accessibility data or displaying a panel.
 
 Memory tests cover provenance, lifecycle and retrieval. Learning tests inject evidence/models to verify exact final-text snapshots, restart discovery, automatic admission/accumulation, deduplication, conflicts/updates, user changes, scoped deletion, atomic failure/retry, source validation and immediate input preemption. Personalization tests inject model output, including tasks that ignore cancellation, to establish durable ordering, dictionary fallback, cleanup guards, stale-context rejection, deadline/cancellation and recovery. Actual model fidelity, AX/cross-app behavior, UI interaction and latency remain device acceptance.
 
@@ -516,7 +516,7 @@ Capture
 ├── context: project / topic / people / entities
 └── personal analysis: separate source snapshot / pending / completed / skipped
 
-DictionaryEntry → spelling and explicit replacement aliases
+DictionaryEntry → one saved word / spelling hint
 MemoryRecord → personal information and source provenance
 ```
 

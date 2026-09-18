@@ -26,7 +26,7 @@ final class CapturePersonalizer {
         if enabled && (otherModelWorkActive || runner.isBusy) { skip = .modelBusy }
         let source = try store.capture(captureID).finalText
         let dictionaryEntries = (try? dictionary.relevantEntries(for: source)) ?? []
-        let prepared = DictionaryReplacer.replace(source, using: dictionaryEntries).text
+        let prepared = DictionarySpelling.normalize(source, using: dictionaryEntries).text
         // Neither a missing personal profile nor retrieval failure disables day-one cleanup.
         let context = skip == nil ? ((try? memory.relevantContext(for: prepared)) ?? []) : []
         let input = try store.refinementInput(for: captureID, context: context, dictionary: dictionaryEntries)

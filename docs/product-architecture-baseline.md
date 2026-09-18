@@ -141,7 +141,7 @@ Persist the Capture and audio destination before recording; checkpoint recogniti
 
 Follow [the approved cleanup contract](input-cleanup.md): preserve meaning, tone, terminology, uncertainty and meaningful short replies; remove meaningless fillers and pause redundancy; fix clear self-corrections; add punctuation, paragraphs and lists only for structure already expressed. Do not summarize, expand, translate, answer or execute the input.
 
-Dictionary entries are user-maintained spellings/names/technical terms. Native Speech context uses spelling hints. Only explicit aliases establish deterministic replacements; case/width variants can normalize to the saved spelling. Dictionary corrections remain available if optional AI cleanup is off, busy or fails. Manually correcting recently inserted text can offer an opt-in native confirmation to save its spelling; this never silently makes a common word a global alias.
+Dictionary entries each contain one user-maintained word/name/technical term, entered in a single native field. The owner's M-011 amendment removes alias and replacement-rule configuration. Native Speech context uses saved words as hints; only case/width variants of the same whole word normalize to its saved spelling, even if optional AI cleanup is off, busy or fails. Do not infer replacements for different words. Manually correcting recently inserted text can offer an opt-in native confirmation to save just the new word.
 
 ### Automatic personal Memory
 

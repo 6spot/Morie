@@ -117,7 +117,7 @@ Historical foundation/candidate build and fixture evidence remains in [M-004](ta
 ## M-005 input personalization
 
 - [ ] With no personal Memory, cleanup removes meaningless speech redundancy and formats existing structure under [the approved contract](input-cleanup.md).
-- [ ] Dictionary spellings supply useful Speech hints; explicit aliases correct their actual recognized matches. Disabling cleanup still applies dictionary rules; a spelling-only entry does not establish an alias.
+- [ ] Saved dictionary words supply useful Speech hints; same-word case/width variants normalize to their saved spelling even with cleanup disabled. Other words and technical spans remain unchanged; no alias rules exist.
 - [ ] Cover Chinese/English/mixed input, 嗯/好的/OK replies, meaningful repetitions, uncertainty/alternatives, clear self-corrections, questions, requests, steps and ordinary narrative. No changed viewpoint, summary, invented heading, answer, explanation, translation or unspoken background.
 - [ ] Preserve people/product names, numbers/dates, negation, conditions, technical commands/paths/URLs/versions and code. Compare actual model output, not just validator acceptance.
 - [ ] Final text is saved before insertion; the target receives exactly that output. Original recognition, actual input, dictionary/Memory snapshots, changes, outcome and duration remain truthful.
@@ -151,7 +151,7 @@ This is an independent opt-in dictionary behavior, not personal-Memory approval.
 - [ ] Keyboard selection, search, filters and deletion show the correct detail. Hidden selections clear and source navigation resets when selecting another record.
 - [ ] Moving between History records stops playback/re-recognition without affecting another Capture. Background personal learning follows input-idle lifecycle, not page selection.
 - [ ] Final text is primary; recognition/refinement/learning snapshots and recording destination/expiry/retry remain accessible. Long text scrolls/selects correctly.
-- [ ] Dictionary editor validates spellings/aliases; Personal Memory editor handles personal information/lifecycle. Save/cancel/error/delete flows use native controls and system confirmations. No routine review inbox remains.
+- [ ] Dictionary editor accepts one word and validates duplicates/invalid input; Personal Memory editor handles personal information/lifecycle. Save/cancel/error/delete flows use native controls and system confirmations. No routine review inbox remains.
 - [ ] Sidebar/menu/Command-comma Settings entries reuse one native Settings scene. Diagnostics supports filters, complete selected messages, resizing, copy-all, file reveal and confirmed clear.
 - [ ] Verify empty/populated/error states, keyboard/VoiceOver, light/dark appearance, increased contrast, reduced motion and native glass/selection/toolbar rendering.
 
@@ -174,6 +174,17 @@ These signed-app checks remain open; isolated logic/layout evidence does not est
 - [ ] At default/minimum sizes, scroll the setup and Settings Forms to the bottom. Long explanations, save/preparation errors and correction-word prompts remain readable and actionable; verify light/dark, native materials and VoiceOver in the actual windows.
 
 Evidence and remaining limits are tracked in [M-010](tasks/M-010-macos-native-setup.md).
+
+## M-011 single-word dictionary
+
+- [ ] **字典 → 添加词语** opens a compact native sheet with only **词语**. The field has initial focus; Return adds the word and Escape cancels. Edit shows the same field and saves the changed word.
+- [ ] Empty/whitespace input disables Add/Save. Duplicate words (including case/width variants), invalid input and save failures show readable inline feedback without discarding edits or overwriting another word.
+- [ ] Add Chinese names, English product names and multiword technical terms. Search/list/detail show just the words. Relaunch preserves them; deletion removes their future Speech hints while saved input and personal Memory remain.
+- [ ] Compare recognition with/without saved words. With cleanup off, only case/width variants of the same whole word normalize. **Morie** must not create unconditional **more e / 莫里 → Morie** substitutions or change code/URLs.
+- [ ] History's **本次使用的字典** shows the exact saved words used for refinement, even after later dictionary edits/deletion. Final text remains saved before insertion and Memory learning.
+- [ ] Opt-in correction suggestions still offer **加入字典 / 暂不添加**, save one word and preserve typing focus. Validate keyboard, VoiceOver, long words/errors and native appearance in the signed app.
+
+Isolated build, logic, separate-process storage and layout evidence is recorded in [M-011](tasks/M-011-simple-dictionary.md). Actual recognition benefit and interactive behavior remain deferred acceptance.
 
 ## Toggle-capture lifecycle
 

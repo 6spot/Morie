@@ -78,12 +78,12 @@ final class DictionaryCorrectionController {
         guard !suggestedWords.contains(key) else { return }
         do { try dictionary.load() } catch { return }
         guard !dictionary.entries.contains(where: {
-            ([ $0.name ] + $0.aliases).contains { MemoryText.normalized($0) == key }
+            MemoryText.normalized($0.name) == key
         }) else { return }
         suggestedWords.insert(key)
         let content = DictionaryCorrectionPrompt(correction: correction, save: { [weak self] in
             guard let self else { return }
-            // Remember the correct spelling, not a blanket replacement of the original word.
+            // Save the same single word as the dictionary editor.
             try self.dictionary.create(DictionaryDraft(name: correction.replacement))
             self.dismiss()
         }, dismiss: { [weak self] in self?.dismiss() })

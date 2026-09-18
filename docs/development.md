@@ -82,7 +82,7 @@ Audio stream tests use synthetic 16 kHz mono PCM and Apple's real AAC writer/dec
 
 Memory tests use isolated SwiftData containers and native NaturalLanguage tokenization to check provenance, lifecycle and bounded personal-context retrieval. Memory and Dictionary write through separate contexts in the same container; development requires no legacy schema or migration setup.
 
-Dictionary tests cover spelling/alias persistence, conflicts, bounded Speech hints, whole-word replacement, overlap and technical-content protection. Correction detector tests cover Chinese/mixed words, shared letters, added/deleted/joined letters, stable-edit timing and undo. They do not observe real Accessibility fields or display prompts.
+Dictionary tests cover word-only persistence, normalized duplicates, invalid-input protection, bounded Speech hints, same-word case/width normalization, overlap and technical-content protection. Correction detector tests cover Chinese/mixed words, shared letters, added/deleted/joined letters, stable-edit timing and undo. They do not observe real Accessibility fields or display prompts.
 
 Learning tests inject structured evidence and delayed models. They verify exact committed final-text sources, idle queue/restart discovery, automatic admission/accumulation, merging/updates, user edits/archive/delete, atomic failure/backoff and input preemption. A cancelled model cannot create late Memory. Personalization tests inject full final text and uncooperative models to check independent cleanup, dictionary fallback, original/final save ordering, provenance, stale source/context, History retry, deadline/cancellation and current-version recovery.
 
@@ -206,8 +206,8 @@ Mode persistence, terminal capture-only storage, cancellation and retry are cove
 
 Interactive checks remain deferred to the evening of 2026-09-18. Use disposable data in the owner's normal signed app when resuming:
 
-1. Add spellings such as **Morie**, **Claude** and a Chinese technical term in **字典**. Separately add an explicit **more e → Morie** alias. Relaunch and verify persistence; conflicts/invalid fields keep the editor open, and Cancel preserves saved values.
-2. Compare Speech recognition with/without a spelling hint. Then verify deterministic alias correction from actual recognized text, including when **自动润色语音输入** is off. A spelling hint alone must not create a broad replacement alias.
+1. In **字典 → 添加词语**, enter a word such as **Morie**, **Claude** or a Chinese technical term in the single **词语** field. Relaunch and verify persistence; duplicate/invalid words keep the editor open, and Cancel preserves saved values. Check initial field focus, Return to save and Escape to cancel.
+2. Compare Speech recognition with/without a saved word. Check case/width normalization of the same word (for example, **morie → Morie**) with **自动润色语音输入** off. A saved **Morie** must not unconditionally replace **more e**, **莫里**, code or URLs.
 3. With an empty Personal Memory profile and cleanup on, test [the cleanup examples](input-cleanup.md): fillers, repeats, clear self-correction, uncertainty, short replies and clear ordered items. No invented content, summary, translation, answer or executed request.
 4. Verify the target receives the exact saved **最终文字**. Inspect recognition, dictionary/Memory snapshots and accepted changes in **识别与润色**.
 5. Re-recognize the saved audio; the delivered final output and its old processing provenance remain available. Exercise cancellation, unavailable/slow AI and save recovery with disposable captures.
@@ -241,7 +241,7 @@ M-008 keeps development on macOS. Use the normal Xcode-signed app and disposable
 1. Switch between **历史记录 / 字典 / 个人记忆 / 诊断**. Resize the window and native split columns at 960 × 600 and 1120 × 720; use the system sidebar toggle/command and fold **资料库 / 应用**.
 2. Select History rows with keyboard and pointer. Search by text/app and change filters; a hidden/deleted record must no longer occupy the detail. Start playback/re-recognition, then change selection or leave History; old work must stop without changing another Capture.
 3. Read final text, open recognition/refinement and recording disclosures, use both copy actions, and follow a linked Memory. Selecting a different Capture resets the detail navigation. Long text remains scrollable and selectable.
-4. Check dictionary and personal-Memory creation/edit/save/cancel, validation errors, lifecycle/deletion and sources. Personal Memory appears automatically; its editor contains personal information, while Dictionary owns spellings/aliases. Learning status must not become a required review task.
+4. Check dictionary and personal-Memory creation/edit/save/cancel, validation errors, lifecycle/deletion and sources. Personal Memory appears automatically; its editor contains personal information, while Dictionary saves one word per entry. Learning status must not become a required review task.
 5. Open **设置** through the sidebar, native menu and **⌘,**; all must reuse the same Settings scene and persist changes. Filter Diagnostics, select a long event, resize its detail, and check copy-all/reveal/clear actions with disposable logs.
 6. Verify keyboard focus, VoiceOver names, light/dark appearance, increased contrast and reduced motion. Native glass, selection colors and toolbar compositing require the real window.
 

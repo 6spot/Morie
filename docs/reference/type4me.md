@@ -329,3 +329,11 @@ The earlier M-004/M-005 audits record the design at that time. The owner's curre
 - **DROP:** vocabulary stored as personal Memory, a required daily-input review inbox, narrow punctuation-only cleanup, provider-specific hotwords and any old-schema compatibility layer. Personal Memory analyzes committed final text in durable idle batches.
 - **ADAPT:** the owner-supplied [OpenLess behavior reference](openless.md) adds an independent opt-in confirmation after a user corrects a word. It creates a spelling hint, not an automatic global replacement or a personal fact. No OpenLess source is copied.
 - **VERIFY:** actual native Speech hint benefit, model fidelity and personal-evidence selection, input preemption, bounded AX reads/focus and native correction-prompt usability on macOS 27. Logic tests cannot establish those device results.
+
+## M-011 word-only dictionary amendment — 2026-09-18
+
+The owner clarified that a dictionary entry should save just one word. [M-011](../tasks/M-011-simple-dictionary.md) removes M-009's explicit-alias fields and configuration directly. The vocabulary/save-error and Speech-hint lessons above still apply; no new upstream implementation is needed for this simplification.
+
+- **ADAPT:** normalized duplicate handling, explicit save errors, bounded native Speech hints and immutable word/processing evidence.
+- **DROP:** alias editing, alias collision rules and unconditional substitutions. Same-word case/width normalization remains, with native word boundaries and technical-content protection.
+- **VERIFY:** actual recognition benefit and the compact native editor's focus/keyboard/VoiceOver behavior. The OpenLess-inspired correction confirmation still saves only the corrected word.

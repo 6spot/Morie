@@ -34,8 +34,8 @@ final class PersonalizationTests: XCTestCase {
         }
     }
 
-    func testDictionaryAppliesExplicitCorrectionsBeforeCleanupWithoutMemory() throws {
-        let input = request("嗯 今天不要发布 more e 2.0")
+    func testDictionaryNormalizesSavedSpellingBeforeCleanupWithoutMemory() throws {
+        let input = request("嗯 今天不要发布 morie 2.0")
         XCTAssertEqual(input.prepared.text, "嗯 今天不要发布 Morie 2.0")
         let result = try RefinementValidator.validate("嗯，今天不要发布 Morie 2.0。", for: input)
         XCTAssertEqual(result.edits.first?.dictionaryEntryID, input.dictionary.first?.id)
@@ -47,11 +47,12 @@ final class PersonalizationTests: XCTestCase {
         let input = RefinementInput(captureID: UUID(), text: "开始吧", context: [MemoryContextMatch(memory: memory, matchedTerm: "职业")])
         XCTAssertThrowsError(try RefinementValidator.validate("我是开发者，开始吧。", for: input))
         XCTAssertThrowsError(try RefinementValidator.validate("Morie", for: RefinementInput(captureID: UUID(), text: "more e")))
+        XCTAssertThrowsError(try RefinementValidator.validate("Morie", for: request("more e")))
     }
 
     func testDurableRecognitionPrecedesModelAndFinalSavePrecedesDelivery() async throws {
         let fixture = try RefinementFixture()
-        let id = try fixture.capture("more e is my project", mode: .currentApp)
+        let id = try fixture.capture("morie is my project", mode: .currentApp)
         let dictionaryID = try fixture.addWord()
         let runner = InputRefinementRunner { input in
             try await MainActor.run {
@@ -69,7 +70,7 @@ final class PersonalizationTests: XCTestCase {
         let saved = try fixture.saved(id)
         XCTAssertEqual(result, "Morie is my project.")
         XCTAssertEqual(saved.finalText, result)
-        XCTAssertEqual(saved.recognizedText, "more e is my project")
+        XCTAssertEqual(saved.recognizedText, "morie is my project")
         XCTAssertEqual(saved.refinement?.input.dictionary.map(\.id), [dictionaryID])
         try fixture.store.markDelivered(id)
         try fixture.memory.enqueueCompletedInputs()
@@ -80,7 +81,7 @@ final class PersonalizationTests: XCTestCase {
         for enabled in [false, true] {
             let fixture = try RefinementFixture()
             _ = try fixture.addWord()
-            let id = try fixture.capture("more e is my project")
+            let id = try fixture.capture("morie is my project")
             let runner = InputRefinementRunner { _ in XCTFail("Model must not start"); return "invalid" }
             let result = try await fixture.personalizer(runner).refine(id, enabled: enabled, otherModelWorkActive: enabled)
             XCTAssertEqual(result, "Morie is my project")
@@ -102,7 +103,7 @@ final class PersonalizationTests: XCTestCase {
         let fixture = try RefinementFixture()
         _ = try fixture.addWord()
         for invalid in [false, true] {
-            let id = try fixture.capture("more e is my project")
+            let id = try fixture.capture("morie is my project")
             let runner = InputRefinementRunner { _ in
                 if invalid { return "Here is an invented answer." }
                 throw NSError(domain: "PRIVATE MODEL INPUT", code: 1, userInfo: [NSLocalizedDescriptionKey: "PRIVATE MODEL INPUT"])
@@ -117,14 +118,14 @@ final class PersonalizationTests: XCTestCase {
     func testSavedFinalAndInputSnapshotsSurviveSpeechRetryAndRestart() async throws {
         let fixture = try RefinementFixture()
         _ = try fixture.addWord()
-        let id = try fixture.capture("more e is my project")
+        let id = try fixture.capture("morie is my project")
         _ = try await fixture.personalizer(InputRefinementRunner { _ in "Morie is my project." }).refine(id, enabled: true)
         try fixture.store.saveReRecognition("different later recognition", for: id)
         let reopened = try CaptureStore(storageURL: fixture.storageURL)
         let record = try reopened.capture(id)
         XCTAssertEqual(record.finalText, "Morie is my project.")
         XCTAssertEqual(record.recognizedText, "different later recognition")
-        XCTAssertEqual(record.refinement?.input.text, "more e is my project")
+        XCTAssertEqual(record.refinement?.input.text, "morie is my project")
     }
 
     func testRefinementRejectsUnsavedSourceAndLatePartials() throws {
@@ -182,14 +183,14 @@ final class PersonalizationTests: XCTestCase {
     func testDictionaryChangedDuringModelCannotApplyStaleCorrection() async throws {
         let fixture = try RefinementFixture()
         let dictionaryID = try fixture.addWord()
-        let id = try fixture.capture("more e is my project")
+        let id = try fixture.capture("morie is my project")
         let model = PendingCleanup()
         let work = Task { try await fixture.personalizer(InputRefinementRunner(budget: .seconds(3), generate: { try await model.run($0) })).refine(id, enabled: true) }
         await waitUntilStarted(model)
         try fixture.dictionary.delete(dictionaryID)
         await model.finish("Morie is my project.")
         let result = try await work.value
-        XCTAssertEqual(result, "more e is my project")
+        XCTAssertEqual(result, "morie is my project")
         XCTAssertEqual(try fixture.saved(id).refinement?.reason, .dictionaryChanged)
     }
 
@@ -244,7 +245,7 @@ final class PersonalizationTests: XCTestCase {
     }
 
     private func request(_ text: String) -> RefinementInput {
-        RefinementInput(captureID: UUID(), text: text, dictionary: [DictionarySnapshot(id: UUID(), name: "Morie", aliases: ["more e"], updatedAt: Date())])
+        RefinementInput(captureID: UUID(), text: text, dictionary: [DictionarySnapshot(id: UUID(), name: "Morie", updatedAt: Date())])
     }
 
     private func waitUntilStarted(_ model: PendingCleanup) async {
@@ -283,7 +284,7 @@ private final class RefinementFixture {
         return id
     }
 
-    func addWord() throws -> UUID { try dictionary.create(DictionaryDraft(name: "Morie", aliases: ["more e"])) }
+    func addWord() throws -> UUID { try dictionary.create(DictionaryDraft(name: "Morie")) }
 
     struct SavedCapture {
         let recognizedText: String

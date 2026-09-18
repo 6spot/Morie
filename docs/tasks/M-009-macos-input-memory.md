@@ -15,7 +15,7 @@ The owner corrected the delivery sequence: prove useful input on one Mac before 
 ## Scope
 
 - Independent basic cleanup under the [approved contract](../input-cleanup.md).
-- A native, user-maintained custom dictionary with exact spellings and explicit aliases.
+- A native, user-maintained custom dictionary. [M-011](M-011-simple-dictionary.md) supersedes the original alias configuration with one saved word per entry.
 - Automatic local personal-Memory learning from committed final input, scheduled in idle batches with restart/retry and input preemption.
 - Evidence-aware admission, merging, replacement, user corrections/deletion and exact source snapshots.
 - Input contextualization without adding unstated personal background.
@@ -30,7 +30,7 @@ iOS, inspiration capture/follow-up, CloudKit/enrollment/container configuration,
 ## Acceptance criteria
 
 1. Cleanup works with an empty/unavailable Memory store, preserves meaningful tone and uncertainty, and never answers the dictated request.
-2. User-defined dictionary entries persist, validate conflicting aliases and correct explicit matches without changing unrelated words or technical content.
+2. User-defined dictionary words persist, reject normalized duplicates and supply Speech hints. Same-word case/width normalization preserves unrelated words and technical content; M-011 removes explicit-alias rules.
 3. Recognized text is saved before processing; final text and actual dictionary/Memory context are saved before insertion and learning.
 4. Completed current-app input automatically enters local learning. Restart/cancellation/model failure does not silently drop unfinished work; new input never waits for background analysis.
 5. Personal information is distinct from dictionary rules. Only supported, durable personal information is admitted; incidental, quoted, temporary or uncertain text must not become asserted user facts.
@@ -52,7 +52,7 @@ iOS, inspiration capture/follow-up, CloudKit/enrollment/container configuration,
 ## Implementation notes
 
 - Separate SwiftData dictionary/personal-Memory records and non-autosaving write contexts preserve the Capture checkpoint boundary. The old candidate schema/workflow is removed directly.
-- Dictionary supplies bounded native Speech hints and deterministic explicit aliases. Cleanup generates full final text under the approved contract and keeps original/input/context/changes before delivery.
+- Dictionary supplies bounded native Speech hints and same-word spelling normalization; M-011 removes the earlier explicit-alias fields and behavior. Cleanup generates full final text under the approved contract and keeps original/input/context/changes before delivery.
 - Personal analysis uses a durable final-text queue, idle batches, evidence/lifecycle filters and immediate cancellation for new input. User edits and forgotten/archived topics take priority.
 - Correction observation is independently opt-in and bounded to a verified recent insertion. The native panel confirms only a spelling, sizes to long content/errors and dismisses when its observation becomes invalid.
 

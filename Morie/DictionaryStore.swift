@@ -5,13 +5,11 @@ import SwiftData
 
 struct DictionaryDraft: Equatable, Sendable {
     var name = ""
-    var aliases: [String] = []
 }
 
 struct DictionarySnapshot: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let name: String
-    let aliases: [String]
     let updatedAt: Date
 }
 
@@ -21,24 +19,21 @@ final class DictionaryEntry {
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var name: String = ""
-    var aliases: [String] = []
 
-    init(_ draft: DictionaryDraft) { name = draft.name; aliases = draft.aliases }
+    init(_ draft: DictionaryDraft) { name = draft.name }
 
-    var draft: DictionaryDraft { DictionaryDraft(name: name, aliases: aliases) }
-    var snapshot: DictionarySnapshot { DictionarySnapshot(id: id, name: name, aliases: aliases, updatedAt: updatedAt) }
+    var snapshot: DictionarySnapshot { DictionarySnapshot(id: id, name: name, updatedAt: updatedAt) }
 }
 
 @MainActor
 final class DictionaryStore: ObservableObject {
     enum StoreError: LocalizedError {
-        case invalidName, invalidAliases, conflictingTerm, unavailable
+        case invalidName, duplicateWord, unavailable
 
         var errorDescription: String? {
             switch self {
-            case .invalidName: "请填写 1–120 个字符的词语或名称，且不换行。"
-            case .invalidAliases: "最多可添加 20 个别名，每行一个，每个 1–120 个字符。"
-            case .conflictingTerm: "此写法或别名已属于其他字典词语，请先编辑该词语。"
+            case .invalidName: "请输入 1–120 个字符的词语，不要换行。"
+            case .duplicateWord: "字典中已有这个词语。"
             case .unavailable: "此字典词语已不存在。"
             }
         }
@@ -59,7 +54,7 @@ final class DictionaryStore: ObservableObject {
     @discardableResult
     func create(_ draft: DictionaryDraft) throws -> UUID {
         let draft = try validate(draft)
-        try requireAvailableTerms(draft)
+        try requireNewWord(draft.name)
         let entry = DictionaryEntry(draft)
         context.insert(entry)
         try save()
@@ -68,10 +63,9 @@ final class DictionaryStore: ObservableObject {
 
     func update(_ id: UUID, draft: DictionaryDraft) throws {
         let draft = try validate(draft)
-        try requireAvailableTerms(draft, excluding: id)
+        try requireNewWord(draft.name, excluding: id)
         let entry = try entry(id)
         entry.name = draft.name
-        entry.aliases = draft.aliases
         entry.updatedAt = Date()
         try save()
     }
@@ -81,13 +75,13 @@ final class DictionaryStore: ObservableObject {
     func relevantEntries(for text: String) throws -> [DictionarySnapshot] {
         try load()
         return entries.map(\.snapshot).filter { entry in
-            ([entry.name] + entry.aliases).contains { !InputText.literalRanges(of: $0, in: text).isEmpty }
+            !InputText.literalRanges(of: entry.name, in: text).isEmpty
         }
     }
 
     func speechHints() throws -> [String] {
         try load()
-        // A bounded native Speech context; explicit aliases remain post-recognition corrections.
+        // A bounded native Speech context containing the user's saved words.
         var characters = 0
         return entries.sorted { $0.updatedAt > $1.updatedAt }.prefix(100).compactMap { entry in
             guard characters + entry.name.count <= 2_000 else { return nil }
@@ -103,29 +97,19 @@ final class DictionaryStore: ObservableObject {
     }
 
     private func validate(_ draft: DictionaryDraft) throws -> DictionaryDraft {
-        func term(_ raw: String) -> String? {
-            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !value.isEmpty, value.count <= 120,
-                  !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else { return nil }
-            return value
-        }
-        guard let name = term(draft.name) else { throw StoreError.invalidName }
-        guard draft.aliases.count <= 20 else { throw StoreError.invalidAliases }
-        var seen = Set([MemoryText.normalized(name)])
-        var aliases: [String] = []
-        for raw in draft.aliases {
-            guard let alias = term(raw) else { throw StoreError.invalidAliases }
-            if seen.insert(MemoryText.normalized(alias)).inserted { aliases.append(alias) }
-        }
-        return DictionaryDraft(name: name, aliases: aliases)
+        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let invalidCharacters = CharacterSet.controlCharacters.union(.newlines)
+        guard !name.isEmpty, name.count <= 120,
+              !name.unicodeScalars.contains(where: invalidCharacters.contains) else { throw StoreError.invalidName }
+        return DictionaryDraft(name: name)
     }
 
-    private func requireAvailableTerms(_ draft: DictionaryDraft, excluding id: UUID? = nil) throws {
+    private func requireNewWord(_ name: String, excluding id: UUID? = nil) throws {
         try load()
-        let terms = Set(([draft.name] + draft.aliases).map(MemoryText.normalized))
+        let key = MemoryText.normalized(name)
         guard !entries.contains(where: { entry in
-            entry.id != id && ([entry.name] + entry.aliases).contains { terms.contains(MemoryText.normalized($0)) }
-        }) else { throw StoreError.conflictingTerm }
+            entry.id != id && MemoryText.normalized(entry.name) == key
+        }) else { throw StoreError.duplicateWord }
     }
 
     private func save() throws {
@@ -135,17 +119,15 @@ final class DictionaryStore: ObservableObject {
     }
 }
 
-enum DictionaryReplacer {
-    static func replace(_ text: String, using entries: [DictionarySnapshot]) -> ValidatedRefinement {
+enum DictionarySpelling {
+    /// Normalize only the same word's case/width; a saved word never implies a substitution rule.
+    static func normalize(_ text: String, using entries: [DictionarySnapshot]) -> ValidatedRefinement {
         let protected = InputText.technicalRanges(in: text)
         var matches: [(range: Range<String.Index>, entry: DictionarySnapshot)] = []
         for entry in entries {
-            for term in [entry.name] + entry.aliases {
-                for range in InputText.literalRanges(of: term, in: text) {
-                    guard String(text[range]) != entry.name,
-                          !protected.contains(where: { $0.overlaps(range) }) else { continue }
-                    matches.append((range, entry))
-                }
+            for range in InputText.literalRanges(of: entry.name, in: text) {
+                guard !protected.contains(where: { $0.overlaps(range) }) else { continue }
+                matches.append((range, entry))
             }
         }
         matches.sort {
@@ -154,9 +136,11 @@ enum DictionaryReplacer {
         }
         var selected: [(range: Range<String.Index>, entry: DictionarySnapshot)] = []
         for match in matches where !selected.contains(where: { $0.range.overlaps(match.range) }) { selected.append(match) }
+        // An already-correct longer term still takes precedence over a shorter overlapping word.
+        let changes = selected.filter { String(text[$0.range]) != $0.entry.name }
         var output = text
-        for match in selected.reversed() { output.replaceSubrange(match.range, with: match.entry.name) }
-        return ValidatedRefinement(text: output, edits: selected.map {
+        for match in changes.reversed() { output.replaceSubrange(match.range, with: match.entry.name) }
+        return ValidatedRefinement(text: output, edits: changes.map {
             RefinementEdit(original: String(text[$0.range]), replacement: $0.entry.name, dictionaryEntryID: $0.entry.id)
         })
     }

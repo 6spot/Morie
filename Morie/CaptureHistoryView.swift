@@ -300,15 +300,9 @@ struct CaptureRefinementSection: View {
             if !refinement.input.dictionary.isEmpty {
                 DisclosureGroup("本次使用的字典") {
                     ForEach(refinement.input.dictionary) { entry in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.name).font(.headline)
-                            if !entry.aliases.isEmpty {
-                                Text("自动替换：\(entry.aliases.joined(separator: "、"))")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(entry.name).font(.headline)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Text("这里保留本次输入使用的字典内容，后续编辑字典不会改变这条记录。")
                         .font(.caption).foregroundStyle(.secondary)

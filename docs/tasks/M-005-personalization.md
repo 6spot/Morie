@@ -15,7 +15,7 @@ Voice input should be immediately useful and readable while retaining the user's
 ## Scope
 
 - The [approved independent cleanup contract](../input-cleanup.md): meaningless filler/repetition removal, clear self-corrections, punctuation, paragraphs and lists only for existing structure.
-- Deterministic dictionary spelling/explicit-alias corrections before optional AI processing.
+- Dictionary spelling normalization of the same word's case/width before optional AI processing; [M-011](M-011-simple-dictionary.md) removes alias rules.
 - Bounded native Foundation Models cleanup, independently useful with empty Memory.
 - Durable original/final text and exact dictionary/context/outcome provenance.
 - Input priority, deadline/cancellation, save-error and stale-source/context handling.
@@ -27,7 +27,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 
 1. Basic cleanup works without Memory and preserves meaning, tone, terminology, uncertainty and complete short replies.
 2. Clear fillers/redundancy/self-corrections can be removed; clear structure can become paragraphs/lists without new content, summary, explanation, translation or answers.
-3. Dictionary corrections remain useful when AI is disabled, busy, unavailable or timed out; only explicit aliases establish replacements.
+3. Saved dictionary words supply Speech hints and same-word spelling normalization even when AI is disabled, busy, unavailable or timed out. No alias or inferred substitution rules remain.
 4. Original recognition is durable before processing; final text and its actual processing context are durable before insertion and idle learning.
 5. Changed/deleted sources and stale dictionary/Memory snapshots cannot deliver a late AI result. Save failure cannot expose unsaved output.
 6. New recording does not wait for optional model teardown. Recover current-version interruptions without replaying a paste; preserve existing final output during Speech retry.
@@ -36,7 +36,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 ## Progress
 
 - [x] Replace anchored punctuation-only proposals with independent cleanup under approved instructions.
-- [x] Apply explicit dictionary rules first and keep dictionary fallback independent of model availability.
+- [x] Normalize saved dictionary spellings first and keep dictionary fallback independent of model availability.
 - [x] Retain deadline/cancellation ownership and durable source/final/provenance checks.
 - [x] Recheck source/dictionary/Memory after generation; preserve Capture through errors/restart/retry.
 - [x] Connect native Settings/History and automatic analysis of saved final input through M-009.
@@ -66,9 +66,9 @@ The dated results below belong to the earlier confirmed-term/anchored-edit slice
 
 ## Quality and latency acceptance
 
-Use [the cleanup/model checklist](../validation.md#m-005-input-personalization) with disposable Chinese, English and mixed-language samples. Compare cleanup with an empty personal profile, dictionary hints only, explicit aliases, related Memory, and cleanup disabled.
+Use [the cleanup/model checklist](../validation.md#m-005-input-personalization) with disposable Chinese, English and mixed-language samples. Compare cleanup with an empty personal profile, dictionary hints, same-word case/width variants, related Memory, and cleanup disabled.
 
-Include meaningful 嗯/好的/OK replies, emphatic repetitions, unclear alternatives, dates/numbers, questions/requests, names, code, commands/URLs and long inputs. Confirm no summary, answer, new background or changed stance. Measure actual Speech hint benefit separately from deterministic aliases; those are different mechanisms. Record model outcomes and the final-to-delivery latency/timeout rate instead of inferring quality from test runtimes.
+Include meaningful 嗯/好的/OK replies, emphatic repetitions, unclear alternatives, dates/numbers, questions/requests, names, code, commands/URLs and long inputs. Confirm no summary, answer, new background or changed stance. Measure actual Speech hint benefit separately from deterministic spelling normalization. Record model outcomes and the final-to-delivery latency/timeout rate instead of inferring quality from test runtimes.
 
 ## Blockers and follow-up
 
