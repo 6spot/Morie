@@ -47,11 +47,11 @@ Excluded:
 | Subtask | Status | Notes |
 | --- | --- | --- |
 | SwiftData Capture schema | IMPLEMENTED / VERIFY | `CaptureRecord` stores stable identity, timestamps, lifecycle, recognized/final text, delivery mode, source app/bundle, original window identity and delivery error. No uniqueness constraint or non-Apple dependency. |
-| Capture-first local store | IMPLEMENTED / VERIFY | A voice Capture is synchronously saved before Speech starts; progressive text is checkpointed at most every 500 ms, then final recognition and delivery state update the same record. Explicit cancellation and an empty final transcript remove the in-progress record; empty persisted leftovers are pruned when the store opens. |
+| Capture-first local store | IMPLEMENTED / VERIFY | A voice Capture is synchronously saved before Speech starts; progressive text is checkpointed at most every 500 ms, then final recognition and delivery state update the same record. Explicit cancellation removes the in-progress record. Empty Speech results currently follow source-audio meaningfulness classification; false-positive retention remains a known follow-up. |
 | Input-loop integration | IMPLEMENTED / VERIFY | Capture UUID is shared with the Phase 0 session UUID. Storage initialization failure blocks capture rather than silently running without durability. |
 | Native management window / History | IMPLEMENTED / VERIFY | One native `Window` + `NavigationSplitView` contains History, Settings, and Diagnostics. The SwiftData container is attached at the window root before History's `@Query` is constructed, keeping the initial History layout consistent; the menu-bar panel has one `Open Morie` entry instead of separate management destinations. |
 | App Context | IN PROGRESS | Source app name, bundle identifier and original window number are stored. Window title collection remains excluded until a minimal privacy-safe requirement is approved. |
-| Source audio / retry | IMPLEMENTED / VERIFY | Replacement owns one `AVCaptureAudioDataOutput`; the same PCM buffers feed `AnalyzerInputConverter` and streamed `AVAudioFile` AAC encoding. Empty recognition is retained only with meaningful audio; silent empty captures are discarded. Owner-hardware start/stop, playback and repeated-capture validation remains open. |
+| Source audio / retry | IMPLEMENTED / VERIFY | Replacement owns one `AVCaptureAudioDataOutput`; the same PCM buffers feed `AnalyzerInputConverter` and streamed `AVAudioFile` AAC encoding. Owner hardware confirmed normal recognition/input and M4A creation. History retry action is not implemented; empty/silent classification still produces false positives and is deferred for later tuning. |
 | Audio retention | IMPLEMENTED / VERIFY | Default 7 days with a 1–365 day Settings control. Expiry removes the M4A asset without deleting Capture text/history metadata. |
 | Tests | IMPLEMENTED / PASS | Logic-only XCTest target covers delivered, delivery-failed, operational-failed and explicit-cancel paths plus persistence across store recreation. Tests use in-memory or unique temporary stores and do not launch Morie. |
 | iCloud/CloudKit | TODO | Requires the real container, entitlements, account/capability handling and sync validation. Local configuration explicitly uses `.none`; it does not pretend CloudKit is active. |
@@ -75,7 +75,15 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 - Management-window restructuring compiled successfully with signing disabled using `/tmp/morie-derived-data.2ZXLp8`.
 - Runtime History and capture-first behavior still require owner validation from the normal Xcode-signed launch.
 - 2026-09-18 real-device crash evidence: incident `F160F627-871F-4F35-A880-74BAFBE55D67` terminates in `AVCaptureAudioFileOutput.startRecording` immediately after `CaptureInputSequenceProvider` creation. The unsafe implementation was reverted in commits `37c7877` and `dd7c782`; strict Swift 6 type-check passes after restoration.
-- The replacement single-output implementation passes Swift 6 complete-concurrency type checking and 7 logic tests. Microphone/Speech/AAC behavior still requires the normal Xcode-launched real-device run.
+- The replacement single-output implementation passes Swift 6 complete-concurrency type checking and 8 logic tests.
+- Owner hardware confirmed on 2026-09-18 that normal Chinese voice input still works and M4A source files are created after the single-output replacement.
+- Owner hardware also reproduced two empty transcripts retained as `failed` (`CBCA4A24`, `5B073CAE`) because the current signal threshold classified their audio as meaningful. Empty-record classification is explicitly deferred rather than accepted as complete.
+
+## Known issues / follow-up
+
+- Empty/silent Capture classification is not reliable enough: ambient/input signal can exceed the current threshold even when the resulting Capture should be discarded. Do not delete all empty-text Captures unconditionally because audible recognition failures must remain retryable. Resolve this together with the History re-recognition flow using duration/energy evidence and explicit user-facing failed-recognition state.
+- History does not yet expose playback or “recognize again” for retained source audio.
+- App Context remains partial, and real iCloud/CloudKit persistence has not started.
 
 ## Known design constraints
 
