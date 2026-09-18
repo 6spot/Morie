@@ -16,6 +16,7 @@ The following owner decisions are now hard requirements:
 4. **Type4Me is an input-foundation reference:** macOS voice input is not a greenfield rewrite. Audit and selectively reuse/adapt proven Type4Me recording-session, hotkey, target/focus, text-injection, Apple Speech, permission, packaging and correction-learning experience. Do not inherit its provider/runtime complexity.
 5. **Development stage, no legacy contract (2026-09-18):** implement the current product, schema and Apple APIs directly. Do not add old-version compatibility, legacy data reconstruction, schema migrations or speculative upgrade paths. Current-version crash recovery and Capture-first data protection still apply.
 6. **Sync sequencing (2026-09-18):** the owner has not set up an Apple Developer account/program and explicitly defers iCloud/CloudKit synchronization to the final integration stage. Continue local development without that configuration. The intended V0 data destination remains each user's own iCloud private database; no Morie backend or Device Only product mode is introduced by this development sequence.
+7. **Memory extraction text (2026-09-18):** candidate extraction uses the saved final text. When M-005 adds AI polishing, persist that polished result separately from recognized text before extracting Memory, and retain the exact text used for each extraction. Until polishing exists, use the current saved final/recognized text without describing it as polished. A changed final text invalidates unreviewed candidates based on an older text.
 
 See also:
 

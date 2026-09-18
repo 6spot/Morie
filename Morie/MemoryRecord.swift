@@ -25,7 +25,7 @@ enum MemoryStatus: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-struct MemoryDraft: Equatable, Sendable {
+struct MemoryDraft: Codable, Equatable, Sendable {
     var kind: MemoryKind = .vocabulary
     var name = ""
     var aliases: [String] = []
@@ -46,6 +46,7 @@ final class MemoryRecord {
     var userConfirmed: Bool = false
     // Manual confirmation is not an inferred model confidence score.
     var confidence: Double?
+    var sourceCandidateID: UUID?
     var supersedesID: UUID?
 
     init(draft: MemoryDraft, sourceCaptureIDs: [UUID] = [], supersedesID: UUID? = nil) {

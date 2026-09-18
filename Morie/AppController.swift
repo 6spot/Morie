@@ -33,6 +33,7 @@ final class AppController: ObservableObject {
 
     let history: CaptureHistoryController?
     let memory: MemoryStore?
+    let memoryCandidates: MemoryCandidateController?
 
     private let capabilityGate = CapabilityGate()
     private let speech = SpeechPipeline()
@@ -61,6 +62,7 @@ final class AppController: ObservableObject {
         self.persistenceError = persistenceError
         history = captureStore.map { CaptureHistoryController(store: $0, locale: Locale(identifier: "zh-CN")) }
         memory = captureStore.map { MemoryStore(container: $0.container) }
+        memoryCandidates = memory.map { MemoryCandidateController(store: $0) }
         let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
@@ -317,6 +319,7 @@ final class AppController: ObservableObject {
         transcript = ""
         state = .recording
         history?.setInputActive(true)
+        memoryCandidates?.setInputActive(true)
 
         hotkey?.setCancellationEnabled(true)
         hud.showRecording()
@@ -686,6 +689,7 @@ final class AppController: ObservableObject {
         targetApplication = nil
         targetWindowNumber = nil
         history?.setInputActive(false)
+        memoryCandidates?.setInputActive(false)
     }
 
     private func presentFailure(title: String, message: String) {

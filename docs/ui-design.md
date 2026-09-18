@@ -112,6 +112,14 @@ Explicit cancellation shows the existing status surface as “Stopping…” unt
 
 The management sidebar adds **Memory** using the existing system navigation. A native searchable list and status picker show active, archived and superseded vocabulary/projects. Details use a grouped Form for names, aliases, notes, confirmation, provenance and lifecycle actions. The editor is a system sheet with standard type/name controls, multiline TextEditors for aliases/notes, inline validation, and Save/Cancel actions. Permanent deletion uses a system confirmation dialog; archive remains reversible.
 
-History offers **Save Memory…** with the source Capture visible. The user can enter a new term/project or link that Capture to an existing active entry. Matching active context and explicitly linked memories are labelled separately. Source inspection does not monitor another app or read the clipboard. Deleting a Capture explains that separately saved memories remain; missing sources are identified explicitly. Automatic candidate extraction and input correction are not presented as available in this slice.
+History offers **Save Memory…** with the source Capture visible. The user can enter a new term/project or link that Capture to an existing active entry. Matching active context and explicitly linked memories are labelled separately. Source inspection does not monitor another app or read the clipboard. Deleting a Capture explains that separately saved memories remain; missing sources are identified explicitly.
+
+## Candidate extraction and review
+
+History's **Find Memory Candidates** action runs Apple on-device analysis of the saved text. Standard `ProgressView` and **Cancel Extraction** controls reflect its lifecycle. Suggestions have explicit **Review Suggestion…**, saved and dismissed states; empty results remain visible and do not imply a failure. Starting voice input cancels this optional work.
+
+The native review sheet shows the supporting quote, a **Text Used for Extraction** disclosure, editable type/name/aliases/notes, an existing-memory picker and Save/Cancel/Dismiss actions. The source identifies saved final or recognized text; it does not claim polishing already exists. After M-005 saves polished final text, the same snapshot surface will retain it. Changed/deleted source text prevents confirmation, with a readable recovery message. Save validation leaves the sheet open.
+
+The Memory list includes current **Candidates to Review**, independent of confirmed active context. A saved AI-derived memory exposes its extraction snapshot in Sources. Deleting a Capture explicitly removes candidate snapshots as well as its text/audio, while confirmed Memory remains. All of these use the existing system list, form, sheet, picker, button and disclosure components; there is no custom review or AI-chat UI.
 
 UI polish is not a reason to fork the product away from the system. Morie's differentiation is Capture, Personal Memory, and personalization—not a custom macOS widget toolkit.

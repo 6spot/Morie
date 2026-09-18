@@ -295,3 +295,11 @@ Morie requirement: selectively save user-confirmed vocabulary/project memory wit
 - **ADAPT:** case-insensitive duplicate detection, surfacing save failures, explicit user choice before vocabulary writes, and recording provenance when an action occurs rather than reconstructing it later.
 - **DROP:** UserDefaults/file migration, built-in dictionaries, snippet replacement rules, URL/automation commands, cloud hotword tables and external ASR restarts. Morie uses the current SwiftData schema directly and has no compatibility contract.
 - **VERIFY:** native editor/navigation/accessibility and the usefulness of real Chinese/English names/aliases. Native NaturalLanguage matching is tested on synthetic examples; no Type4Me source or dictionary is copied.
+
+## M-004 candidate provenance audit — 2026-09-18
+
+Morie requirement: use saved final text for selective candidate extraction, retain the actual input/evidence, and explicitly review before creating Memory. The owner requires future AI-polished output to be saved here while recognized text remains separate. Revisited `UI/Settings/CorrectionProvenance.swift` and `Type4MeTests/CorrectionProvenanceTests.swift` (#300).
+
+- **ADAPT:** record the actual text/provenance at the action boundary; distinguish recognized text from final output and avoid attributing an AI transformation to another operation. Keep explicit review and duplicate/save-error behavior from the vocabulary audit above.
+- **DROP:** legacy provenance reconstruction, snippet/provider routing, translation modes and old-build inference. Morie has no released data contract and calls the macOS 27 on-device Foundation Models APIs directly. No Type4Me source was copied.
+- **VERIFY:** model selectivity, Chinese/English evidence fidelity, review usability and optional-model cancellation latency on owner hardware. Deterministic tests prove source-state handling, not AI quality.

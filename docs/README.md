@@ -30,4 +30,4 @@ Documentation changes with the code. A behavior, architecture, UI rule, task sta
 
 ## Current product stage
 
-Morie is validating **Phase 0 — macOS Input Foundation**, extending **Phase 1 — Durable Capture**, and implementing the first **Phase 2 — Personal Memory** slice. The owner deferred interactive device checks until the evening of 2026-09-18 and CloudKit sync until final integration. Current Memory work covers explicit vocabulary/project storage, provenance and relevant-context retrieval; iOS and Morie Cloud remain later work.
+Morie is validating **Phase 0 — macOS Input Foundation**, extending **Phase 1 — Durable Capture**, and implementing **Phase 2 — Personal Memory**. The owner deferred interactive device checks until the evening of 2026-09-18 and CloudKit sync until final integration. Current Memory work includes vocabulary/project storage, provenance, relevant-context retrieval and on-demand Apple AI candidate extraction with explicit review. M-005 will persist polished final text before Memory extraction; iOS and Morie Cloud remain later work.

@@ -13,6 +13,9 @@ final class MemoryStore: ObservableObject {
         case sourceUnavailable
         case sourceNotReady
         case notEditable
+        case sourceChanged
+        case invalidCandidates
+        case candidateUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -24,11 +27,15 @@ final class MemoryStore: ObservableObject {
             case .sourceUnavailable: "The source capture is no longer available."
             case .sourceNotReady: "Finish the capture and save its text before creating memory from it."
             case .notEditable: "This memory has been superseded. Open its replacement to make changes."
+            case .sourceChanged: "The saved text has changed. Extract candidates from the updated text before saving a suggestion."
+            case .invalidCandidates: "The model returned an invalid candidate set. Your capture has been kept."
+            case .candidateUnavailable: "This candidate has already been reviewed or is no longer available."
             }
         }
     }
 
     @Published private(set) var entries: [MemoryRecord] = []
+    @Published private(set) var extractions: [MemoryExtractionRecord] = []
 
     private let container: ModelContainer
     private let context: ModelContext
@@ -42,6 +49,108 @@ final class MemoryStore: ObservableObject {
 
     func load() throws {
         entries = try context.fetch(FetchDescriptor<MemoryRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]))
+        extractions = try context.fetch(FetchDescriptor<MemoryExtractionRecord>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)]))
+    }
+
+    var pendingCandidates: [MemoryCandidate] {
+        extractions.flatMap(\.candidates).filter { $0.status == .pending }
+    }
+
+    func extractionInput(for captureID: UUID) throws -> MemoryExtractionInput {
+        let current = MemoryExtractionInput(capture: try requireSource(captureID))
+        // Only committed text can be sent to the model, including after M-005 polishing.
+        let reader = ModelContext(container)
+        let request = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == captureID })
+        guard let saved = try reader.fetch(request).first else { throw StoreError.sourceUnavailable }
+        guard saved.lifecycle != .capturing, saved.lifecycle != .cancelled else { throw StoreError.sourceNotReady }
+        let input = MemoryExtractionInput(capture: saved)
+        guard input == current else { throw StoreError.sourceChanged }
+        return input
+    }
+
+    func extraction(for input: MemoryExtractionInput) -> MemoryExtractionRecord? {
+        extractions.first { $0.input == input }
+    }
+
+    func candidate(_ id: UUID) throws -> (extraction: MemoryExtractionRecord, candidate: MemoryCandidate) {
+        try load()
+        for extraction in extractions {
+            if let candidate = extraction.candidates.first(where: { $0.id == id }) {
+                return (extraction, candidate)
+            }
+        }
+        throw StoreError.candidateUnavailable
+    }
+
+    func isCurrent(_ extraction: MemoryExtractionRecord) -> Bool {
+        guard let input = try? extractionInput(for: extraction.sourceCaptureID) else { return false }
+        return input == extraction.input
+    }
+
+    @discardableResult
+    func saveCandidates(_ suggestions: [MemorySuggestion], for input: MemoryExtractionInput) throws -> UUID {
+        guard try extractionInput(for: input.captureID) == input else { throw StoreError.sourceChanged }
+        try load()
+        if let existing = extraction(for: input) { return existing.id }
+        guard suggestions.count <= 3 else { throw StoreError.invalidCandidates }
+        var seen = Set<String>()
+        let selected = suggestions.compactMap { suggestion -> MemorySuggestion? in
+            guard suggestion.confidence.isFinite, (0.8...1).contains(suggestion.confidence),
+                  let draft = try? validated(suggestion.draft) else { return nil }
+            let evidence = suggestion.evidence.trimmingCharacters(in: .whitespacesAndNewlines)
+            let source = MemoryText.normalized(input.text)
+            guard !evidence.isEmpty, evidence.count <= 500, input.text.contains(evidence),
+                  MemoryText.normalized(evidence).contains(MemoryText.normalized(draft.name)),
+                  draft.aliases.allSatisfy({ source.contains(MemoryText.normalized($0)) }),
+                  seen.insert("\(draft.kind.rawValue):\(MemoryText.normalized(draft.name))").inserted
+            else { return nil }
+            return MemorySuggestion(draft: draft, evidence: evidence, confidence: suggestion.confidence)
+        }
+        let extraction = MemoryExtractionRecord(input: input, suggestions: selected)
+        context.insert(extraction)
+        try save()
+        return extraction.id
+    }
+
+    @discardableResult
+    func acceptCandidate(_ id: UUID, draft: MemoryDraft, existingMemoryID: UUID? = nil) throws -> UUID {
+        let (extraction, candidate) = try candidate(id)
+        guard candidate.status == .pending else { throw StoreError.candidateUnavailable }
+        guard try extractionInput(for: extraction.sourceCaptureID) == extraction.input else { throw StoreError.sourceChanged }
+        let record: MemoryRecord
+        if let existingMemoryID {
+            record = try editableMemory(existingMemoryID)
+            guard record.status == .active else { throw StoreError.notEditable }
+            if !record.sourceCaptureIDs.contains(extraction.sourceCaptureID) {
+                record.sourceCaptureIDs.append(extraction.sourceCaptureID)
+            }
+            record.updatedAt = Date()
+        } else {
+            let draft = try validated(draft)
+            try requireAvailableName(draft)
+            record = MemoryRecord(draft: draft, sourceCaptureIDs: [extraction.sourceCaptureID])
+            record.sourceCandidateID = id
+            record.confidence = draft == candidate.suggestion.draft ? candidate.suggestion.confidence : nil
+            context.insert(record)
+        }
+        updateCandidate(id, in: extraction, status: .accepted, memoryID: record.id)
+        try save()
+        return record.id
+    }
+
+    func dismissCandidate(_ id: UUID) throws {
+        let (extraction, candidate) = try candidate(id)
+        guard candidate.status == .pending else { throw StoreError.candidateUnavailable }
+        updateCandidate(id, in: extraction, status: .dismissed)
+        try save()
+    }
+
+    private func updateCandidate(_ id: UUID, in extraction: MemoryExtractionRecord, status: MemoryCandidateStatus, memoryID: UUID? = nil) {
+        var candidates = extraction.candidates
+        guard let index = candidates.firstIndex(where: { $0.id == id }) else { return }
+        candidates[index].status = status
+        candidates[index].memoryID = memoryID
+        extraction.candidates = candidates
     }
 
     func memory(_ id: UUID) throws -> MemoryRecord {
@@ -130,13 +239,15 @@ final class MemoryStore: ObservableObject {
         return record
     }
 
-    private func requireSource(_ id: UUID) throws {
+    @discardableResult
+    private func requireSource(_ id: UUID) throws -> CaptureRecord {
         // Read the Capture's authoritative context; this context only writes Memory.
         let request = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
         guard let capture = try container.mainContext.fetch(request).first else { throw StoreError.sourceUnavailable }
-        guard capture.lifecycle != .capturing,
+        guard capture.lifecycle != .capturing, capture.lifecycle != .cancelled,
               !(capture.finalText + capture.recognizedText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { throw StoreError.sourceNotReady }
+        return capture
     }
 
     private func requireAvailableName(_ draft: MemoryDraft, excluding id: UUID? = nil) throws {

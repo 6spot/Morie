@@ -2,7 +2,7 @@
 
 ## Current stage
 
-Morie is validating **Phase 0 — macOS Input Foundation** and **Phase 1 — Durable Capture** while implementing the first **Phase 2 — Personal Memory** slice. The current boundary includes the native input loop, local persistence, History recovery, explicit vocabulary/project memory and relevant-context inspection. Automatic Memory Candidates, input personalization, iOS and Morie Cloud remain subsequent work. The owner has deferred interactive device checks until the evening and sync until final integration.
+Morie is validating **Phase 0 — macOS Input Foundation** and **Phase 1 — Durable Capture** while implementing **Phase 2 — Personal Memory**. The current boundary includes the native input loop, local persistence, History recovery, explicit vocabulary/project memory, relevant-context inspection and on-demand Apple AI candidates with human review. Input personalization, iOS and Morie Cloud remain subsequent work. The owner has deferred interactive device checks until the evening and sync until final integration.
 
 Type4Me is an experience/reference archive, not Morie's architecture or migration template. Every retained lesson is filtered through Morie's product design and the macOS 27-only platform boundary.
 
@@ -61,6 +61,10 @@ Morie/
 │   ├── MemoryStore.swift
 │   ├── MemoryContextRetriever.swift
 │   ├── MemoryView.swift
+│   ├── MemoryExtractionRecord.swift
+│   ├── MemoryCandidateExtractor.swift
+│   ├── MemoryCandidateController.swift
+│   ├── MemoryCandidatesView.swift
 │   ├── MorieControlCenter.swift
 │   ├── CaptureHUD.swift
 │   ├── Diagnostics.swift
@@ -72,6 +76,7 @@ Morie/
 │   ├── CaptureHistoryTests.swift
 │   ├── CaptureAudioStreamTests.swift
 │   ├── MemoryTests.swift
+│   ├── MemoryCandidateTests.swift
 │   └── TestDiagnostics.swift
 ├── .github/workflows/
 │   ├── macos-27-ci.yml
@@ -339,11 +344,27 @@ History exposes related records and separately labels records saved from that Ca
 
 Native `List`, `NavigationStack`, `Form`, `Picker`, `TextField`, `TextEditor`, sheets and confirmation dialogs provide Memory search, detail, editing and lifecycle actions. A History sheet can create a new entry or link its Capture to an existing active entry. Source links show the saved Capture's text and source app/date. The UI distinguishes manual creation, unavailable source Captures, archived records and superseded records.
 
+### Memory Candidates
+
+`MemoryExtractionInput` prefers nonempty saved `finalText`, using `recognizedText` only when no final text exists. `MemoryStore` reads a separate committed context and compares it with the authoritative Capture context before extraction. Unsaved text, recording and deleted sources are rejected. The owner's 2026-09-18 decision requires M-005 to save polished final text before using this boundary, preserving recognized text separately. This slice does not perform polishing or label unprocessed final text as polished.
+
+`MemoryCandidateExtractor` uses only `SystemLanguageModel.default`, a fresh `LanguageModelSession`, and `@Generable` output for up to three Vocabulary/Project suggestions. The current SDK's token-count/context-size APIs bound the complete prompt, instructions, schema and response; oversized input is refused rather than truncated. Default Apple guardrails remain enabled. The source is treated as data, not instructions. Each suggestion needs a literal supporting quote containing its name, explicitly present aliases and a finite model confidence estimate of at least 0.8. Invalid/duplicate suggestions are filtered. That estimate is not a calibrated accuracy guarantee; human review is required.
+
+`MemoryExtractionRecord` persists the exact text/type used, including future polished final text, together with candidates and pending/accepted/dismissed decisions. A successful empty extraction is persisted too. Repeating analysis of the same saved text reuses its result and preserves review decisions. Changed input gets a separate result; stale pending candidates cannot be confirmed. Accepted Memory records retain source Capture IDs, the originating candidate ID and an optional unchanged suggestion confidence. User edits clear that model estimate. Linking to existing active Memory preserves its name/notes and confirmation metadata.
+
+Candidate confirmation and Memory changes share the Memory write context and one save. Source existence and current text are rechecked before committing either extraction or review. Deleting a Capture deletes all its extraction snapshots in the same store save, while independently confirmed Memory remains. Existing Capture/Memory schema is used directly, without migrations or legacy reconstruction.
+
+`MemoryCandidateController` owns one cancellable optional extraction. History explicitly requests analysis with **Find Memory Candidates**; recording/delivery does not schedule model work automatically. Leaving that Capture detail or starting live input cancels analysis. Live Speech does not wait for model cancellation, and a late result cannot commit. Foundation Models failure messages are fixed strings so prompts/output are not exposed through debug descriptions or logs. Model quality and cancellation latency remain device acceptance items.
+
+History exposes progress/cancel, review/dismiss and the exact source snapshot using standard SwiftUI controls. The Memory list uses native `@Query` source changes to show only pending candidates whose text still matches; rendering does not issue a database fetch per candidate. Review can edit fields or link to an existing active entry. Confirmed AI-derived Memory also exposes the original extraction snapshot while the source Capture exists.
+
 ### `MorieTests`
 
 The logic-only XCTest target compiles persistence, History recovery and the audio stream sources directly, without launching Morie or entering TCC. Tests use in-memory or unique temporary databases/audio directories. An explicit store URL defaults audio storage to the same temporary parent. A test-only diagnostics sink prevents tests from touching the running app's log. File recognition is replaced by an injected async closure for deterministic success/failure/cancellation tests. Audio stream tests write and decode real AAC using synthetic PCM and injected converter failures; native Speech, microphone lifecycle and playback interactions remain separate integration/device checks.
 
 Memory tests use those isolated containers and native NaturalLanguage tokenization. They cover restart durability, explicit provenance, normalization/conflicts, source readiness, lifecycle exclusion, replacement, scoped deletion and deterministic bounded retrieval. No model inference or production data is used.
+
+Candidate tests inject model output and delayed results to cover final-text priority, committed snapshots/restart, explicit confirmation/dismissal, source evidence filtering, conflicts/linking, changed/deleted sources, cancellation, live-input preemption, empty-result reuse and failure privacy. The real Foundation Models implementation is compiled, but these deterministic tests do not establish inference quality or runtime availability.
 
 ## Type4Me extraction boundary
 

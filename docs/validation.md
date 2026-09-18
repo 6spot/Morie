@@ -113,6 +113,20 @@ Use disposable Capture/Memory entries when interactive validation resumes tonigh
 
 2026-09-18: all **47 isolated tests** passed, including 16 Memory tests and the 31 Capture/History/audio regression tests. Offscreen native rendering checked list/detail/editor/context layout with synthetic data. Evidence is in [M-004](./tasks/M-004-memory.md#validation-evidence); interactive acceptance remains open.
 
+## M-004 Memory Candidates
+
+- [ ] In a disposable saved Capture, choose **Find Memory Candidates**; verify zero to three selective Vocabulary/Project suggestions with grounded Chinese/English names, aliases, notes and literal evidence.
+- [ ] Inspect **Text Used for Extraction**. It must match saved final text, or recognized text only when no final exists. Current final text is not described as AI-polished; M-005 must save and retain polished output here later.
+- [ ] Edit/save, link to an existing active memory, dismiss and cancel review. Confirmed Memory and review states survive relaunch; pending suggestions never participate in related context.
+- [ ] Inspect the source snapshot from saved AI-derived Memory. The exact extraction text remains available even after a later source-text change, until that source Capture is deleted.
+- [ ] Change the source during extraction or before review confirmation. Stale results must not save; re-extraction uses the updated text. Repeating an already analyzed text preserves decisions and does not rerun inference.
+- [ ] Cancel inference, leave the detail and begin live capture. Verify no late candidates, blocked voice startup or unnecessary model work after cancellation.
+- [ ] Exercise empty suggestions, oversized input, model unavailability/refusal and unsupported language; Captures and existing Memory remain, with readable recovery.
+- [ ] Delete a disposable source Capture during/after extraction; its snapshots disappear, no late result recreates them, and separately confirmed Memory remains.
+- [ ] Verify Memory inbox/review/source disclosure/progress controls with keyboard, VoiceOver and long text; measure model latency/energy and live-input preemption.
+
+2026-09-18: all **65 isolated tests** pass, including 18 candidate tests with injected inference. The real macOS 27 Foundation Models path compiles. These results establish persistence and concurrency behavior, not AI quality; the real-model and interaction checks remain open for tonight. Evidence is in [M-004](./tasks/M-004-memory.md#candidate-slice-validation).
+
 ## Toggle-capture lifecycle
 
 Verify repeated sequences:

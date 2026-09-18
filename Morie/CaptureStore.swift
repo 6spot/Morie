@@ -39,7 +39,7 @@ final class CaptureStore {
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
 
     init(inMemory: Bool = false, storageURL: URL? = nil, audioDirectory: URL? = nil) throws {
-        let schema = Schema([CaptureRecord.self, MemoryRecord.self])
+        let schema = Schema([CaptureRecord.self, MemoryRecord.self, MemoryExtractionRecord.self])
         precondition(!(inMemory && storageURL != nil), "An in-memory store cannot also use a storage URL.")
 
         let configuration: ModelConfiguration
@@ -245,10 +245,14 @@ final class CaptureStore {
     func deleteCapture(_ id: UUID) throws {
         let record = try capture(id)
         guard records[id] == nil, record.lifecycle != .capturing else { throw StoreError.captureInProgress }
+        let extractions = try container.mainContext.fetch(FetchDescriptor<MemoryExtractionRecord>(
+            predicate: #Predicate { $0.sourceCaptureID == id }
+        ))
         let url = audioURL(for: record)
         if let url, FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)
         }
+        for extraction in extractions { container.mainContext.delete(extraction) }
         container.mainContext.delete(record)
         try container.mainContext.save()
         Diagnostics.record("History", "Deleted Capture \(label(id))")

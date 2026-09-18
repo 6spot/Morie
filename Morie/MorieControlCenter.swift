@@ -44,10 +44,11 @@ struct MorieControlCenter: View {
         } detail: {
             switch selection ?? .history {
             case .history:
-                if let history = controller.history, let memory = controller.memory {
+                if let history = controller.history, let memory = controller.memory, let candidates = controller.memoryCandidates {
                     CaptureHistoryView(
                         history: history,
                         memory: memory,
+                        candidates: candidates,
                         canStartCapture: controller.canStartCapture,
                         onRecord: controller.startCaptureOnly,
                         onRecognize: controller.recognizeHistoryCapture

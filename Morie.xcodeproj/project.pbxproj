@@ -26,6 +26,10 @@
 		A10000000000000000000012 /* MemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* MemoryStore.swift */; };
 		A10000000000000000000013 /* MemoryContextRetriever.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* MemoryContextRetriever.swift */; };
 		A10000000000000000000014 /* MemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* MemoryView.swift */; };
+		A10000000000000000000015 /* MemoryExtractionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* MemoryExtractionRecord.swift */; };
+		A10000000000000000000016 /* MemoryCandidateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* MemoryCandidateExtractor.swift */; };
+		A10000000000000000000017 /* MemoryCandidateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* MemoryCandidateController.swift */; };
+		A10000000000000000000018 /* MemoryCandidatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* MemoryCandidatesView.swift */; };
 		A20000000000000000000001 /* CaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* CaptureStoreTests.swift */; };
 		A20000000000000000000002 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* CaptureRecord.swift */; };
 		A20000000000000000000003 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
@@ -39,6 +43,10 @@
 		A2000000000000000000000B /* MemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* MemoryStore.swift */; };
 		A2000000000000000000000C /* MemoryContextRetriever.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* MemoryContextRetriever.swift */; };
 		A2000000000000000000000D /* MemoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000006 /* MemoryTests.swift */; };
+		A2000000000000000000000E /* MemoryExtractionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* MemoryExtractionRecord.swift */; };
+		A2000000000000000000000F /* MemoryCandidateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* MemoryCandidateExtractor.swift */; };
+		A20000000000000000000010 /* MemoryCandidateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* MemoryCandidateController.swift */; };
+		A20000000000000000000011 /* MemoryCandidateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* MemoryCandidateTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,12 +72,17 @@
 		B10000000000000000000020 /* MemoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryStore.swift; sourceTree = "<group>"; };
 		B10000000000000000000021 /* MemoryContextRetriever.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryContextRetriever.swift; sourceTree = "<group>"; };
 		B10000000000000000000022 /* MemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryView.swift; sourceTree = "<group>"; };
+		B10000000000000000000023 /* MemoryExtractionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryExtractionRecord.swift; sourceTree = "<group>"; };
+		B10000000000000000000024 /* MemoryCandidateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCandidateExtractor.swift; sourceTree = "<group>"; };
+		B10000000000000000000025 /* MemoryCandidateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCandidateController.swift; sourceTree = "<group>"; };
+		B10000000000000000000026 /* MemoryCandidatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCandidatesView.swift; sourceTree = "<group>"; };
 		B20000000000000000000001 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000002 /* MorieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MorieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000000000000000000003 /* CaptureHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000004 /* TestDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestDiagnostics.swift; sourceTree = "<group>"; };
 		B20000000000000000000005 /* CaptureAudioStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAudioStreamTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000006 /* MemoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000007 /* MemoryCandidateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCandidateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,6 +134,10 @@
 				B10000000000000000000020 /* MemoryStore.swift */,
 				B10000000000000000000021 /* MemoryContextRetriever.swift */,
 				B10000000000000000000022 /* MemoryView.swift */,
+				B10000000000000000000023 /* MemoryExtractionRecord.swift */,
+				B10000000000000000000024 /* MemoryCandidateExtractor.swift */,
+				B10000000000000000000025 /* MemoryCandidateController.swift */,
+				B10000000000000000000026 /* MemoryCandidatesView.swift */,
 			);
 			path = Morie;
 			sourceTree = "<group>";
@@ -133,6 +150,7 @@
 				B20000000000000000000004 /* TestDiagnostics.swift */,
 				B20000000000000000000005 /* CaptureAudioStreamTests.swift */,
 				B20000000000000000000006 /* MemoryTests.swift */,
+				B20000000000000000000007 /* MemoryCandidateTests.swift */,
 			);
 			path = MorieTests;
 			sourceTree = "<group>";
@@ -249,6 +267,10 @@
 				A10000000000000000000012 /* MemoryStore.swift in Sources */,
 				A10000000000000000000013 /* MemoryContextRetriever.swift in Sources */,
 				A10000000000000000000014 /* MemoryView.swift in Sources */,
+				A10000000000000000000015 /* MemoryExtractionRecord.swift in Sources */,
+				A10000000000000000000016 /* MemoryCandidateExtractor.swift in Sources */,
+				A10000000000000000000017 /* MemoryCandidateController.swift in Sources */,
+				A10000000000000000000018 /* MemoryCandidatesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -269,6 +291,10 @@
 				A2000000000000000000000B /* MemoryStore.swift in Sources */,
 				A2000000000000000000000C /* MemoryContextRetriever.swift in Sources */,
 				A2000000000000000000000D /* MemoryTests.swift in Sources */,
+				A2000000000000000000000E /* MemoryExtractionRecord.swift in Sources */,
+				A2000000000000000000000F /* MemoryCandidateExtractor.swift in Sources */,
+				A20000000000000000000010 /* MemoryCandidateController.swift in Sources */,
+				A20000000000000000000011 /* MemoryCandidateTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

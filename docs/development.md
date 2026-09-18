@@ -67,6 +67,8 @@ Audio stream tests use synthetic 16 kHz mono PCM and Apple's real AAC writer/dec
 
 Memory tests use isolated SwiftData containers and native NaturalLanguage word tokenization to check explicit persistence, provenance, deduplication, lifecycle and bounded retrieval. Memory shares the container schema with Capture but writes through a separate `ModelContext`; there is no migration/legacy-store setup step.
 
+Candidate tests inject structured suggestions or delayed async results. They exercise committed final-text snapshots, review decisions, filtering/conflicts, changed/deleted sources and cancellation without invoking Apple Intelligence. Product compilation includes the real Foundation Models structured-generation path. Model quality, context limits and latency must be exercised separately on disposable data.
+
 ## CI compile gate
 
 `.github/workflows/macos-27-ci.yml` compiles product changes on GitHub's `xcode-27` hosted environment. `.github/workflows/macos-27-package.yml` creates the test artifact.
@@ -190,6 +192,20 @@ The owner deferred interactive device checks until the evening of 2026-09-18. Wh
 6. Delete a disposable source Capture, then a disposable Memory; independently saved Memory and source Capture data are retained respectively, with missing-source feedback where applicable.
 
 See the full [Memory device checklist](./validation.md#m-004-memory-foundation). Offscreen rendering verifies layout only and does not complete these interaction checks.
+
+## Memory Candidate smoke test
+
+When evening device validation resumes, use a disposable Capture containing an explicitly described vocabulary term or project:
+
+1. Open History → **Find Memory Candidates**. Review each proposed entry and its supporting quote/**Text Used for Extraction**; this uses saved final text, not necessarily AI-polished text yet.
+2. Edit and Save one suggestion, dismiss another, relaunch, and verify the decisions and source snapshot persist. Pending suggestions also appear in Memory.
+3. Try a name already present in active Memory; validation must keep the sheet open so you can choose that existing entry. Linking adds provenance without replacing its notes.
+4. Change the saved source through re-recognition where applicable. Old pending suggestions must not save; re-extraction should retain a new snapshot. Already delivered final output remains authoritative when re-recognition changes only recognized text.
+5. Cancel during analysis, leave the detail, or begin voice input. A late model result must not create candidates; voice input must remain responsive.
+6. Verify an empty result, unsupported/oversized input and model unavailability. The saved Capture remains intact and manual Memory remains available.
+7. Delete the disposable Capture; its extraction snapshots disappear while separately confirmed Memory remains.
+
+Do not run these against production History automatically. M-005 must save polished `finalText` before extraction and retain `recognizedText`; this requirement is recorded in its [task criteria](./tasks/M-005-personalization.md).
 
 ## Development rules
 

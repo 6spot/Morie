@@ -35,7 +35,7 @@ Phase 0 remains `IN PROGRESS` until it has been built and exercised on a support
 
 M-003's local Capture-first slice now includes SwiftData History, App Context basics, compressed source audio with retention, native playback/re-recognition, capture-only recording, and preservation after operational interruption. It remains `IN PROGRESS`: History/capture-only/interruption interactions need device validation, and ambient-noise classification and App Context remain open. On 2026-09-18, the owner deferred iCloud/CloudKit sync to the final integration stage because Apple Developer enrollment is not yet set up; it does not block current local development. M-002 also remains open for the remaining runtime/performance validation matrix.
 
-The owner deferred device validation until the evening of 2026-09-18 and requested continued development. M-004's first slice implements explicitly saved Vocabulary/Project memory, provenance, native management and relevant-context retrieval; all 47 tests pass. Automatic Memory Candidate extraction is next. Earlier device acceptance is still open; this does not authorize merging unvalidated work.
+The owner deferred device validation until the evening of 2026-09-18 and requested continued development. M-004 implements Vocabulary/Project memory, provenance, native management/retrieval and on-demand Apple AI candidate extraction with explicit review; all 65 tests pass. Candidate input snapshots prefer saved final text. M-005 must persist future polished output before extraction while retaining recognized text. Earlier device acceptance and real-model quality/latency remain open; the next development phase is personalization.
 
 ## Maintenance rules
 

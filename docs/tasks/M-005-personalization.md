@@ -34,6 +34,8 @@ Excluded:
 3. Rewriting preserves user intent and trends toward the user's own expression rather than generic AI prose.
 4. Incorrect/stale Memory can be excluded or superseded without persistent contamination.
 5. Personalization latency and failure behavior are documented.
+6. Persist polished output in Capture `finalText` before delivery/Memory extraction, while retaining Speech `recognizedText`. History and Memory provenance must retain the polished result actually used. This is the owner's explicit 2026-09-18 requirement; do not extract from raw recognition when a saved polished final text exists.
+7. A final-text change makes pending candidates based on the previous text stale. Polishing failure keeps the saved Capture intact and must not mislabel recognized text as AI-polished output.
 
 ## Progress
 

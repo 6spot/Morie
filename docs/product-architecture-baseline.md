@@ -168,6 +168,8 @@ Start with restrained high-value context rather than a knowledge graph:
 
 Memory must retain provenance and lifecycle information such as source captures, confidence, confirmation state, timestamps, and active/superseded/archived status.
 
+Owner decision, 2026-09-18: use the saved final text for Memory extraction. Once AI polishing ships, save the polished output in `finalText`, retain `recognizedText`, and extract only after that save. Each extraction retains its exact input snapshot; pending suggestions from changed text require a new extraction. Current extraction may use saved recognition until polishing exists, without claiming it has been polished.
+
 ### Phase 3 — Personalization
 
 Use relevant historical context to improve current input:

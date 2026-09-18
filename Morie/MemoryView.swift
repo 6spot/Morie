@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MemoryView: View {
     @ObservedObject var store: MemoryStore
+    @Query private var captures: [CaptureRecord]
     @State private var search = ""
     @State private var status: MemoryStatus = .active
     @State private var editor: MemoryEditorMode?
@@ -16,25 +17,50 @@ struct MemoryView: View {
         }
     }
 
+    private var visibleCandidates: [MemoryCandidate] {
+        let inputs = Dictionary(uniqueKeysWithValues: captures.filter {
+            $0.lifecycle != .capturing && $0.lifecycle != .cancelled
+        }.map { ($0.id, MemoryExtractionInput(capture: $0)) })
+        return store.extractions.filter { extraction in
+            guard let input = inputs[extraction.sourceCaptureID] else { return false }
+            return input == extraction.input
+        }.flatMap(\.candidates).filter {
+            $0.status == .pending && (search.isEmpty || $0.suggestion.draft.name.localizedStandardContains(search))
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 if let errorMessage { Text(errorMessage).foregroundStyle(.secondary) }
-                ForEach(visibleEntries) { entry in
-                    NavigationLink {
-                        MemoryDetailView(store: store, memoryID: entry.id)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Label(entry.name, systemImage: entry.kind?.systemImage ?? "bookmark")
-                            Text(entry.kind?.title ?? "Memory").font(.caption).foregroundStyle(.secondary)
-                            if !entry.notes.isEmpty { Text(entry.notes).lineLimit(2).foregroundStyle(.secondary) }
+                if !visibleCandidates.isEmpty {
+                    Section("Candidates to Review") {
+                        ForEach(visibleCandidates) { candidate in
+                            Button { editor = .reviewCandidate(candidate.id) } label: {
+                                Label(candidate.suggestion.draft.name, systemImage: "sparkles")
+                            }
                         }
-                        .padding(.vertical, 4)
+                    }
+                }
+                if !visibleEntries.isEmpty {
+                    Section("\(status.title) Memories") {
+                        ForEach(visibleEntries) { entry in
+                            NavigationLink {
+                                MemoryDetailView(store: store, memoryID: entry.id)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Label(entry.name, systemImage: entry.kind?.systemImage ?? "bookmark")
+                                    Text(entry.kind?.title ?? "Memory").font(.caption).foregroundStyle(.secondary)
+                                    if !entry.notes.isEmpty { Text(entry.notes).lineLimit(2).foregroundStyle(.secondary) }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
                     }
                 }
             }
             .overlay {
-                if visibleEntries.isEmpty && errorMessage == nil {
+                if visibleEntries.isEmpty && visibleCandidates.isEmpty && errorMessage == nil {
                     ContentUnavailableView(
                         search.isEmpty ? "No \(status.title) Memories" : "No Matching Memories",
                         systemImage: "text.book.closed",
@@ -83,6 +109,11 @@ struct MemoryDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                     Section("Sources") {
+                        if let candidateID = memory.sourceCandidateID,
+                           let extraction = store.extractions.first(where: { $0.candidates.contains(where: { $0.id == candidateID }) }) {
+                            Text("Saved from an AI suggestion you reviewed.").foregroundStyle(.secondary)
+                            MemoryExtractionSource(extraction: extraction)
+                        }
                         if memory.sourceCaptureIDs.isEmpty {
                             Text("Added manually").foregroundStyle(.secondary)
                         }
@@ -147,12 +178,14 @@ enum MemoryEditorMode: Identifiable {
     case create(sourceCaptureID: UUID?)
     case edit(UUID)
     case replace(UUID)
+    case reviewCandidate(UUID)
 
     var id: String {
         switch self {
         case .create(let source): "create-\(source?.uuidString ?? "manual")"
         case .edit(let id): "edit-\(id)"
         case .replace(let id): "replace-\(id)"
+        case .reviewCandidate(let id): "review-\(id)"
         }
     }
 
@@ -161,6 +194,7 @@ enum MemoryEditorMode: Identifiable {
         case .create: "Save Memory"
         case .edit: "Edit Memory"
         case .replace: "Replace Memory"
+        case .reviewCandidate: "Review Memory Candidate"
         }
     }
 }
@@ -173,6 +207,22 @@ struct MemoryEditorSheet: View {
     @State private var aliases = ""
     @State private var existingID: UUID?
     @State private var errorMessage: String?
+    @State private var candidateExtraction: MemoryExtractionRecord?
+    @State private var candidate: MemoryCandidate?
+    @State private var candidateIsCurrent = false
+
+    private var canChooseExisting: Bool {
+        switch mode {
+        case .create(let sourceID): sourceID != nil
+        case .reviewCandidate: true
+        default: false
+        }
+    }
+
+    private var canSave: Bool {
+        if case .reviewCandidate = mode { return candidateIsCurrent && candidate?.status == .pending }
+        return true
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -180,6 +230,16 @@ struct MemoryEditorSheet: View {
             Form {
                 if case .create(let sourceID) = mode, let sourceID {
                     Section("From Capture") { CaptureMemorySource(captureID: sourceID).lineLimit(5) }
+                }
+                if let candidateExtraction, let candidate {
+                    Section("Source Evidence") {
+                        Text(candidate.suggestion.evidence).textSelection(.enabled)
+                        MemoryExtractionSource(extraction: candidateExtraction)
+                        Text("Review the name, aliases and notes before saving. AI suggestions can be inaccurate.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if canChooseExisting {
                     Picker("Save to", selection: $existingID) {
                         Text("New Memory").tag(nil as UUID?)
                         ForEach(store.entries.filter { $0.status == .active }) {
@@ -217,8 +277,14 @@ struct MemoryEditorSheet: View {
             .formStyle(.grouped)
             HStack {
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                if case .reviewCandidate(let id) = mode, candidate?.status == .pending {
+                    Button("Dismiss Suggestion") {
+                        do { try store.dismissCandidate(id); dismiss() }
+                        catch { errorMessage = error.localizedDescription }
+                    }
+                }
                 Spacer()
-                Button("Save") { save() }.keyboardShortcut(.defaultAction)
+                Button("Save") { save() }.keyboardShortcut(.defaultAction).disabled(!canSave)
             }
         }
         .padding(20)
@@ -232,6 +298,14 @@ struct MemoryEditorSheet: View {
                     guard let saved = try store.memory(id).draft else { throw MemoryStore.StoreError.memoryUnavailable }
                     draft = saved
                     aliases = saved.aliases.joined(separator: "\n")
+                case .reviewCandidate(let id):
+                    let result = try store.candidate(id)
+                    candidateExtraction = result.extraction
+                    candidate = result.candidate
+                    draft = result.candidate.suggestion.draft
+                    aliases = draft.aliases.joined(separator: "\n")
+                    candidateIsCurrent = store.isCurrent(result.extraction)
+                    if !candidateIsCurrent { throw MemoryStore.StoreError.sourceChanged }
                 }
             } catch { errorMessage = error.localizedDescription }
         }
@@ -246,6 +320,7 @@ struct MemoryEditorSheet: View {
                 else { try store.create(draft, sourceCaptureID: sourceID) }
             case .edit(let id): try store.update(id, draft: draft)
             case .replace(let id): try store.replace(id, with: draft)
+            case .reviewCandidate(let id): try store.acceptCandidate(id, draft: draft, existingMemoryID: existingID)
             }
             dismiss()
         } catch { errorMessage = error.localizedDescription }
