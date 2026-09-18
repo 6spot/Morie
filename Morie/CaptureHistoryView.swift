@@ -5,7 +5,8 @@ import SwiftUI
 
 struct CaptureHistoryView: View {
     @ObservedObject var history: CaptureHistoryController
-    let canRecognize: Bool
+    let canStartCapture: Bool
+    let onRecord: () -> Void
     let onRecognize: (UUID) -> Void
 
     @Query(sort: \CaptureRecord.createdAt, order: .reverse)
@@ -17,7 +18,7 @@ struct CaptureHistoryView: View {
             List(captures) { capture in
                 NavigationLink(value: capture.id) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(capture.historyText.isEmpty ? "No speech recognized" : capture.historyText)
+                        Text(capture.historySummary)
                             .lineLimit(3)
 
                         HStack(spacing: 8) {
@@ -49,7 +50,7 @@ struct CaptureHistoryView: View {
                         capture: capture,
                         captureID: id,
                         history: history,
-                        canRecognize: canRecognize,
+                        canRecognize: canStartCapture,
                         onRecognize: onRecognize
                     )
                 } else {
@@ -58,6 +59,13 @@ struct CaptureHistoryView: View {
             }
         }
         .frame(minWidth: 620, minHeight: 420)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Record Capture", systemImage: "mic") { onRecord() }
+                    .disabled(!canStartCapture)
+                    .help("Record an idea and save it to History.")
+            }
+        }
         .onChange(of: captures.map(\.id)) { _, ids in
             path.removeAll { !ids.contains($0) }
         }
@@ -83,6 +91,7 @@ private struct CaptureDetailView: View {
         Form {
             Section("Capture") {
                 LabeledContent("Created", value: capture.createdAt.formatted(date: .abbreviated, time: .standard))
+                LabeledContent("Destination", value: capture.deliveryModeRawValue == CaptureDeliveryMode.captureOnly.rawValue ? "History" : "Current App")
                 if let app = capture.sourceApplicationName {
                     LabeledContent("Source App", value: app)
                 }
@@ -94,7 +103,9 @@ private struct CaptureDetailView: View {
 
             Section("Recognition") {
                 if recognizedText.isEmpty {
-                    Text("No speech was recognized. You can listen to the recording and try again.")
+                    Text(capture.lifecycle == .capturing
+                         ? "Recording… Finish with the capture controls or your shortcut."
+                         : "No speech was recognized. You can listen to the recording and try again.")
                         .foregroundStyle(.secondary)
                 } else {
                     Text(recognizedText).textSelection(.enabled)
@@ -229,6 +240,11 @@ private struct CaptureAudioPlayer: NSViewRepresentable {
 
 private extension CaptureRecord {
     var historyText: String { finalText.isEmpty ? recognizedText : finalText }
+
+    var historySummary: String {
+        if !historyText.isEmpty { return historyText }
+        return lifecycle == .capturing ? "Recording…" : "No speech recognized"
+    }
 
     var historyStatus: String {
         switch lifecycle {

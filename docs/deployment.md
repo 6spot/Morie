@@ -102,6 +102,8 @@ Do not introduce an updater framework before the distribution strategy requires 
 
 ## CloudKit deployment — Phase 1
 
+The owner confirmed on 2026-09-18 that Morie's CloudKit container has not been created. The repository has no configured iCloud container or Development Team. Establish those in Apple Developer/Xcode before adding the CloudKit entitlements and enabling sync.
+
 Phase 1 will add the actual iCloud/CloudKit environment. At that point this guide must include:
 
 - iCloud container identifier;

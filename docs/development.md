@@ -162,6 +162,16 @@ From the normal Xcode-signed app, open **Morie → History** and select a Captur
 
 Use generated fixture audio and temporary stores for automated API checks. Never transcribe or delete production History as part of an automated smoke test.
 
+## Capture-only voice smoke test
+
+1. From **Open Morie → History**, choose **Record Capture** and speak an idea. Complete it with the HUD; verify “已保存”, **Destination: History**, saved text and playable audio.
+2. Repeat with shortcut finish and Escape cancellation. Cancellation removes the unfinished Capture and audio.
+3. Start in History, switch to another app and finish there. The saved idea must not be pasted, focus must not be restored elsewhere, and the clipboard must remain unchanged.
+4. Alternate this entry with normal shortcut input into a disposable document. Each new shortcut capture must still deliver to its original app and report “已输入”.
+5. Start while a History recording is playing or being re-recognized. The existing live-capture preemption must apply, and no second microphone session may start.
+
+Mode persistence, terminal capture-only storage, cancellation and retry are covered by isolated logic tests. These checks do not replace the interactive clipboard/focus/microphone checks above.
+
 ## Development rules
 
 ### Work from tasks

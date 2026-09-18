@@ -45,6 +45,24 @@ final class CaptureHistoryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: fixture.audioURL), HistoryFixture.audioData)
     }
 
+    func testRetryRecoversCaptureOnlyWithoutChangingItsDestination() async throws {
+        let fixture = try HistoryFixture(deliveryMode: .captureOnly)
+        defer { fixture.removeFiles() }
+        let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+            "recovered idea"
+        }
+
+        history.recognizeAgain(fixture.id)
+        await history.waitForRecognition()
+
+        let reopened = try CaptureStore(storageURL: fixture.storeURL)
+        let capture = try reopened.capture(fixture.id)
+        XCTAssertEqual(capture.deliveryModeRawValue, CaptureDeliveryMode.captureOnly.rawValue)
+        XCTAssertEqual(capture.lifecycle, .recognized)
+        XCTAssertEqual(capture.finalText, "recovered idea")
+        XCTAssertEqual(try reopened.sourceAudioURL(for: fixture.id), fixture.audioURL)
+    }
+
     func testEmptyRetryKeepsSavedTextAndAudio() async throws {
         let fixture = try HistoryFixture(deliveredText: "keep this output")
         defer { fixture.removeFiles() }
@@ -160,14 +178,15 @@ private struct HistoryFixture {
     let id = UUID()
     let audioURL: URL
 
-    init(deliveredText: String? = nil) throws {
+    init(deliveredText: String? = nil, deliveryMode: CaptureDeliveryMode = .currentApp) throws {
         directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieHistoryTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         storeURL = directory.appending(path: "captures.store")
         store = try CaptureStore(storageURL: storeURL)
         audioURL = try store.beginVoiceCapture(
-            id: id, applicationName: "Notes", bundleIdentifier: "com.apple.Notes", windowNumber: nil
+            id: id, deliveryMode: deliveryMode,
+            applicationName: "Notes", bundleIdentifier: "com.apple.Notes", windowNumber: nil
         )
         try Self.audioData.write(to: audioURL)
         try store.attachSourceAudio(CapturedSourceAudio(url: audioURL, duration: 2), for: id)

@@ -10,6 +10,7 @@ final class CaptureStore {
         case audioExpired
         case audioUnavailable
         case emptyRecognition
+        case invalidDeliveryMode
 
         var errorDescription: String? {
             switch self {
@@ -18,6 +19,7 @@ final class CaptureStore {
             case .audioExpired: "The source recording has expired. Saved text is still available."
             case .audioUnavailable: "The source recording is no longer available."
             case .emptyRecognition: "No speech was recognized. The saved text and recording have been kept."
+            case .invalidDeliveryMode: "The capture has an invalid delivery mode."
             }
         }
     }
@@ -80,6 +82,7 @@ final class CaptureStore {
 
     func beginVoiceCapture(
         id: UUID,
+        deliveryMode: CaptureDeliveryMode,
         applicationName: String?,
         bundleIdentifier: String?,
         windowNumber: CGWindowID?
@@ -87,6 +90,7 @@ final class CaptureStore {
         try pruneExpiredAudio()
         let record = CaptureRecord(
             id: id,
+            deliveryMode: deliveryMode,
             sourceApplicationName: applicationName,
             sourceBundleIdentifier: bundleIdentifier,
             originalWindowNumber: windowNumber
@@ -130,15 +134,23 @@ final class CaptureStore {
         lastProgressiveSave[id] = now
     }
 
-    func completeRecognition(_ text: String, for id: UUID) throws {
-        guard let record = records[id] else { return }
+    @discardableResult
+    func completeRecognition(_ text: String, for id: UUID) throws -> CaptureDeliveryMode {
+        guard let record = records[id] else { throw StoreError.captureNotFound }
+        guard let deliveryMode = CaptureDeliveryMode(rawValue: record.deliveryModeRawValue) else {
+            throw StoreError.invalidDeliveryMode
+        }
         record.recognizedText = text
         record.finalText = text
         record.lifecycle = .recognized
         record.updatedAt = Date()
         try container.mainContext.save()
         lastProgressiveSave[id] = nil
+        if deliveryMode == .captureOnly {
+            records[id] = nil
+        }
         Diagnostics.record("CaptureStore", "Capture \(label(id)) recognition saved; characters=\(text.count)")
+        return deliveryMode
     }
 
     func markDelivered(_ id: UUID) throws {

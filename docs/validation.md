@@ -66,6 +66,19 @@ Automated persistence/History tests cover success, empty results, failure, cance
 
 2026-09-18: the final isolated app build and all **20 logic tests** passed on macOS 27 / Xcode 27, with no failures or skipped tests. A separate native `CaptureFileTranscriber` check recognized generated Chinese AAC audio, reported empty recognition for a silent M4A, and rejected a missing file. Offscreen rendering checked the Capture detail layout only. Evidence paths are recorded in [`M-003-capture.md`](./tasks/M-003-capture.md); the interactive checks above remain open.
 
+## M-003 capture-only voice entry
+
+- [ ] Choose **History → Record Capture**, speak and finish with the HUD; text/audio are saved with **Destination: History**, and feedback says “已保存”.
+- [ ] Finish another capture-only recording with the configured shortcut; the entry's saved destination remains authoritative.
+- [ ] Switch to another app before finishing; no paste, clipboard mutation or target-app activation occurs.
+- [ ] Cancel with Escape/HUD; the unfinished row and audio are removed, and a new capture starts normally.
+- [ ] Alternate capture-only and global-shortcut captures; current-app input still restores/delivers to the correct target and reports “已输入”.
+- [ ] Retry an empty/failed capture-only recording; recovery retains its History destination and does not trigger delivery.
+- [ ] Start capture-only during History playback/retry; preemption works and capture startup remains responsive.
+- [ ] The native toolbar action is accessible by keyboard/VoiceOver and cannot start duplicate recordings during startup/finalization.
+
+2026-09-18: isolated Debug compilation and all **24 logic tests** passed (0 failed/skipped). Offscreen native rendering confirms the History toolbar action and the completed capture-only destination/status. These checks do not establish microphone, clipboard/focus or live interaction acceptance; the checklist remains open.
+
 ## Toggle-capture lifecycle
 
 Verify repeated sequences:

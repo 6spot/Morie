@@ -52,11 +52,13 @@ final class CaptureRecord {
 
     init(
         id: UUID,
+        deliveryMode: CaptureDeliveryMode,
         sourceApplicationName: String?,
         sourceBundleIdentifier: String?,
         originalWindowNumber: CGWindowID?
     ) {
         self.id = id
+        self.deliveryModeRawValue = deliveryMode.rawValue
         self.sourceApplicationName = sourceApplicationName
         self.sourceBundleIdentifier = sourceBundleIdentifier
         self.originalWindowNumber = originalWindowNumber.map(Int64.init)

@@ -5,12 +5,95 @@ import XCTest
 
 @MainActor
 final class CaptureStoreTests: XCTestCase {
+    func testCaptureOnlyModeIsSavedBeforeRecognitionAndCompletesWithoutDelivery() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "MorieCaptureOnlyTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "captures.store")
+        let store = try CaptureStore(storageURL: storeURL)
+        let id = UUID()
+        let audioURL = try store.beginVoiceCapture(
+            id: id, deliveryMode: .captureOnly,
+            applicationName: "Morie", bundleIdentifier: "me.morie.mac", windowNumber: nil
+        )
+
+        let persisted = try XCTUnwrap(ModelContext(store.container).fetch(FetchDescriptor<CaptureRecord>()).first)
+        XCTAssertEqual(persisted.deliveryModeRawValue, CaptureDeliveryMode.captureOnly.rawValue)
+        XCTAssertEqual(persisted.lifecycle, .capturing)
+        XCTAssertNil(persisted.originalWindowNumber)
+
+        let audio = Data("saved idea audio".utf8)
+        try audio.write(to: audioURL)
+        try store.attachSourceAudio(CapturedSourceAudio(url: audioURL, duration: 2, hasMeaningfulAudio: true), for: id)
+        let destination = try store.completeRecognition("remember this idea", for: id)
+
+        XCTAssertEqual(destination, .captureOnly)
+        XCTAssertEqual(try store.sourceAudioURL(for: id), audioURL,
+                       "Capture-only completion must release active-record ownership without a delivery step")
+        try store.cancel(id)
+        XCTAssertEqual(try store.capture(id).lifecycle, .recognized,
+                       "Late cancellation must not discard a completed Capture")
+
+        let reopened = try CaptureStore(storageURL: storeURL)
+        let capture = try reopened.capture(id)
+        XCTAssertEqual(capture.deliveryModeRawValue, CaptureDeliveryMode.captureOnly.rawValue)
+        XCTAssertEqual(capture.lifecycle, .recognized)
+        XCTAssertEqual(capture.recognizedText, "remember this idea")
+        XCTAssertEqual(capture.finalText, "remember this idea")
+        XCTAssertEqual(capture.sourceBundleIdentifier, "me.morie.mac")
+        XCTAssertNil(capture.deliveryErrorDescription)
+        XCTAssertEqual(try Data(contentsOf: reopened.sourceAudioURL(for: id)), audio)
+    }
+
+    func testCurrentAppRecognitionKeepsOwnershipUntilDeliveryFinishes() throws {
+        let store = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
+        let id = UUID()
+        let audioURL = try store.beginVoiceCapture(
+            id: id, deliveryMode: .currentApp,
+            applicationName: "Notes", bundleIdentifier: "com.apple.Notes", windowNumber: 42
+        )
+        try Data("input audio".utf8).write(to: audioURL)
+        try store.attachSourceAudio(CapturedSourceAudio(url: audioURL, duration: 2), for: id)
+
+        let destination = try store.completeRecognition("insert this text", for: id)
+
+        XCTAssertEqual(destination, .currentApp)
+        XCTAssertThrowsError(try store.sourceAudioURL(for: id)) { error in
+            guard case CaptureStore.StoreError.captureInProgress = error else {
+                return XCTFail("Expected captureInProgress, got \(error)")
+            }
+        }
+        try store.markDelivered(id)
+        XCTAssertEqual(try store.capture(id).lifecycle, .delivered)
+        XCTAssertEqual(try store.sourceAudioURL(for: id), audioURL)
+    }
+
+    func testCaptureOnlyCancellationRemovesUnfinishedTextAndAudio() throws {
+        let store = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
+        let id = UUID()
+        let audioURL = try store.beginVoiceCapture(
+            id: id, deliveryMode: .captureOnly,
+            applicationName: "Morie", bundleIdentifier: "me.morie.mac", windowNumber: nil
+        )
+        try Data("discarded idea audio".utf8).write(to: audioURL)
+        try store.updateRecognizedText("unfinished idea", for: id)
+
+        try store.cancel(id)
+
+        XCTAssertNil(try fetch(id, from: store))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: audioURL.path))
+    }
+
     func testDeliveredLifecyclePreservesRecognitionAndContext() throws {
         let store = try CaptureStore(inMemory: true)
         let id = UUID()
 
         _ = try store.beginVoiceCapture(
             id: id,
+            deliveryMode: .currentApp,
             applicationName: "Notes",
             bundleIdentifier: "com.apple.Notes",
             windowNumber: CGWindowID(42)
@@ -33,7 +116,7 @@ final class CaptureStoreTests: XCTestCase {
         let store = try CaptureStore(inMemory: true)
         let id = UUID()
 
-        _ = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        _ = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
         try store.completeRecognition("keep this", for: id)
         try store.markDeliveryFailed(id, error: "Target window closed")
 
@@ -47,7 +130,7 @@ final class CaptureStoreTests: XCTestCase {
         let store = try CaptureStore(inMemory: true)
         let id = UUID()
 
-        _ = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        _ = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
         try store.updateRecognizedText("recoverable partial", for: id)
         try store.markFailed(id, error: "Speech stopped")
 
@@ -61,7 +144,7 @@ final class CaptureStoreTests: XCTestCase {
         let store = try CaptureStore(inMemory: true)
         let id = UUID()
 
-        _ = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        _ = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
         try store.cancel(id)
 
         XCTAssertNil(try fetch(id, from: store))
@@ -78,7 +161,7 @@ final class CaptureStoreTests: XCTestCase {
 
         do {
             let store = try CaptureStore(storageURL: storeURL)
-            _ = try store.beginVoiceCapture(id: id, applicationName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", windowNumber: nil)
+            _ = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", windowNumber: nil)
             try store.completeRecognition("persisted", for: id)
             try store.markDelivered(id)
         }
@@ -101,7 +184,7 @@ final class CaptureStoreTests: XCTestCase {
 
         do {
             let store = try CaptureStore(storageURL: storeURL)
-            _ = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+            _ = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
         }
 
         let reopenedStore = try CaptureStore(storageURL: storeURL)
@@ -116,7 +199,7 @@ final class CaptureStoreTests: XCTestCase {
 
         let store = try CaptureStore(inMemory: true, audioDirectory: directory)
         let id = UUID()
-        let audioURL = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        let audioURL = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
         try Data("audio".utf8).write(to: audioURL)
         try store.attachSourceAudio(CapturedSourceAudio(url: audioURL, duration: 1), for: id)
         try store.markFailed(id, error: "No text recognized")
@@ -141,7 +224,7 @@ final class CaptureStoreTests: XCTestCase {
         let id = UUID()
         do {
             let store = try CaptureStore(storageURL: storeURL, audioDirectory: audioDirectory)
-            let audioURL = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+            let audioURL = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
             try Data("audio".utf8).write(to: audioURL)
             try store.attachSourceAudio(
                 CapturedSourceAudio(url: audioURL, duration: 1, hasMeaningfulAudio: true),
@@ -159,7 +242,7 @@ final class CaptureStoreTests: XCTestCase {
             let store = try CaptureStore(inMemory: true)
             defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
             let id = UUID()
-            let url = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+            let url = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
             try Data("audio".utf8).write(to: url)
             let source = CapturedSourceAudio(url: url, duration: duration, hasMeaningfulAudio: meaningful)
             try store.attachSourceAudio(source, for: id)
@@ -177,7 +260,7 @@ final class CaptureStoreTests: XCTestCase {
             let store = try CaptureStore(inMemory: true)
             defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
             let id = UUID()
-            let url = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+            let url = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
             try Data("audio".utf8).write(to: url)
             let source = CapturedSourceAudio(url: url, duration: duration, hasMeaningfulAudio: meaningful)
             try store.attachSourceAudio(source, for: id)
@@ -198,7 +281,7 @@ final class CaptureStoreTests: XCTestCase {
         let storeURL = directory.appending(path: "captures.store")
         let id = UUID()
         let store = try CaptureStore(storageURL: storeURL)
-        let audioURL = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        let audioURL = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
         try Data("audio".utf8).write(to: audioURL)
         let source = CapturedSourceAudio(url: audioURL, duration: 2)
         try store.attachSourceAudio(source, for: id)
@@ -226,7 +309,7 @@ final class CaptureStoreTests: XCTestCase {
         let storeURL = directory.appending(path: "captures.store")
         let id = UUID()
         let store = try CaptureStore(storageURL: storeURL)
-        let url = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        let url = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
         try Data("interrupted audio".utf8).write(to: url)
 
         let reopened = try CaptureStore(storageURL: storeURL)
@@ -242,7 +325,7 @@ final class CaptureStoreTests: XCTestCase {
         var captured: [(UUID, URL)] = []
         for _ in 0..<2 {
             let id = UUID()
-            let url = try store.beginVoiceCapture(id: id, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+            let url = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
             try Data("audio".utf8).write(to: url)
             try store.attachSourceAudio(CapturedSourceAudio(url: url, duration: 2), for: id)
             try store.markFailed(id, error: "No text recognized")

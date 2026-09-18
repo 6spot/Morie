@@ -267,3 +267,13 @@ Inspected `Type4Me/UI/Settings/HistoryTab.swift`, the finalization/retry portion
 - **VERIFY:** quiet speech versus ambient noise and native file-recognition/playback behavior on macOS 27. No new audio threshold is accepted as a proven speech detector.
 
 Apple's current [`SpeechDetector`](https://developer.apple.com/documentation/speech/speechdetector) documentation says it gates transcription and may discard real speech. Morie therefore keeps the live `SpeechTranscriber` path and performs explicit History retry through `SpeechAnalyzer.analyzeSequence(from:)`. Uncertain empty recordings remain recoverable. No Type4Me source was copied.
+
+## M-003 capture-only entry audit — 2026-09-18
+
+The approved Morie baseline requires `captureOnly` as an intentional in-app entry. Inspected the session-start target reset and post-recognition delivery decision in `Type4Me/Session/RecognitionSession.swift`, together with the cancellation tests and #311 history already cited above.
+
+- **ADAPT:** establish a fresh destination for every capture, retain session identity through asynchronous finalization, and keep successful completion distinct from cancellation.
+- **DROP:** Type4Me's manual/automation target routing and configurable clipboard output after cancellation. Morie's saved `captureOnly` mode bypasses delivery entirely and uses the existing explicit-discard cancellation behavior.
+- **VERIFY:** switching apps before capture-only finish, alternating with normal shortcut input, and live microphone/History preemption on macOS 27.
+
+The implementation adds no provider, legacy format, old API or compatibility route, and copies no Type4Me source.

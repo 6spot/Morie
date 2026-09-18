@@ -273,6 +273,8 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 - source-audio filenames are saved before recording, and interrupted records with audio or checkpointed text become recoverable failures when the store opens;
 - source application name, bundle identifier and original window identity are the current minimal App Context.
 
+Every new voice Capture has an explicit, durably saved delivery mode. The global shortcut creates `currentApp`; History's **Record Capture** action creates `captureOnly`. Both use the same capture UUID, microphone session, Speech pipeline, cancellation and History preemption. An in-app capture records Morie as the source and has no external target/window. Recognition completion returns the saved mode: capture-only completion ends as `recognized` and releases active-record ownership immediately; current-app completion retains ownership through delivery. Capture-only success never enters `TextInjector` or the clipboard/focus path and reports “已保存” in the shared HUD.
+
 The local `ModelConfiguration` explicitly disables CloudKit until a real container and entitlements are configured. This is an implementation stage, not a Device Only product mode.
 
 M-003's approved persistence direction is audio-first: the durable raw Capture is compressed source audio, recognized text is the Speech result, and final text is the later post-processing result. Source audio defaults to 7-day retention, Settings exposes a 1–365 day policy, and expiry removes audio without deleting text/history metadata. Encoding streams to disk rather than retaining a complete PCM recording in memory.

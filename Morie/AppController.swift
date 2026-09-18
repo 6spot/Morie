@@ -106,8 +106,8 @@ final class AppController: ObservableObject {
         }
     }
 
-    var canRecognizeHistory: Bool {
-        guard activeCaptureID == nil else { return false }
+    var canStartCapture: Bool {
+        guard activeCaptureID == nil, captureStore != nil else { return false }
         switch state {
         case .ready, .failed: return true
         default: return false
@@ -115,8 +115,12 @@ final class AppController: ObservableObject {
     }
 
     func recognizeHistoryCapture(_ id: UUID) {
-        guard canRecognizeHistory else { return }
+        guard canStartCapture else { return }
         history?.recognizeAgain(id)
+    }
+
+    func startCaptureOnly() {
+        startNewCapture(deliveryMode: .captureOnly)
     }
 
     func bootstrap() async {
@@ -246,26 +250,36 @@ final class AppController: ObservableObject {
 
         switch state {
         case .ready, .failed:
-            startNewCapture()
+            startNewCapture(deliveryMode: .currentApp)
         default:
             Diagnostics.record("Session", "Toggle ignored while state=\(String(describing: state))", level: .warning)
         }
     }
 
-    private func startNewCapture() {
-        guard activeCaptureID == nil else { return }
+    private func startNewCapture(deliveryMode: CaptureDeliveryMode) {
+        guard canStartCapture, let captureStore else { return }
 
         lastPresentedFailure = nil
 
         let sessionID = UUID()
-        targetApplication = NSWorkspace.shared.frontmostApplication
-        targetWindowNumber = TextInjector.frontmostWindowNumber(for: targetApplication)
+        let sourceApplication: NSRunningApplication?
+        switch deliveryMode {
+        case .currentApp:
+            sourceApplication = NSWorkspace.shared.frontmostApplication
+            targetApplication = sourceApplication
+            targetWindowNumber = TextInjector.frontmostWindowNumber(for: targetApplication)
+        case .captureOnly:
+            sourceApplication = .current
+            targetApplication = nil
+            targetWindowNumber = nil
+        }
 
         do {
-            activeSourceAudioURL = try captureStore?.beginVoiceCapture(
+            activeSourceAudioURL = try captureStore.beginVoiceCapture(
                 id: sessionID,
-                applicationName: targetApplication?.localizedName,
-                bundleIdentifier: targetApplication?.bundleIdentifier,
+                deliveryMode: deliveryMode,
+                applicationName: sourceApplication?.localizedName,
+                bundleIdentifier: sourceApplication?.bundleIdentifier,
                 windowNumber: targetWindowNumber
             )
         } catch {
@@ -290,7 +304,7 @@ final class AppController: ObservableObject {
         let targetBundle = targetApplication?.bundleIdentifier ?? "unknown"
         Diagnostics.record(
             "Session",
-            "Capture \(label(sessionID)) started; target=\(targetName) (\(targetBundle)); window=\(targetWindowNumber.map(String.init) ?? "unknown"); locale=\(speechLocale.identifier)"
+            "Capture \(label(sessionID)) started; mode=\(deliveryMode.rawValue); target=\(targetName) (\(targetBundle)); window=\(targetWindowNumber.map(String.init) ?? "unknown"); locale=\(speechLocale.identifier)"
         )
 
         captureStartTask = Task { @MainActor [weak self] in
@@ -432,10 +446,13 @@ final class AppController: ObservableObject {
 
             transcript = finalText
             Diagnostics.record("Speech", "Final transcript ready; characters=\(finalText.count)")
-            try captureStore?.attachSourceAudio(result.sourceAudio, for: sessionID)
+            guard let captureStore else {
+                throw ControllerError.persistenceUnavailable("Capture store was not initialized.")
+            }
+            try captureStore.attachSourceAudio(result.sourceAudio, for: sessionID)
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                let disposition = try captureStore?.finishEmptyRecognition(for: sessionID, sourceAudio: result.sourceAudio)
+                let disposition = try captureStore.finishEmptyRecognition(for: sessionID, sourceAudio: result.sourceAudio)
                 hotkey?.setCancellationEnabled(false)
                 resetSessionIdentity()
                 state = .ready
@@ -447,7 +464,11 @@ final class AppController: ObservableObject {
                 return
             }
 
-            try captureStore?.completeRecognition(finalText, for: sessionID)
+            let deliveryMode = try captureStore.completeRecognition(finalText, for: sessionID)
+            if deliveryMode == .captureOnly {
+                completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
+                return
+            }
 
             state = .delivering
             hud.showProcessing()
@@ -463,8 +484,8 @@ final class AppController: ObservableObject {
             )
             try Task.checkCancellation()
             Diagnostics.record("Delivery", "Injection completed for \(label(sessionID))")
-            try captureStore?.markDelivered(sessionID)
-            completeSuccessfulSession(sessionID)
+            try captureStore.markDelivered(sessionID)
+            completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
         } catch is CancellationError {
             Diagnostics.record("Session", "Finish cancelled for \(label(sessionID))", level: .warning)
             await speech.cancel(sessionID: sessionID)
@@ -562,14 +583,14 @@ final class AppController: ObservableObject {
         }
     }
 
-    private func completeSuccessfulSession(_ sessionID: UUID) {
+    private func completeSuccessfulSession(_ sessionID: UUID, deliveryMode: CaptureDeliveryMode) {
         guard activeCaptureID == sessionID else { return }
         Diagnostics.record("Session", "Capture \(label(sessionID)) completed successfully")
         hotkey?.setCancellationEnabled(false)
         resetSessionIdentity()
         lastPresentedFailure = nil
         state = .ready
-        hud.showSuccess()
+        hud.showSuccess(deliveryMode: deliveryMode)
     }
 
     private func completeCancelledSession(_ sessionID: UUID) {

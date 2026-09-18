@@ -44,7 +44,8 @@ struct MorieControlCenter: View {
                 if let history = controller.history {
                     CaptureHistoryView(
                         history: history,
-                        canRecognize: controller.canRecognizeHistory,
+                        canStartCapture: controller.canStartCapture,
+                        onRecord: controller.startCaptureOnly,
                         onRecognize: controller.recognizeHistoryCapture
                     )
                 }

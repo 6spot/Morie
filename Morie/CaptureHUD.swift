@@ -52,11 +52,11 @@ final class CaptureHUDController {
         Diagnostics.record("HUD", "Compact capture HUD entered processing state")
     }
 
-    func showSuccess() {
+    func showSuccess(deliveryMode: CaptureDeliveryMode) {
         hideTask?.cancel()
-        model.showFeedback(.success)
+        model.showFeedback(deliveryMode == .captureOnly ? .saved : .success)
         showPanel()
-        Diagnostics.record("HUD", "Compact capture HUD showing animated input success")
+        Diagnostics.record("HUD", "Compact capture HUD showing success; mode=\(deliveryMode.rawValue)")
 
         hideTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(850))
@@ -208,6 +208,7 @@ private final class CaptureHUDModel: ObservableObject {
         case recording
         case processing
         case success
+        case saved
         case clipboardFallback
         case recognitionFailure
         case failure
@@ -341,13 +342,13 @@ private struct CaptureHUDView: View {
                 .frame(width: Layout.waveformWidth, height: Layout.waveformHeight)
                 .accessibilityLabel("正在处理录音")
 
-        case .success:
-            Label("已输入", systemImage: "checkmark.circle.fill")
+        case .success, .saved:
+            Label(model.phase == .saved ? "已保存" : "已输入", systemImage: "checkmark.circle.fill")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.green)
                 .symbolEffect(.bounce, value: model.feedbackGeneration)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityLabel("文字已输入")
+                .accessibilityLabel(model.phase == .saved ? "录音和文字已保存到历史记录" : "文字已输入")
 
         case .clipboardFallback:
             Label("已复制到剪贴板", systemImage: "doc.on.clipboard.fill")

@@ -25,7 +25,8 @@ The first implementation includes:
 - focus restoration and universal clipboard + synthetic paste delivery;
 - a native macOS 27 Liquid Glass capture HUD with cancel, live level, and finish controls;
 - local SwiftData Capture-first persistence and a native Morie management window for History, Settings, and Diagnostics;
-- History recording playback, cancellable file re-recognition, explicit text copying, and Capture deletion with native confirmation.
+- History recording playback, cancellable file re-recognition, explicit text copying, and Capture deletion with native confirmation;
+- a native **Record Capture** action in History to save a voice idea without inserting it into another app.
 
 Phase 0 runtime validation and Phase 1 Capture persistence development are both in progress. CloudKit is not yet configured.
 
@@ -48,6 +49,7 @@ Phase 0 runtime validation and Phase 1 Capture persistence development are both 
 3. Select your Development Team if signing requires it.
 4. Run Morie and grant Microphone, Speech Recognition, and Accessibility permissions when prompted.
 5. Place the caret in another app, press and release **Fn / Globe**, speak, then press and release it again to finish. Press **Escape** to cancel. Change the binding in Settings if required.
+6. To save an idea to History, choose **Open Morie → History → Record Capture**. Finish with the HUD or your shortcut; the HUD reports “已保存”.
 
 See [`docs/development.md`](docs/development.md) for the full development workflow and [`docs/validation.md`](docs/validation.md) for acceptance testing.
 

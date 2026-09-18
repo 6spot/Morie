@@ -104,4 +104,6 @@ Re-recognition has a standard button, `ProgressView`, and Cancel action. Saved t
 
 An empty recognition with retained audio shows “未识别，录音已保存” in the existing HUD and appears as “Not Recognized” in History. A discarded no-input capture hides the HUD; neither case reports “已输入”.
 
+History's native **Record Capture** toolbar button starts an intentional voice capture saved to History. It is disabled while another capture is active or capabilities are unavailable. Recording uses the existing HUD finish/cancel controls and shortcut; successful completion reports “已保存”. Capture details show **Destination: History** or **Current App**, and an unfinished record reads “Recording…”. This entry point does not restore another app's focus, inject text or copy text automatically.
+
 UI polish is not a reason to fork the product away from the system. Morie's differentiation is Capture, Personal Memory, and personalization—not a custom macOS widget toolkit.
