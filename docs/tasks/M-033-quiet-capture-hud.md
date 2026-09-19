@@ -13,9 +13,9 @@ Make the compact Capture capsule visually quieter and more internally consistent
 ## Owner decisions
 
 - Cancel and Finish controls use one neutral low-contrast color treatment.
-- The capsule uses macOS 27's native `NSGlassEffectView` appearance without a custom black tint, so Liquid Glass retains its own translucency/refraction.
+- The capsule uses macOS 27's native `NSGlassEffectView.Style.clear` with no custom tint, so the HUD reads as transparent Liquid Glass rather than a gray-white frosted chip.
 - The `Thinking` label uses secondary text contrast so the black text does not dominate the capsule.
-- The earlier rotating accent border is replaced by the reference-style left-to-right fill sweep: a subtle neutral overlay grows across the compact capsule **once per Thinking entry**, then settles into a faint static state while processing continues.
+- The earlier fill-style Thinking sweep is replaced by a single soft highlight band that travels left → right. It is intentionally not a filling progress bar and leaves the native glass untouched after it passes.
 - Normal successful completion has **no separate success node**.
 - When processing finishes successfully, the `Thinking` capsule closes immediately using its existing collapse/fade-out animation.
 - This applies to both current-app delivery and capture-only completion: no `SUCCESS`, **已输入**, **已保存**, checkmark or green flash remains.
@@ -29,12 +29,12 @@ Make the compact Capture capsule visually quieter and more internally consistent
 ```text
 recording
 [ x ]      waveform      [ ✓ ]
- neutral                 neutral
+ dynamic secondary gray
 
 processing
           Thinking
    secondary text +
-   left → right soft sweep
+   one slow glass shimmer
 
 successful completion
           Thinking
@@ -43,21 +43,21 @@ successful completion
        no success dwell
 ```
 
-The native `NSGlassEffectView` remains the surface and now uses its system-owned appearance with no custom black tint. No custom blur/material or third-party UI dependency is introduced.
+The native `NSGlassEffectView` remains the surface and now uses Apple's clear glass style with no custom tint. Recording glyphs and waveform use dynamic secondary-gray contrast instead of bright white / near-black extremes. No custom blur/material or third-party UI dependency is introduced.
 
 ## Acceptance criteria
 
 - [x] Cancel/Finish symbols have the same neutral foreground treatment.
 - [x] Cancel/Finish buttons have the same low-contrast bordered treatment.
-- [x] Capsule no longer applies a custom black tint; macOS owns the Liquid Glass rendering.
+- [x] Capsule uses native clear Liquid Glass with no custom tint.
 - [x] Thinking text uses secondary contrast instead of primary black.
-- [x] Thinking uses a left-to-right reference-style sweep instead of a rotating border highlight.
+- [x] Thinking uses a single left-to-right glass highlight instead of a rotating border or fill-progress animation.
 - [x] Current-app success has no separate HUD state or dwell.
 - [x] Capture-only success has no separate HUD state or dwell.
 - [x] Clipboard/recognition status messages have no leading decorative icon.
 - [x] macOS 27 Release compile passes (CI #143).
 - [x] MorieTests pass (CI #143).
-- [ ] Owner-device visual/audio check confirms native Liquid Glass is restored, the first cue no longer crackles, and Thinking sweeps only once.
+- [ ] Owner-device visual/audio check confirms clear Liquid Glass is visually present, waveform/control contrast is calm, the first cue no longer crackles, and the slower Thinking shimmer no longer implies false progress.
 
 ## Reference motion/sound refinement — 2026-09-20
 
@@ -82,7 +82,7 @@ Morie therefore keeps the approved neutral controls and secondary `Thinking` tex
 
 These changes remain synthesized/prepared once at `CaptureSoundFeedback` initialization; no sound asset or dependency is added.
 
-The Thinking animation was then refined to match the reference more closely: instead of an angular highlight orbiting the capsule border, a low-contrast fill advances from left to right over ~1.05 s. Owner testing showed that repeated sweeps were distracting, so the final contract is **one sweep per Thinking entry**; after reaching the right edge it settles to a faint static overlay until processing ends. Reduced Motion shows only the static treatment.
+The Thinking animation was then refined again after owner-device review. A 1.05 s fill still read like a progress bar that reached 100% before local-model cleanup finished. The final direction is a **single ~2.20 s shimmer band**, not a fill: a soft highlight traverses the clear-glass capsule once, then disappears while `Thinking` remains static until processing really finishes. Reduced Motion skips the shimmer entirely.
 
 macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for the reference-motion/sound implementation. The initial looping left-to-right Thinking sweep passed CI #152; the owner then reported three real-device issues: first-cue cold-start distortion, weakened Liquid Glass from custom tinting, and repeated Thinking sweeps. This follow-up removes the custom glass tint, makes the sweep single-run, and adds an 18 ms silent pre-roll plus a slightly softer attack before each synthesized cue. macOS 27 CI #155 passed both the Release product compile and the full MorieTests gate for these fixes.
 
