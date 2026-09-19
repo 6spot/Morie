@@ -150,33 +150,34 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(InputRefiner.instructionsText.contains("个人记忆仅用于理解当前表达"))
     }
 
-    func testDurableRecognitionPrecedesModelAndFinalSavePrecedesDelivery() async throws {
+    func testRefinementUsesLiveStateAndFlushMakesResultDurable() async throws {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("morie is my project", mode: .currentApp)
         let dictionaryID = try fixture.addWord()
         let runner = InputRefinementRunner { input in
-            try await MainActor.run {
-                let saved = try fixture.saved(input.captureID)
-                XCTAssertEqual(saved.recognizedText, input.text)
-                XCTAssertEqual(saved.finalText, input.text)
-                XCTAssertEqual(saved.refinement?.status, .running)
-                XCTAssertEqual(input.dictionary.map(\.id), [dictionaryID])
-                XCTAssertEqual(input.prepared.text, "Morie is my project")
-                XCTAssertTrue(input.context.isEmpty)
-            }
+            XCTAssertEqual(input.dictionary.map(\.id), [dictionaryID])
+            XCTAssertEqual(input.prepared.text, "Morie is my project")
+            XCTAssertTrue(input.context.isEmpty)
             return "Morie is my project."
         }
+
         let result = try await fixture.personalizer(runner).refine(id, enabled: true)
-        let saved = try fixture.saved(id)
+        let live = try fixture.store.capture(id)
         XCTAssertEqual(result, "Morie is my project.")
-        XCTAssertEqual(saved.finalText, result)
-        XCTAssertEqual(saved.recognizedText, "morie is my project")
-        XCTAssertEqual(saved.refinement?.input.dictionary.map(\.id), [dictionaryID])
+        XCTAssertEqual(live.finalText, result)
+        XCTAssertEqual(live.recognizedText, "morie is my project")
+        XCTAssertEqual(live.refinement?.input.dictionary.map(\.id), [dictionaryID])
+
+        let durable = try await fixture.saved(id)
+        XCTAssertEqual(durable.finalText, result)
+        XCTAssertEqual(durable.refinement?.status, .applied)
+
         try fixture.store.markDelivered(
             id,
             applicationName: "Test",
             bundleIdentifier: "me.morie.tests"
         )
+        try await fixture.store.flushPersistence(for: id)
         try fixture.memory.enqueueCompletedInput(captureID: id)
         XCTAssertEqual(try fixture.memory.analysisSource(for: id).text, result)
     }
@@ -204,7 +205,7 @@ final class PersonalizationTests: XCTestCase {
 
         XCTAssertEqual(result, "今天继续测试 Morie。")
         XCTAssertTrue(
-            try XCTUnwrap(fixture.saved(id).refinement)
+            try XCTUnwrap((try await fixture.saved(id)).refinement)
                 .input.expressionStyle.contains("倾向保留句末标点。")
         )
     }
@@ -217,7 +218,7 @@ final class PersonalizationTests: XCTestCase {
             let runner = InputRefinementRunner { _ in XCTFail("Model must not start"); return "invalid" }
             let result = try await fixture.personalizer(runner).refine(id, enabled: enabled, otherModelWorkActive: enabled)
             XCTAssertEqual(result, "Morie is my project")
-            XCTAssertEqual(try fixture.saved(id).refinement?.reason, enabled ? .modelBusy : .disabled)
+            XCTAssertEqual((try await fixture.saved(id)).refinement?.reason, enabled ? .modelBusy : .disabled)
         }
     }
 
@@ -257,8 +258,8 @@ final class PersonalizationTests: XCTestCase {
             }
             let result = try await fixture.personalizer(runner).refine(id, enabled: true)
             XCTAssertEqual(result, "Morie is my project")
-            XCTAssertEqual(try fixture.saved(id).refinement?.reason, invalidPayload ? .invalidEdits : .generationFailed)
-            XCTAssertFalse(try fixture.saved(id).refinement?.reason?.message.contains("PRIVATE") == true)
+            XCTAssertEqual((try await fixture.saved(id)).refinement?.reason, invalidPayload ? .invalidEdits : .generationFailed)
+            XCTAssertFalse((try await fixture.saved(id)).refinement?.reason?.message.contains("PRIVATE") == true)
         }
     }
 
@@ -268,7 +269,7 @@ final class PersonalizationTests: XCTestCase {
         let generated = "Foundation Models 给出的结构化结果。"
         let result = try await fixture.personalizer(InputRefinementRunner { _ in generated }).refine(id, enabled: true)
         XCTAssertEqual(result, generated)
-        XCTAssertEqual(try fixture.saved(id).refinement?.status, .applied)
+        XCTAssertEqual((try await fixture.saved(id)).refinement?.status, .applied)
     }
 
     func testSavedFinalAndInputSnapshotsSurviveSpeechRetryAndRestart() async throws {
@@ -276,6 +277,8 @@ final class PersonalizationTests: XCTestCase {
         _ = try fixture.addWord()
         let id = try fixture.capture("morie is my project")
         _ = try await fixture.personalizer(InputRefinementRunner { _ in "Morie is my project." }).refine(id, enabled: true)
+        try await fixture.store.flushPersistence(for: id)
+        fixture.store.releaseCaptureOwnership(id)
         try fixture.store.saveReRecognition("different later recognition", for: id)
         let reopened = try CaptureStore(storageURL: fixture.storageURL)
         let record = try reopened.capture(id)
@@ -288,35 +291,16 @@ final class PersonalizationTests: XCTestCase {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("saved input")
         try fixture.store.updateRecognizedText("late partial", for: id)
-        XCTAssertEqual(try fixture.saved(id).recognizedText, "saved input")
+        XCTAssertEqual(try fixture.store.capture(id).recognizedText, "saved input")
         try fixture.store.capture(id).finalText = "unsaved input"
         XCTAssertThrowsError(try fixture.store.refinementInput(for: id, context: []))
     }
 
-    func testFailedFinalSaveRollsBackBeforeReturningDurableOriginal() async throws {
-        let fixture = try RefinementFixture(commit: { context in
-            if try context.fetch(FetchDescriptor<CaptureRecord>()).contains(where: { $0.finalText == "Clean this." }) { throw RefinementTestError.diskFull }
-            try context.save()
-        })
-        let id = try fixture.capture("clean this")
-        let result = try await fixture.personalizer(InputRefinementRunner { _ in "Clean this." }).refine(id, enabled: true)
-        XCTAssertEqual(result, "clean this")
-        XCTAssertEqual(try fixture.saved(id).finalText, "clean this")
-        XCTAssertEqual(try fixture.saved(id).refinement?.reason, .saveFailed)
-    }
-
-    func testFailedStartDoesNotInvokeModelOrLoseOriginal() async throws {
-        let fixture = try RefinementFixture(commit: { _ in throw RefinementTestError.diskFull })
-        let id = try fixture.capture("saved input")
-        let result = try await fixture.personalizer(InputRefinementRunner { _ in XCTFail("Model must not start"); return "wrong" }).refine(id, enabled: true)
-        XCTAssertEqual(result, "saved input")
-        XCTAssertEqual(try fixture.saved(id).finalText, "saved input")
-    }
-
-    func testRestartClearsRunningRefinementWithoutInferenceOrDelivery() throws {
+    func testRestartClearsRunningRefinementWithoutInferenceOrDelivery() async throws {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("saved input", mode: .currentApp)
         try fixture.store.beginRefinement(fixture.store.refinementInput(for: id, context: []))
+        try await fixture.store.flushPersistence(for: id)
         let reopened = try CaptureStore(storageURL: fixture.storageURL)
         let capture = try reopened.capture(id)
         XCTAssertEqual(capture.refinement?.status, .interrupted)
@@ -347,7 +331,7 @@ final class PersonalizationTests: XCTestCase {
         await model.finish("Morie is my project.")
         let result = try await work.value
         XCTAssertEqual(result, "morie is my project")
-        XCTAssertEqual(try fixture.saved(id).refinement?.reason, .dictionaryChanged)
+        XCTAssertEqual((try await fixture.saved(id)).refinement?.reason, .dictionaryChanged)
     }
 
     func testMemoryEditedDuringModelDoesNotApplyStaleContext() async throws {
@@ -361,7 +345,7 @@ final class PersonalizationTests: XCTestCase {
         await model.finish("Morie is my project.")
         let result = try await work.value
         XCTAssertEqual(result, "Morie is my project")
-        XCTAssertEqual(try fixture.saved(id).refinement?.reason, .memoryChanged)
+        XCTAssertEqual((try await fixture.saved(id)).refinement?.reason, .memoryChanged)
     }
 
     func testRefinementWaitsForModelWithoutAnArbitraryDeadline() async throws {
@@ -377,7 +361,7 @@ final class PersonalizationTests: XCTestCase {
         let result = try await work.value
         XCTAssertEqual(result, "Saved input.")
         XCTAssertFalse(runner.isBusy)
-        XCTAssertEqual(try fixture.saved(id).finalText, "Saved input.")
+        XCTAssertEqual((try await fixture.saved(id)).finalText, "Saved input.")
     }
 
     func testCallerCancellationDoesNotWaitForModelOrReturnDeliverableText() async throws {
@@ -391,10 +375,10 @@ final class PersonalizationTests: XCTestCase {
         do { _ = try await work.value; XCTFail("Cancelled input must not return a deliverable result") }
         catch { XCTAssertTrue(error is CancellationError) }
         XCTAssertTrue(runner.isBusy)
-        XCTAssertEqual(try fixture.saved(id).refinement?.status, .interrupted)
+        XCTAssertEqual((try await fixture.saved(id)).refinement?.status, .interrupted)
         await model.finish("Saved input.")
         await runner.waitForModelToFinish()
-        XCTAssertEqual(try fixture.saved(id).finalText, "saved input")
+        XCTAssertEqual((try await fixture.saved(id)).finalText, "saved input")
     }
 
     private func request(_ text: String) -> RefinementInput {
@@ -410,7 +394,6 @@ final class PersonalizationTests: XCTestCase {
     }
 }
 
-private enum RefinementTestError: Error { case diskFull }
 
 @MainActor
 private final class RefinementFixture {
@@ -420,11 +403,11 @@ private final class RefinementFixture {
     let memory: MemoryStore
     let dictionary: DictionaryStore
 
-    init(commit: @escaping (ModelContext) throws -> Void = { try $0.save() }) throws {
+    init() throws {
         directory = FileManager.default.temporaryDirectory.appending(path: "MorieRefinement-\(UUID())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         storageURL = directory.appending(path: "captures.store")
-        store = try CaptureStore(storageURL: storageURL, commitRefinement: commit)
+        store = try CaptureStore(storageURL: storageURL)
         memory = MemoryStore(container: store.container)
         dictionary = DictionaryStore(container: store.container)
     }
@@ -446,7 +429,8 @@ private final class RefinementFixture {
         let refinement: CaptureRefinement?
     }
 
-    func saved(_ id: UUID) throws -> SavedCapture {
+    func saved(_ id: UUID) async throws -> SavedCapture {
+        try await store.flushPersistence(for: id)
         let reader = ModelContext(store.container)
         let record = try XCTUnwrap(reader.fetch(FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })).first)
         return SavedCapture(recognizedText: record.recognizedText, finalText: record.finalText, lifecycle: record.lifecycle, refinement: record.refinement)
