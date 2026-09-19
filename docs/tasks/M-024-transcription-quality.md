@@ -247,3 +247,9 @@ This follow-up keeps the closed-world safety boundary but strengthens layout beh
 - no headings, extra items, renamed items, or inferred content are authorized.
 
 Regression coverage includes natural three-item enumeration, count-led two-item enumeration, the owner's short semantic-shift pattern, and a compact short-contrast counterexample.
+
+### Validation
+
+- [x] macOS 27 CI #165 Release product compile passed.
+- [x] macOS 27 CI #165 full MorieTests gate passed, including the new semantic-formatting regressions.
+- [ ] Owner-device unscripted input confirms Foundation Models now follows the stronger list/paragraph layout contract without over-formatting ordinary short speech.
