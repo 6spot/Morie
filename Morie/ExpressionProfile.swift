@@ -40,6 +40,8 @@ final class ExpressionProfileRecord {
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var snapshot = ExpressionProfileSnapshot()
+
+    init() {}
 }
 
 struct ExpressionStyleSample: Equatable, Sendable {
