@@ -117,13 +117,15 @@ final class PersonalizationTests: XCTestCase {
             ],
             dictionary: [
                 DictionarySnapshot(id: dictionaryID, name: "GitHub", updatedAt: updatedAt)
-            ]
+            ],
+            expressionStyle: ["倾向保留句末标点。"]
         )
 
         let prompt = try InputRefiner.promptText(for: input)
         XCTAssertTrue(prompt.contains(#""dictionary":["GitHub"]"#))
         XCTAssertTrue(prompt.contains(#""name":"Morie""#))
         XCTAssertTrue(prompt.contains(#""notes":"Morie is a voice input project.""#))
+        XCTAssertTrue(prompt.contains(#""expressionStyle":["倾向保留句末标点。"]"#))
         XCTAssertFalse(prompt.contains(dictionaryID.uuidString))
         XCTAssertFalse(prompt.contains(memoryID.uuidString))
         XCTAssertFalse(prompt.contains("updatedAt"))
@@ -177,6 +179,34 @@ final class PersonalizationTests: XCTestCase {
         )
         try fixture.memory.enqueueCompletedInput(captureID: id)
         XCTAssertEqual(try fixture.memory.analysisSource(for: id).text, result)
+    }
+
+    func testStableExpressionProfileIsIncludedInCleanupAndSavedProvenance() async throws {
+        let fixture = try RefinementFixture()
+        let profile = ExpressionProfileStore(container: fixture.store.container)
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        for index in 0..<10 {
+            try profile.record(
+                injected: "今天我们继续测试Morie这个输入功能",
+                edited: "今天我们继续测试 Morie 这个输入功能。",
+                at: start.addingTimeInterval(Double(index) * 12 * 60 * 60)
+            )
+        }
+
+        let id = try fixture.capture("今天继续测试 Morie")
+        let result = try await fixture.personalizer(
+            InputRefinementRunner { input in
+                XCTAssertTrue(input.expressionStyle.contains("倾向保留句末标点。"))
+                return "今天继续测试 Morie。"
+            },
+            expressionProfile: profile
+        ).refine(id, enabled: true, expressionStyleEnabled: true)
+
+        XCTAssertEqual(result, "今天继续测试 Morie。")
+        XCTAssertTrue(
+            try XCTUnwrap(fixture.saved(id).refinement)
+                .input.expressionStyle.contains("倾向保留句末标点。")
+        )
     }
 
     func testDisabledOrBusyCleanupStillAppliesDictionaryWithoutInvokingModel() async throws {
@@ -422,8 +452,17 @@ private final class RefinementFixture {
         return SavedCapture(recognizedText: record.recognizedText, finalText: record.finalText, lifecycle: record.lifecycle, refinement: record.refinement)
     }
 
-    func personalizer(_ runner: InputRefinementRunner) -> CapturePersonalizer {
-        CapturePersonalizer(store: store, memory: memory, dictionary: dictionary, runner: runner)
+    func personalizer(
+        _ runner: InputRefinementRunner,
+        expressionProfile: ExpressionProfileStore? = nil
+    ) -> CapturePersonalizer {
+        CapturePersonalizer(
+            store: store,
+            memory: memory,
+            dictionary: dictionary,
+            expressionProfile: expressionProfile,
+            runner: runner
+        )
     }
 }
 
