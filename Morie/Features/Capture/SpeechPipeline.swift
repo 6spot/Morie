@@ -392,23 +392,29 @@ actor SpeechPipeline {
     private func prepareAssets(for backend: SpeechRecognitionBackend) async throws {
         switch backend {
         case .speechTranscriber(let locale):
-            let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
-            if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                Diagnostics.record("Speech", "SpeechTranscriber asset installation required")
+            let liveTranscriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+            let finalTranscriber = SpeechTranscriber(locale: locale, preset: .transcription)
+            if let installation = try await AssetInventory.assetInstallationRequest(
+                supporting: [liveTranscriber, finalTranscriber]
+            ) {
+                Diagnostics.record("Speech", "SpeechTranscriber live/final asset installation required")
                 try await installation.downloadAndInstall()
-                Diagnostics.record("Speech", "SpeechTranscriber asset installation completed")
+                Diagnostics.record("Speech", "SpeechTranscriber live/final asset installation completed")
             } else {
-                Diagnostics.record("Speech", "SpeechTranscriber assets already available")
+                Diagnostics.record("Speech", "SpeechTranscriber live/final assets already available")
             }
 
         case .dictationTranscriber(let locale):
-            let transcriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
-            if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                Diagnostics.record("Speech", "DictationTranscriber asset installation required")
+            let liveTranscriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
+            let finalTranscriber = DictationTranscriber(locale: locale, preset: .longDictation)
+            if let installation = try await AssetInventory.assetInstallationRequest(
+                supporting: [liveTranscriber, finalTranscriber]
+            ) {
+                Diagnostics.record("Speech", "DictationTranscriber live/final asset installation required")
                 try await installation.downloadAndInstall()
-                Diagnostics.record("Speech", "DictationTranscriber asset installation completed")
+                Diagnostics.record("Speech", "DictationTranscriber live/final asset installation completed")
             } else {
-                Diagnostics.record("Speech", "DictationTranscriber assets already available")
+                Diagnostics.record("Speech", "DictationTranscriber live/final assets already available")
             }
         }
     }
