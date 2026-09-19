@@ -124,11 +124,11 @@ Settings and Permissions are flexible grouped Forms inside Control Center rather
 
 ## Capture HUD visual language
 
-The compact capture capsule is deliberately low-contrast. Recording controls use the same neutral gray-white treatment on both sides; Cancel and Finish are distinguished by their symbols and accessibility labels, not by opposite black/white fills or semantic success/error colors. The `NSGlassEffectView` surface must not apply a custom black tint; macOS 27 owns the Liquid Glass translucency, refraction and environmental appearance.
+The compact capture capsule is deliberately low-contrast. The surface uses `NSGlassEffectView.Style.clear` with no custom tint so macOS 27 owns the Liquid Glass translucency, refraction and environmental appearance. Recording controls and waveform use dynamic secondary-gray contrast rather than bright white controls or a near-black waveform.
 
 Status color is reserved for state, not button identity:
 
-- **Thinking** uses a restrained neutral left-to-right fill sweep inside the compact capsule. The sweep replaces the earlier rotating border highlight; do not combine the two animations. It runs once when Thinking appears, then remains in a faint static settled state until processing finishes.
+- **Thinking** uses one restrained left-to-right shimmer band inside the compact capsule. It is not a progress fill and must not imply 0–100% completion. The shimmer runs once over about 2.2 seconds, then disappears while the native clear glass and Thinking text remain until processing finishes.
 - normal successful completion has no separate success state: once processing completes, the `Thinking` capsule immediately runs its normal collapse/fade-out animation;
 - this applies to both current-app delivery and capture-only completion; no `SUCCESS`, **已输入**, **已保存**, checkmark, green flash or other success badge is shown in the HUD;
 - clipboard fallback, no-speech and recognition-failure messages remain visible because they communicate an outcome the user may need to act on; they stay text-only and visually secondary;
@@ -136,7 +136,7 @@ Status color is reserved for state, not button identity:
 
 Do not add decorative leading status icons back to these text messages. Normal success is communicated by the disappearance of the processing capsule itself; do not add another success dwell state unless new usability evidence requires one. Strong semantic color is reserved for outcomes that genuinely require attention.
 
-The recording-to-processing morph uses motion rather than another status color: the wide recording capsule contracts around the waveform before `Thinking` replaces it. The processing capsule is narrower (94 pt versus 142 pt recording width). When Thinking first appears, a low-contrast neutral overlay progresses from the left edge toward the right edge once, then settles to a faint static overlay; it must not loop continuously. Successful completion keeps that compact shape and fades almost in place instead of collapsing to a tiny dot. Reduced Motion skips the staged morph and moving sweep, using only the final compact/static treatment.
+The recording-to-processing morph uses motion rather than another status color: the wide recording capsule contracts around the waveform before `Thinking` replaces it. The processing capsule is narrower (94 pt versus 142 pt recording width). When Thinking first appears, a narrow low-contrast highlight traverses the glass once from left to right over about 2.2 seconds; because it leaves no filled track behind, it reads as activity rather than progress. Successful completion keeps that compact shape and fades almost in place instead of collapsing to a tiny dot. Reduced Motion skips the moving shimmer and uses only the compact static glass treatment.
 
 ## History recovery
 
