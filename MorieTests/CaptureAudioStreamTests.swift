@@ -119,6 +119,22 @@ final class CaptureAudioStreamTests: XCTestCase {
         try assertReadableSignal(completion.sourceAudio.url)
     }
 
+    func testFinishReleasesConverterAndMeterClosuresBeforeStreamDeinit() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let (stream, probe) = try makeProbeStream(at: directory.appending(path: "release.m4a"))
+        XCTAssertNotNil(probe.value)
+
+        stream.append(try makeAudio())
+        _ = stream.finish()
+
+        XCTAssertNil(
+            probe.value,
+            "Native converter/callback captures must be released when a recording finishes, even while the stream object still exists"
+        )
+    }
+
     func testInterruptedCaptureKeepsTextAudioAndDestinationAcrossRestart() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -170,6 +186,18 @@ final class CaptureAudioStreamTests: XCTestCase {
         XCTAssertThrowsError(try store.capture(id))
     }
 
+    private func makeProbeStream(at url: URL) throws -> (CaptureAudioStream, WeakLifetimeProbe) {
+        let probe = LifetimeProbe()
+        let weakProbe = WeakLifetimeProbe(probe)
+        let stream = try CaptureAudioStream(
+            destinationURL: url,
+            convert: { [probe] _ in _ = probe; return [] },
+            flush: { [probe] in _ = probe; return [] },
+            onAudioLevel: { [probe] _ in _ = probe }
+        )
+        return (stream, weakProbe)
+    }
+
     private func makeDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieAudioStreamTests-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -208,4 +236,12 @@ final class CaptureAudioStreamTests: XCTestCase {
         let energy = (0..<Int(buffer.frameLength)).reduce(Float(0)) { $0 + channel[$1] * channel[$1] }
         XCTAssertGreaterThan(energy, 1, "The preserved AAC must decode to the written signal", file: file, line: line)
     }
+}
+
+
+private final class LifetimeProbe: @unchecked Sendable {}
+
+private final class WeakLifetimeProbe {
+    weak var value: LifetimeProbe?
+    init(_ value: LifetimeProbe) { self.value = value }
 }
