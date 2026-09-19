@@ -4,6 +4,42 @@ import XCTest
 
 @MainActor
 final class CaptureHistoryTests: XCTestCase {
+    func testHistoryQueryExcludesLiveCaptureUntilTerminalState() throws {
+        let store = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
+
+        let completedID = UUID()
+        _ = try store.beginVoiceCapture(
+            id: completedID,
+            deliveryMode: .currentApp,
+            applicationName: "Notes",
+            bundleIdentifier: "com.apple.Notes"
+        )
+        try store.markFailed(completedID, error: "saved failure")
+
+        let liveID = UUID()
+        _ = try store.beginVoiceCapture(
+            id: liveID,
+            deliveryMode: .captureOnly,
+            applicationName: "Morie",
+            bundleIdentifier: "me.morie.mac"
+        )
+
+        let reader = ModelContext(store.container)
+        var visible = try reader.fetch(CaptureHistoryQuery.descriptor(limit: 200))
+        XCTAssertEqual(Set(visible.map(\.id)), [completedID])
+
+        try store.updateRecognizedText("progressively saved text", for: liveID)
+        visible = try reader.fetch(CaptureHistoryQuery.descriptor(limit: 200))
+        XCTAssertEqual(Set(visible.map(\.id)), [completedID],
+                       "Progressive durability must not expose the in-progress row in normal History.")
+
+        try store.markFailed(liveID, error: "recognition stopped")
+        visible = try reader.fetch(CaptureHistoryQuery.descriptor(limit: 200))
+        XCTAssertEqual(Set(visible.map(\.id)), [completedID, liveID],
+                       "A retained terminal Capture should enter History exactly after it stops being live.")
+    }
+
     func testRetryRecoversFailedCaptureAndSurvivesRestart() async throws {
         let fixture = try HistoryFixture()
         defer { fixture.removeFiles() }

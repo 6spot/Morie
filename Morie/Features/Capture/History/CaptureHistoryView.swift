@@ -53,14 +53,17 @@ struct CaptureHistoryView: View {
 
                 HStack(spacing: 8) {
                     if let applicationName = capture.sourceApplicationName {
-                        Text(applicationName).lineLimit(1)
+                        Text(applicationName)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
-                    Text(capture.historyListDate)
-                        .lineLimit(1)
-                    Spacer(minLength: 8)
                     if let status = capture.historyStatus {
                         Text(status).lineLimit(1)
                     }
+                    Spacer(minLength: 8)
+                    Text(capture.historyListDate)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
