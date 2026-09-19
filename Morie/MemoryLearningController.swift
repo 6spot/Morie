@@ -16,6 +16,7 @@ final class MemoryLearningController: ObservableObject {
     private let batchSize: Int
     private var workerTask: Task<Void, Never>?
     private var workerID: UUID?
+    private var nextMinimumDelay: Duration = .zero
     private var isRunning = false
     private var didReconcileAtStartup = false
 
@@ -51,15 +52,17 @@ final class MemoryLearningController: ObservableObject {
 
     func stop() {
         isRunning = false
-        cancelWorker()
+        workerTask?.cancel()
     }
 
     func setInputActive(_ active: Bool) {
         isInputActive = active
         if active {
-            cancelWorker()
-        } else {
+            workerTask?.cancel()
+        } else if workerTask == nil {
             schedule(minimumDelay: idleDelay)
+        } else {
+            nextMinimumDelay = max(nextMinimumDelay, idleDelay)
         }
     }
 
@@ -74,8 +77,12 @@ final class MemoryLearningController: ObservableObject {
         }
 
         if !isInputActive {
-            cancelWorker()
-            schedule(minimumDelay: idleDelay)
+            if workerTask == nil {
+                schedule(minimumDelay: idleDelay)
+            } else {
+                nextMinimumDelay = max(nextMinimumDelay, idleDelay)
+                workerTask?.cancel()
+            }
         }
     }
 
@@ -85,8 +92,12 @@ final class MemoryLearningController: ObservableObject {
             try store.retry(source)
             message = nil
             if !isInputActive {
-                cancelWorker()
-                schedule()
+                nextMinimumDelay = .zero
+                if let workerTask {
+                    workerTask.cancel()
+                } else {
+                    schedule()
+                }
             }
         } catch {
             message = "无法安排个人记忆学习，你的输入已保存。"
@@ -125,13 +136,6 @@ final class MemoryLearningController: ObservableObject {
             await self.processBatch()
             self.workerFinished(id)
         }
-    }
-
-    private func cancelWorker() {
-        workerID = nil
-        workerTask?.cancel()
-        workerTask = nil
-        analyzingCaptureID = nil
     }
 
     private func processBatch() async {
@@ -173,6 +177,8 @@ final class MemoryLearningController: ObservableObject {
         analyzingCaptureID = nil
         workerTask = nil
         workerID = nil
-        schedule()
+        let minimumDelay = nextMinimumDelay
+        nextMinimumDelay = .zero
+        schedule(minimumDelay: minimumDelay)
     }
 }
