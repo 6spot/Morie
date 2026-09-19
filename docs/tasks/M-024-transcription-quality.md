@@ -253,3 +253,44 @@ Regression coverage includes natural three-item enumeration, count-led two-item 
 - [x] macOS 27 CI #165 Release product compile passed.
 - [x] macOS 27 CI #165 full MorieTests gate passed, including the new semantic-formatting regressions.
 - [ ] Owner-device unscripted input confirms Foundation Models now follows the stronger list/paragraph layout contract without over-formatting ordinary short speech.
+
+
+## 2026-09-20 accurate final transcription pass
+
+Owner approved using the existing saved-audio transcription path as the authoritative final ASR pass instead of treating the live progressive transcript as final output.
+
+The normal capture flow is now:
+
+```text
+microphone
+  → SpeechTranscriber(.progressiveTranscription)
+      live HUD / progressive checkpoint text
+  → close source audio + finalize live analyzer
+  → CaptureFileTranscriber
+      SpeechTranscriber(.transcription)
+      or DictationTranscriber(.longDictation) fallback
+      + the Capture's frozen Dictionary hints
+  → authoritative recognizedText
+  → optional cleanup
+  → delivery / History
+```
+
+Behavior rules:
+
+- progressive transcription remains the low-latency live feedback path and the fallback result;
+- the closed source audio is re-read once with the non-progressive accurate preset before cleanup;
+- the same per-Capture dictionary hint snapshot is applied through `AnalysisContext` during the accurate pass;
+- confirmed no-speech audio skips the second pass;
+- an empty/failed accurate pass never fails an otherwise usable input and falls back to the progressive transcript;
+- cancellation still terminates the operation instead of silently falling back;
+- no cloud ASR, third-party runtime or additional microphone capture path is introduced.
+
+Diagnostics now separate `finish → speech-live-final` from `finish → speech-final`, allowing owner-device validation to measure the quality/latency cost of the accurate pass rather than folding it into cleanup or persistence.
+
+### Validation
+
+- [x] Deterministic transcript-selection tests cover accurate-result preference and empty/missing accurate-result fallback.
+- [ ] macOS 27 product compile passes.
+- [ ] MorieTests gate passes.
+- [ ] Owner-device Mandarin sample compares progressive text against the final accurate pass.
+- [ ] Owner-device Chinese/English and Dictionary-term samples confirm the second pass improves or preserves recognition without unacceptable finish latency.
