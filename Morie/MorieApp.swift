@@ -199,6 +199,27 @@ struct MorieSettingsView: View {
                 }
             }
 
+            Section("iCloud") {
+                Toggle("使用 iCloud 同步与备份", isOn: Binding(
+                    get: { controller.iCloudSyncEnabled },
+                    set: { controller.setICloudSyncEnabled($0) }
+                ))
+                .disabled(controller.iCloudSyncState.isChecking)
+
+                Text("同步历史文字、字典、个人记忆和表达习惯到你的 iCloud 私有数据库。原始录音仍只保存在这台 Mac 上。默认关闭。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                LabeledContent("状态", value: controller.iCloudSyncState.detail)
+
+                if controller.iCloudSyncEnabled {
+                    Button("重新检查 iCloud") {
+                        controller.refreshICloudSyncState()
+                    }
+                    .disabled(controller.iCloudSyncState.isChecking)
+                }
+            }
+
             Section("快捷键") {
                 Picker(
                     "开始或结束录音",
