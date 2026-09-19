@@ -22,26 +22,31 @@ final class CaptureSoundFeedback {
             switch self {
             case .start:
                 [
-                    Tone(frequency: 392.0, duration: 0.050, gain: 0.78, brightness: 0.22),
-                    Tone(frequency: 523.25, duration: 0.090, gain: 1.0, brightness: 0.24),
+                    // Reference clip: ~130 ms G4 followed immediately by a
+                    // longer ~200 ms C5 tail.
+                    Tone(frequency: 392.0, duration: 0.132, gain: 0.96, brightness: 0.026),
+                    Tone(frequency: 523.25, duration: 0.205, gain: 1.00, brightness: 0.022),
                 ]
             case .stop:
                 [
-                    Tone(frequency: 392.0, duration: 0.058, gain: 0.56, brightness: 0.26),
-                    Tone(frequency: 293.66, duration: 0.100, gain: 0.62, brightness: 0.34),
+                    // Reference clip: the finish cue is not a tiny tick; its
+                    // first G4 is comparable in level to Start and resolves
+                    // into a soft, longer D4.
+                    Tone(frequency: 392.0, duration: 0.134, gain: 0.92, brightness: 0.030),
+                    Tone(frequency: 293.66, duration: 0.225, gain: 0.96, brightness: 0.024),
                 ]
             }
         }
 
         var volume: Float {
             switch self {
-            case .start: 0.125
-            case .stop: 0.075
+            case .start: 0.105
+            case .stop: 0.095
             }
         }
     }
 
-    private let sampleRate: Double = 44_100
+    private let sampleRate: Double = 48_000
     private var startPlayer: AVAudioPlayer?
     private var stopPlayer: AVAudioPlayer?
 
@@ -81,9 +86,11 @@ final class CaptureSoundFeedback {
     private func wavData(
         for tones: [Tone]
     ) -> Data? {
-        let attack = 0.0009
-        let release = 0.014
-        let interToneGapFrames = Int(0.007 * sampleRate)
+        let attack = 0.0024
+        let release = 0.026
+        // The reference changes pitch directly rather than inserting an
+        // audible pause between notes.
+        let interToneGapFrames = 0
         var samples: [Int16] = []
 
         for (toneIndex, tone) in tones.enumerated() {
@@ -102,13 +109,15 @@ final class CaptureSoundFeedback {
                 let decay = exp(-2.65 * progress)
                 let phase = 2 * .pi * tone.frequency * t
 
-                // Mostly a clean musical tone with just enough upper harmonic
-                // energy to feel crisp on laptop speakers at low volume.
+                // The reference is much closer to a clean sine than the
+                // previous brighter synthesized cue. Its tiny third harmonic
+                // is more audible than the second, so keep the timbre clear
+                // without turning the cue into a dull pure sine.
                 let fundamental = sin(phase)
-                let second = sin(phase * 2.0) * tone.brightness
-                let third = sin(phase * 3.0) * tone.brightness * 0.24
-                let fourth = sin(phase * 4.0) * tone.brightness * 0.08 * (1 - progress)
-                let normalization = 1 + tone.brightness * 1.32
+                let second = sin(phase * 2.0) * tone.brightness * 0.25
+                let third = sin(phase * 3.0) * tone.brightness
+                let fourth = sin(phase * 4.0) * tone.brightness * 0.12 * (1 - progress)
+                let normalization = 1 + tone.brightness * 1.37
                 let timbre = (fundamental + second + third + fourth) / normalization
 
                 let value = timbre

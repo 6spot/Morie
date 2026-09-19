@@ -57,7 +57,32 @@ The native `NSGlassEffectView` remains the surface; only its tint intensity is r
 - [x] Clipboard/recognition status messages have no leading decorative icon.
 - [x] macOS 27 Release compile passes (CI #143).
 - [x] MorieTests pass (CI #143).
-- [ ] Owner-device visual check confirms contrast feels appropriately quiet.
+- [ ] Owner-device visual/audio check confirms the reference-style width morph, Thinking transition, completion fade and longer cleaner cues feel right.
+
+## Reference motion/sound refinement — 2026-09-20
+
+The owner supplied a 5.2-second reference capture and asked Morie to adopt its calmer transition rhythm and cue character without undoing the already-approved neutral control colors.
+
+Frame/audio inspection found:
+
+- the recording capsule contracts around the waveform before `Thinking` replaces it;
+- the processing capsule is materially narrower than the recording capsule;
+- successful completion fades the compact processing capsule rather than collapsing it into a tiny dot or showing a success badge;
+- the reference Start cue is approximately G4 (392 Hz) → C5 (523 Hz);
+- the reference Finish cue is approximately G4 (392 Hz) → D4 (294 Hz);
+- the pitches already matched Morie, but the reference notes are substantially longer, nearly gapless, cleaner in harmonic content, and much closer in Start/Finish loudness.
+
+Morie therefore keeps the approved neutral controls, secondary `Thinking` text and existing accent processing border, while changing motion/audio:
+
+- recording glass remains 142 pt wide; processing contracts to 94 pt over ~160 ms;
+- the wide recording content stays visible during that contraction, so the side controls are naturally clipped/retracted and the waveform remains briefly before a 90 ms fade to `Thinking`;
+- successful processing now fades at ~94% scale over 200 ms instead of shrinking to 10%;
+- Start tone durations are 132 ms + 205 ms; Finish is 134 ms + 225 ms, with no audible inter-note gap;
+- generated cue sample rate is 48 kHz, harmonic energy is reduced toward the reference's near-sine timbre, and Finish volume is brought closer to Start.
+
+These changes remain synthesized/prepared once at `CaptureSoundFeedback` initialization; no sound asset or dependency is added.
+
+macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for this reference-motion/sound implementation.
 
 ## Validation boundary
 
