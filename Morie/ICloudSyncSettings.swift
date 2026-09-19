@@ -20,6 +20,10 @@ enum ICloudSyncState: Equatable {
     case restartRequired(String)
     case unavailable(String)
 
+    var isChecking: Bool {
+        if case .checking = self { true } else { false }
+    }
+
     var detail: String {
         switch self {
         case .off:
