@@ -32,8 +32,10 @@ final class CaptureSessionController {
     var inputRefinementEnabled: Bool
     var correctionSuggestionsEnabled: Bool
     var expressionLearningEnabled: Bool
+    var soundFeedbackEnabled: Bool
 
     private let speech = SpeechPipeline()
+    private let soundFeedback = CaptureSoundFeedback()
     private let injector = TextInjector()
     private let hud = CaptureHUDController()
     private let captureStore: CaptureStore?
@@ -64,7 +66,8 @@ final class CaptureSessionController {
         memoryLearning: MemoryLearningController?,
         inputRefinementEnabled: Bool,
         correctionSuggestionsEnabled: Bool,
-        expressionLearningEnabled: Bool
+        expressionLearningEnabled: Bool,
+        soundFeedbackEnabled: Bool
     ) {
         self.captureStore = captureStore
         self.history = history
@@ -75,6 +78,7 @@ final class CaptureSessionController {
         self.inputRefinementEnabled = inputRefinementEnabled
         self.correctionSuggestionsEnabled = correctionSuggestionsEnabled
         self.expressionLearningEnabled = expressionLearningEnabled
+        self.soundFeedbackEnabled = soundFeedbackEnabled
 
         hud.onCancel = { [weak self] in
             Task { @MainActor in
@@ -323,6 +327,9 @@ final class CaptureSessionController {
 
             speechReadyCaptureID = sessionID
             captureStartTask = nil
+            if soundFeedbackEnabled {
+                soundFeedback.playStart()
+            }
             Diagnostics.record("Speech", "Speech session \(label(sessionID)) is recording")
 
             if finishRequestedCaptureID == sessionID {
@@ -361,7 +368,16 @@ final class CaptureSessionController {
         Diagnostics.record("Speech", "Finalizing Speech session \(label(sessionID))")
 
         do {
-            let result = try await speech.stop(sessionID: sessionID)
+            let shouldPlayStopCue = soundFeedbackEnabled
+            let result = try await speech.stop(
+                sessionID: sessionID,
+                onCaptureStopped: { [weak self] in
+                    guard shouldPlayStopCue else { return }
+                    Task { @MainActor in
+                        self?.soundFeedback.playStop()
+                    }
+                }
+            )
             recordLatency("speech-final", sessionID: sessionID)
             Diagnostics.recordMemory("speech-stop \(label(sessionID))")
             var finalText = result.transcript
