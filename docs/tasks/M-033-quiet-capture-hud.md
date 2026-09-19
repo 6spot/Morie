@@ -82,6 +82,8 @@ Morie therefore keeps the approved neutral controls, secondary `Thinking` text a
 
 These changes remain synthesized/prepared once at `CaptureSoundFeedback` initialization; no sound asset or dependency is added.
 
+macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for this reference-motion/sound implementation.
+
 ## Validation boundary
 
 The earlier visual refinement passed CI #143. The follow-up that removes the success dwell passed macOS 27 CI #146: Release compile and the full MorieTests gate both succeeded. Final owner-device acceptance should confirm that `Thinking → collapse` feels faster and clearer than a separate success message.
