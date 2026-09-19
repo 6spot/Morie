@@ -54,8 +54,12 @@ final class MemoryStore: ObservableObject {
 
     func analysis(for source: MemoryAnalysisSource) -> MemoryAnalysisSnapshot? {
         let reader = makeContext()
-        guard let record = try? analysis(in: reader, for: source), let record else { return nil }
-        return MemoryAnalysisSnapshot(record)
+        do {
+            guard let record = try analysis(in: reader, for: source) else { return nil }
+            return MemoryAnalysisSnapshot(record)
+        } catch {
+            return nil
+        }
     }
 
     func analyses(for captureID: UUID, linkedTo memoryID: UUID? = nil) -> [MemoryAnalysisSnapshot] {
