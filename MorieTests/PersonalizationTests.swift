@@ -46,6 +46,11 @@ final class PersonalizationTests: XCTestCase {
             ).text,
             "我们明天去公园。"
         )
+        XCTAssertTrue(InputRefiner.instructionsText.contains("# 任务目标"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("# 绝对边界"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("# 口语整理"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("# 中文自然格式"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("# 结构与语境"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("Gethab"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("GitHub"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("界面标签"))
@@ -53,7 +58,8 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(InputRefiner.instructionsText.contains("不得新增用户没有说过"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("原文没有，就不能出现在输出里"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("9:00 → 9点"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("同一词在不同分句中再次指代对象"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("同一词在后续分句中再次指代对象"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("非正式内容以自然表达为主"))
         XCTAssertFalse(InputRefiner.instructionsText.contains("已输入我觉得有必要存在吗"))
         XCTAssertFalse(InputRefiner.instructionsText.contains("授权的时候我们的窗口授权完之后"))
     }
