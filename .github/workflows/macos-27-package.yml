@@ -31,7 +31,7 @@ jobs:
           set -o pipefail
           xcodebuild \
             -project Morie.xcodeproj \
-            -target Morie \
+            -scheme Morie \
             -configuration Release \
             -sdk macosx27.0 \
             CODE_SIGNING_ALLOWED=NO \
