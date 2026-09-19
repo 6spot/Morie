@@ -4,6 +4,33 @@ import XCTest
 
 @MainActor
 final class CaptureHistoryTests: XCTestCase {
+    func testFinalRecognitionPrefersAccurateTranscriptWhenAvailable() {
+        XCTAssertEqual(
+            CaptureFileTranscriber.preferredTranscript(
+                live: "实时识别结果",
+                accurate: "高精度识别结果"
+            ),
+            "高精度识别结果"
+        )
+    }
+
+    func testFinalRecognitionFallsBackToLiveTranscriptWhenAccurateResultIsMissing() {
+        XCTAssertEqual(
+            CaptureFileTranscriber.preferredTranscript(
+                live: "保留实时识别结果",
+                accurate: "   \n"
+            ),
+            "保留实时识别结果"
+        )
+        XCTAssertEqual(
+            CaptureFileTranscriber.preferredTranscript(
+                live: "保留实时识别结果",
+                accurate: nil
+            ),
+            "保留实时识别结果"
+        )
+    }
+
     func testHistoryQueryExcludesLiveCaptureUntilTerminalState() async throws {
         let store = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
