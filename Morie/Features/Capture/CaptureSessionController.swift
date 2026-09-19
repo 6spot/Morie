@@ -53,6 +53,7 @@ final class CaptureSessionController {
     private var captureShutdownTask: Task<Void, Never>?
     private var stoppingCaptureID: UUID?
     private var activeSourceAudioURL: URL?
+    private var finishRequestedAt: ContinuousClock.Instant?
 
     init(
         captureStore: CaptureStore?,
@@ -180,6 +181,7 @@ final class CaptureSessionController {
         }
 
         finishRequestedCaptureID = sessionID
+        finishRequestedAt = ContinuousClock.now
         setPhase(.finalizing)
         onCancellationEnabledChange?(false)
         hud.showProcessing()
@@ -356,6 +358,7 @@ final class CaptureSessionController {
 
         do {
             let result = try await speech.stop(sessionID: sessionID)
+            recordLatency("speech-final", sessionID: sessionID)
             Diagnostics.recordMemory("speech-stop \(label(sessionID))")
             var finalText = result.transcript
             guard let captureStore else {
@@ -395,6 +398,7 @@ final class CaptureSessionController {
                     expressionStyleEnabled: expressionLearningEnabled,
                     otherModelWorkActive: memoryLearning?.isModelBusy == true
                 )
+                recordLatency("refinement-final", sessionID: sessionID)
                 Diagnostics.recordMemory("refinement-finish \(label(sessionID))")
                 try Task.checkCancellation()
                 guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
@@ -402,6 +406,11 @@ final class CaptureSessionController {
             }
 
             if deliveryMode == .captureOnly {
+                try await captureStore.flushPersistence(for: sessionID)
+                Diagnostics.record(
+                    "CapturePersistence",
+                    "Capture-only final state is durable for \(label(sessionID))"
+                )
                 completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
                 return
             }
@@ -416,6 +425,7 @@ final class CaptureSessionController {
             let deliveryApplication = try injector.deliver(finalText)
             let deliveredName = deliveryApplication.localizedName
             let deliveredBundle = deliveryApplication.bundleIdentifier
+            recordLatency("paste-dispatched", sessionID: sessionID)
             Diagnostics.record(
                 "Delivery",
                 "Injection completed for \(label(sessionID)); app=\(deliveredName ?? "unknown") (\(deliveredBundle ?? "unknown"))"
@@ -435,8 +445,20 @@ final class CaptureSessionController {
                 applicationName: deliveredName,
                 bundleIdentifier: deliveredBundle
             )
-            memoryLearning?.captureDidComplete(sessionID)
             completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
+            Task { @MainActor [weak self, weak captureStore] in
+                guard let self, let captureStore else { return }
+                do {
+                    try await captureStore.flushPersistence(for: sessionID)
+                    self.memoryLearning?.captureDidComplete(sessionID)
+                } catch {
+                    Diagnostics.record(
+                        "CapturePersistence",
+                        "Post-delivery flush failed for \(self.label(sessionID)): \(error.localizedDescription)",
+                        level: .error
+                    )
+                }
+            }
         } catch {
             Diagnostics.record(
                 "Session",
@@ -627,6 +649,7 @@ final class CaptureSessionController {
         activeSourceAudioURL = nil
         speechReadyCaptureID = nil
         finishRequestedCaptureID = nil
+        finishRequestedAt = nil
         captureStartTask = nil
         captureFinishTask = nil
         history?.setInputActive(false)
@@ -638,6 +661,19 @@ final class CaptureSessionController {
         if notify {
             onPhaseChange?(phase)
         }
+    }
+
+    private func recordLatency(_ stage: String, sessionID: UUID) {
+        guard let finishRequestedAt else { return }
+        let value = (ContinuousClock.now - finishRequestedAt).components
+        let milliseconds = max(
+            0,
+            Int(Double(value.seconds) * 1_000 + Double(value.attoseconds) / 1e15)
+        )
+        Diagnostics.record(
+            "InputLatency",
+            "Capture \(label(sessionID)) finish→\(stage)=\(milliseconds)ms"
+        )
     }
 
     private func label(_ sessionID: UUID) -> String {
