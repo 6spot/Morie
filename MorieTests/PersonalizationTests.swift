@@ -50,6 +50,8 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(InputRefiner.instructionsText.contains("GitHub"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("界面标签"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("“已输入”"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("标点整理是必做项"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("授权的时候，我们的窗口"))
     }
 
     func testModelPromptSendsOnlyDictionaryWordsAndUsefulMemoryText() throws {
