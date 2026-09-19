@@ -229,6 +229,16 @@ final class DictionaryStore: ObservableObject {
     }
 
 
+    func hasConfirmedCorrection(original: String, replacement: String) throws -> Bool {
+        let originalKey = Self.correctionKey(original)
+        let replacementKey = Self.correctionKey(replacement)
+        return try context.fetch(FetchDescriptor<DictionaryCorrectionRule>()).contains {
+            Self.correctionKey($0.original) == originalKey
+                && Self.correctionKey($0.replacement) == replacementKey
+        }
+    }
+
+
     func relevantEntries(for text: String) throws -> [DictionarySnapshot] {
         _ = text
         return try contextualEntries()
