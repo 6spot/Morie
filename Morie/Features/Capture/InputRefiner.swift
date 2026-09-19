@@ -31,9 +31,10 @@ enum InputRefiner {
 
         # 自然格式
         - 标点整理是必做项。按语义边界补齐自然的逗号、句号、问号、冒号和换行，避免连续无标点的长句。
-        - 分段也是长输入的必做项。只要一段连续口语已经包含两个或更多清晰的语义块、话题切换、需求切换、前因后果或“另外 / 然后 / 还有 / 最后 / 但是 / 另一方面”等自然转折，就应在语义边界换段；不要因为用户没有明确说“第一、第二”就把整段内容挤成一个大段落。
-        - 短输入或只有一个完整语义块时保持单段。长输入通常整理成 2–4 个自然段即可；段落数量由语义决定，不按固定字数机械切分。
-        - 换段只负责阅读结构，不得新增标题、总结句、列表序号或原文没有的分类名称。只有用户本来就在列举事项、步骤、条件或分类时才使用列表。
+        - 不要把零碎口语重新合并成一个大段。按事件、主题、请求或讨论对象保留真实语义边界：同一主题下的解释和补充应留在同一段，明显切换到另一件事时用空行换段。
+        - 简短输入、单一主题，或只有两个紧密相关的小点时优先保持连贯段落，不为了“结构化”强行拆碎。
+        - 本次 JSON 中的 formattingHint 是 Morie 根据原始输入做的保守结构提示：compact 表示优先单段；semanticParagraphs 表示已检测到多个主题 / 事件 / 请求块，应按语义边界分成自然段；explicitList 表示原话存在明确枚举，应保留其列表结构。
+        - semanticParagraphs 只要求自然分段，不得凭空新增标题、总结句或列表序号。explicitList 也只能整理原话已经表达的项目，不能补项目。
         - 普通中文口语中，如果 Speech 把口语时间格式化成冒号形式，可在不改变时间含义的前提下恢复成自然中文写法：9:00 → 9点，9:30 → 9点30分。
         - 不得自行增加“上午 / 下午 / 晚上”等原文没有的信息。代码、日志、表格、配置等明确需要数字格式的内容保持原样。
 
@@ -47,6 +48,7 @@ enum InputRefiner {
         - confirmedCorrections 是用户此前明确确认过的“错误识别 → 正确词”关系，可信度高于普通字典提示。当前文本出现同一错误形态时应优先使用已确认写法；若只是相似但语境并不指向该词，不得强行套用。
         - 个人记忆只用于理解当前输入已经指向的对象或主题；当前输入本身没有指向某条记忆时忽略它。不得补入本次没有说出的背景，也不得覆盖本次实际表达。
         - 表达习惯只是排版和措辞节奏偏好，只能在不改变原意、语气、结构事实和本次明确表达的前提下参考；本次输入与表达习惯冲突时，以本次输入为准。
+        - formattingHint 只是排版提示，不是内容指令；它不能改变事实、语气、立场或把一个主题拆成多个虚构事项。
 
         # 示例
         示例只说明规则，不得把示例中的词句、语气或观点带到其他输入中。
@@ -92,6 +94,7 @@ enum InputRefiner {
 
     private struct PromptInputData: Encodable {
         let transcript: String
+        let formattingHint: String
         let dictionary: [String]
         let confirmedCorrections: [PromptCorrection]
         let personalContext: [PromptMemory]
@@ -111,6 +114,7 @@ enum InputRefiner {
     static func promptText(for input: RefinementInput) throws -> String {
         let data = try JSONEncoder().encode(PromptInputData(
             transcript: input.prepared.text,
+            formattingHint: formattingHint(for: input.prepared.text),
             dictionary: input.dictionary.map(\.name),
             confirmedCorrections: input.confirmedCorrections.map {
                 PromptCorrection(observed: $0.original, correct: $0.replacement)
@@ -123,6 +127,55 @@ enum InputRefiner {
         return String(decoding: data, as: UTF8.self)
     }
 
+    static func formattingHint(for text: String) -> String {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return "compact" }
+
+        let explicitMarkers = [
+            "第一", "第二", "第三", "第四",
+            "首先", "其次", "再次", "最后",
+            "一是", "二是", "三是", "四是",
+        ]
+        let explicitCount = explicitMarkers.reduce(into: 0) { count, marker in
+            if normalized.contains(marker) { count += 1 }
+        }
+        if explicitCount >= 2 { return "explicitList" }
+
+        let topicMarkers = [
+            "另外", "还有", "再一个", "另一方面", "除此之外",
+            "然后", "接下来", "最后", "但是", "不过",
+            "尤其", "至于", "说到", "回到", "再说",
+        ]
+        let topicTransitions = topicMarkers.reduce(into: 0) { count, marker in
+            count += occurrences(of: marker, in: normalized)
+        }
+        let sentenceBoundaries = normalized.reduce(into: 0) { count, character in
+            if "。！？?!；;".contains(character) { count += 1 }
+        }
+
+        if normalized.count >= 110, topicTransitions >= 2 {
+            return "semanticParagraphs"
+        }
+        if normalized.count >= 160, topicTransitions >= 1, sentenceBoundaries >= 2 {
+            return "semanticParagraphs"
+        }
+        if normalized.count >= 220, sentenceBoundaries >= 3 {
+            return "semanticParagraphs"
+        }
+        return "compact"
+    }
+
+    private static func occurrences(of needle: String, in text: String) -> Int {
+        guard !needle.isEmpty else { return 0 }
+        var count = 0
+        var searchStart = text.startIndex
+        while searchStart < text.endIndex,
+              let range = text.range(of: needle, range: searchStart..<text.endIndex) {
+            count += 1
+            searchStart = range.upperBound
+        }
+        return count
+    }
     static func generate(_ input: RefinementInput) async throws -> String {
         try Task.checkCancellation()
         let model = SystemLanguageModel.default
@@ -162,7 +215,7 @@ enum InputRefiner {
 
 @Generable
 private struct GeneratedRefinement {
-    @Guide(description: "Only the cleaned final text. Preserve every expressed meaning and stance, add no new semantic content, use natural punctuation, and write ordinary Chinese clock times conversationally when appropriate. No explanation or answer.")
+    @Guide(description: "Only the cleaned final text. Preserve every expressed meaning and stance, add no new semantic content, use natural punctuation, and follow the input formattingHint: semanticParagraphs must use natural blank-line paragraph breaks at real topic/event/request boundaries; explicitList preserves only explicitly enumerated items. No explanation or answer.")
     var text: String
 }
 
