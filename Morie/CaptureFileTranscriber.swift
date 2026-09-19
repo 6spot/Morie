@@ -19,12 +19,12 @@ enum CaptureFileTranscriber {
         try Task.checkCancellation()
         let audioFile = try AVAudioFile(forReading: url)
         guard audioFile.length > 0 else { throw TranscriptionError.emptyRecognition }
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
+        guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
             throw TranscriptionError.unsupportedLocale
         }
         try Task.checkCancellation()
 
-        let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
+        let transcriber = DictationTranscriber(locale: locale, preset: .longDictation)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
 
         return try await withTaskCancellationHandler {
@@ -35,7 +35,7 @@ enum CaptureFileTranscriber {
                     let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
                     if !text.isEmpty { segments.append(text) }
                 }
-                return segments.joined(separator: " ")
+                return segments.joined()
             }
             defer { results.cancel() }
 
