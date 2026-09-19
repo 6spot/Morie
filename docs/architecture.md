@@ -64,6 +64,7 @@ Morie/
 │   │   │   ├── CaptureRefinement.swift
 │   │   │   ├── InputRefiner.swift
 │   │   │   ├── CaptureHUD.swift
+│   │   │   ├── CaptureSessionController.swift
 │   │   │   └── History/
 │   │   │       ├── CaptureHistoryController.swift
 │   │   │       └── CaptureHistoryView.swift
@@ -213,22 +214,34 @@ The primary bundle language and localized privacy descriptions are `zh-Hans`. Ap
 
 ### `AppController`
 
-Owns Phase 0 orchestration:
+Owns application-level orchestration and the UI-facing state surface:
 
 - bootstrap/capability flow;
-- Speech asset preparation before Ready;
-- hotkey installation;
-- authoritative capture UUID;
-- current-keyboard-focus delivery at final paste time;
-- start/finish/cancel coordination;
+- global hotkey installation and shortcut preference changes;
+- setup/permission gating;
+- mapping live Capture phases into the existing visible state machine;
+- top-level Settings/iCloud state;
+- idle Memory learner startup outside an active capture;
+- application-level failure presentation and scheduled audio maintenance.
+
+It no longer owns the authoritative capture UUID/task bookkeeping, Speech lifecycle, HUD state or text delivery. Those belong to the Capture feature.
+
+### `CaptureSessionController`
+
+Owns the authoritative live Capture lifecycle:
+
+- capture UUID and source-audio destination;
+- Speech asset preparation, start/finalization and progressive transcript persistence;
+- finish-during-Speech-startup coordination;
+- explicit cancel and interruption shutdown;
+- HUD recording/processing/success/failure state;
 - dictionary hints, independent cleanup and durable final text;
-- delivery transition and opt-in correction observation;
-- idle Memory learner startup/preemption;
-- terminal success/cancel/failure cleanup.
+- current-keyboard-focus delivery and bounded post-insertion observation;
+- terminal success/failure cleanup and preservation of interrupted text/audio.
 
-It specifically prevents finish/cancel-during-setup from becoming a late or orphaned recording session.
+One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; shortcut failure, microphone interruption and Speech errors retain a failed Capture. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
 
-One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; shortcut failure, microphone interruption and Speech errors retain a failed Capture. Read-only setup refresh no longer interrupts capture. New input waits until shutdown ends. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
+`AppController` receives phase/transcript/failure callbacks and keeps the app/setup state machine authoritative. Returning a Capture session to idle only returns the visible app state to Ready when the current state is capture-owned; a concurrent blocked/checking state is not overwritten.
 
 ### `CapabilityGate` / `PermissionSetupController`
 
