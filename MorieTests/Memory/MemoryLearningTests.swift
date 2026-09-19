@@ -34,6 +34,9 @@ final class MemoryLearningTests: XCTestCase {
         XCTAssertTrue(fixture.memory.analyses.isEmpty)
         XCTAssertThrowsError(try fixture.memory.analysisSource(for: pending))
         try fixture.captures.markDeliveryFailed(pending, error: "test clipboard fallback")
+        // This fixture is testing Memory admission, not background Capture I/O.
+        // Make the terminal test source durable before a separate Memory context reads it.
+        try fixture.captures.container.mainContext.save()
         try fixture.memory.reconcileCompletedInputs()
         XCTAssertEqual(fixture.memory.analyses.map(\.sourceCaptureID), [pending])
     }
@@ -293,6 +296,10 @@ private final class LearningFixture {
                 applicationName: "Test",
                 bundleIdentifier: "me.morie.tests"
             )
+            // Production starts Memory only after CapturePersistenceWriter has
+            // flushed. This synchronous fixture setup establishes that same
+            // durable precondition without testing the writer in every Memory test.
+            try captures.container.mainContext.save()
         }
         return id
     }
