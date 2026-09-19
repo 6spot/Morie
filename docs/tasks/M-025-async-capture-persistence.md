@@ -82,12 +82,16 @@ Excluded:
 - [x] Main-context autosave is disabled so live mutation cannot implicitly write to disk.
 - [x] Input/persistence latency diagnostics are emitted.
 - [ ] Updated Capture/Personalization tests compile and pass.
-- [ ] Final macOS 27 Release product compile passes.
+- [x] Final macOS 27 Release product compile passes.
 - [ ] Owner-device timing confirms History activity does not materially increase finish→paste latency.
 
 ## Validation
 
-Product compile runs on Xcode 27/macOS 27 after each implementation head.
+GitHub Actions `macOS 27 CI` run #72 passed the final code head (`7e20c7930aeca8616e5d45fd3379be34820ad6ff`) as a Release product compile on Xcode 27/macOS 27.
+
+A static hot-path check also confirms that `updateRecognizedText`, `completeRecognition` and the live refinement path no longer contain `container.mainContext.save()`. The remaining synchronous main-context saves are the initial recovery shell plus History retry/delete, audio-retention maintenance and startup recovery operations outside normal finish-to-paste delivery.
+
+Product compile runs on Xcode 27/macOS 27 after implementation heads.
 
 Added logic coverage includes:
 
