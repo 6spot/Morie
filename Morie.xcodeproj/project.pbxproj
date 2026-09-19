@@ -17,6 +17,7 @@
 		A10000000000000000000009 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* CaptureRecord.swift */; };
 		A1000000000000000000000A /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
 		A1000000000000000000000B /* CaptureHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* CaptureHistoryView.swift */; };
+		A30000000000000000000001 /* CaptureHistoryQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000001 /* CaptureHistoryQuery.swift */; };
 		A1000000000000000000000C /* MorieControlCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* MorieControlCenter.swift */; };
 		A1000000000000000000000D /* CaptureAudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* CaptureAudioSource.swift */; };
 		A1000000000000000000000E /* CaptureFileTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* CaptureFileTranscriber.swift */; };
@@ -40,6 +41,7 @@
 		A20000000000000000000005 /* CaptureFileTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* CaptureFileTranscriber.swift */; };
 		A20000000000000000000006 /* CaptureHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* CaptureHistoryController.swift */; };
 		A20000000000000000000007 /* CaptureHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* CaptureHistoryTests.swift */; };
+		A30000000000000000000002 /* CaptureHistoryQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000001 /* CaptureHistoryQuery.swift */; };
 		A20000000000000000000008 /* CaptureAudioStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* CaptureAudioStream.swift */; };
 		A20000000000000000000009 /* CaptureAudioStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* CaptureAudioStreamTests.swift */; };
 		A2000000000000000000000A /* MemoryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* MemoryRecord.swift */; };
@@ -97,6 +99,7 @@
 		B10000000000000000000010 /* CaptureRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRecord.swift; sourceTree = "<group>"; };
 		B10000000000000000000011 /* CaptureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStore.swift; sourceTree = "<group>"; };
 		B10000000000000000000012 /* CaptureHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryView.swift; sourceTree = "<group>"; };
+		B30000000000000000000001 /* CaptureHistoryQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHistoryQuery.swift; sourceTree = "<group>"; };
 		B10000000000000000000013 /* MorieControlCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieControlCenter.swift; sourceTree = "<group>"; };
 		B10000000000000000000014 /* Morie.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Morie.entitlements; sourceTree = "<group>"; };
 		B10000000000000000000015 /* CaptureAudioSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAudioSource.swift; sourceTree = "<group>"; };
@@ -237,6 +240,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000017 /* CaptureHistoryController.swift */,
+				B30000000000000000000001 /* CaptureHistoryQuery.swift */,
 				B10000000000000000000012 /* CaptureHistoryView.swift */,
 			);
 			path = History;
@@ -535,6 +539,7 @@
 				A10000000000000000000009 /* CaptureRecord.swift in Sources */,
 				A1000000000000000000000A /* CaptureStore.swift in Sources */,
 				A1000000000000000000000B /* CaptureHistoryView.swift in Sources */,
+				A30000000000000000000001 /* CaptureHistoryQuery.swift in Sources */,
 				A1000000000000000000000C /* MorieControlCenter.swift in Sources */,
 				A1000000000000000000000D /* CaptureAudioSource.swift in Sources */,
 				A1000000000000000000000E /* CaptureFileTranscriber.swift in Sources */,
@@ -578,6 +583,7 @@
 				A20000000000000000000004 /* TestDiagnostics.swift in Sources */,
 				A20000000000000000000005 /* CaptureFileTranscriber.swift in Sources */,
 				A20000000000000000000006 /* CaptureHistoryController.swift in Sources */,
+				A30000000000000000000002 /* CaptureHistoryQuery.swift in Sources */,
 				A20000000000000000000007 /* CaptureHistoryTests.swift in Sources */,
 				A20000000000000000000008 /* CaptureAudioStream.swift in Sources */,
 				A20000000000000000000009 /* CaptureAudioStreamTests.swift in Sources */,
