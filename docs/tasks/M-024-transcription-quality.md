@@ -173,3 +173,53 @@ This specifically targets owner samples that contain several independent intenti
 - [ ] owner-device unscripted speech confirms the hint improves real paragraph output without over-fragmenting short messages.
 
 Semantic-format implementation head `57a0f3d435c855ae03114f5b0efb19d60ee64820` passed GitHub Actions `macOS 27 CI` run #97.
+
+## 2026-09-19 owner sample — cleanup context leakage
+
+Owner-device History exposed a stronger failure than paragraphing alone:
+
+```text
+原始语音识别：
+这几个分段我也没测试，这是我自己手动分的段嗯。
+
+最终文字：
+这几个分段我也没测试，这是我自己手动分的段。
+
+GitHub 里有 issues。
+```
+
+The second sentence is not grounded in the displayed raw transcript. This is classified as **cleanup semantic injection**, not ASR or paragraphing error.
+
+Repository review found two concrete priming risks:
+
+1. `DictionaryStore.relevantEntries(for:)` ignored its `text` argument and sent the entire bounded Dictionary to Foundation Models on every cleanup request.
+2. `InputRefiner.instructionsText` had grown into a long rule/example document containing real built-in vocabulary such as GitHub / Issues, increasing the chance that the on-device model treats helper context as content.
+
+### Adapted reference lessons
+
+OpenLess's current Light prompt contributes the useful contract **润色，不是重写，更不是扩写**, a small set of allowed edit operations, conservative ASR correction and a strong no-expansion boundary. Type4Me's evaluation material shows that explicit multi-item technical speech benefits from structure, but its richer structured rewrites are not appropriate as Morie's default cleanup mode.
+
+Morie therefore does **not** copy either prompt wholesale. The Apple Foundation Models path gets a shorter closed-world instruction set with fewer competing rules and no vocabulary-bearing examples.
+
+### Runtime changes
+
+- Speech keeps the full bounded canonical hint list; ASR biasing is unchanged.
+- Foundation Models cleanup gets at most 16 canonical terms that are actually present or a close Latin spelling neighbor of a transcript token.
+- Confirmed correction mappings reach cleanup only when their observed wrong form is present in this transcript. Exact deterministic correction still runs before the model.
+- Prompt field `dictionary` is renamed to `spellingCandidates` to make its role explicit.
+- The system prompt states that helper fields may only correct/disambiguate text already expressed and can never create a sentence/topic.
+- `@Guide` repeats the same closed-world rule at the generated field boundary.
+- `ValidatedRefinement` adds a final grounding check for longer output clauses; a clearly unrelated generated sentence is rejected and the dictionary-prepared original is used instead.
+
+### Regression target
+
+The exact owner sample above is now a regression fixture: appending `GitHub 里有 issues。` to the unrelated source must fail validation.
+
+### Validation
+
+- [x] unrelated dictionary / confirmed-correction context is filtered out in logic tests;
+- [x] near Latin spelling `Gethab` still selects `GitHub` as a cleanup candidate;
+- [x] unrelated appended sentence is rejected by refinement validation;
+- [ ] Xcode 27 / macOS 27 Release compile passes;
+- [ ] test-capable run executes Dictionary + Personalization logic tests;
+- [ ] owner device confirms the same class of short input no longer gains unrelated dictionary vocabulary.
