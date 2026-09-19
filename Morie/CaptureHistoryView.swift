@@ -46,24 +46,27 @@ struct CaptureHistoryView: View {
 
     var body: some View {
         List(visibleCaptures, selection: $selection) { capture in
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(capture.historySummary)
-                    .lineLimit(3)
+                    .lineLimit(2, reservesSpace: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text(capture.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                HStack {
+
+                HStack(spacing: 8) {
                     if let applicationName = capture.sourceApplicationName {
                         Text(applicationName).lineLimit(1)
                     }
+                    Text(capture.historyListDate)
+                        .lineLimit(1)
                     Spacer(minLength: 8)
-                    Text(capture.historyStatus)
+                    if let status = capture.historyStatus {
+                        Text(status).lineLimit(1)
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 5)
+            .transaction { $0.animation = nil }
             .tag(capture.id)
         }
         .listStyle(.inset)
@@ -123,12 +126,14 @@ struct CaptureDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(capture.finalText.isEmpty ? "识别文字" : "最终文字")
                     .font(.title)
-                Text(capture.createdAt, format: .dateTime.month(.wide).day().year().hour().minute())
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 12) {
-                    Label(capture.historyStatus, systemImage: "waveform")
+                HStack(spacing: 8) {
                     if let app = capture.sourceApplicationName { Text(app) }
+                    Text(capture.createdAt.formatted(
+                        .dateTime.locale(Locale(identifier: "zh-Hans")).year().month().day().hour().minute()
+                    ))
+                    if let status = capture.historyStatus {
+                        Label(status, systemImage: "waveform")
+                    }
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -361,11 +366,18 @@ private extension CaptureRecord {
         return lifecycle == .capturing ? "正在录音…" : "未识别到语音"
     }
 
-    var historyStatus: String {
+    var historyListDate: String {
+        createdAt.formatted(
+            .dateTime.locale(Locale(identifier: "zh-Hans")).month().day().hour().minute()
+        )
+    }
+
+    /// Normal completed records do not need a redundant "已保存/已输入" badge.
+    /// Keep status text only when it communicates active work or a problem.
+    var historyStatus: String? {
         switch lifecycle {
         case .capturing: "录音中"
-        case .recognized: "已保存"
-        case .delivered: "已输入"
+        case .recognized, .delivered: nil
         case .deliveryFailed: "未能输入"
         case .cancelled: "已取消"
         case .failed: historyText.isEmpty ? "未能识别" : "录音失败"

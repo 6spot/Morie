@@ -4,7 +4,7 @@
 
 - **State:** IN PROGRESS
 - **Phase:** macOS UX
-- **Last updated:** 2026-09-18
+- **Last updated:** 2026-09-19
 - **Branch:** `feature/m-008-native-management`, after foundation commit `aecc307`
 - **Owner direction:** finish the current macOS foundation, then improve the management pages and unify their design language. iOS is not scheduled.
 
@@ -44,6 +44,7 @@ Excluded: iOS, CloudKit integration, model behavior changes, new runtimes/depend
 - [x] Align Settings and Diagnostics; M-009 replaces the former candidate review with automatic learning status.
 - [x] Compile and inspect native offscreen previews; fix layout issues.
 - [x] Update architecture/UI/development/validation records.
+- [x] Stabilize live History rows with a reserved two-line preview, move month/day/time beside the source app, and remove redundant normal-state 已保存/已输入 labels while retaining active/error status.
 - [ ] Complete supported-device keyboard, accessibility and live-input checks.
 
 ## Design decisions

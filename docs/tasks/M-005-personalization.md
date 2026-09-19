@@ -42,6 +42,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 - [x] Connect native Settings/History and automatic analysis of saved final input through M-009.
 - [x] Verify with isolated model stubs, persistence tests and actual SDK compilation.
 - [x] Simplify the Foundation Models cleanup prompt and send only dictionary word strings plus useful Memory name/notes text; omit UUIDs, timestamps, status/origin and matching metadata from the model payload. Native Speech already receives only `[String]` dictionary hints, so no Speech metadata path required a code change.
+- [x] Tighten cleanup fidelity for words being discussed as UI labels/terms: apparent repetition must not remove or rename labels such as `已输入`.
 - [ ] Measure fidelity, unintended changes, hint benefit, timeout rate, final-to-delivery latency and native interactions.
 
 ## Implementation notes
