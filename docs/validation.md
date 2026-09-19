@@ -74,7 +74,7 @@ Automated persistence/History tests cover success, empty results, failure, cance
 - [ ] Finish another capture-only recording with the configured shortcut; the entry's saved destination remains authoritative.
 - [ ] Switch to another app before finishing; no paste, clipboard mutation or target-app activation occurs.
 - [ ] Cancel with Escape/HUD; the unfinished row and audio are removed, and a new capture starts normally.
-- [ ] Alternate capture-only and global-shortcut captures; current-app input still restores/delivers to the correct target and reports “已输入”.
+- [ ] Alternate capture-only and global-shortcut captures; current-app input still delivers to the field that owns keyboard focus at paste time and reports “已输入”, without restoring the record-start app.
 - [ ] Retry an empty/failed capture-only recording; recovery retains its History destination and does not trigger delivery.
 - [ ] Start capture-only during History playback/retry; preemption works and capture startup remains responsive.
 - [ ] The native toolbar action is accessible by keyboard/VoiceOver and cannot start duplicate recordings during startup/finalization.
@@ -89,7 +89,7 @@ Use disposable captures from the normal Xcode-signed app. Repeat the relevant ca
 - [ ] Refresh setup during Speech startup and normal finalization. It does not restart bootstrap, tear down capture or create an orphan microphone session, duplicate completion or stale state.
 - [ ] Reproduce shortcut unavailability/Accessibility revocation while recording. Ordinary keyboard input remains usable; the Capture is retained and status stays blocked until setup is checked and **开始使用** succeeds.
 - [ ] Exercise a real microphone/capture-session interruption where practical. Failure ends capture without requiring the user to press Finish; retained audio can be played or shows an accurate native error.
-- [ ] Interrupt during focus handoff before paste. Saved text stays in History and no delayed clipboard staging/paste occurs. A paste already dispatched retains its actual delivery outcome.
+- [ ] Interrupt after final text is ready but before current-focus paste dispatch. Saved text stays in History and no delayed clipboard staging/paste occurs. A paste already dispatched retains its actual delivery outcome.
 - [ ] Cancel with Escape/HUD during startup and recording. Native recording closes before the row/file disappear; a subsequent capture starts normally.
 - [ ] Repeat interruption/recheck/cancel followed by another capture. No stale text, stuck progress, duplicate recording or retained microphone indicator remains.
 
@@ -117,7 +117,7 @@ Historical foundation/candidate build and fixture evidence remains in [M-004](ta
 ## M-005 input personalization
 
 - [ ] With no personal Memory, cleanup removes meaningless speech redundancy and formats existing structure under [the approved contract](input-cleanup.md).
-- [ ] Saved dictionary words supply useful Speech hints; same-word letter-case variants normalize to their saved spelling even with cleanup disabled. Full-/half-width spelling, other words and technical spans remain unchanged; no alias rules exist.
+- [ ] Saved canonical dictionary words supply useful Speech hints; same-word letter-case variants normalize to their saved spelling even with cleanup disabled. Full-/half-width spelling, other words and technical spans remain unchanged. Separately confirmed observed-ASR → canonical-word mappings may apply deterministically, but no broad/unconfirmed alias rule exists.
 - [ ] Cover Chinese/English/mixed input, 嗯/好的/OK replies, meaningful repetitions, uncertainty/alternatives, clear self-corrections, questions, requests, steps and ordinary narrative. No changed viewpoint, summary, invented heading, answer, explanation, translation or unspoken background.
 - [ ] Verify contextually unambiguous Chinese ASR corrections such as **尝试常文字效果 → 尝试长文字效果** and dictionary-assisted **试一试长蚊子 → 试一试长文字** occur, while ambiguous homophones remain unchanged. Corrections must follow whole-utterance meaning rather than a changed-character quota; confirm dictionary terms, names, numbers, negation, code and URLs remain protected.
 - [ ] Preserve people/product names, numbers/dates, negation, conditions, technical commands/paths/URLs/versions and code. Judge actual Foundation Models output on supported hardware; Morie does not use a second mechanical language validator.
@@ -138,11 +138,11 @@ This is an independent opt-in dictionary behavior, not personal-Memory approval.
 - [ ] Confirm exact insertion anchoring at the caret in current macOS native, browser and editor fields. Missing/unsupported range APIs cause a silent skip; no broad document fallback is used.
 - [ ] Correct a word, including Chinese/mixed words, added/deleted letters and joined words. A suggestion waits for at least two seconds of settled text; undo/intermediate typing does not save a partial word.
 - [ ] Pure append/delete of phrases, punctuation/numbers/code/URL edits and broad rewrites do not create word suggestions. Record false positives/negatives rather than assuming all edits are recognition corrections.
-- [ ] The native panel appears without activating Morie or stealing text focus. Remember saves the correct spelling with **no automatic alias**. Not Now/expiry saves nothing; one word does not repeatedly prompt per process.
+- [ ] The native panel appears without activating Morie or stealing text focus. Explicit confirmation keeps/adds the canonical spelling and may persist the bounded observed-ASR → canonical-word mapping internally. Not Now/expiry saves nothing; no broad/unconfirmed mapping is learned; one word does not repeatedly prompt per process.
 - [ ] Further edits, moving the selection outside the insertion, field/app changes, new input and disabling the setting stop observation/dismiss the suggestion. Exercise unrelated/concurrent edits elsewhere in the same document to check range inference.
 - [ ] Secure input/password fields and excluded terminal/password-manager apps do not produce reads/prompts. Capture-only input and clipboard fallback never attach the watcher.
 - [ ] Check the 30-second observation / 20-second prompt limits, save errors, longest supported words, keyboard/VoiceOver, fullscreen, multiple screens and system appearance.
-- [ ] Inspect diagnostics/storage behavior: external field text is not logged, sent to AI or copied into Capture; only explicit Remember persists the spelling.
+- [ ] Inspect diagnostics/storage behavior: external field text is not logged, sent to AI or copied into Capture; only explicit confirmation may persist the canonical word and its bounded correction mapping.
 
 [OpenLess audit](reference/openless.md) records the behavior reference and native adaptation. Detector tests and offscreen rendering do not establish AX field semantics, no-focus-steal behavior or actual cross-app precision.
 
@@ -257,7 +257,7 @@ Test at least:
 - project/product names with and without dictionary Speech hints;
 - quiet and normal office acoustic conditions.
 
-M-015 uses Apple's `DictationTranscriber(.progressiveLongDictation)` for live input and `.longDictation` for History re-recognition. Result segments are concatenated exactly as Apple emits them; Morie does not invent spaces or guessed punctuation between segments. Record whether partial/volatile punctuation is sensible, whether finalization changes it materially, whether punctuation survives segment boundaries, and whether the end of a short utterance is ever lost after the finish action.
+Morie now prefers Apple's newer `SpeechTranscriber` for both live and saved-audio transcription when the requested locale/device supports it, and uses `DictationTranscriber` only as the Apple-native runtime fallback when preparation/support requires it. Result segments are concatenated exactly as Apple emits them; Morie does not invent spaces or guessed punctuation between segments. Record the actual backend shown in Overview/diagnostics, whether partial/volatile punctuation is sensible, whether finalization changes it materially, whether punctuation survives segment boundaries, and whether the end of a short utterance is ever lost after the finish action.
 
 ## Capture HUD and Liquid Glass
 
@@ -266,7 +266,7 @@ Validate the HUD over light, dark, detailed, and full-screen backgrounds:
 - the HUD renders as one continuous system Liquid Glass capsule that visibly samples the content behind its window, rather than an opaque black surface or three separate glass islands;
 - the cancel, waveform, and finish grouping matches the approved compact reference hierarchy;
 - the panel appears on the screen containing the pointer and near the bottom-center of its visible frame;
-- it never activates itself, steals text focus, or replaces the original target application;
+- it never activates itself, steals text focus, or restores/replaces the application that was active when recording began;
 - cancel and finish buttons have correct pointer-down feedback, hit targets, tooltips, and accessibility labels;
 - the waveform is present on the first frame, stays low at both edges and tallest in the middle, and changes its center with real microphone level without opening a second capture path;
 - normal speech produces clearly visible changes; the Debug log reports a nonzero audio-channel count and changing average/peak/normalized meter values rather than a missing-channel or floor-pinned warning;
