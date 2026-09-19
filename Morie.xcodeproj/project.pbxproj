@@ -634,8 +634,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/foundation-models-utilities";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
+				kind = revision;
+				revision = 2aa12937e30d310687f40fc470ea35495816c9a4;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
