@@ -49,7 +49,7 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(InputRefiner.instructionsText.contains("# 任务目标"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("# 绝对边界"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("# 口语整理"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("# 中文自然格式"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("# 自然格式"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("# 结构与语境"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("Gethab"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("GitHub"))
@@ -60,9 +60,38 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(InputRefiner.instructionsText.contains("9:00 → 9点"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("同一词在后续分句中再次指代对象"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("非正式内容以自然表达为主"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("明显中途改口 / 句子重启"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("废弃半句"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("中文、英文或中英文混合"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("当前输入本身没有指向某条记忆时忽略它"))
         XCTAssertFalse(InputRefiner.instructionsText.contains("已输入我觉得有必要存在吗"))
         XCTAssertFalse(InputRefiner.instructionsText.contains("授权的时候我们的窗口授权完之后"))
+    }
+
+    func testFalseStartCleanupCanKeepFinalCompleteRestartWithoutMechanicalRule() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "这个功能要让他就是先，算了我重新说，让这个功能只在当前窗口生效"
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "让这个功能只在当前窗口生效。",
+                for: input
+            ).text,
+            "让这个功能只在当前窗口生效。"
+        )
+
+        let independent = RefinementInput(
+            captureID: UUID(),
+            text: "先保存当前内容，然后重新打开窗口"
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "先保存当前内容，然后重新打开窗口。",
+                for: independent
+            ).text,
+            "先保存当前内容，然后重新打开窗口。"
+        )
     }
 
     func testModelPromptSendsOnlyDictionaryWordsAndUsefulMemoryText() throws {

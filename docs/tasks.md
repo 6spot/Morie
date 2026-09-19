@@ -29,6 +29,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-014 | Input routing | Deliver final text to current keyboard focus like a system input method | IN PROGRESS | — | [`M-014`](./tasks/M-014-current-focus-input.md) |
 | M-015 | Speech quality | Use Apple dictation punctuation for live and saved-audio transcription | IN PROGRESS | — | [`M-015`](./tasks/M-015-native-dictation-punctuation.md) |
 | M-016 | Input quality | Keep cleanup Memory context small and directly relevant | IN PROGRESS | — | [`M-016`](./tasks/M-016-conservative-cleanup-context.md) |
+| M-017 | Input quality | Clean abandoned fragments and sentence restarts without losing independent meaning | IN PROGRESS | — | [`M-017`](./tasks/M-017-cleanup-false-starts.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
