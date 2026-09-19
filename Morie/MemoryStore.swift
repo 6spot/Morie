@@ -76,6 +76,13 @@ final class MemoryStore: ObservableObject {
         return try reader.fetchCount(FetchDescriptor<MemoryAnalysisRecord>())
     }
 
+    func analysisRecords() throws -> [MemoryAnalysisRecord] {
+        let reader = makeContext()
+        return try reader.fetch(
+            FetchDescriptor<MemoryAnalysisRecord>(sortBy: [SortDescriptor(\.sourceCapturedAt)])
+        )
+    }
+
     /// One startup reconciliation recovers completed inputs that may have been saved just before a crash.
     /// Normal operation enqueues only the Capture that just reached a terminal delivery state.
     func reconcileCompletedInputs() throws {
