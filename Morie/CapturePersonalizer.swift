@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 final class CapturePersonalizer {
     static let enabledDefaultsKey = "inputRefinementEnabled"
+    private static let cleanupMemoryContextLimit = 4
 
     private let store: CaptureStore
     private let memory: MemoryStore
@@ -28,7 +29,9 @@ final class CapturePersonalizer {
         let dictionaryEntries = (try? dictionary.relevantEntries(for: source)) ?? []
         let prepared = DictionarySpelling.normalize(source, using: dictionaryEntries).text
         // Neither a missing personal profile nor retrieval failure disables day-one cleanup.
-        let context = skip == nil ? ((try? memory.relevantContext(for: prepared)) ?? []) : []
+        let context = skip == nil
+            ? ((try? memory.relevantContext(for: prepared, limit: Self.cleanupMemoryContextLimit)) ?? [])
+            : []
         let input = try store.refinementInput(for: captureID, context: context, dictionary: dictionaryEntries)
 
         do {
@@ -49,7 +52,10 @@ final class CapturePersonalizer {
             case .keptOriginal(let reason):
                 return try keepOriginal(input, reason: reason, started: started)
             case .text(let text):
-                let current = (try? memory.relevantContext(for: input.prepared.text)) ?? []
+                let current = (try? memory.relevantContext(
+                    for: input.prepared.text,
+                    limit: Self.cleanupMemoryContextLimit
+                )) ?? []
                 guard current == input.context else {
                     return try keepOriginal(input, reason: .memoryChanged, started: started)
                 }
