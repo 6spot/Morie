@@ -278,6 +278,7 @@ microphone
 Behavior rules:
 
 - progressive transcription remains the low-latency live feedback path and the fallback result;
+- bootstrap prepares both live and final Speech presets before Ready so normal finish does not start an asset download;
 - the closed source audio is re-read once with the non-progressive accurate preset before cleanup;
 - the same per-Capture dictionary hint snapshot is applied through `AnalysisContext` during the accurate pass;
 - confirmed no-speech audio skips the second pass;
