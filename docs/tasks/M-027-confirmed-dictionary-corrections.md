@@ -54,7 +54,7 @@ On confirmation:
 
 Exact confirmed mappings run before optional AI cleanup, so they still work when Foundation Models is disabled, busy or unavailable. The prepared text then receives ordinary canonical spelling normalization.
 
-The cleanup prompt also receives the bounded confirmed relations as high-confidence evidence for contextually obvious near variants, with an explicit instruction not to force a correction when the current meaning does not point to that word.
+Confirmed relations remain part of `RefinementInput` provenance/staleness checks, but after the 2026-09-19 cleanup-leakage finding they are no longer serialized into the Foundation Models prompt. Exact confirmed mappings are applied deterministically before AI cleanup; this avoids turning historical wrong/correct word pairs into generation vocabulary.
 
 ## Safety
 
@@ -74,7 +74,7 @@ The cleanup prompt also receives the bounded confirmed relations as high-confide
 - [x] Missing canonical replacement is added as a correction-sourced user word.
 - [x] Exact mappings apply before optional AI cleanup.
 - [x] Correction provenance is carried in `RefinementEdit.correctionRuleID`.
-- [x] Confirmed mappings are supplied to the cleanup prompt.
+- [x] Confirmed mappings are applied before cleanup and retained as provenance; they are intentionally excluded from the model prompt after the cleanup-leakage follow-up.
 - [x] Mapping changes participate in refinement staleness checks.
 - [x] Visible Dictionary remains canonical-word only.
 - [x] macOS 27 Release product compile passes.

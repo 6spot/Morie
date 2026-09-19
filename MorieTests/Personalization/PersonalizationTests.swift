@@ -18,12 +18,35 @@ final class PersonalizationTests: XCTestCase {
         }
     }
 
-    func testStructuredModelTextIsTrustedWithoutMechanicalContentChecks() throws {
+    func testCleanupValidationKeepsShortCorrectionsButRejectsUngroundedNewSentences() throws {
         let input = RefinementInput(captureID: UUID(), text: "我觉得可能周四吧")
         XCTAssertEqual(try ValidatedRefinement.accepting("周四。", for: input).text, "周四。")
-        XCTAssertEqual(try ValidatedRefinement.accepting("这是模型给出的完整新表达。", for: input).text, "这是模型给出的完整新表达。")
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("这是模型给出的完整新表达。", for: input)
+        )
         XCTAssertThrowsError(try ValidatedRefinement.accepting("   ", for: input))
         XCTAssertThrowsError(try ValidatedRefinement.accepting("无效\0文本", for: input))
+    }
+
+    func testCleanupValidationRejectsDictionaryPrimedHallucinatedSentence() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "这几个分段我也没测试，这是我自己手动分的段嗯。"
+        )
+
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "这几个分段我也没测试，这是我自己手动分的段。\n\nGitHub 里有 issues。",
+                for: input
+            )
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "这几个分段我也没测试，这是我自己手动分的段。",
+                for: input
+            ).text,
+            "这几个分段我也没测试，这是我自己手动分的段。"
+        )
     }
 
     func testContextualChineseRecognitionCorrectionUsesContextInsteadOfACharacterLimit() throws {
@@ -46,31 +69,19 @@ final class PersonalizationTests: XCTestCase {
             ).text,
             "我们明天去公园。"
         )
-        XCTAssertTrue(InputRefiner.instructionsText.contains("# 任务目标"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("# 绝对边界"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("# 口语整理"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("# 自然格式"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("# 结构与语境"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("Gethab"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("GitHub"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("界面标签"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("标点整理是必做项"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("不得新增用户没有说过"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("原文没有，就不能出现在输出里"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("9:00 → 9点"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("同一词在后续分句中再次指代对象"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("非正式内容以自然表达为主"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("明显中途改口 / 句子重启"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("废弃半句"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("不要把零碎口语重新合并成一个大段"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("# 最高优先级：只整理原文"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("润色不是重写，更不是扩写"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("spellingCandidates"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("只能用于修正对应词"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("personalContext"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("不能把记忆里的事实"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("semanticParagraphs"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("只有两个紧密相关的小点时优先保持连贯段落"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("中文、英文或中英文混合"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("当前输入本身没有指向某条记忆时忽略它"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("confirmedCorrections"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("Athers → Issues"))
-        XCTAssertFalse(InputRefiner.instructionsText.contains("已输入我觉得有必要存在吗"))
-        XCTAssertFalse(InputRefiner.instructionsText.contains("授权的时候我们的窗口授权完之后"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("explicitList"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("不按固定字数机械切段"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("9:00 整理为 9点"))
+        XCTAssertFalse(InputRefiner.instructionsText.contains("GitHub"))
+        XCTAssertFalse(InputRefiner.instructionsText.contains("Issues"))
+        XCTAssertFalse(InputRefiner.instructionsText.contains("Gethab"))
     }
 
     func testFalseStartCleanupCanKeepFinalCompleteRestartWithoutMechanicalRule() throws {
@@ -136,8 +147,9 @@ final class PersonalizationTests: XCTestCase {
 
         let prompt = try InputRefiner.promptText(for: input)
         XCTAssertTrue(prompt.contains(#""formattingHint":"compact""#))
-        XCTAssertTrue(prompt.contains(#""dictionary":["GitHub"]"#))
-        XCTAssertTrue(prompt.contains(#""confirmedCorrections":[{"observed":"Athers","correct":"Issues"}]"#))
+        XCTAssertTrue(prompt.contains(#""spellingCandidates":["GitHub"]"#))
+        XCTAssertFalse(prompt.contains("confirmedCorrections"))
+        XCTAssertFalse(prompt.contains("Athers"))
         XCTAssertTrue(prompt.contains(#""name":"Morie""#))
         XCTAssertTrue(prompt.contains(#""notes":"Morie is a voice input project.""#))
         XCTAssertTrue(prompt.contains(#""expressionStyle":["倾向保留句末标点。"]"#))
@@ -197,7 +209,8 @@ final class PersonalizationTests: XCTestCase {
         let memory = MemorySnapshot(id: UUID(), kind: .fact, status: .active, name: "职业", notes: "我是开发者。", origin: .automatic, updatedAt: Date())
         let input = RefinementInput(captureID: UUID(), text: "开始吧", context: [MemoryContextMatch(memory: memory, matchedTerm: "职业")])
         XCTAssertEqual(try ValidatedRefinement.accepting("我是开发者，开始吧。", for: input).text, "我是开发者，开始吧。")
-        XCTAssertTrue(InputRefiner.instructionsText.contains("个人记忆仅用于理解当前表达"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("personalContext"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("不能把记忆里的事实"))
     }
 
     func testRefinementUsesLiveStateAndFlushMakesResultDurable() async throws {

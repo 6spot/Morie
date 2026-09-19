@@ -79,17 +79,48 @@ final class DictionaryTests: XCTestCase {
         }
     }
 
-    func testSavedWordSuppliesHintsAndCleanupContextEvenWhenRecognitionMisspellsIt() throws {
+    func testSavedWordAlwaysSuppliesSpeechHintButCleanupContextIsTranscriptRelevant() throws {
         let captures = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let store = DictionaryStore(container: captures.container)
         let id = try store.create(DictionaryDraft(name: "UserSpecificTerm"))
+
         XCTAssertTrue(try store.speechHints().contains("UserSpecificTerm"))
-        XCTAssertTrue(try store.relevantEntries(for: "use user specific term").map(\.id).contains(id))
+        XCTAssertTrue(
+            try store.relevantEntries(for: "Use UserSpecificTerm here.")
+                .map(\.id)
+                .contains(id)
+        )
+        XCTAssertFalse(
+            try store.relevantEntries(for: "这几个分段是我自己手动分的。")
+                .map(\.id)
+                .contains(id)
+        )
+
+        let github = try store.relevantEntries(for: "Gethab 里面看一下 issue")
+        XCTAssertTrue(github.contains(where: { $0.name == "GitHub" }))
+
         try store.delete(id)
         XCTAssertFalse(try store.speechHints().contains("UserSpecificTerm"))
         XCTAssertFalse(try store.relevantEntries(for: "UserSpecificTerm").map(\.id).contains(id))
         XCTAssertTrue(try store.speechHints().contains("GitHub"))
+    }
+
+    func testUnrelatedDictionaryTermsAndCorrectionsDoNotReachCleanupContext() throws {
+        let captures = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
+        let store = DictionaryStore(container: captures.container)
+
+        _ = try store.create(DictionaryDraft(name: "Issues"))
+        _ = try store.saveConfirmedCorrection(original: "Athers", replacement: "Issues")
+
+        let unrelated = "这几个分段我也没测试，这是我自己手动分的段。"
+        XCTAssertFalse(try store.relevantEntries(for: unrelated).contains(where: { $0.name == "Issues" }))
+        XCTAssertFalse(try store.relevantEntries(for: unrelated).contains(where: { $0.name == "GitHub" }))
+        XCTAssertTrue(try store.relevantConfirmedCorrections(for: unrelated).isEmpty)
+
+        let related = try store.relevantConfirmedCorrections(for: "GitHub 里的 Athers 可以关掉了")
+        XCTAssertEqual(related.map(\.replacement), ["Issues"])
     }
 
     func testBuiltInWordsAreReadOnlyAndUserEntriesOverrideTheirDisplaySource() throws {
