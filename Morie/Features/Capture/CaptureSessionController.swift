@@ -368,16 +368,7 @@ final class CaptureSessionController {
         Diagnostics.record("Speech", "Finalizing Speech session \(label(sessionID))")
 
         do {
-            let shouldPlayStopCue = soundFeedbackEnabled
-            let result = try await speech.stop(
-                sessionID: sessionID,
-                onCaptureStopped: { [weak self] in
-                    guard shouldPlayStopCue else { return }
-                    Task { @MainActor in
-                        self?.soundFeedback.playStop()
-                    }
-                }
-            )
+            let result = try await speech.stop(sessionID: sessionID)
             recordLatency("speech-final", sessionID: sessionID)
             Diagnostics.recordMemory("speech-stop \(label(sessionID))")
             var finalText = result.transcript
@@ -606,6 +597,9 @@ final class CaptureSessionController {
         onCancellationEnabledChange?(false)
         resetSessionIdentity()
         setPhase(.idle)
+        if soundFeedbackEnabled {
+            soundFeedback.playStop()
+        }
         hud.showSuccess(deliveryMode: deliveryMode)
 
         let completedLabel = label(sessionID)
