@@ -3,19 +3,13 @@ import Foundation
 
 struct TextInjector {
     enum InjectionError: LocalizedError {
-        case noTargetApplication
-        case targetWindowClosed
-        case focusRestoreFailed
+        case noCurrentTargetApplication
         case pasteFailed
 
         var errorDescription: String? {
             switch self {
-            case .noTargetApplication:
-                "原来的目标应用已不可用，文字已复制到剪贴板。"
-            case .targetWindowClosed:
-                "原来的输入窗口已关闭，文字已复制到剪贴板。"
-            case .focusRestoreFailed:
-                "无法返回原来的应用，文字已复制到剪贴板。"
+            case .noCurrentTargetApplication:
+                "当前没有可输入的外部应用，文字已复制到剪贴板。"
             case .pasteFailed:
                 "无法自动输入文字，文字已保留在剪贴板中。"
             }
@@ -23,7 +17,6 @@ struct TextInjector {
     }
 
     private static let syntheticInputEventMarker = Int64.random(in: 1...Int64.max)
-    private static let focusHandoffDelay: Duration = .milliseconds(100)
     private static let clipboardRestoreDelay: Duration = .milliseconds(500)
     private static let transientPasteboardType = NSPasteboard.PasteboardType(
         "org.nspasteboard.TransientType"
@@ -37,93 +30,44 @@ struct TextInjector {
         event.getIntegerValueField(.eventSourceUserData) == syntheticInputEventMarker
     }
 
+    /// Interactive Morie input follows the system keyboard model: resolve the
+    /// destination only when the final text is ready, never reactivate an app
+    /// remembered at recording start.
     @MainActor
-    static func frontmostWindowNumber(for application: NSRunningApplication?) -> CGWindowID? {
-        guard let application,
-              let windows = CGWindowListCopyWindowInfo(
-                [.optionOnScreenOnly, .excludeDesktopElements],
-                kCGNullWindowID
-              ) as? [[CFString: Any]]
-        else { return nil }
-
-        return windows.first { window in
-            let ownerPID = window[kCGWindowOwnerPID] as? NSNumber
-            let layer = window[kCGWindowLayer] as? NSNumber
-            return ownerPID?.int32Value == application.processIdentifier
-                && layer?.intValue == 0
-        }
-        .flatMap { ($0[kCGWindowNumber] as? NSNumber)?.uint32Value }
-    }
-
-    @MainActor
-    func deliver(
-        _ text: String,
-        to application: NSRunningApplication?,
-        originalWindowNumber: CGWindowID?
-    ) async throws {
+    func deliver(_ text: String) throws -> NSRunningApplication {
         try Task.checkCancellation()
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            Diagnostics.record("Delivery", "deliver() received empty text; returning", level: .warning)
-            return
+            Diagnostics.record("Delivery", "deliver() received empty text; returning current app", level: .warning)
+            guard let application = NSWorkspace.shared.frontmostApplication else {
+                throw InjectionError.noCurrentTargetApplication
+            }
+            return application
         }
 
-        guard let application,
+        guard let application = NSWorkspace.shared.frontmostApplication,
               !application.isTerminated,
               application.bundleIdentifier != Bundle.main.bundleIdentifier
         else {
             Diagnostics.record(
                 "Delivery",
-                "Target application missing/terminated/self; preserving transcript on clipboard",
+                "No external frontmost application at delivery time; preserving transcript on clipboard",
                 level: .error
             )
             copyToClipboard(text)
-            throw InjectionError.noTargetApplication
+            throw InjectionError.noCurrentTargetApplication
         }
 
         let targetName = application.localizedName ?? "unknown"
         let targetBundle = application.bundleIdentifier ?? "unknown"
+        Diagnostics.record(
+            "Delivery",
+            "Dispatching current-focus input to \(targetName) (\(targetBundle))"
+        )
 
-        if let originalWindowNumber, !Self.windowExists(originalWindowNumber) {
-            Diagnostics.record(
-                "Delivery",
-                "Original target window \(originalWindowNumber) no longer exists; preserving transcript on clipboard",
-                level: .error
-            )
-            copyToClipboard(text)
-            throw InjectionError.targetWindowClosed
-        }
-
-        Diagnostics.record("Delivery", "Restoring target application \(targetName) (\(targetBundle))")
-
-        let activated = application.activate()
-        Diagnostics.record("Delivery", "Target activation returned \(activated)")
-        guard activated else {
-            copyToClipboard(text)
-            throw InjectionError.focusRestoreFailed
-        }
-
-        try await Task.sleep(for: Self.focusHandoffDelay)
-        try Task.checkCancellation()
-        Diagnostics.record("Delivery", "Focus handoff grace period completed")
-
-        if let originalWindowNumber, !Self.windowExists(originalWindowNumber) {
-            Diagnostics.record(
-                "Delivery",
-                "Original target window \(originalWindowNumber) closed during focus handoff; preserving transcript on clipboard",
-                level: .error
-            )
-            copyToClipboard(text)
-            throw InjectionError.targetWindowClosed
-        }
-
-        // Morie intentionally uses one generic delivery mechanism for current-app
-        // insertion. Direct AX writes can report success while some editors ignore
-        // the mutation, which makes success impossible to trust uniformly. A
-        // temporary clipboard value plus a synthetic Cmd+V exercises the same
-        // standard paste path the target application already supports for users.
-        Diagnostics.record("Delivery", "Using universal clipboard Cmd+V delivery")
-
+        // A temporary clipboard value plus a synthetic Cmd+V intentionally lets
+        // macOS and the target application's first-responder chain decide which
+        // control receives text. Accessibility is not used to prove editability.
         guard pasteThroughClipboard(text) else {
             copyToClipboard(text)
             Diagnostics.record(
@@ -134,18 +78,8 @@ struct TextInjector {
             throw InjectionError.pasteFailed
         }
 
-        Diagnostics.record("Delivery", "Clipboard Cmd+V delivery dispatched")
-    }
-
-    private static func windowExists(_ windowNumber: CGWindowID) -> Bool {
-        guard let windows = CGWindowListCopyWindowInfo(
-            [.optionIncludingWindow, .excludeDesktopElements],
-            windowNumber
-        ) as? [[CFString: Any]] else { return false }
-
-        return windows.contains { window in
-            (window[kCGWindowNumber] as? NSNumber)?.uint32Value == windowNumber
-        }
+        Diagnostics.record("Delivery", "Current-focus clipboard Cmd+V dispatched")
+        return application
     }
 
     @MainActor
