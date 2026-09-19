@@ -75,10 +75,12 @@
 		A10000000000000000000026 /* CapturePersistenceWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* CapturePersistenceWriter.swift */; };
 		A10000000000000000000027 /* SpeechRecognitionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000041 /* SpeechRecognitionBackend.swift */; };
 		A10000000000000000000028 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000042 /* OverviewView.swift */; };
+		A10000000000000000000029 /* CaptureSoundFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000043 /* CaptureSoundFeedback.swift */; };
 		A2000000000000000000001F /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
 		A20000000000000000000020 /* ExpressionProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000013 /* ExpressionProfileTests.swift */; };
 		A20000000000000000000021 /* CapturePersistenceWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* CapturePersistenceWriter.swift */; };
 		A20000000000000000000022 /* SpeechRecognitionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000041 /* SpeechRecognitionBackend.swift */; };
+		A20000000000000000000023 /* CaptureSoundFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000043 /* CaptureSoundFeedback.swift */; };
 		A10000000000000000000022 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
@@ -136,6 +138,7 @@
 		B10000000000000000000040 /* CapturePersistenceWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePersistenceWriter.swift; sourceTree = "<group>"; };
 		B10000000000000000000041 /* SpeechRecognitionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognitionBackend.swift; sourceTree = "<group>"; };
 		B10000000000000000000042 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
+		B10000000000000000000043 /* CaptureSoundFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSoundFeedback.swift; sourceTree = "<group>"; };
 		B20000000000000000000013 /* ExpressionProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpressionProfileTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000036 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -224,6 +227,7 @@
 				B10000000000000000000039 /* CaptureSessionController.swift */,
 				B10000000000000000000040 /* CapturePersistenceWriter.swift */,
 				B10000000000000000000041 /* SpeechRecognitionBackend.swift */,
+				B10000000000000000000043 /* CaptureSoundFeedback.swift */,
 				D30000000000000000000004 /* History */,
 			);
 			path = Capture;
@@ -527,6 +531,7 @@
 				A10000000000000000000026 /* CapturePersistenceWriter.swift in Sources */,
 				A10000000000000000000027 /* SpeechRecognitionBackend.swift in Sources */,
 				A10000000000000000000028 /* OverviewView.swift in Sources */,
+				A10000000000000000000029 /* CaptureSoundFeedback.swift in Sources */,
 				A10000000000000000000009 /* CaptureRecord.swift in Sources */,
 				A1000000000000000000000A /* CaptureStore.swift in Sources */,
 				A1000000000000000000000B /* CaptureHistoryView.swift in Sources */,
@@ -569,6 +574,7 @@
 				A20000000000000000000003 /* CaptureStore.swift in Sources */,
 				A20000000000000000000021 /* CapturePersistenceWriter.swift in Sources */,
 				A20000000000000000000022 /* SpeechRecognitionBackend.swift in Sources */,
+				A20000000000000000000023 /* CaptureSoundFeedback.swift in Sources */,
 				A20000000000000000000004 /* TestDiagnostics.swift in Sources */,
 				A20000000000000000000005 /* CaptureFileTranscriber.swift in Sources */,
 				A20000000000000000000006 /* CaptureHistoryController.swift in Sources */,
