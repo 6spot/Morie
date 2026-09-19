@@ -23,6 +23,8 @@ Morie intentionally does not support older Macs by adding alternate ASR/LLM runt
 
 The macOS app bundle identifier is `me.morie.mac`. Privacy permissions are associated with this identifier and the current local signing identity.
 
+M-034's Apple `foundation-models-utilities` dependency is pinned in the Xcode project and in the shared workspace resolution file at `Morie.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`. A normal clone/pull should therefore resolve the same revision automatically. If Xcode still shows stale package metadata after pulling, use **File → Packages → Resolve Package Versions** (or `xcodebuild -resolvePackageDependencies -project Morie.xcodeproj -scheme Morie`) before changing project references.
+
 The target enables Hardened Runtime and signs with `Morie/Morie.entitlements`. The Apple audio-input entitlement is required in addition to `NSMicrophoneUsageDescription`; without it, macOS can reject `AVCaptureDevice.requestAccess(for: .audio)` immediately without presenting consent.
 
 Command-line compile validation must use isolated temporary DerivedData so it cannot overwrite the signed app used by an active Xcode session:
