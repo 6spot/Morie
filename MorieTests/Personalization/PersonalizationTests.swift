@@ -18,12 +18,35 @@ final class PersonalizationTests: XCTestCase {
         }
     }
 
-    func testStructuredModelTextIsTrustedWithoutMechanicalContentChecks() throws {
+    func testCleanupValidationKeepsShortCorrectionsButRejectsUngroundedNewSentences() throws {
         let input = RefinementInput(captureID: UUID(), text: "我觉得可能周四吧")
         XCTAssertEqual(try ValidatedRefinement.accepting("周四。", for: input).text, "周四。")
-        XCTAssertEqual(try ValidatedRefinement.accepting("这是模型给出的完整新表达。", for: input).text, "这是模型给出的完整新表达。")
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("这是模型给出的完整新表达。", for: input)
+        )
         XCTAssertThrowsError(try ValidatedRefinement.accepting("   ", for: input))
         XCTAssertThrowsError(try ValidatedRefinement.accepting("无效\0文本", for: input))
+    }
+
+    func testCleanupValidationRejectsDictionaryPrimedHallucinatedSentence() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "这几个分段我也没测试，这是我自己手动分的段嗯。"
+        )
+
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "这几个分段我也没测试，这是我自己手动分的段。\n\nGitHub 里有 issues。",
+                for: input
+            )
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "这几个分段我也没测试，这是我自己手动分的段。",
+                for: input
+            ).text,
+            "这几个分段我也没测试，这是我自己手动分的段。"
+        )
     }
 
     func testContextualChineseRecognitionCorrectionUsesContextInsteadOfACharacterLimit() throws {
