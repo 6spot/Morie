@@ -44,6 +44,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-029 | No-speech handling | Discard true no-speech captures while retaining retryable speech audio | DONE | [#44](https://github.com/6spot/Morie/issues/44) | [`M-029`](./tasks/M-029-no-speech-retention.md) |
 | M-030 | Validation | Execute deterministic MorieTests in macOS 27 CI | DONE | [#48](https://github.com/6spot/Morie/issues/48) | [`M-030`](./tasks/M-030-macos-logic-test-gate.md) |
 | M-031 | Documentation | Align current source-of-truth docs and supersede stale Phase-0 instructions | DONE | [#49](https://github.com/6spot/Morie/issues/49) | [`M-031`](./tasks/M-031-source-of-truth-alignment.md) |
+| M-032 | Capture lifecycle | Freeze per-Capture settings and Speech hint context | IN PROGRESS | [#50](https://github.com/6spot/Morie/issues/50) | [`M-032`](./tasks/M-032-capture-session-context.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
