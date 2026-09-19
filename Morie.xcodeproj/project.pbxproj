@@ -74,6 +74,7 @@
 		A10000000000000000000025 /* CaptureSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000039 /* CaptureSessionController.swift */; };
 		A10000000000000000000026 /* CapturePersistenceWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* CapturePersistenceWriter.swift */; };
 		A10000000000000000000027 /* SpeechRecognitionBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000041 /* SpeechRecognitionBackend.swift */; };
+		A10000000000000000000028 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000042 /* OverviewView.swift */; };
 		A2000000000000000000001F /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
 		A20000000000000000000020 /* ExpressionProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000013 /* ExpressionProfileTests.swift */; };
 		A20000000000000000000021 /* CapturePersistenceWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* CapturePersistenceWriter.swift */; };
@@ -134,6 +135,7 @@
 		B10000000000000000000039 /* CaptureSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSessionController.swift; sourceTree = "<group>"; };
 		B10000000000000000000040 /* CapturePersistenceWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePersistenceWriter.swift; sourceTree = "<group>"; };
 		B10000000000000000000041 /* SpeechRecognitionBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognitionBackend.swift; sourceTree = "<group>"; };
+		B10000000000000000000042 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
 		B20000000000000000000013 /* ExpressionProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpressionProfileTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000036 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -189,6 +191,7 @@
 		D30000000000000000000002 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				D30000000000000000000010 /* Overview */,
 				D30000000000000000000003 /* Capture */,
 				D30000000000000000000005 /* Memory */,
 				D30000000000000000000006 /* Dictionary */,
@@ -196,6 +199,14 @@
 				D30000000000000000000008 /* Setup */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000010 /* Overview */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000042 /* OverviewView.swift */,
+			);
+			path = Overview;
 			sourceTree = "<group>";
 		};
 		D30000000000000000000003 /* Capture */ = {
@@ -515,6 +526,7 @@
 				A10000000000000000000025 /* CaptureSessionController.swift in Sources */,
 				A10000000000000000000026 /* CapturePersistenceWriter.swift in Sources */,
 				A10000000000000000000027 /* SpeechRecognitionBackend.swift in Sources */,
+				A10000000000000000000028 /* OverviewView.swift in Sources */,
 				A10000000000000000000009 /* CaptureRecord.swift in Sources */,
 				A1000000000000000000000A /* CaptureStore.swift in Sources */,
 				A1000000000000000000000B /* CaptureHistoryView.swift in Sources */,
