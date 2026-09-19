@@ -194,6 +194,18 @@ private struct CaptureHistoryListPane: View {
     }
 }
 
+enum CaptureHistoryQuery {
+    static func descriptor(limit: Int) -> FetchDescriptor<CaptureRecord> {
+        let capturing = CaptureLifecycle.capturing.rawValue
+        var descriptor = FetchDescriptor<CaptureRecord>(
+            predicate: #Predicate { $0.lifecycleRawValue != capturing },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return descriptor
+    }
+}
+
 @MainActor
 private struct CaptureHistoryQueryPane: View {
     @Query private var captures: [CaptureRecord]
@@ -216,11 +228,7 @@ private struct CaptureHistoryQueryPane: View {
         self.onRecord = onRecord
         self.onLoadMore = onLoadMore
 
-        var descriptor = FetchDescriptor<CaptureRecord>(
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = limit
-        _captures = Query(descriptor)
+        _captures = Query(CaptureHistoryQuery.descriptor(limit: limit))
     }
 
     var body: some View {
