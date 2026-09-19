@@ -16,10 +16,10 @@ Make the compact Capture capsule visually quieter and more internally consistent
 - The capsule glass is less black/heavy.
 - The existing soft blue/accent processing ring is retained unchanged.
 - The `Thinking` label uses secondary text contrast so the black text does not dominate the capsule.
-- Current-app completion changes from **已输入** to plain `SUCCESS`.
-- `SUCCESS` uses the same softened accent-color family as the processing ring; bright green is removed.
-- Text feedback inside the capsule does not carry decorative leading icons.
-- Capture-only completion remains **已保存**, also text-only.
+- Normal successful completion has **no separate success node**.
+- When processing finishes successfully, the `Thinking` capsule closes immediately using its existing collapse/fade-out animation.
+- This applies to both current-app delivery and capture-only completion: no `SUCCESS`, **已输入**, **已保存**, checkmark or green flash remains.
+- Result messages are reserved for exceptional/actionable outcomes such as clipboard fallback or recognition failure, and remain text-only.
 - Chinese accessibility labels remain descriptive even where the visible completion word is English.
 
 ## Implementation
@@ -36,10 +36,11 @@ processing
    secondary text +
    existing accent ring
 
-current-app success
-          SUCCESS
-     soft accent color
-     no leading icon
+successful completion
+          Thinking
+             ↓
+      collapse / fade out
+       no success dwell
 ```
 
 The native `NSGlassEffectView` remains the surface; only its tint intensity is reduced. No custom blur/material or third-party UI dependency is introduced.
@@ -51,12 +52,13 @@ The native `NSGlassEffectView` remains the surface; only its tint intensity is r
 - [x] Capsule tint is visibly softer than the previous black-heavy value.
 - [x] Thinking ring is unchanged.
 - [x] Thinking text uses secondary contrast instead of primary black.
-- [x] Current-app success is plain `SUCCESS`, no icon, no green.
-- [x] Saved/clipboard/recognition status messages have no leading decorative icon.
+- [x] Current-app success has no separate HUD state or dwell.
+- [x] Capture-only success has no separate HUD state or dwell.
+- [x] Clipboard/recognition status messages have no leading decorative icon.
 - [x] macOS 27 Release compile passes (CI #143).
 - [x] MorieTests pass (CI #143).
 - [ ] Owner-device visual check confirms contrast feels appropriately quiet.
 
 ## Validation boundary
 
-Hosted CI #143 passed both the macOS 27 Release compile and the full MorieTests gate. It cannot establish the final perceived contrast of Liquid Glass on the owner's display, so the owner-device visual check remains the final UI acceptance item before M-033 is closed.
+The earlier visual refinement passed CI #143. The follow-up that removes the success dwell passed macOS 27 CI #146: Release compile and the full MorieTests gate both succeeded. Final owner-device acceptance should confirm that `Thinking → collapse` feels faster and clearer than a separate success message.

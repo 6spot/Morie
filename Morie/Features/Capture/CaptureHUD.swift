@@ -56,16 +56,11 @@ final class CaptureHUDController {
     }
 
     func showSuccess(deliveryMode: CaptureDeliveryMode) {
-        hideTask?.cancel()
-        model.showFeedback(deliveryMode == .captureOnly ? .saved : .success)
-        showPanel()
-        Diagnostics.record("HUD", "Compact capture HUD showing success; mode=\(deliveryMode.rawValue)")
-
-        hideTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(850))
-            guard !Task.isCancelled else { return }
-            self?.hide()
-        }
+        Diagnostics.record(
+            "HUD",
+            "Capture completed successfully; closing processing HUD; mode=\(deliveryMode.rawValue)"
+        )
+        hide()
     }
 
     func showClipboardFallback() {
@@ -337,8 +332,6 @@ final class CaptureHUDModel: ObservableObject {
         case hidden
         case recording
         case processing
-        case success
-        case saved
         case clipboardFallback
         case noSpeech
         case recognitionFailure
@@ -478,13 +471,6 @@ private struct CaptureHUDView: View {
                         .allowsHitTesting(false)
                 }
                 .accessibilityLabel("正在整理输入")
-
-        case .success, .saved:
-            Text(model.phase == .saved ? "已保存" : "SUCCESS")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.accentColor.opacity(0.52))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityLabel(model.phase == .saved ? "录音和文字已保存到历史记录" : "文字已输入")
 
         case .clipboardFallback:
             Text("已复制到剪贴板")
