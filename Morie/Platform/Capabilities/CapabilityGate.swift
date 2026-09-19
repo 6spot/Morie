@@ -177,10 +177,14 @@ struct CapabilityGate {
     }
 
     private func inspectSpeech(locale: Locale) async -> CapabilityCheck {
-        guard await DictationTranscriber.supportedLocale(equivalentTo: locale) != nil else {
+        guard let backend = await SpeechRecognitionBackend.preferred(for: locale) else {
             return .init(requirement: .speechTranscription, state: .unavailable,
-                         detail: "Apple 听写暂不支持当前输入语言（\(locale.identifier)）。")
+                         detail: "Apple 本机语音转写暂不支持当前输入语言（\(locale.identifier)）。")
         }
+        Diagnostics.record(
+            "Capability",
+            "Preferred Speech backend for \(locale.identifier): \(backend.logName) (\(backend.locale.identifier))"
+        )
         return .init(requirement: .speechTranscription, state: .ready)
     }
 }
