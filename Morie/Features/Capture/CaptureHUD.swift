@@ -553,13 +553,13 @@ private struct CaptureHUDView: View {
                 Button(action: model.confirm) {
                     Image(systemName: "checkmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(Color.secondary.opacity(0.88))
                         .frame(width: Layout.controlVisualSize, height: Layout.controlVisualSize)
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.circle)
                 .controlSize(.small)
-                .tint(.white.opacity(0.16))
+                .tint(Color.secondary.opacity(0.14))
                 .frame(width: Layout.controlLaneWidth, height: Layout.innerHeight)
                 .accessibilityLabel("完成录音")
                 .help("完成录音")
@@ -617,13 +617,15 @@ private struct CaptureHUDView: View {
 private struct ProcessingSweep: View {
     let reduceMotion: Bool
 
-    @State private var sweepOffset: CGFloat = 0
+    @State private var sweepProgress: CGFloat = 0
 
     private let sweepDuration: TimeInterval = 2.20
 
     var body: some View {
         GeometryReader { geometry in
             let bandWidth = max(30, geometry.size.width * 0.52)
+            let travel = geometry.size.width + bandWidth
+            let offset = -bandWidth + travel * sweepProgress
 
             if !reduceMotion {
                 LinearGradient(
@@ -638,10 +640,10 @@ private struct ProcessingSweep: View {
                     endPoint: .trailing
                 )
                 .frame(width: bandWidth, height: geometry.size.height)
-                .offset(x: sweepOffset)
+                .offset(x: offset)
                 .clipShape(Capsule())
                 .task {
-                    sweepOffset = -bandWidth
+                    sweepProgress = 0
                     await Task.yield()
                     guard !Task.isCancelled else { return }
 
@@ -649,7 +651,7 @@ private struct ProcessingSweep: View {
                     // a progress fill. If processing outlives the sweep, the
                     // capsule simply remains in its native glass state.
                     withAnimation(.easeInOut(duration: sweepDuration)) {
-                        sweepOffset = geometry.size.width
+                        sweepProgress = 1
                     }
                 }
             }
