@@ -14,7 +14,7 @@
 
 ## Why
 
-Morie's first product dependency is a reliable macOS voice-input loop. Recording, transcription, session finalization, focus restoration, and text delivery must be dependable before persistence and Personal Memory have a stable product surface to improve.
+Morie's first product dependency is a reliable macOS voice-input loop. Recording, transcription, session finalization, current-focus routing, and text delivery must be dependable before persistence and Personal Memory have a stable product surface to improve.
 
 M-002 is not a Type4Me port. It starts from Morie's design and macOS 27 architecture, then uses Type4Me only as evidence for failure modes worth retaining.
 
@@ -257,9 +257,9 @@ Tracked categories include:
 - `App` — bootstrap and Ready/blocked transitions;
 - `Capability` / `Permission` — Apple Intelligence, Speech, microphone, Speech authorization, Accessibility;
 - `Hotkey` — event-tap install, accepted keyDown/keyUp, repeats, modifier mismatch, tap disable/fail-open release;
-- `Session` — capture IDs, target app/bundle, cancellation/completion;
+- `Session` — capture IDs, delivery-mode ownership, cancellation/completion;
 - `Speech` — assets, microphone/provider/analyzer lifecycle, result lengths, finalization/cancel;
-- `Delivery` — target activation, AX write, clipboard fallback, synthetic Cmd+V;
+- `Delivery` — current-frontmost target resolution, clipboard fallback, synthetic Cmd+V;
 - `Clipboard` — temporary write and change-count-aware restore;
 - `UI` — native failure alerts.
 
@@ -281,7 +281,7 @@ A repository workflow compiles and packages product code on GitHub's macOS 27 ho
 
 The diagnostics build containing the native Debug window and cross-layer instrumentation passed Xcode 27 build/sign/package at commit `ec888bd4`.
 
-This is compile/package evidence only. CI cannot prove microphone routing, TCC permission UI, physical global keyboard behavior, focus restoration, target-app insertion, Liquid Glass appearance, or latency on the user's real Mac.
+This is compile/package evidence only. CI cannot prove microphone routing, TCC permission UI, physical global keyboard behavior, current-focus routing, target-app insertion, Liquid Glass appearance, or latency on the user's real Mac.
 
 ## Type4Me audit result
 
