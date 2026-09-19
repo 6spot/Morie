@@ -6,6 +6,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A50000000000000000000001 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
+		A50000000000000000000002 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000001 /* FoundationModelsUtilities */; };
+		A50000000000000000000003 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000002 /* FoundationModelsUtilities */; };
 		A10000000000000000000001 /* MorieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* MorieApp.swift */; };
 		A10000000000000000000002 /* AppController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* AppController.swift */; };
 		A10000000000000000000003 /* CapabilityGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* CapabilityGate.swift */; };
@@ -87,6 +90,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B50000000000000000000001 /* RefinementModelSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementModelSettings.swift; sourceTree = "<group>"; };
 		B10000000000000000000001 /* MorieApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieApp.swift; sourceTree = "<group>"; };
 		B10000000000000000000002 /* AppController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppController.swift; sourceTree = "<group>"; };
 		B10000000000000000000003 /* CapabilityGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilityGate.swift; sourceTree = "<group>"; };
@@ -150,13 +154,17 @@
 		C10000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				A50000000000000000000002 /* FoundationModelsUtilities in Frameworks */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C20000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				A50000000000000000000003 /* FoundationModelsUtilities in Frameworks */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -329,6 +337,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000038 /* ICloudSyncSettings.swift */,
+				B50000000000000000000001 /* RefinementModelSettings.swift */,
 			);
 			path = Cloud;
 			sourceTree = "<group>";
@@ -439,6 +448,9 @@
 			buildRules = ();
 			dependencies = ();
 			name = Morie;
+			packageProductDependencies = (
+				G50000000000000000000001 /* FoundationModelsUtilities */,
+			);
 			productName = Morie;
 			productReference = B10000000000000000000007 /* Morie.app */;
 			productType = "com.apple.product-type.application";
@@ -454,6 +466,9 @@
 			buildRules = ();
 			dependencies = ();
 			name = MorieTests;
+			packageProductDependencies = (
+				G50000000000000000000002 /* FoundationModelsUtilities */,
+			);
 			productName = MorieTests;
 			productReference = B20000000000000000000002 /* MorieTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -490,6 +505,9 @@
 			knownRegions = ("zh-Hans", Base);
 			mainGroup = D10000000000000000000001;
 			productRefGroup = D10000000000000000000003 /* Products */;
+			packageReferences = (
+				H50000000000000000000001 /* XCRemoteSwiftPackageReference "foundation-models-utilities" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -521,6 +539,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A50000000000000000000001 /* RefinementModelSettings.swift in Sources */,
 				A10000000000000000000020 /* PermissionSetupController.swift in Sources */,
 				A10000000000000000000021 /* MorieSetupView.swift in Sources */,
 				A10000000000000000000001 /* MorieApp.swift in Sources */,
@@ -609,6 +628,30 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		H50000000000000000000001 /* XCRemoteSwiftPackageReference "foundation-models-utilities" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/foundation-models-utilities";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		G50000000000000000000001 /* FoundationModelsUtilities */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = H50000000000000000000001 /* XCRemoteSwiftPackageReference "foundation-models-utilities" */;
+			productName = FoundationModelsUtilities;
+		};
+		G50000000000000000000002 /* FoundationModelsUtilities */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = H50000000000000000000001 /* XCRemoteSwiftPackageReference "foundation-models-utilities" */;
+			productName = FoundationModelsUtilities;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F20000000000000000000001 /* Debug */ = {
