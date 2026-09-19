@@ -18,7 +18,7 @@ The owner corrected the delivery sequence: prove useful input on one Mac before 
 - A native custom dictionary. [M-011](M-011-simple-dictionary.md) supersedes the original alias configuration with one saved word per entry, adds a tiny code-owned read-only baseline, and persists manual vs correction-confirmed user-word provenance.
 - Automatic local personal-Memory learning from committed final input, scheduled in idle batches with restart/retry and input preemption.
 - Evidence-aware admission, merging, replacement, user corrections/deletion and exact source snapshots.
-- Input contextualization without adding unstated personal background.
+- Input contextualization without adding unstated personal background; M-016 limits cleanup to a small, directly relevant Memory set while learning may still inspect its own broader evidence context.
 - Native dictionary/Memory management without a required suggestion inbox.
 - Opt-in native correction-to-dictionary prompt following the owner-supplied OpenLess behavior reference; explicit spelling confirmation, with no inferred global alias.
 - Update task order and documentation to match these owner decisions.
@@ -53,7 +53,7 @@ iOS, inspiration capture/follow-up, CloudKit/enrollment/container configuration,
 
 - Separate SwiftData dictionary/personal-Memory records and non-autosaving write contexts preserve the Capture checkpoint boundary. The old candidate schema/workflow is removed directly.
 - Dictionary supplies bounded native Speech hints and same-word letter-case normalization; M-011 removes the earlier explicit-alias fields and behavior. Cleanup generates full final text under the approved contract, permits a bounded number of contextually unambiguous Chinese-character recognition corrections, and keeps original/input/context/changes before delivery.
-- Personal analysis uses a durable final-text queue, idle batches, evidence/lifecycle filters and immediate cancellation for new input. User edits and forgotten/archived topics take priority.
+- Personal analysis uses a durable final-text queue, idle batches, evidence/lifecycle filters and immediate cancellation for new input. User edits and forgotten/archived topics take priority. Cleanup and learning intentionally use different context budgets: cleanup is capped at four highly relevant memories to reduce leakage, while learning can inspect a broader bounded profile for conflict/update detection.
 - Correction observation is independently opt-in and bounded to a verified recent insertion. The native panel confirms only a spelling, saves it with correction provenance, sizes to long content/errors and dismisses when its observation becomes invalid. Manual and correction-confirmed words share the same user dictionary model but remain distinguishable by provenance; the built-in baseline is separate code-owned data.
 
 ## Reference decisions

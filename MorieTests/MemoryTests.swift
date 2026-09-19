@@ -213,6 +213,29 @@ final class MemoryContextRetrieverTests: XCTestCase {
         XCTAssertTrue(MemoryContextRetriever.retrieve(for: "GitHub", from: [unrelated]).isEmpty)
     }
 
+    func testSingleGenericOverlapDoesNotInjectPersonalMemory() {
+        let first = memory("Alpha", notes: "我在开发输入功能。")
+        let second = memory("Beta", notes: "我也在开发系统功能。")
+        XCTAssertTrue(
+            MemoryContextRetriever.retrieve(
+                for: "这个功能需要处理一下",
+                from: [first, second]
+            ).isEmpty
+        )
+    }
+
+    func testDistinctiveSingleTermCanStillRetrieveMemoryFromNotes() {
+        let project = memory("当前项目", notes: "我在开发 Morie。")
+        let other = memory("其他项目", notes: "我在开发别的工具。")
+        XCTAssertEqual(
+            MemoryContextRetriever.retrieve(
+                for: "Morie 的标点体验",
+                from: [other, project]
+            ).map(\.id),
+            [project.id]
+        )
+    }
+
     func testEmptyContextAndLimitsAreBounded() {
         let records = (0..<12).map { memory("Project\($0)") }
         let query = records.map(\.name).joined(separator: " ")

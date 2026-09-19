@@ -46,6 +46,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 - [x] Make punctuation completion an explicit model requirement and schema guide.
 - [x] Remove over-specific examples that could leak wording into unrelated input; explicitly forbid introducing unspoken stance words, generalize semantic-vs-stutter repetition handling, and normalize ordinary Chinese clock times such as `9:00 → 9点` without inventing AM/PM.
 - [x] Reorganize the cleanup prompt using the proven Type4Me lesson of role → goal → boundaries → spoken cleanup → formatting → structure/register → context → generic examples, while deliberately dropping its aggressive number/list/title/transition rewriting behavior.
+- [x] Keep personal Memory context conservative: cleanup receives at most four directly relevant items, common single-word overlap is insufficient, and the prompt must ignore Memory that the current input does not actually point to.
 - [ ] Measure fidelity, unintended changes, hint benefit, timeout rate, final-to-delivery latency and native interactions.
 
 ## Implementation notes

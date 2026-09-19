@@ -28,12 +28,13 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-013 | macOS UX | Simplify menu, setup, filters, Settings and Dictionary navigation | IN PROGRESS | — | [`M-013`](./tasks/M-013-control-center.md) |
 | M-014 | Input routing | Deliver final text to current keyboard focus like a system input method | IN PROGRESS | — | [`M-014`](./tasks/M-014-current-focus-input.md) |
 | M-015 | Speech quality | Use Apple dictation punctuation for live and saved-audio transcription | IN PROGRESS | — | [`M-015`](./tasks/M-015-native-dictation-punctuation.md) |
+| M-016 | Input quality | Keep cleanup Memory context small and directly relevant | IN PROGRESS | — | [`M-016`](./tasks/M-016-conservative-cleanup-context.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
 ## Current milestone
 
-The owner's amended priority is **one Mac's input → dictionary/cleanup → automatic personal Memory loop**, tracked in M-009. M-002/M-003 preserve input and recovery; M-004/M-005 now supply personal Memory and independent cleanup; M-008 supplies native management; M-010 supplies Chinese/native setup usability, M-011 simplifies dictionary entry to a single word, M-014 replaces original-app restoration with current-keyboard-focus delivery, and M-015 moves the Speech layer to Apple's punctuated dictation preset. Required real-device checks remain open. iCloud/CloudKit is outside this milestone, and iOS/inspiration follow-up are not scheduled. The historical phase numbers below are reference IDs, not the execution order.
+The owner's amended priority is **one Mac's input → dictionary/cleanup → automatic personal Memory loop**, tracked in M-009. M-002/M-003 preserve input and recovery; M-004/M-005 now supply personal Memory and independent cleanup; M-008 supplies native management; M-010 supplies Chinese/native setup usability, M-011 simplifies dictionary entry to a single word, M-014 replaces original-app restoration with current-keyboard-focus delivery, M-015 moves the Speech layer to Apple's punctuated dictation preset, and M-016 tightens personal-Memory context so cleanup sees only a few directly relevant items. Required real-device checks remain open. iCloud/CloudKit is outside this milestone, and iOS/inspiration follow-up are not scheduled. The historical phase numbers below are reference IDs, not the execution order.
 
 ### Implementation and remaining acceptance
 
