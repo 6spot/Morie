@@ -6,9 +6,10 @@
 
 ## Goal
 
-Morie must stop capture-only rendering when the HUD is hidden and avoid periodic
-data-layer work when there is nothing to process. Establish the real-device
-idle CPU/RSS baseline and investigate any remaining idle cost.
+Morie must stop capture-only rendering when the HUD is hidden, avoid periodic
+data-layer work when there is nothing to process, and prevent persistent object
+graphs from growing with every completed Capture. Establish the real-device
+idle CPU/RSS baseline and repeated-use memory plateau.
 
 ## Observed problem
 
@@ -48,6 +49,12 @@ No Type4Me source or external dependency is copied.
   error entries still flush immediately.
 - Dictionary and Memory literal matching reuse precomputed word boundaries
   instead of tokenizing the same input once per candidate.
+- Memory Analysis history is no longer retained in a published all-record array.
+  Queue/status/detail reads use bounded queries and UI value snapshots, while
+  the Memory mutation context is recreated after saves.
+- History initially retains at most 200 Capture rows and loads older records
+  explicitly in 200-row increments.
+- The correction-suggestion suppression cache is capped at 256 words.
 
 ## Validation
 
