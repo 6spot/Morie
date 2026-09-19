@@ -215,6 +215,45 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertNil(try XCTUnwrap(fetch(id, from: store)).sourceAudioRelativePath)
     }
 
+    func testStartingCaptureDoesNotRunExpiredAudioMaintenance() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "MorieAudioHotPathTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = try CaptureStore(inMemory: true, audioDirectory: directory)
+        let expiredID = UUID()
+        let expiredURL = try store.beginVoiceCapture(
+            id: expiredID,
+            deliveryMode: .currentApp,
+            applicationName: nil,
+            bundleIdentifier: nil,
+            windowNumber: nil
+        )
+        try Data("audio".utf8).write(to: expiredURL)
+        try store.attachSourceAudio(CapturedSourceAudio(url: expiredURL, duration: 1), for: expiredID)
+        try store.markFailed(expiredID, error: "No text recognized")
+        let expiredRecord = try XCTUnwrap(fetch(expiredID, from: store))
+        expiredRecord.sourceAudioExpiresAt = .distantPast
+        try store.container.mainContext.save()
+
+        let activeID = UUID()
+        _ = try store.beginVoiceCapture(
+            id: activeID,
+            deliveryMode: .currentApp,
+            applicationName: nil,
+            bundleIdentifier: nil,
+            windowNumber: nil
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: expiredURL.path))
+        XCTAssertNotNil(try XCTUnwrap(fetch(expiredID, from: store)).sourceAudioRelativePath)
+
+        try store.cancel(activeID)
+        try store.pruneExpiredAudio()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: expiredURL.path))
+    }
+
     func testMeaningfulAudioPreservesEmptyFailedCaptureAcrossRecreation() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieMeaningfulAudioTests-\(UUID().uuidString)", directoryHint: .isDirectory)
