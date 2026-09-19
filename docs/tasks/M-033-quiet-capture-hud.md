@@ -84,7 +84,7 @@ These changes remain synthesized/prepared once at `CaptureSoundFeedback` initial
 
 The Thinking animation was then refined to match the reference more closely: instead of an angular highlight orbiting the capsule border, a low-contrast fill advances from left to right over ~1.05 s. Owner testing showed that repeated sweeps were distracting, so the final contract is **one sweep per Thinking entry**; after reaching the right edge it settles to a faint static overlay until processing ends. Reduced Motion shows only the static treatment.
 
-macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for the reference-motion/sound implementation. The initial looping left-to-right Thinking sweep passed CI #152; the owner then reported three real-device issues: first-cue cold-start distortion, weakened Liquid Glass from custom tinting, and repeated Thinking sweeps. This follow-up removes the custom glass tint, makes the sweep single-run, and adds an 18 ms silent pre-roll plus a slightly softer attack before each synthesized cue.
+macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for the reference-motion/sound implementation. The initial looping left-to-right Thinking sweep passed CI #152; the owner then reported three real-device issues: first-cue cold-start distortion, weakened Liquid Glass from custom tinting, and repeated Thinking sweeps. This follow-up removes the custom glass tint, makes the sweep single-run, and adds an 18 ms silent pre-roll plus a slightly softer attack before each synthesized cue. macOS 27 CI #155 passed both the Release product compile and the full MorieTests gate for these fixes.
 
 ## Validation boundary
 
