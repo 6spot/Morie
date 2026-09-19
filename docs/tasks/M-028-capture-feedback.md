@@ -74,3 +74,22 @@ The old indeterminate `ProgressView` is removed. Processing uses a compact `Thin
 GitHub Actions `macOS 27 CI` run #94 passed the Release product compile on Xcode 27/macOS 27.
 
 Owner-device validation remains open for cue loudness/tone, Bluetooth behavior, and the subjective center-morph feel.
+
+## 2026-09-19 owner-device tuning
+
+Owner validation confirmed that the first M-028 slice works end-to-end, but identified three presentation issues:
+
+- the scale animation visually appeared to grow from the lower-left rather than the capsule center;
+- the synthesized two-sine cue sounded too dull;
+- `Thinking` was too small and its leading symbol was unnecessary.
+
+Follow-up changes:
+
+- animate the actual `NSGlassEffectView` rather than the whole root content view;
+- explicitly set the glass layer anchor point/position to the capsule center before applying scale transforms;
+- use a slightly slower 10% → 100% center morph (220 ms open / 160 ms close);
+- replace the pure-sine cue with a shorter higher-frequency chime containing restrained second/third harmonics and exponential decay;
+- increase `Thinking` to 13 pt semibold and remove the icon;
+- add a subtle rotating capsule-border highlight during processing, with a stationary low-opacity border under Reduce Motion.
+
+Owner-device visual/audio feel validation remains open for this tuned version.
