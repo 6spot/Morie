@@ -2,6 +2,9 @@ name: macOS 27 Test Package
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
