@@ -6,8 +6,9 @@
 
 ## Goal
 
-Morie must stop capture-only rendering when the HUD is hidden. Establish the
-real-device idle CPU/RSS baseline and investigate any remaining idle cost.
+Morie must stop capture-only rendering when the HUD is hidden and avoid periodic
+data-layer work when there is nothing to process. Establish the real-device
+idle CPU/RSS baseline and investigate any remaining idle cost.
 
 ## Observed problem
 
@@ -35,6 +36,18 @@ No Type4Me source or external dependency is copied.
 - Showing a later HUD creates a fresh native panel/view tree.
 - A focused regression test covers the hidden → recording → hidden lifecycle
   and audio-level reset.
+- Personal Memory learning no longer polls every 30 seconds. Normal Capture
+  completion enqueues one source, startup performs one crash-recovery
+  reconciliation, and retryable work schedules only its earliest retry time.
+- Source-audio expiry cleanup runs at startup, after retention-policy changes
+  and from a daily ready-state maintenance loop. Capture start and History
+  playback/re-recognition no longer trigger full-table cleanup scans.
+- Control Center creates the full Capture query only while History is visible;
+  selected details use a UUID-filtered query.
+- Diagnostic file output is coalesced into short batches and bounded to 5 MiB;
+  error entries still flush immediately.
+- Dictionary and Memory literal matching reuse precomputed word boundaries
+  instead of tokenizing the same input once per candidate.
 
 ## Validation
 
@@ -42,6 +55,8 @@ No Type4Me source or external dependency is copied.
   including the new HUD lifecycle regression (0 failures, 0 skipped).
 - 2026-09-19: isolated unsigned macOS 27 Debug app build succeeded.
 - `git diff --check` passed.
+- Event-driven/data-query changes require the branch CI and updated logic tests
+  before merge; real-device behavior remains a separate acceptance gate.
 - Real-device idle CPU, Energy Impact and RSS measurements: pending.
 
 The task remains **IN PROGRESS** until the signed-app before/after runtime

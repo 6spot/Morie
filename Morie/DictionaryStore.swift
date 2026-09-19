@@ -137,9 +137,10 @@ enum DictionarySpelling {
     /// Normalize only the same word's letter case; a saved word never implies a substitution rule.
     static func normalize(_ text: String, using entries: [DictionarySnapshot]) -> ValidatedRefinement {
         let protected = InputText.technicalRanges(in: text)
+        let wordRanges = InputText.words(in: text)
         var matches: [(range: Range<String.Index>, entry: DictionarySnapshot)] = []
         for entry in entries {
-            for range in InputText.literalRanges(of: entry.name, in: text) {
+            for range in InputText.literalRanges(of: entry.name, in: text, wordRanges: wordRanges) {
                 guard !protected.contains(where: { $0.overlaps(range) }) else { continue }
                 matches.append((range, entry))
             }
@@ -171,13 +172,20 @@ enum InputText {
     }
 
     static func literalRanges(of term: String, in text: String) -> [Range<String.Index>] {
+        literalRanges(of: term, in: text, wordRanges: words(in: text))
+    }
+
+    static func literalRanges(
+        of term: String,
+        in text: String,
+        wordRanges: [Range<String.Index>]
+    ) -> [Range<String.Index>] {
         guard !term.isEmpty else { return [] }
-        let words = words(in: text)
         var start = text.startIndex
         var matches: [Range<String.Index>] = []
         while start < text.endIndex,
               let range = text.range(of: term, options: [.caseInsensitive], range: start..<text.endIndex) {
-            if !words.contains(where: {
+            if !wordRanges.contains(where: {
                 ($0.lowerBound < range.lowerBound && range.lowerBound < $0.upperBound)
                     || ($0.lowerBound < range.upperBound && range.upperBound < $0.upperBound)
             }) { matches.append(range) }

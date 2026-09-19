@@ -53,7 +53,6 @@ final class CaptureHistoryController: ObservableObject {
             return
         }
         do {
-            try store.pruneExpiredAudio()
             let url = try store.sourceAudioURL(for: id)
             let item = AVPlayerItem(url: url)
             player = AVPlayer(playerItem: item)
@@ -86,7 +85,6 @@ final class CaptureHistoryController: ObservableObject {
         guard !isInputActive, recognitionTask == nil else { return }
         let url: URL
         do {
-            try store.pruneExpiredAudio()
             url = try store.sourceAudioURL(for: id)
         } catch {
             recognitionMessage = error.localizedDescription

@@ -54,22 +54,45 @@ final class MemoryStore: ObservableObject {
 
     func analysis(for source: MemoryAnalysisSource) -> MemoryAnalysisRecord? { analyses.first { $0.source == source } }
 
-    /// The durable Capture log is the queue source; restart also discovers input saved just before a crash.
-    func enqueueCompletedInputs() throws {
+    /// One startup reconciliation recovers completed inputs that may have been saved just before a crash.
+    /// Normal operation enqueues only the Capture that just reached a terminal delivery state.
+    func reconcileCompletedInputs() throws {
         try load()
-        let captures = try container.mainContext.fetch(FetchDescriptor<CaptureRecord>(sortBy: [SortDescriptor(\.createdAt)]))
+        let knownCaptureIDs = Set(analyses.map(\.sourceCaptureID))
+        let captures = try container.mainContext.fetch(
+            FetchDescriptor<CaptureRecord>(sortBy: [SortDescriptor(\.createdAt)])
+        )
         var inserted = false
         for capture in captures where eligibleForLearning(capture) {
-            guard let source = try? analysisSource(for: capture.id), analysis(for: source) == nil else { continue }
+            let source = MemoryAnalysisSource(capture: capture)
+            guard !knownCaptureIDs.contains(capture.id) else { continue }
             context.insert(MemoryAnalysisRecord(source: source))
             inserted = true
         }
         if inserted { try save() }
     }
 
+    func enqueueCompletedInput(captureID: UUID) throws {
+        try load()
+        guard let source = try? analysisSource(for: captureID),
+              analysis(for: source) == nil else { return }
+        context.insert(MemoryAnalysisRecord(source: source))
+        try save()
+    }
+
     func pendingSources(now: Date = Date(), limit: Int = 3) throws -> [MemoryAnalysisSource] {
         try load()
-        return analyses.filter { $0.state == .pending && $0.nextAttemptAt <= now }.prefix(max(0, limit)).map(\.source)
+        return analyses.filter { $0.state == .pending && $0.nextAttemptAt <= now }
+            .prefix(max(0, limit))
+            .map(\.source)
+    }
+
+    func nextPendingAttemptDate() throws -> Date? {
+        try load()
+        return analyses.lazy
+            .filter { $0.state == .pending }
+            .map(\.nextAttemptAt)
+            .min()
     }
 
     func learningInput(for source: MemoryAnalysisSource) throws -> MemoryLearningInput {

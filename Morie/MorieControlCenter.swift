@@ -39,7 +39,6 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
 @MainActor
 struct MorieControlCenter: View {
     @ObservedObject var controller: AppController
-    @Query(sort: \CaptureRecord.createdAt, order: .reverse) private var captures: [CaptureRecord]
     @State private var selection: ControlCenterSection? = .history
     @State private var selectedCaptureID: UUID?
     @State private var selectedMemory: UUID?
@@ -130,8 +129,7 @@ struct MorieControlCenter: View {
     private var libraryList: some View {
         switch selection ?? .history {
         case .history:
-            CaptureHistoryView(
-                captures: captures,
+            CaptureHistoryListPane(
                 selection: $selectedCaptureID,
                 canStartCapture: controller.canStartCapture,
                 onRecord: controller.startCaptureOnly
@@ -151,29 +149,10 @@ struct MorieControlCenter: View {
     private var libraryDetail: some View {
         switch selection ?? .history {
         case .history:
-            NavigationStack {
-                if let id = selectedCaptureID,
-                   let capture = captures.first(where: { $0.id == id }),
-                   let history = controller.history,
-                   let memory = controller.memory,
-                   let learning = controller.memoryLearning {
-                    CaptureDetailView(
-                        capture: capture,
-                        captureID: id,
-                        history: history,
-                        memory: memory,
-                        learning: learning,
-                        canRecognize: controller.canStartCapture,
-                        onRecognize: controller.recognizeHistoryCapture
-                    )
-                } else {
-                    ContentUnavailableView(
-                        "选择一条记录",
-                        systemImage: "waveform",
-                        description: Text("在这里查看保存的文字、录音和相关个人记忆。")
-                    )
-                }
-            }
+            CaptureHistoryDetailPane(
+                controller: controller,
+                selectedCaptureID: selectedCaptureID
+            )
             .id(selectedCaptureID)
         case .memory:
             NavigationStack {
@@ -192,6 +171,63 @@ struct MorieControlCenter: View {
             EmptyView()
         default:
             EmptyView()
+        }
+    }
+}
+
+@MainActor
+private struct CaptureHistoryListPane: View {
+    @Query(sort: \CaptureRecord.createdAt, order: .reverse) private var captures: [CaptureRecord]
+    @Binding var selection: UUID?
+    let canStartCapture: Bool
+    let onRecord: () -> Void
+
+    var body: some View {
+        CaptureHistoryView(
+            captures: captures,
+            selection: $selection,
+            canStartCapture: canStartCapture,
+            onRecord: onRecord
+        )
+    }
+}
+
+@MainActor
+private struct CaptureHistoryDetailPane: View {
+    @ObservedObject var controller: AppController
+    @Query private var captures: [CaptureRecord]
+    let selectedCaptureID: UUID?
+
+    init(controller: AppController, selectedCaptureID: UUID?) {
+        self.controller = controller
+        self.selectedCaptureID = selectedCaptureID
+        let queryID = selectedCaptureID ?? UUID()
+        _captures = Query(filter: #Predicate<CaptureRecord> { $0.id == queryID })
+    }
+
+    var body: some View {
+        NavigationStack {
+            if let id = selectedCaptureID,
+               let capture = captures.first,
+               let history = controller.history,
+               let memory = controller.memory,
+               let learning = controller.memoryLearning {
+                CaptureDetailView(
+                    capture: capture,
+                    captureID: id,
+                    history: history,
+                    memory: memory,
+                    learning: learning,
+                    canRecognize: controller.canStartCapture,
+                    onRecognize: controller.recognizeHistoryCapture
+                )
+            } else {
+                ContentUnavailableView(
+                    "选择一条记录",
+                    systemImage: "waveform",
+                    description: Text("在这里查看保存的文字、录音和相关个人记忆。")
+                )
+            }
         }
     }
 }

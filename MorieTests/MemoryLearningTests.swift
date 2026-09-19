@@ -30,18 +30,18 @@ final class MemoryLearningTests: XCTestCase {
         let pending = UUID()
         _ = try fixture.captures.beginVoiceCapture(id: pending, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
         try fixture.captures.completeRecognition("I work on Morie.", for: pending)
-        try fixture.memory.enqueueCompletedInputs()
+        try fixture.memory.reconcileCompletedInputs()
         XCTAssertTrue(fixture.memory.analyses.isEmpty)
         XCTAssertThrowsError(try fixture.memory.analysisSource(for: pending))
         try fixture.captures.markDeliveryFailed(pending, error: "test clipboard fallback")
-        try fixture.memory.enqueueCompletedInputs()
+        try fixture.memory.reconcileCompletedInputs()
         XCTAssertEqual(fixture.memory.analyses.map(\.sourceCaptureID), [pending])
     }
 
     func testUnsavedSourceAndStaleModelResultsCannotBecomeMemory() throws {
         let fixture = try LearningFixture()
         let source = try fixture.capture("I work on Morie.")
-        try fixture.memory.enqueueCompletedInputs()
+        try fixture.memory.reconcileCompletedInputs()
         let input = try fixture.memory.learningInput(for: fixture.memory.analysisSource(for: source))
         let capture = try fixture.captures.capture(source)
         capture.finalText = "I work on something else."
@@ -154,7 +154,7 @@ final class MemoryLearningTests: XCTestCase {
     func testFailedAtomicSaveKeepsQueuePendingAndDoesNotPartiallyAdmitMemory() throws {
         let fixture = try LearningFixture()
         let id = try fixture.capture("I work on Morie.")
-        try fixture.memory.enqueueCompletedInputs()
+        try fixture.memory.reconcileCompletedInputs()
         let failing = MemoryStore(container: fixture.captures.container, commit: { _ in throw LearningTestError.diskFull })
         let input = try failing.learningInput(for: failing.analysisSource(for: id))
         XCTAssertThrowsError(try failing.apply([LearningFixture.suggestion()], from: input))
@@ -170,7 +170,7 @@ final class MemoryLearningTests: XCTestCase {
         let id = try fixture.capture("I work on Morie.")
         let reopened = try CaptureStore(storageURL: fixture.url)
         let memory = MemoryStore(container: reopened.container)
-        try memory.enqueueCompletedInputs()
+        try memory.reconcileCompletedInputs()
         let source = try memory.analysisSource(for: id)
         let now = Date()
         try memory.recordFailure(.generationFailed, for: source, now: now)
@@ -292,7 +292,7 @@ private final class LearningFixture {
     }
 
     func learn(_ id: UUID, suggestion: MemorySuggestion = LearningFixture.suggestion()) throws {
-        try memory.enqueueCompletedInputs()
+        try memory.enqueueCompletedInput(captureID: id)
         let input = try memory.learningInput(for: memory.analysisSource(for: id))
         try memory.apply([suggestion], from: input)
     }
