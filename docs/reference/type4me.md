@@ -392,3 +392,14 @@ Morie requirement: ordinary interactive dictation should behave like a keyboard/
 - **VERIFY:** switching apps/fields while Speech or Foundation Models is still processing, custom-rendered editors, terminals, selected-text replacement, clipboard managers and rapid repeated captures on the signed macOS 27 app.
 
 Morie removes its superseded original-window persistence directly. Development data compatibility is not a product requirement at this stage; no compatibility adapter is retained.
+
+
+## M-017 false-start cleanup follow-up — 2026-09-19
+
+Rechecked Type4Me's current Voice Polish prompt in `Type4Me/UI/AppState.swift`. One useful current rule is to treat a clear mid-sentence restart as self-correction and delete an abandoned fragment, while its broader formatting/number rules remain intentionally more aggressive than Morie.
+
+- **ADAPT:** clear abandoned fragments and sentence restarts can be removed when the later clause fully replaces the same thought.
+- **ADAPT:** preserve intentional repetition and keep both clauses when they contain independent information or the replacement relationship is uncertain.
+- **DROP:** mandatory Arabic-number conversion, forced total-summary formatting, generated titles/subitems, transition insertion and count rewriting.
+- **ADAPT:** avoid defining cleanup as Chinese-only; Morie keeps the same restrained contract for Chinese, English and mixed-language dictation.
+- **VERIFY:** real Foundation Models behavior on natural false starts such as partial clause → restart, versus two independent clauses that merely share words.
