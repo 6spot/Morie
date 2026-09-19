@@ -2,7 +2,7 @@
 
 ## Status
 
-**IN PROGRESS** — 2026-09-19
+**DONE** — 2026-09-19
 
 Issue: [#50](https://github.com/6spot/Morie/issues/50)
 
@@ -60,9 +60,11 @@ The editable Settings values remain application preferences for the **next** Cap
 - [x] Accepted Start/Finish sound behavior is consistent within the same Capture.
 - [x] Context is cleared on terminal/reset paths.
 - [x] Existing session UUID/stale callback protection remains unchanged.
-- [ ] macOS 27 Release product compile passes.
-- [ ] Deterministic logic-test gate passes on the M-032 head.
+- [x] macOS 27 Release product compile passes (CI #139).
+- [x] Deterministic logic-test gate passes on the M-032 head (CI #139: 136 tests, 0 failures).
 
 ## Validation
 
-No provider abstraction or new persistence schema is introduced. Direct session-setting behavior still benefits from a small owner-device check: begin a recording, change one relevant setting before finishing, and confirm the current Capture keeps its start-time behavior while the next Capture uses the new preference.
+No provider abstraction or new persistence schema is introduced. CI #139 passed the Release product compile and all 136 deterministic logic tests. The implementation reads mutable preferences only while constructing `CaptureSessionContext`; Speech startup, cleanup, post-insertion learning and accepted finish feedback read the pinned context.
+
+A small owner-device smoke check remains useful but is not a merge blocker: begin a recording, change one relevant setting before finishing, and confirm the current Capture keeps its start-time behavior while the next Capture uses the new preference.
