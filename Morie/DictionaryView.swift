@@ -9,36 +9,60 @@ struct DictionaryView: View {
     @State private var confirmsDeletion = false
     @State private var errorMessage: String?
 
-    private var selectedEntry: DictionaryEntry? {
+    private let columns = [
+        GridItem(.adaptive(minimum: 96, maximum: 180), spacing: 8, alignment: .leading)
+    ]
+
+    private var selectedEntry: DictionaryDisplayEntry? {
         guard let selection else { return nil }
-        return store.entries.first { $0.id == selection }
+        return store.displayEntries.first { $0.id == selection }
     }
 
-    private var visibleEntries: [DictionaryEntry] {
+    private var selectedUserEntryID: UUID? {
+        guard selectedEntry?.isEditable == true else { return nil }
+        return selectedEntry?.id
+    }
+
+    private var visibleEntries: [DictionaryDisplayEntry] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        return store.entries.filter { entry in
+        return store.displayEntries.filter { entry in
             query.isEmpty || entry.name.localizedStandardContains(query)
         }
     }
 
     var body: some View {
-        List(selection: $selection) {
-            if let errorMessage { Label(errorMessage, systemImage: "exclamationmark.triangle") }
-            ForEach(visibleEntries) { entry in
-                Text(entry.name)
-                    .lineLimit(2)
-                    .padding(.vertical, 6)
-                    .tag(entry.id)
-                    .contextMenu {
-                        Button("编辑") { edit(entry.id) }
-                        Button("删除…", role: .destructive) {
-                            selection = entry.id
-                            confirmsDeletion = true
-                        }
-                    }
+        ScrollView {
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
             }
+
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                ForEach(visibleEntries) { entry in
+                    let item = DictionaryWordItem(
+                        entry: entry,
+                        isSelected: selection == entry.id,
+                        select: { selection = entry.id }
+                    )
+                    .help(entry.source.helpText)
+
+                    if entry.isEditable {
+                        item.contextMenu {
+                            Button("编辑") { edit(entry.id) }
+                            Button("删除…", role: .destructive) {
+                                selection = entry.id
+                                confirmsDeletion = true
+                            }
+                        }
+                    } else {
+                        item
+                    }
+                }
+            }
+            .padding(20)
         }
-        .listStyle(.inset)
         .overlay {
             if visibleEntries.isEmpty && errorMessage == nil {
                 ContentUnavailableView {
@@ -56,13 +80,13 @@ struct DictionaryView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("编辑词语", systemImage: "pencil") {
-                    if let selectedEntry { edit(selectedEntry.id) }
+                    if let selectedUserEntryID { edit(selectedUserEntryID) }
                 }
-                .disabled(selectedEntry == nil)
+                .disabled(selectedUserEntryID == nil)
                 Button("删除词语…", systemImage: "trash", role: .destructive) {
                     confirmsDeletion = true
                 }
-                .disabled(selectedEntry == nil)
+                .disabled(selectedUserEntryID == nil)
                 Button("添加词语", systemImage: "plus", action: add)
             }
         }
@@ -71,7 +95,7 @@ struct DictionaryView: View {
         }
         .confirmationDialog("删除这个字典词语？", isPresented: $confirmsDeletion, titleVisibility: .visible) {
             Button("删除词语", role: .destructive) {
-                guard let id = selectedEntry?.id else { return }
+                guard let id = selectedUserEntryID else { return }
                 do {
                     try store.delete(id)
                     selection = nil
@@ -99,6 +123,30 @@ struct DictionaryView: View {
     private func edit(_ id: UUID) {
         editingEntryID = id
         showingEditor = true
+    }
+}
+
+private struct DictionaryWordItem: View {
+    let entry: DictionaryDisplayEntry
+    let isSelected: Bool
+    let select: () -> Void
+
+    var body: some View {
+        if isSelected {
+            Button(action: select) {
+                Text(entry.name)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.borderedProminent)
+        } else {
+            Button(action: select) {
+                Text(entry.name)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
+        }
     }
 }
 
