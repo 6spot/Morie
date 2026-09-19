@@ -281,7 +281,8 @@ final class PersonalizationTests: XCTestCase {
             let runner = InputRefinementRunner { _ in XCTFail("Model must not start"); return "invalid" }
             let result = try await fixture.personalizer(runner).refine(id, enabled: enabled, otherModelWorkActive: enabled)
             XCTAssertEqual(result, "Morie is my project")
-            XCTAssertEqual((try await fixture.saved(id)).refinement?.reason, enabled ? .modelBusy : .disabled)
+            let saved = try await fixture.saved(id)
+            XCTAssertEqual(saved.refinement?.reason, enabled ? .modelBusy : .disabled)
         }
     }
 
@@ -321,8 +322,9 @@ final class PersonalizationTests: XCTestCase {
             }
             let result = try await fixture.personalizer(runner).refine(id, enabled: true)
             XCTAssertEqual(result, "Morie is my project")
-            XCTAssertEqual((try await fixture.saved(id)).refinement?.reason, invalidPayload ? .invalidEdits : .generationFailed)
-            XCTAssertFalse((try await fixture.saved(id)).refinement?.reason?.message.contains("PRIVATE") == true)
+            let saved = try await fixture.saved(id)
+            XCTAssertEqual(saved.refinement?.reason, invalidPayload ? .invalidEdits : .generationFailed)
+            XCTAssertFalse(saved.refinement?.reason?.message.contains("PRIVATE") == true)
         }
     }
 
@@ -332,7 +334,8 @@ final class PersonalizationTests: XCTestCase {
         let generated = "Foundation Models 给出的结构化结果。"
         let result = try await fixture.personalizer(InputRefinementRunner { _ in generated }).refine(id, enabled: true)
         XCTAssertEqual(result, generated)
-        XCTAssertEqual((try await fixture.saved(id)).refinement?.status, .applied)
+        let saved = try await fixture.saved(id)
+        XCTAssertEqual(saved.refinement?.status, .applied)
     }
 
     func testSavedFinalAndInputSnapshotsSurviveSpeechRetryAndRestart() async throws {
@@ -394,7 +397,8 @@ final class PersonalizationTests: XCTestCase {
         await model.finish("Morie is my project.")
         let result = try await work.value
         XCTAssertEqual(result, "morie is my project")
-        XCTAssertEqual((try await fixture.saved(id)).refinement?.reason, .dictionaryChanged)
+        let saved = try await fixture.saved(id)
+        XCTAssertEqual(saved.refinement?.reason, .dictionaryChanged)
     }
 
     func testMemoryEditedDuringModelDoesNotApplyStaleContext() async throws {
@@ -408,7 +412,8 @@ final class PersonalizationTests: XCTestCase {
         await model.finish("Morie is my project.")
         let result = try await work.value
         XCTAssertEqual(result, "Morie is my project")
-        XCTAssertEqual((try await fixture.saved(id)).refinement?.reason, .memoryChanged)
+        let saved = try await fixture.saved(id)
+        XCTAssertEqual(saved.refinement?.reason, .memoryChanged)
     }
 
     func testRefinementWaitsForModelWithoutAnArbitraryDeadline() async throws {
@@ -424,7 +429,8 @@ final class PersonalizationTests: XCTestCase {
         let result = try await work.value
         XCTAssertEqual(result, "Saved input.")
         XCTAssertFalse(runner.isBusy)
-        XCTAssertEqual((try await fixture.saved(id)).finalText, "Saved input.")
+        let saved = try await fixture.saved(id)
+        XCTAssertEqual(saved.finalText, "Saved input.")
     }
 
     func testCallerCancellationDoesNotWaitForModelOrReturnDeliverableText() async throws {
@@ -438,10 +444,12 @@ final class PersonalizationTests: XCTestCase {
         do { _ = try await work.value; XCTFail("Cancelled input must not return a deliverable result") }
         catch { XCTAssertTrue(error is CancellationError) }
         XCTAssertTrue(runner.isBusy)
-        XCTAssertEqual((try await fixture.saved(id)).refinement?.status, .interrupted)
+        let interrupted = try await fixture.saved(id)
+        XCTAssertEqual(interrupted.refinement?.status, .interrupted)
         await model.finish("Saved input.")
         await runner.waitForModelToFinish()
-        XCTAssertEqual((try await fixture.saved(id)).finalText, "saved input")
+        let settled = try await fixture.saved(id)
+        XCTAssertEqual(settled.finalText, "saved input")
     }
 
     private func request(_ text: String) -> RefinementInput {
