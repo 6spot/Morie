@@ -41,14 +41,11 @@ final class CaptureStore {
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
     private var persistenceRevision: [UUID: Int] = [:]
     private let persistenceWriter: CapturePersistenceWriter
-    private let commitRefinement: (ModelContext) throws -> Void
 
     init(
         inMemory: Bool = false, storageURL: URL? = nil, audioDirectory: URL? = nil,
-        cloudSyncEnabled requestedCloudSync: Bool = false,
-        commitRefinement: @escaping (ModelContext) throws -> Void = { try $0.save() }
+        cloudSyncEnabled requestedCloudSync: Bool = false
     ) throws {
-        self.commitRefinement = commitRefinement
         let schema = Schema([
             CaptureRecord.self,
             DictionaryEntry.self,
