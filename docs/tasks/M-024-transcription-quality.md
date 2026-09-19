@@ -40,7 +40,7 @@ History already stores raw `recognizedText` separately from `finalText` and refi
 - Dictionary hints are verified for terminology cases.
 - Any Speech-layer change preserves Apple's punctuation and segment ownership.
 - No cloud ASR or third-party dependency is introduced speculatively.
-- macOS 27 compile gate passes.
+- [x] macOS 27 compile gate passes.
 
 
 ## 2026-09-19 History simplification
@@ -79,3 +79,10 @@ Current classification:
 - cleanup recovery: useful on this sample.
 
 Do not attribute this sample to accent alone. Keep collecting controlled samples before changing Speech configuration.
+
+
+## Validation
+
+GitHub Actions `macOS 27 CI` run #75 passed the Release product compile for PR #28 on Xcode 27/macOS 27.
+
+The change is presentation-only: persisted `recognizedText`, `finalText`, refinement edits, dictionary snapshots and memory-context snapshots are unchanged.
