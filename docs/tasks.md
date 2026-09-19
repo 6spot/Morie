@@ -36,7 +36,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-021 | Architecture | Extract live Capture session lifecycle from AppController | DONE | [#20](https://github.com/6spot/Morie/issues/20) / [PR #21](https://github.com/6spot/Morie/pull/21) | [`M-021`](./tasks/M-021-capture-session-controller.md) |
 | M-022 | History UX | Keep History stable during live persistence and right-align row time | IN PROGRESS | [#22](https://github.com/6spot/Morie/issues/22) / [PR #25](https://github.com/6spot/Morie/pull/25) | [`M-022`](./tasks/M-022-history-live-stability.md) |
 | M-023 | Dictionary UX | Split user terms from built-in read-only terms | TODO | [#23](https://github.com/6spot/Morie/issues/23) | [`M-023`](./tasks/M-023-dictionary-readonly-sections.md) |
-| M-024 | Speech quality | Improve transcription readability and diagnose native recognition quality | TODO | [#24](https://github.com/6spot/Morie/issues/24) | [`M-024`](./tasks/M-024-transcription-quality.md) |
+| M-024 | Speech quality | Improve transcription readability and diagnose native recognition quality | IN PROGRESS | [#24](https://github.com/6spot/Morie/issues/24) | [`M-024`](./tasks/M-024-transcription-quality.md) |
 | M-025 | Input latency | Move History persistence off the normal input hot path | IN PROGRESS | [#26](https://github.com/6spot/Morie/issues/26) / [PR #27](https://github.com/6spot/Morie/pull/27) | [`M-025`](./tasks/M-025-async-capture-persistence.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
