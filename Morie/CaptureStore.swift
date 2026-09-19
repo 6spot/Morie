@@ -37,6 +37,7 @@ final class CaptureStore {
     let container: ModelContainer
     let audioDirectory: URL
 
+    private var context: ModelContext
     private var records: [UUID: CaptureRecord] = [:]
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
     private let commitRefinement: (ModelContext) throws -> Void
@@ -66,6 +67,8 @@ final class CaptureStore {
             )
         }
         container = try ModelContainer(for: schema, configurations: [configuration])
+        context = ModelContext(container)
+        context.autosaveEnabled = false
         if let audioDirectory {
             self.audioDirectory = audioDirectory
         } else if let storageURL {
@@ -94,6 +97,7 @@ final class CaptureStore {
         bundleIdentifier: String?,
         windowNumber: CGWindowID?
     ) throws -> URL {
+        resetContextIfIdle()
         let record = CaptureRecord(
             id: id,
             deliveryMode: deliveryMode,
@@ -105,9 +109,9 @@ final class CaptureStore {
         record.sourceAudioExpiresAt = Calendar.current.date(
             byAdding: .day, value: Self.audioRetentionDays, to: record.createdAt
         )
-        container.mainContext.insert(record)
+        context.insert(record)
         records[id] = record
-        try container.mainContext.save()
+        try saveContext()
         Diagnostics.record("CaptureStore", "Durably created voice Capture \(label(id))")
         return audioDirectory.appending(path: "\(id.uuidString).m4a")
     }
@@ -122,7 +126,7 @@ final class CaptureStore {
         record.sourceAudioExpiresAt = Calendar.current.date(byAdding: .day, value: Self.audioRetentionDays, to: Date())
         record.sourceAudioHasMeaningfulContent = source.hasMeaningfulAudio
         record.updatedAt = Date()
-        try container.mainContext.save()
+        try context.save()
         Diagnostics.record("CaptureStore", "Source audio saved for \(label(id)); bytes=\(size)")
     }
 
@@ -136,7 +140,7 @@ final class CaptureStore {
             return
         }
 
-        try container.mainContext.save()
+        try saveContext()
         lastProgressiveSave[id] = now
     }
 
@@ -150,10 +154,11 @@ final class CaptureStore {
         record.finalText = text
         record.lifecycle = .recognized
         record.updatedAt = Date()
-        try container.mainContext.save()
+        try saveContext()
         lastProgressiveSave[id] = nil
         if deliveryMode == .captureOnly {
             records[id] = nil
+            resetContextIfIdle()
         }
         Diagnostics.record("CaptureStore", "Capture \(label(id)) recognition saved; characters=\(text.count)")
         return deliveryMode
@@ -230,9 +235,11 @@ final class CaptureStore {
 
     private func saveRefinementChanges() throws {
         do {
-            try commitRefinement(container.mainContext)
+            try commitRefinement(context)
+            resetContextIfIdle()
         } catch {
-            container.mainContext.rollback()
+            context.rollback()
+            resetContextIfIdle()
             throw error
         }
     }
@@ -265,9 +272,10 @@ final class CaptureStore {
     }
 
     func capture(_ id: UUID) throws -> CaptureRecord {
+        if let record = records[id] { return record }
         var descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
-        guard let record = try container.mainContext.fetch(descriptor).first else {
+        guard let record = try context.fetch(descriptor).first else {
             throw StoreError.captureNotFound
         }
         return record
@@ -305,9 +313,10 @@ final class CaptureStore {
         record.lastRecognitionErrorDescription = nil
         record.updatedAt = Date()
         do {
-            try container.mainContext.save()
+            try saveContext()
         } catch {
-            container.mainContext.rollback()
+            context.rollback()
+            resetContextIfIdle()
             throw error
         }
         Diagnostics.record("History", "Recognition updated for \(label(id)); characters=\(text.count)")
@@ -320,9 +329,10 @@ final class CaptureStore {
         record.lastRecognitionErrorDescription = message
         record.updatedAt = Date()
         do {
-            try container.mainContext.save()
+            try saveContext()
         } catch {
-            container.mainContext.rollback()
+            context.rollback()
+            resetContextIfIdle()
             throw error
         }
     }
@@ -330,16 +340,16 @@ final class CaptureStore {
     func deleteCapture(_ id: UUID) throws {
         let record = try capture(id)
         guard records[id] == nil, record.lifecycle != .capturing, record.refinement?.status != .running else { throw StoreError.captureInProgress }
-        let extractions = try container.mainContext.fetch(FetchDescriptor<MemoryAnalysisRecord>(
+        let extractions = try context.fetch(FetchDescriptor<MemoryAnalysisRecord>(
             predicate: #Predicate { $0.sourceCaptureID == id }
         ))
         let url = audioURL(for: record)
         if let url, FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)
         }
-        for extraction in extractions { container.mainContext.delete(extraction) }
-        container.mainContext.delete(record)
-        try container.mainContext.save()
+        for extraction in extractions { context.delete(extraction) }
+        context.delete(record)
+        try saveContext()
         Diagnostics.record("History", "Deleted Capture \(label(id))")
     }
 
@@ -347,9 +357,10 @@ final class CaptureStore {
         guard let record = records[id] else { return }
         try deleteAudio(for: record)
         lastProgressiveSave[id] = nil
-        container.mainContext.delete(record)
-        try container.mainContext.save()
+        context.delete(record)
+        try context.save()
         records[id] = nil
+        resetContextIfIdle()
         Diagnostics.record("CaptureStore", "Cancelled Capture \(label(id)) removed")
     }
 
@@ -365,9 +376,10 @@ final class CaptureStore {
         record.lifecycle = lifecycle
         record.deliveryErrorDescription = error
         record.updatedAt = Date()
-        try container.mainContext.save()
+        try context.save()
         records[id] = nil
         lastProgressiveSave[id] = nil
+        resetContextIfIdle()
         Diagnostics.record("CaptureStore", "Capture \(label(id)) saved with lifecycle=\(lifecycle.rawValue)")
     }
 
@@ -379,7 +391,7 @@ final class CaptureStore {
                     && ($0.sourceAudioExpiresAt ?? noExpiry) <= now
             }
         )
-        let expired = try container.mainContext.fetch(descriptor).filter {
+        let expired = try context.fetch(descriptor).filter {
             records[$0.id] == nil && $0.refinement?.status != .running
         }
         guard !expired.isEmpty else { return }
@@ -388,7 +400,7 @@ final class CaptureStore {
             try deleteAudio(for: record)
             record.sourceAudioRelativePath = nil
         }
-        try container.mainContext.save()
+        try saveContext()
         Diagnostics.record("CaptureStore", "Expired source audio for \(expired.count) Capture(s)")
     }
 
@@ -396,10 +408,10 @@ final class CaptureStore {
         let value = min(max(days, 1), 365)
         UserDefaults.standard.set(value, forKey: Self.audioRetentionDaysDefaultsKey)
         let descriptor = FetchDescriptor<CaptureRecord>()
-        for record in try container.mainContext.fetch(descriptor) where record.sourceAudioRelativePath != nil {
+        for record in try context.fetch(descriptor) where record.sourceAudioRelativePath != nil {
             record.sourceAudioExpiresAt = Calendar.current.date(byAdding: .day, value: value, to: record.createdAt)
         }
-        try container.mainContext.save()
+        try saveContext()
         try pruneExpiredAudio()
     }
 
@@ -424,7 +436,7 @@ final class CaptureStore {
 
     private func recoverInterruptedCaptures() throws {
         let descriptor = FetchDescriptor<CaptureRecord>()
-        let interrupted = try container.mainContext.fetch(descriptor).filter {
+        let interrupted = try context.fetch(descriptor).filter {
             $0.lifecycle == .capturing || $0.refinement?.status == .running
         }
         guard !interrupted.isEmpty else { return }
@@ -447,7 +459,7 @@ final class CaptureStore {
                 || !record.finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             if size == 0 && !hasText {
                 try deleteAudio(for: record)
-                container.mainContext.delete(record)
+                context.delete(record)
                 continue
             }
             if size > 0 {
@@ -457,8 +469,20 @@ final class CaptureStore {
             record.deliveryErrorDescription = "录音已中断，已保存的文字和可用录音均已保留。"
             record.updatedAt = Date()
         }
-        try container.mainContext.save()
+        try saveContext()
         Diagnostics.record("CaptureStore", "Recovered \(interrupted.count) interrupted Capture(s)")
+    }
+
+    private func saveContext() throws {
+        try context.save()
+        resetContextIfIdle()
+    }
+
+    private func resetContextIfIdle() {
+        guard records.isEmpty else { return }
+        let fresh = ModelContext(container)
+        fresh.autosaveEnabled = false
+        context = fresh
     }
 
     private func label(_ id: UUID) -> String {
