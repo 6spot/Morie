@@ -12,9 +12,9 @@ final class CaptureSoundFeedback {
         var tones: [(frequency: Double, duration: Double)] {
             switch self {
             case .start:
-                [(660, 0.045), (990, 0.055)]
+                [(880, 0.040), (1_320, 0.070)]
             case .stop:
-                [(880, 0.045), (587, 0.055)]
+                [(1_175, 0.040), (784, 0.070)]
             }
         }
     }
@@ -46,7 +46,7 @@ final class CaptureSoundFeedback {
         startPlayer?.stop()
         stopPlayer?.stop()
         player.currentTime = 0
-        player.volume = 0.28
+        player.volume = 0.36
         player.play()
         Diagnostics.record("CaptureSound", "Played \(label) cue")
     }
@@ -59,20 +59,27 @@ final class CaptureSoundFeedback {
     private func wavData(
         for tones: [(frequency: Double, duration: Double)]
     ) -> Data? {
-        let attack = 0.004
-        let release = 0.012
+        let attack = 0.0018
+        let release = 0.010
+        let interToneGapFrames = Int(0.004 * sampleRate)
         var samples: [Int16] = []
 
-        for tone in tones {
+        for (toneIndex, tone) in tones.enumerated() {
+            if toneIndex > 0 {
+                samples.append(contentsOf: repeatElement(0, count: interToneGapFrames))
+            }
             let frameCount = max(1, Int(tone.duration * sampleRate))
             for index in 0..<frameCount {
                 let t = Double(index) / sampleRate
                 let remaining = tone.duration - t
-                let envelope = min(
-                    1,
-                    min(t / attack, max(0, remaining / release))
-                )
-                let value = sin(2 * .pi * tone.frequency * t) * envelope * 0.42
+                let attackEnvelope = min(1, t / attack)
+                let releaseEnvelope = min(1, max(0, remaining / release))
+                let decay = exp(-3.8 * t / tone.duration)
+                let fundamental = sin(2 * .pi * tone.frequency * t)
+                let second = sin(2 * .pi * tone.frequency * 2 * t) * 0.24
+                let third = sin(2 * .pi * tone.frequency * 3 * t) * 0.07
+                let timbre = (fundamental + second + third) / 1.31
+                let value = timbre * attackEnvelope * releaseEnvelope * decay * 0.72
                 samples.append(Int16(max(-1, min(1, value)) * Double(Int16.max)))
             }
         }
