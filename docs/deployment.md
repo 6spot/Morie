@@ -104,22 +104,33 @@ Do not introduce an updater framework before the distribution strategy requires 
 
 Keep `CFBundleDevelopmentRegion = zh-Hans` and the bundled `zh-Hans.lproj/InfoPlist.strings` in both Debug and Release artifacts. Privacy descriptions must match the Chinese setup page. A packaged first launch must inspect requirements without automatically prompting, and all Settings entry points must open the native Command-comma Settings scene. Validate these using the signed test artifact; unsigned compile output must not replace the owner's installed app.
 
-## CloudKit deployment — later cross-device milestone
+## CloudKit deployment — M-019 foundation
 
-On 2026-09-18, the owner corrected the delivery order: complete the single-Mac input/dictionary/Memory loop before cross-device sync. CloudKit is outside the current milestone, not a prerequisite for local persistence or task completion. Apple Developer enrollment/container setup is also not ready; do not request it until an actual cross-device milestone is scheduled.
+On 2026-09-19, the owner scheduled optional iCloud/CloudKit after the single-Mac input, cleanup/Memory and Expression Profile work. Morie does not add a local automatic-backup subsystem.
 
-The intended storage is each user's own iCloud private database within Morie's app container. The developer team provisions the app's CloudKit capability and container once. End users use their own iCloud accounts and do not need developer accounts. Morie operates no shared cloud backend in V0.
+M-019 adds the code-side opt-in foundation:
 
-That later milestone will add the actual iCloud/CloudKit environment. At that point this guide must include:
+- Settings defaults iCloud sync/backup off;
+- the production SwiftData store uses `cloudKitDatabase: .none` while off;
+- when the saved setting is on, launch requests `.automatic`, which uses the primary CloudKit container from the signed app entitlements;
+- in-memory tests and explicit development storage URLs always stay local;
+- a CloudKit-backed-store initialization failure falls back to the local current-schema store and surfaces the sync problem;
+- source-audio files remain local and are not part of managed CloudKit persistence.
 
-- iCloud container identifier;
-- required entitlements;
-- Development vs Production CloudKit environment handling;
-- schema/container initialization and promotion procedure;
-- current Capture schema and conflict/deletion semantics;
-- release validation for cross-device synchronization.
+The intended storage is each user's own iCloud private database. End users use their own iCloud account and do not need developer accounts; Morie operates no shared user-data backend.
 
-Do not hard-code fake container identifiers or declare CloudKit ready before the actual Apple Developer configuration exists.
+**The repository still does not contain an iCloud container identifier or CloudKit entitlement.** Do not invent one. Before signed runtime validation, the project owner/developer team must create/select the real container and enable iCloud + CloudKit for Morie's signing identity in Xcode/Apple Developer.
+
+Once that real container exists, record here:
+
+- the actual iCloud container identifier;
+- final required entitlements;
+- Development vs Production environment handling;
+- CloudKit schema initialization and production promotion;
+- observed sync/conflict/deletion behavior;
+- multi-device release validation.
+
+Do not declare CloudKit ready solely because the app compiles or because the opt-in setting is visible.
 
 ## Secrets and credentials
 
