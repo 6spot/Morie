@@ -128,15 +128,15 @@ The compact capture capsule is deliberately low-contrast. Recording controls use
 
 Status color is reserved for state, not button identity:
 
-- **Thinking** keeps the existing soft system accent-color border animation.
+- **Thinking** uses a restrained neutral left-to-right fill sweep inside the compact capsule. The sweep replaces the earlier rotating border highlight; do not combine the two animations.
 - normal successful completion has no separate success state: once processing completes, the `Thinking` capsule immediately runs its normal collapse/fade-out animation;
 - this applies to both current-app delivery and capture-only completion; no `SUCCESS`, **已输入**, **已保存**, checkmark, green flash or other success badge is shown in the HUD;
 - clipboard fallback, no-speech and recognition-failure messages remain visible because they communicate an outcome the user may need to act on; they stay text-only and visually secondary;
-- accessibility labels remain descriptive Simplified Chinese even when the visible success word is English.
+- accessibility labels remain descriptive Simplified Chinese.
 
 Do not add decorative leading status icons back to these text messages. Normal success is communicated by the disappearance of the processing capsule itself; do not add another success dwell state unless new usability evidence requires one. Strong semantic color is reserved for outcomes that genuinely require attention.
 
-The recording-to-processing morph uses motion rather than another status color: the wide recording capsule contracts around the waveform before `Thinking` replaces it. The processing capsule is narrower (94 pt versus 142 pt recording width). Successful completion keeps that compact shape and fades almost in place instead of collapsing to a tiny dot. Reduced Motion skips the staged morph and uses the final state directly.
+The recording-to-processing morph uses motion rather than another status color: the wide recording capsule contracts around the waveform before `Thinking` replaces it. The processing capsule is narrower (94 pt versus 142 pt recording width). While Thinking is active, a low-contrast neutral overlay progresses from the left edge toward the right edge, briefly settles/fades, then repeats; it should read as directional processing rather than a progress meter or scanning light. Successful completion keeps that compact shape and fades almost in place instead of collapsing to a tiny dot. Reduced Motion skips the staged morph and moving sweep, using only the final compact/static treatment.
 
 ## History recovery
 

@@ -14,8 +14,8 @@ Make the compact Capture capsule visually quieter and more internally consistent
 
 - Cancel and Finish controls use one neutral low-contrast color treatment.
 - The capsule glass is less black/heavy.
-- The existing soft blue/accent processing ring is retained unchanged.
 - The `Thinking` label uses secondary text contrast so the black text does not dominate the capsule.
+- The earlier rotating accent border is replaced by the reference-style left-to-right fill sweep: a subtle neutral overlay grows across the compact capsule, settles, fades, then repeats while processing continues.
 - Normal successful completion has **no separate success node**.
 - When processing finishes successfully, the `Thinking` capsule closes immediately using its existing collapse/fade-out animation.
 - This applies to both current-app delivery and capture-only completion: no `SUCCESS`, **已输入**, **已保存**, checkmark or green flash remains.
@@ -34,7 +34,7 @@ recording
 processing
           Thinking
    secondary text +
-   existing accent ring
+   left → right soft sweep
 
 successful completion
           Thinking
@@ -50,8 +50,8 @@ The native `NSGlassEffectView` remains the surface; only its tint intensity is r
 - [x] Cancel/Finish symbols have the same neutral foreground treatment.
 - [x] Cancel/Finish buttons have the same low-contrast bordered treatment.
 - [x] Capsule tint is visibly softer than the previous black-heavy value.
-- [x] Thinking ring is unchanged.
 - [x] Thinking text uses secondary contrast instead of primary black.
+- [x] Thinking uses a left-to-right reference-style sweep instead of a rotating border highlight.
 - [x] Current-app success has no separate HUD state or dwell.
 - [x] Capture-only success has no separate HUD state or dwell.
 - [x] Clipboard/recognition status messages have no leading decorative icon.
@@ -72,7 +72,7 @@ Frame/audio inspection found:
 - the reference Finish cue is approximately G4 (392 Hz) → D4 (294 Hz);
 - the pitches already matched Morie, but the reference notes are substantially longer, nearly gapless, cleaner in harmonic content, and much closer in Start/Finish loudness.
 
-Morie therefore keeps the approved neutral controls, secondary `Thinking` text and existing accent processing border, while changing motion/audio:
+Morie therefore keeps the approved neutral controls and secondary `Thinking` text while changing motion/audio:
 
 - recording glass remains 142 pt wide; processing contracts to 94 pt over ~160 ms;
 - the wide recording content stays visible during that contraction, so the side controls are naturally clipped/retracted and the waveform remains briefly before a 90 ms fade to `Thinking`;
@@ -82,7 +82,9 @@ Morie therefore keeps the approved neutral controls, secondary `Thinking` text a
 
 These changes remain synthesized/prepared once at `CaptureSoundFeedback` initialization; no sound asset or dependency is added.
 
-macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for this reference-motion/sound implementation.
+The Thinking animation was then refined to match the reference more closely: instead of an angular highlight orbiting the capsule border, a low-contrast fill advances from left to right over ~1.05 s, briefly settles/fades, pauses, and repeats while processing remains active. Reduced Motion shows only a static subtle treatment.
+
+macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for the reference-motion/sound implementation. The left-to-right Thinking sweep then passed macOS 27 CI #152: Release compile and the full MorieTests gate both succeeded.
 
 ## Validation boundary
 
