@@ -419,3 +419,26 @@ Expected:
 - Terminal/iTerm/Keychain/secure fields are not observed in this first slice.
 
 Real-model acceptance should compare the same dictated text with Expression Profile disabled/enabled after stable evidence. Confirm the difference is presentation-only and does not change facts, numbers, negation, requests or stance.
+
+
+## M-019 iCloud sync and backup
+
+The iCloud control is optional and must not become a prerequisite for normal voice input.
+
+Before a real CloudKit container is configured:
+
+- the repository must contain no fake/placeholder container identifier;
+- local mode must still build and run with iCloud disabled;
+- in-memory tests and explicit development-store URLs must report CloudKit disabled;
+- enabling on a build that cannot access CloudKit must surface an unavailable state rather than corrupting or deleting local data.
+
+After the real Apple Developer/Xcode iCloud + CloudKit capability and primary container are configured on a signed build:
+
+- with the toggle off, restart Morie and confirm normal local SwiftData behavior with no required iCloud account;
+- enable **使用 iCloud 同步与备份**, confirm an available account, restart, and verify the active store uses managed CloudKit;
+- create/edit/delete a History text record, user Dictionary word, Personal Memory and stable Expression Profile evidence, then verify the corresponding data appears on a second signed device/build using the same iCloud account;
+- confirm original M4A recording files do not appear on the other device and remain governed by local retention;
+- disable the toggle, restart, and confirm local data remains usable while managed CloudKit sync is no longer requested;
+- test no-account, temporarily-unavailable and account-change cases without deleting local data;
+- test concurrent edits/deletes before calling multi-device sync accepted;
+- do not call M-019 complete from hosted CI alone.

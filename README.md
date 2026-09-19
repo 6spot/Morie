@@ -9,7 +9,7 @@ Morie is an Apple-native voice-input product that learns useful personal context
 - **Capture first:** save intentional input before AI processing; save final text before insertion and Memory analysis.
 - **Expression first:** preserve meaning and tone. Cleanup never answers, summarizes or adds information to what the user said.
 - **Dictionary, Memory and Expression Profile are separate:** the dictionary specifies words and spellings; personal Memory learns semantic facts/projects/preferences; Expression Profile learns only aggregate presentation habits from bounded edits to Morie-inserted text.
-- **Private Mode:** local Apple intelligence with no Morie backend. iCloud/CloudKit belongs to a later cross-device milestone and uses each user's own private database. It is outside the current milestone; iOS and mobile inspiration follow-up are unscheduled.
+- **Private Mode:** local Apple intelligence with no Morie backend. iCloud/CloudKit is explicit opt-in and uses each user's own private database; raw source audio remains local. iOS and mobile inspiration follow-up remain unscheduled.
 - **Development stage:** implement the current design directly, with no legacy schemas, migration layers or compatibility shims.
 
 ## Current development status
@@ -41,7 +41,8 @@ Isolated logic tests and compilation cover the implementation. Real-model qualit
 7. **个人记忆** fills automatically from completed current-app input. History shows learning status and the final-text snapshot; management actions remain optional.
 8. To try correction learning, enable **设置 → 修改输入后建议加入字典**. Correct a word in recently inserted text and pause. Supported fields can show **加入字典 / 暂不添加** without interrupting typing.
 9. To try Expression Profile learning, enable **设置 → 学习我的表达习惯**. Morie observes only the recently inserted range for a short time, learns aggregate punctuation/paragraph/list/spacing preferences, and does not persist the edited raw text as profile data.
-10. Use the system sidebar toolbar/View command to show or hide navigation, and the **资料库 / 应用** disclosure controls to fold groups. The native menu-bar menu provides **打开 Morie / 设置… / 使用引导与权限… / 退出 Morie**.
+10. **设置 → 使用 iCloud 同步与备份** is optional and defaults off. It synchronizes SwiftData through the user's private CloudKit database after the real app capability/container is configured; changing it takes effect on the next launch. Original audio remains local.
+11. Use the system sidebar toolbar/View command to show or hide navigation, and the **资料库 / 应用** disclosure controls to fold groups. The native menu-bar menu provides **打开 Morie / 设置… / 使用引导与权限… / 退出 Morie**.
 
 The existing **历史记录 → 开始录音** action remains available for saved-only recordings; its inspiration/follow-up experience is not being expanded in this milestone.
 

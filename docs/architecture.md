@@ -315,6 +315,24 @@ The first slice is deliberately narrow:
 
 The same bounded observer also powers explicit dictionary suggestions, avoiding two competing Accessibility polling loops. Dictionary spelling corrections remain separate user-owned dictionary data and are not counted as style evidence.
 
+
+### `ICloudSyncSettings` / managed SwiftData CloudKit
+
+iCloud is optional and explicitly user-controlled. Morie does not add a local automatic-backup subsystem.
+
+The production SwiftData store is configured at launch with `ModelConfiguration.CloudKitDatabase`:
+
+- toggle off: `.none`, local SwiftData only;
+- toggle on: `.automatic`, allowing SwiftData to use the primary CloudKit container from the app's signed iCloud entitlements;
+- in-memory tests and explicit storage URLs always force `.none` so development/test fixtures never contact CloudKit.
+
+The setting is applied on the next launch because the `ModelContainer` owns its CloudKit configuration for its lifetime. Enabling first checks `CKContainer.default().accountStatus()`. If a requested CloudKit-backed store cannot open, Morie retries the current schema locally and reports the iCloud failure instead of blocking voice input.
+
+Managed CloudKit uses the user's private database; there is no Morie data backend. The SwiftData records cover History text and processing provenance, user Dictionary, Personal Memory and Expression Profile. Source-audio files remain in Morie's local `CaptureAudio` directory and are not uploaded by this managed store.
+
+The repository intentionally does not invent an iCloud container identifier. The actual Apple Developer/Xcode CloudKit capability and primary container must be configured before runtime synchronization can be accepted.
+
+
 ### `TextInjector`
 
 Delivery is intentionally generic and follows the system-input model:

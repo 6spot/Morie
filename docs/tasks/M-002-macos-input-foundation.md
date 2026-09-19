@@ -99,7 +99,7 @@ Explicitly excluded:
 | Speech capability/locale check | DONE | `DictationTranscriber` locale support for the same native module Morie actually uses. |
 | Microphone/Speech authorization | DONE / VERIFY | Native first-request prompts plus modal/menu System Settings recovery when macOS returns denial without presenting consent. Only Accessibility suppresses Morie's modal to avoid stacking it over Device Control and Data Access; microphone revoke/re-enable/recheck needs another real-device pass. |
 | Accessibility trust check | DONE | Native trust prompt/check plus direct System Settings recovery; user manually enables Morie, then rechecks. |
-| iCloud/CloudKit capability check | DEFERRED | Outside the single-Mac milestone per the owner’s 2026-09-18 correction. A later cross-device task will own provisioning/account/sync acceptance; M-003 local persistence has no CloudKit dependency. |
+| iCloud/CloudKit capability check | OPTIONAL / M-019 | iCloud is not part of the mandatory input setup gate. M-019 adds a default-off Settings control and checks `CKContainer.accountStatus()` only when the user opts in. Real sync still requires the actual signed CloudKit capability/container. |
 | Global toggle-capture hotkey | IMPLEMENTED / VERIFY | Owner-approved default is solo `Fn / Globe` release: first release starts, second finishes, Fn chords do not trigger, and `Escape` cancels. A timed-out event tap now fails open and is released instead of entering an automatic re-enable loop that can block keyboard input. Native Settings provides alternate combinations; real-device timeout recovery and Fn/system-conflict validation remain. |
 | Reliable recording/session layer | IMPLEMENTED / VERIFY | Unique session IDs, setup cancellation, stale-result rejection, deterministic terminal cleanup. |
 | Modern Apple Speech pipeline | IMPLEMENTED / VERIFY | M-015 uses `SpeechAnalyzer` + `DictationTranscriber(.progressiveLongDictation)` + one `AVCaptureAudioDataOutput`/`AnalyzerInputConverter`; Apple dictation owns first-pass punctuation while preserving live volatile results. M-003 shares the same buffers with streamed source-audio encoding. Remaining punctuation/finalization cases still need device proof. |
@@ -391,7 +391,7 @@ These items keep M-002 **IN PROGRESS** even though the initial Phase 0 implement
 
 ## Follow-up
 
-M-003 already provides the Capture-first local reliability boundary. The current execution order is input quality first, then Expression Profile, then optional iCloud/CloudKit sync/backup after the single-Mac data model settles.
+M-003 already provides the Capture-first local reliability boundary. The current sequence has now reached M-019: optional iCloud/CloudKit sync/backup follows the input-quality and Expression Profile work and remains outside the mandatory microphone/Speech/Accessibility setup gate.
 
 Morie does not add a local automatic-backup subsystem during development or as an interim product feature. Development schema changes may discard old local development data instead of carrying compatibility or backup machinery.
 

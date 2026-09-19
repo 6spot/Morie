@@ -70,6 +70,7 @@
 		A2000000000000000000001D /* CaptureHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* CaptureHUD.swift */; };
 		A2000000000000000000001E /* CaptureHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000012 /* CaptureHUDTests.swift */; };
 		A10000000000000000000023 /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
+		A10000000000000000000024 /* ICloudSyncSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000038 /* ICloudSyncSettings.swift */; };
 		A2000000000000000000001F /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
 		A20000000000000000000020 /* ExpressionProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000013 /* ExpressionProfileTests.swift */; };
 		A10000000000000000000022 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* InfoPlist.strings */; };
@@ -124,6 +125,7 @@
 		B20000000000000000000011 /* PermissionSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSetupTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000012 /* CaptureHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHUDTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000037 /* ExpressionProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpressionProfile.swift; sourceTree = "<group>"; };
+		B10000000000000000000038 /* ICloudSyncSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSyncSettings.swift; sourceTree = "<group>"; };
 		B20000000000000000000013 /* ExpressionProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpressionProfileTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000036 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -188,6 +190,7 @@
 				B10000000000000000000028 /* InputRefiner.swift */,
 				B10000000000000000000029 /* CapturePersonalizer.swift */,
 				B10000000000000000000037 /* ExpressionProfile.swift */,
+				B10000000000000000000038 /* ICloudSyncSettings.swift */,
 				B10000000000000000000033 /* PostInsertionLearningController.swift */,
 				B10000000000000000000032 /* DictionaryCorrection.swift */,
 				B10000000000000000000031 /* DictionaryView.swift */,
@@ -350,6 +353,7 @@
 				A1000000000000000000001A /* InputRefiner.swift in Sources */,
 				A1000000000000000000001B /* CapturePersonalizer.swift in Sources */,
 				A10000000000000000000023 /* ExpressionProfile.swift in Sources */,
+				A10000000000000000000024 /* ICloudSyncSettings.swift in Sources */,
 				A1000000000000000000001F /* PostInsertionLearningController.swift in Sources */,
 				A1000000000000000000001E /* DictionaryCorrection.swift in Sources */,
 				A1000000000000000000001D /* DictionaryView.swift in Sources */,

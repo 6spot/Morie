@@ -30,6 +30,8 @@ The following owner decisions are now hard requirements:
 
 16. **One-word dictionary (2026-09-18, amended 2026-09-19):** the owner simplified dictionary entry to saving one word. This supersedes the explicit-alias portion of amendment 12: remove aliases and replacement-rule configuration from storage, processing and UI. Saved words supply native Speech hints; only letter-case variants of the same word normalize to its spelling, while full-/half-width forms remain distinct. Manual-correction confirmation saves just the new word. Do not infer substitutions or add compatibility machinery for the removed design.
 
+17. **iCloud sequencing and backup boundary (2026-09-19):** after current-focus input, native dictation punctuation, Dictionary/Cleanup/Memory quality and Expression Profile, begin optional iCloud/CloudKit sync/backup. Do not build a local automatic-backup subsystem. The iCloud control defaults off, uses the user's private CloudKit database through Apple-native persistence, and keeps original recording files local in the first slice. Development schema changes may discard obsolete development data instead of creating upgrade backups or compatibility migrations.
+
 The source document below is historical product direction. These amendments supersede its phase order, immediate iCloud requirement, mandatory confirmation and inspiration scope.
 
 See also:

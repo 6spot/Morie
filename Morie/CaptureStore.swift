@@ -35,6 +35,7 @@ final class CaptureStore {
 
     let container: ModelContainer
     let audioDirectory: URL
+    let cloudSyncEnabled: Bool
 
     private var records: [UUID: CaptureRecord] = [:]
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
@@ -42,6 +43,7 @@ final class CaptureStore {
 
     init(
         inMemory: Bool = false, storageURL: URL? = nil, audioDirectory: URL? = nil,
+        cloudSyncEnabled requestedCloudSync: Bool = false,
         commitRefinement: @escaping (ModelContext) throws -> Void = { try $0.save() }
     ) throws {
         self.commitRefinement = commitRefinement
@@ -54,6 +56,12 @@ final class CaptureStore {
             ExpressionProfileRecord.self,
         ])
         precondition(!(inMemory && storageURL != nil), "An in-memory store cannot also use a storage URL.")
+
+        // Tests and explicit storage URLs are always local. Production uses the
+        // same SwiftData store and opts into Apple's managed private CloudKit
+        // sync only when the user explicitly enables it.
+        cloudSyncEnabled = requestedCloudSync && !inMemory && storageURL == nil
+        let cloudDatabase: ModelConfiguration.CloudKitDatabase = cloudSyncEnabled ? .automatic : .none
 
         let configuration: ModelConfiguration
         if let storageURL {
@@ -68,7 +76,7 @@ final class CaptureStore {
                 "MorieCaptures",
                 schema: schema,
                 isStoredInMemoryOnly: inMemory,
-                cloudKitDatabase: .none
+                cloudKitDatabase: cloudDatabase
             )
         }
         container = try ModelContainer(for: schema, configurations: [configuration])

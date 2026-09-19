@@ -8,10 +8,32 @@ struct MorieApp: App {
     private let captureStore: CaptureStore?
 
     init() {
+        let wantsICloud = ICloudSyncSettings.isEnabled
         do {
-            let store = try CaptureStore()
+            let store = try CaptureStore(cloudSyncEnabled: wantsICloud)
             captureStore = store
-            _controller = StateObject(wrappedValue: AppController(captureStore: store))
+            _controller = StateObject(
+                wrappedValue: AppController(captureStore: store)
+            )
+        } catch where wantsICloud {
+            // Optional iCloud must never make local input unusable. If the
+            // CloudKit-backed SwiftData configuration cannot open, retry the
+            // same current schema locally and surface the cloud failure.
+            do {
+                let store = try CaptureStore(cloudSyncEnabled: false)
+                captureStore = store
+                _controller = StateObject(
+                    wrappedValue: AppController(
+                        captureStore: store,
+                        cloudSyncStartupError: error
+                    )
+                )
+            } catch {
+                captureStore = nil
+                _controller = StateObject(
+                    wrappedValue: AppController(captureStore: nil, persistenceError: error)
+                )
+            }
         } catch {
             captureStore = nil
             _controller = StateObject(
@@ -174,6 +196,27 @@ struct MorieSettingsView: View {
 
                 Button("清除已学习的表达习惯…", role: .destructive) {
                     confirmsExpressionReset = true
+                }
+            }
+
+            Section("iCloud") {
+                Toggle("使用 iCloud 同步与备份", isOn: Binding(
+                    get: { controller.iCloudSyncEnabled },
+                    set: { controller.setICloudSyncEnabled($0) }
+                ))
+                .disabled(controller.iCloudSyncState.isChecking)
+
+                Text("同步历史文字、字典、个人记忆和表达习惯到你的 iCloud 私有数据库。原始录音仍只保存在这台 Mac 上。默认关闭。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                LabeledContent("状态", value: controller.iCloudSyncState.detail)
+
+                if controller.iCloudSyncEnabled {
+                    Button("重新检查 iCloud") {
+                        controller.refreshICloudSyncState()
+                    }
+                    .disabled(controller.iCloudSyncState.isChecking)
                 }
             }
 

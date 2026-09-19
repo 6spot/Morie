@@ -175,3 +175,15 @@ Expression Profile is controlled from the native **设置** page rather than add
 - Supporting copy states that Morie observes only the text it just inserted, learns aggregate punctuation/paragraph/list/spacing preferences, and does not persist the edited source text as profile data.
 - **清除已学习的表达习惯…** uses a destructive native confirmation dialog and clears only aggregate style learning, not History, Dictionary or Personal Memory.
 - Do not expose raw accumulator values or developer-style confidence controls in the ordinary settings UI.
+
+
+## iCloud settings
+
+The first iCloud control lives in the native **设置** page.
+
+- **使用 iCloud 同步与备份** is a native Toggle and defaults off.
+- Turning it on first checks the current iCloud account and only persists the request when CloudKit reports an available account.
+- Because SwiftData's CloudKit configuration belongs to the launched `ModelContainer`, a change that alters the active storage mode clearly states that Morie must be restarted before it takes effect.
+- Status uses a native `LabeledContent`; an enabled configuration exposes **重新检查 iCloud**.
+- Supporting copy states the data boundary: History text, Dictionary, Personal Memory and Expression Profile use the user's private iCloud database; original recordings remain local.
+- iCloud is optional. A CloudKit startup failure falls back to the local current-schema store and surfaces the cloud error instead of blocking normal voice input.

@@ -4,6 +4,22 @@ import XCTest
 
 @MainActor
 final class CaptureStoreTests: XCTestCase {
+    func testIsolatedStoresNeverEnableManagedCloudSync() throws {
+        let inMemory = try CaptureStore(inMemory: true, cloudSyncEnabled: true)
+        defer { try? FileManager.default.removeItem(at: inMemory.audioDirectory) }
+        XCTAssertFalse(inMemory.cloudSyncEnabled)
+
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "MorieCloudIsolation-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let explicit = try CaptureStore(
+            storageURL: directory.appending(path: "captures.store"),
+            cloudSyncEnabled: true
+        )
+        XCTAssertFalse(explicit.cloudSyncEnabled)
+    }
+
     func testCaptureOnlyModeIsSavedBeforeRecognitionAndCompletesWithoutDelivery() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieCaptureOnlyTests-\(UUID().uuidString)", directoryHint: .isDirectory)
