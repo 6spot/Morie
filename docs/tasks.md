@@ -42,7 +42,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-027 | Dictionary learning | Learn confirmed ASR error → canonical word mappings | IN PROGRESS | [#35](https://github.com/6spot/Morie/issues/35) / [PR #36](https://github.com/6spot/Morie/pull/36) | [`M-027`](./tasks/M-027-confirmed-dictionary-corrections.md) |
 | M-028 | Capture UX | Add native start/stop cues and center-morph capsule feedback | DONE | [#37](https://github.com/6spot/Morie/issues/37) | [`M-028`](./tasks/M-028-capture-feedback.md) |
 | M-029 | No-speech handling | Discard true no-speech captures while retaining retryable speech audio | DONE | [#44](https://github.com/6spot/Morie/issues/44) | [`M-029`](./tasks/M-029-no-speech-retention.md) |
-| M-030 | Validation | Execute deterministic MorieTests in macOS 27 CI | IN PROGRESS | [#48](https://github.com/6spot/Morie/issues/48) | [`M-030`](./tasks/M-030-macos-logic-test-gate.md) |
+| M-030 | Validation | Execute deterministic MorieTests in macOS 27 CI | DONE | [#48](https://github.com/6spot/Morie/issues/48) | [`M-030`](./tasks/M-030-macos-logic-test-gate.md) |
 | M-031 | Documentation | Align current source-of-truth docs and supersede stale Phase-0 instructions | DONE | [#49](https://github.com/6spot/Morie/issues/49) | [`M-031`](./tasks/M-031-source-of-truth-alignment.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
