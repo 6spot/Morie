@@ -45,6 +45,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 - [x] Tighten cleanup fidelity for words being discussed as UI labels/terms: apparent repetition must not remove or rename labels such as `已输入`.
 - [x] Make punctuation completion an explicit model requirement and schema guide.
 - [x] Remove over-specific examples that could leak wording into unrelated input; explicitly forbid introducing unspoken stance words, generalize semantic-vs-stutter repetition handling, and normalize ordinary Chinese clock times such as `9:00 → 9点` without inventing AM/PM.
+- [x] Reorganize the cleanup prompt using the proven Type4Me lesson of role → goal → boundaries → spoken cleanup → formatting → structure/register → context → generic examples, while deliberately dropping its aggressive number/list/title/transition rewriting behavior.
 - [ ] Measure fidelity, unintended changes, hint benefit, timeout rate, final-to-delivery latency and native interactions.
 
 ## Implementation notes
