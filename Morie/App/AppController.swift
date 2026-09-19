@@ -50,28 +50,43 @@ final class AppController: ObservableObject {
 
     private static let setupCompletedKey = "setup.completed"
     private var setupObservation: AnyCancellable?
-    private let speech = SpeechPipeline()
-    private let injector = TextInjector()
-    private let hud = CaptureHUDController()
     private let captureStore: CaptureStore?
     private let personalizer: CapturePersonalizer?
     private let postInsertionLearning: PostInsertionLearningController?
     private let persistenceError: Error?
     private let cloudSyncStartupError: Error?
-    private let speechLocale = Locale(identifier: "zh-CN")
 
     private var hotkey: PushToTalkHotkey?
-    private var activeCaptureID: UUID?
-    private var speechReadyCaptureID: UUID?
-    private var finishRequestedCaptureID: UUID?
-    private var captureStartTask: Task<Void, Never>?
-    private var captureFinishTask: Task<Void, Never>?
-    private var captureShutdownTask: Task<Void, Never>?
     private var audioMaintenanceTask: Task<Void, Never>?
-    private var stoppingCaptureID: UUID?
-    private var activeSourceAudioURL: URL?
     private var lastPresentedFailure: String?
     private var iCloudStatusTask: Task<Void, Never>?
+
+    private lazy var captureSession: CaptureSessionController = {
+        let session = CaptureSessionController(
+            captureStore: captureStore,
+            history: history,
+            dictionary: dictionary,
+            personalizer: personalizer,
+            postInsertionLearning: postInsertionLearning,
+            memoryLearning: memoryLearning,
+            inputRefinementEnabled: inputRefinementEnabled,
+            correctionSuggestionsEnabled: correctionSuggestionsEnabled,
+            expressionLearningEnabled: expressionLearningEnabled
+        )
+        session.onPhaseChange = { [weak self] phase in
+            self?.applyCapturePhase(phase)
+        }
+        session.onTranscriptChange = { [weak self] text in
+            self?.transcript = text
+        }
+        session.onCancellationEnabledChange = { [weak self] enabled in
+            self?.hotkey?.setCancellationEnabled(enabled)
+        }
+        session.onPresentFailure = { [weak self] title, message in
+            self?.presentFailure(title: title, message: message)
+        }
+        return session
+    }()
 
     init(
         captureStore: CaptureStore?,
@@ -136,17 +151,6 @@ final class AppController: ObservableObject {
                 : .off
         }
 
-        hud.onCancel = { [weak self] in
-            Task { @MainActor in
-                await self?.cancelCaptureFromUser(source: "HUD")
-            }
-        }
-        hud.onConfirm = { [weak self] in
-            Task { @MainActor in
-                self?.requestFinishActiveCapture(source: "HUD")
-            }
-        }
-
         setupObservation = setup.objectWillChange.sink { [weak self] in
             self?.objectWillChange.send()
         }
@@ -183,6 +187,7 @@ final class AppController: ObservableObject {
 
     func setInputRefinementEnabled(_ enabled: Bool) {
         inputRefinementEnabled = enabled
+        captureSession.inputRefinementEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: CapturePersonalizer.enabledDefaultsKey)
     }
 
@@ -192,12 +197,14 @@ final class AppController: ObservableObject {
             enabled,
             forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
         )
+        captureSession.correctionSuggestionsEnabled = enabled
         if !enabled && !expressionLearningEnabled { postInsertionLearning?.stop() }
     }
 
     func setExpressionLearningEnabled(_ enabled: Bool) {
         expressionLearningEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: ExpressionProfileStore.enabledDefaultsKey)
+        captureSession.expressionLearningEnabled = enabled
         if !enabled && !correctionSuggestionsEnabled { postInsertionLearning?.stop() }
     }
 
@@ -302,7 +309,7 @@ final class AppController: ObservableObject {
     }
 
     var canStartCapture: Bool {
-        guard activeCaptureID == nil, captureShutdownTask == nil,
+        guard !captureSession.isActive,
               !isBootstrapping, setup.isReady, captureStore != nil else { return false }
         switch state {
         case .ready, .failed: return true
@@ -323,12 +330,12 @@ final class AppController: ObservableObject {
         !isCaptureActive && !isBootstrapping && !setup.isBusy
     }
 
-    var isCaptureActive: Bool { activeCaptureID != nil || captureShutdownTask != nil }
+    var isCaptureActive: Bool { captureSession.isActive }
 
     func bootstrap(completingSetup: Bool = false) async {
         // A setup action must not tear down intentional input. Returning from
         // System Settings calls setup.refresh(), never this startup routine.
-        guard activeCaptureID == nil, captureShutdownTask == nil,
+        guard !captureSession.isActive,
               !isBootstrapping, setup.activeRequest == nil else { return }
         isBootstrapping = true
         defer { isBootstrapping = false }
@@ -341,7 +348,7 @@ final class AppController: ObservableObject {
         postInsertionLearning?.stop()
         hotkey?.invalidate()
         hotkey = nil
-        hud.hide()
+        captureSession.hideHUD()
         history?.pausePlayback()
         await history?.cancelRecognitionAndWait()
 
@@ -368,8 +375,7 @@ final class AppController: ObservableObject {
                 return
             }
 
-            Diagnostics.record("App", "Capability gate passed; preparing Speech assets for locale \(speechLocale.identifier)")
-            try await speech.prepare(locale: speechLocale)
+            try await captureSession.prepareSpeech()
             try Task.checkCancellation()
             guard state == .checking else { return }
 
@@ -424,7 +430,7 @@ final class AppController: ObservableObject {
             },
             onCancel: { [weak self] in
                 Task { @MainActor in
-                    await self?.cancelCaptureFromUser(source: "Escape")
+                    await self?.captureSession.cancel(source: "Escape")
                 }
             },
             onUnavailable: { [weak self] error in
@@ -442,7 +448,7 @@ final class AppController: ObservableObject {
 
     func setCaptureShortcut(_ shortcut: CaptureShortcut) {
         guard shortcut != captureShortcut else { return }
-        guard activeCaptureID == nil else {
+        guard !captureSession.hasActiveCapture else {
             Diagnostics.record("Hotkey", "Shortcut change ignored during an active capture", level: .warning)
             return
         }
@@ -464,8 +470,8 @@ final class AppController: ObservableObject {
     }
 
     private func handleHotkeyToggle() {
-        if activeCaptureID != nil {
-            requestFinishActiveCapture(source: captureShortcut.logName)
+        if captureSession.hasActiveCapture {
+            captureSession.requestFinish(source: captureShortcut.logName)
             return
         }
 
@@ -473,291 +479,18 @@ final class AppController: ObservableObject {
         case .ready, .failed:
             startNewCapture(deliveryMode: .currentApp)
         default:
-            Diagnostics.record("Session", "Toggle ignored while state=\(String(describing: state))", level: .warning)
+            Diagnostics.record(
+                "Session",
+                "Toggle ignored while state=\(String(describing: state))",
+                level: .warning
+            )
         }
     }
 
     private func startNewCapture(deliveryMode: CaptureDeliveryMode) {
-        guard canStartCapture, let captureStore else { return }
-
+        guard canStartCapture else { return }
         lastPresentedFailure = nil
-
-        let sessionID = UUID()
-        // Interactive input intentionally does not pin an application at record
-        // start. The destination is resolved only when final text is ready.
-        let sourceApplication: NSRunningApplication? = deliveryMode == .captureOnly ? .current : nil
-
-        do {
-            activeSourceAudioURL = try captureStore.beginVoiceCapture(
-                id: sessionID,
-                deliveryMode: deliveryMode,
-                applicationName: sourceApplication?.localizedName,
-                bundleIdentifier: sourceApplication?.bundleIdentifier
-            )
-        } catch {
-            let message = error.localizedDescription
-            state = .failed(message)
-            Diagnostics.record("CaptureStore", "Could not create Capture \(label(sessionID)): \(message)", level: .error)
-            presentFailure(title: "无法保存这次录音", message: message)
-            return
-        }
-
-        activeCaptureID = sessionID
-        speechReadyCaptureID = nil
-        finishRequestedCaptureID = nil
-        transcript = ""
-        state = .recording
-        history?.setInputActive(true)
-        postInsertionLearning?.stop()
-        memoryLearning?.setInputActive(true)
-
-        hotkey?.setCancellationEnabled(true)
-        hud.showRecording()
-
-        Diagnostics.record(
-            "Session",
-            "Capture \(label(sessionID)) started; mode=\(deliveryMode.rawValue); deliveryTarget=currentKeyboardFocus; locale=\(speechLocale.identifier)"
-        )
-        Diagnostics.recordMemory("capture-start \(label(sessionID))")
-
-        captureStartTask = Task { @MainActor [weak self] in
-            await self?.startCapture(sessionID: sessionID)
-        }
-    }
-
-    private func requestFinishActiveCapture(source: String) {
-        guard let sessionID = activeCaptureID else {
-            Diagnostics.record("Session", "Finish requested from \(source) with no active capture", level: .warning)
-            return
-        }
-
-        guard state == .recording, stoppingCaptureID == nil,
-              finishRequestedCaptureID != sessionID, captureFinishTask == nil else {
-            Diagnostics.record("Session", "Duplicate finish request ignored for \(label(sessionID))", level: .warning)
-            return
-        }
-
-        finishRequestedCaptureID = sessionID
-        state = .finalizing
-        hotkey?.setCancellationEnabled(false)
-        hud.showProcessing()
-        Diagnostics.record("Session", "Finish requested for \(label(sessionID)) from \(source)")
-
-        if speechReadyCaptureID == sessionID {
-            beginFinish(sessionID: sessionID)
-        } else {
-            Diagnostics.record("Session", "Finish for \(label(sessionID)) is pending Speech startup")
-        }
-    }
-
-    private func beginFinish(sessionID: UUID) {
-        guard activeCaptureID == sessionID,
-              stoppingCaptureID == nil,
-              speechReadyCaptureID == sessionID,
-              captureFinishTask == nil
-        else {
-            return
-        }
-
-        captureFinishTask = Task { @MainActor [weak self] in
-            await self?.finishCapture(sessionID: sessionID)
-        }
-    }
-
-    private func startCapture(sessionID: UUID) async {
-        Diagnostics.record("Speech", "Starting Speech session \(label(sessionID))")
-
-        do {
-            await history?.cancelRecognitionAndWait()
-            try Task.checkCancellation()
-            guard activeCaptureID == sessionID else { throw CancellationError() }
-            guard let sourceAudioURL = activeSourceAudioURL else {
-                throw ControllerError.persistenceUnavailable("原始录音存储尚未初始化。")
-            }
-            try await speech.start(
-                sessionID: sessionID,
-                locale: speechLocale,
-                sourceAudioURL: sourceAudioURL,
-                dictionaryWords: (try? dictionary?.speechHints()) ?? [],
-                onTranscript: { [weak self] resultSessionID, text in
-                    Task { @MainActor in
-                        guard self?.activeCaptureID == resultSessionID,
-                              self?.stoppingCaptureID != resultSessionID,
-                              self?.state == .recording || self?.state == .finalizing else {
-                            Diagnostics.record("Speech", "Ignored stale transcript for \(String(resultSessionID.uuidString.prefix(8)))", level: .warning)
-                            return
-                        }
-
-                        self?.transcript = text
-                        do {
-                            try self?.captureStore?.updateRecognizedText(text, for: resultSessionID)
-                        } catch {
-                            Diagnostics.record(
-                                "CaptureStore",
-                                "Progressive save failed for \(String(resultSessionID.uuidString.prefix(8))): \(error.localizedDescription)",
-                                level: .error
-                            )
-                        }
-                        Diagnostics.record(
-                            "Speech",
-                            "Transcript update for \(String(resultSessionID.uuidString.prefix(8))); characters=\(text.count)"
-                        )
-                    }
-                },
-                onAudioLevel: { [weak self] resultSessionID, level in
-                    Task { @MainActor in
-                        guard self?.activeCaptureID == resultSessionID,
-                              self?.state == .recording
-                        else { return }
-
-                        self?.hud.updateAudioLevel(level)
-                    }
-                },
-                onFailure: { [weak self] resultSessionID, message in
-                    Task { @MainActor in
-                        await self?.handleSpeechFailure(sessionID: resultSessionID, message: message)
-                    }
-                }
-            )
-
-            try Task.checkCancellation()
-            guard activeCaptureID == sessionID, stoppingCaptureID == nil else {
-                throw CancellationError()
-            }
-
-            speechReadyCaptureID = sessionID
-            captureStartTask = nil
-            Diagnostics.record("Speech", "Speech session \(label(sessionID)) is recording")
-
-            if finishRequestedCaptureID == sessionID {
-                Diagnostics.record("Session", "Applying pending finish request for \(label(sessionID))")
-                beginFinish(sessionID: sessionID)
-            }
-        } catch {
-            Diagnostics.record("Speech", "Speech start failed for \(label(sessionID)): \(error.localizedDescription)", level: .error)
-            await preserveFailedSpeech(sessionID: sessionID, error: error)
-            failSession(sessionID, error: error)
-        }
-    }
-
-    private func finishCapture(sessionID: UUID) async {
-        guard activeCaptureID == sessionID,
-              stoppingCaptureID == nil,
-              speechReadyCaptureID == sessionID
-        else {
-            Diagnostics.record("Session", "Finish ignored because \(label(sessionID)) is no longer active/ready", level: .warning)
-            return
-        }
-
-        state = .finalizing
-        hud.showProcessing()
-        Diagnostics.record("Speech", "Finalizing Speech session \(label(sessionID))")
-
-        do {
-            let result = try await speech.stop(sessionID: sessionID)
-            Diagnostics.recordMemory("speech-stop \(label(sessionID))")
-            var finalText = result.transcript
-            guard let captureStore else {
-                throw ControllerError.persistenceUnavailable("记录存储尚未初始化。")
-            }
-            // Persist a late final result even if an interruption has taken over
-            // UI/teardown ownership. Only the explicit discard path deletes it.
-            try captureStore.updateRecognizedText(finalText, for: sessionID)
-            try captureStore.attachSourceAudio(result.sourceAudio, for: sessionID)
-            guard activeCaptureID == sessionID, stoppingCaptureID == nil,
-                  !Task.isCancelled else { return }
-
-            transcript = finalText
-            Diagnostics.record("Speech", "Final transcript ready; characters=\(finalText.count)")
-
-            guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                let disposition = try captureStore.finishEmptyRecognition(for: sessionID, sourceAudio: result.sourceAudio)
-                hotkey?.setCancellationEnabled(false)
-                resetSessionIdentity()
-                state = .ready
-                if disposition == .retainedForRetry {
-                    hud.showRecognitionFailure()
-                } else {
-                    hud.hide()
-                }
-                return
-            }
-
-            let deliveryMode = try captureStore.completeRecognition(finalText, for: sessionID)
-            if let personalizer {
-                state = .refining
-                finalText = try await personalizer.refine(
-                    sessionID,
-                    enabled: inputRefinementEnabled,
-                    expressionStyleEnabled: expressionLearningEnabled,
-                    otherModelWorkActive: memoryLearning?.isModelBusy == true
-                )
-                Diagnostics.recordMemory("refinement-finish \(label(sessionID))")
-                // Cancellation/recheck may have taken over while the optional model was running.
-                try Task.checkCancellation()
-                guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
-                transcript = finalText
-            }
-            if deliveryMode == .captureOnly {
-                completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
-                return
-            }
-
-            state = .delivering
-            hud.showProcessing()
-
-            Diagnostics.record(
-                "Delivery",
-                "Resolving current keyboard focus for \(finalText.count)-character input"
-            )
-            let deliveryApplication = try injector.deliver(finalText)
-            let deliveredName = deliveryApplication.localizedName
-            let deliveredBundle = deliveryApplication.bundleIdentifier
-            Diagnostics.record(
-                "Delivery",
-                "Injection completed for \(label(sessionID)); app=\(deliveredName ?? "unknown") (\(deliveredBundle ?? "unknown"))"
-            )
-            if !Task.isCancelled, stoppingCaptureID == nil {
-                postInsertionLearning?.observeInsertion(
-                    finalText,
-                    in: deliveryApplication,
-                    dictionarySuggestionsEnabled: correctionSuggestionsEnabled,
-                    expressionLearningEnabled: expressionLearningEnabled
-                )
-            }
-            // Delivery may already have dispatched before cancellation arrived.
-            // Record that outcome even when interruption now owns the UI.
-            try captureStore.markDelivered(
-                sessionID,
-                applicationName: deliveredName,
-                bundleIdentifier: deliveredBundle
-            )
-            memoryLearning?.captureDidComplete(sessionID)
-            completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
-        } catch {
-            Diagnostics.record("Session", "Capture \(label(sessionID)) failed: \(error.localizedDescription)", level: .error)
-            await preserveFailedSpeech(sessionID: sessionID, error: error)
-            failSession(sessionID, error: error)
-        }
-    }
-
-    private func cancelCaptureFromUser(source: String) async {
-        guard let sessionID = activeCaptureID else {
-            Diagnostics.record("Session", "Cancel requested from \(source) with no active capture", level: .warning)
-            return
-        }
-
-        guard state == .recording else {
-            Diagnostics.record("Session", "Cancel from \(source) ignored while state=\(String(describing: state))", level: .warning)
-            return
-        }
-
-        Diagnostics.record("Session", "Capture \(label(sessionID)) cancelled by \(source)", level: .warning)
-        state = .stopping
-        hotkey?.setCancellationEnabled(false)
-        hud.hide()
-        await stopActiveCapture(disposition: .discard)
-        if state == .stopping { state = .ready }
+        captureSession.start(deliveryMode: deliveryMode)
     }
 
     private func handleHotkeyUnavailable(_ message: String) async {
@@ -765,10 +498,10 @@ final class AppController: ObservableObject {
         state = .blocked(message)
         hotkey?.invalidate()
         hotkey = nil
-        hud.hide()
-        await stopActiveCapture(disposition: .interrupted(message))
+        captureSession.hideHUD()
+        await captureSession.interrupt(message: message)
         if state == .blocked(message) {
-            hud.showFailure()
+            captureSession.showFailureHUD()
             setupError = message
             needsSetup = true
             await setup.refresh()
@@ -780,148 +513,28 @@ final class AppController: ObservableObject {
         )
     }
 
-    private func handleSpeechFailure(sessionID: UUID, message: String) async {
-        guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
-        Diagnostics.record("Speech", "Live recognition failed for \(label(sessionID)): \(message)", level: .error)
-        state = .failed(message)
-        await stopActiveCapture(disposition: .interrupted(message))
-        if state == .failed(message) { hud.showFailure() }
-    }
-
-    private enum StopDisposition {
-        case discard
-        case interrupted(String)
-    }
-
-    private func stopActiveCapture(disposition: StopDisposition) async {
-        if let captureShutdownTask {
-            await captureShutdownTask.value
-            return
-        }
-        guard let sessionID = activeCaptureID else { return }
-
-        stoppingCaptureID = sessionID
-        hotkey?.setCancellationEnabled(false)
-        hud.hide()
-        Diagnostics.record("Session", "Stopping active capture \(label(sessionID)); disposition=\(disposition)")
-
-        let startTask = captureStartTask
-        let finishTask = captureFinishTask
-        startTask?.cancel()
-        finishTask?.cancel()
-
-        let shutdownTask = Task { @MainActor in
-            // Close the writer first. Awaiting the work tasks afterward lets
-            // their last text/audio snapshot reach storage before disposition.
-            let snapshot = await speech.stopImmediately(sessionID: sessionID)
-            preserveSpeechResult(snapshot, for: sessionID)
-            await startTask?.value
-            await finishTask?.value
-
-            do {
-                switch disposition {
-                case .discard:
-                    try captureStore?.cancel(sessionID)
-                case .interrupted(let message):
-                    try captureStore?.markFailed(sessionID, error: message)
-                }
-            } catch {
-                Diagnostics.record("CaptureStore", "Capture shutdown save failed: \(error.localizedDescription)", level: .error)
+    private func applyCapturePhase(_ phase: CaptureSessionController.Phase) {
+        switch phase {
+        case .idle:
+            switch state {
+            case .recording, .stopping, .finalizing, .refining, .delivering:
+                state = .ready
+            default:
+                break
             }
-
-            if activeCaptureID == sessionID { resetSessionIdentity() }
-            stoppingCaptureID = nil
+        case .recording:
+            state = .recording
+        case .stopping:
+            state = .stopping
+        case .finalizing:
+            state = .finalizing
+        case .refining:
+            state = .refining
+        case .delivering:
+            state = .delivering
+        case .failed(let message):
+            state = .failed(message)
         }
-        captureShutdownTask = shutdownTask
-        await shutdownTask.value
-        captureShutdownTask = nil
-    }
-
-    private func preserveFailedSpeech(sessionID: UUID, error: Error) async {
-        if case let SpeechPipeline.PipelineError.recognitionFailed(_, result) = error {
-            preserveSpeechResult(result, for: sessionID)
-        }
-        let result = await speech.stopImmediately(sessionID: sessionID)
-        preserveSpeechResult(result, for: sessionID)
-    }
-
-    private func preserveSpeechResult(_ result: SpeechPipeline.Result?, for sessionID: UUID) {
-        guard let result else { return }
-        if !result.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            do {
-                try captureStore?.updateRecognizedText(result.transcript, for: sessionID)
-            } catch {
-                Diagnostics.record("CaptureStore", "Could not preserve interrupted text: \(error.localizedDescription)", level: .error)
-            }
-        }
-        do {
-            try captureStore?.attachSourceAudio(result.sourceAudio, for: sessionID)
-        } catch {
-            Diagnostics.record("CaptureStore", "Could not preserve interrupted audio metadata: \(error.localizedDescription)", level: .error)
-        }
-    }
-
-    private func completeSuccessfulSession(_ sessionID: UUID, deliveryMode: CaptureDeliveryMode) {
-        guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
-        Diagnostics.record("Session", "Capture \(label(sessionID)) completed successfully")
-        hotkey?.setCancellationEnabled(false)
-        resetSessionIdentity()
-        lastPresentedFailure = nil
-        state = .ready
-        hud.showSuccess(deliveryMode: deliveryMode)
-        let completedLabel = label(sessionID)
-        Diagnostics.recordMemory("capture-complete \(completedLabel)")
-        Task { @MainActor [weak self] in
-            do { try await Task.sleep(for: .seconds(2)) }
-            catch { return }
-            guard self?.activeCaptureID == nil else { return }
-            Diagnostics.recordMemory("capture-settled \(completedLabel)")
-        }
-    }
-
-    private func failSession(_ sessionID: UUID, error: Error) {
-        guard activeCaptureID == sessionID else { return }
-
-        let message = error.localizedDescription
-        let preservedOnClipboard = error is TextInjector.InjectionError
-        do {
-            if preservedOnClipboard {
-                try captureStore?.markDeliveryFailed(sessionID, error: message)
-                memoryLearning?.captureDidComplete(sessionID)
-            } else if stoppingCaptureID != sessionID {
-                try captureStore?.markFailed(sessionID, error: message)
-            }
-        } catch {
-            Diagnostics.record("CaptureStore", "Failure state save failed: \(error.localizedDescription)", level: .error)
-        }
-        guard stoppingCaptureID != sessionID else { return }
-        Diagnostics.record("Session", "Capture \(label(sessionID)) failed: \(message)", level: .error)
-        hotkey?.setCancellationEnabled(false)
-        resetSessionIdentity()
-        state = .failed(message)
-
-        if preservedOnClipboard {
-            hud.showClipboardFallback()
-            Diagnostics.record(
-                "UI",
-                "Delivery fallback reported in HUD; modal alert suppressed because transcript is preserved",
-                level: .warning
-            )
-        } else {
-            hud.showFailure()
-            presentFailure(title: "Morie 输入失败", message: message)
-        }
-    }
-
-    private func resetSessionIdentity() {
-        activeCaptureID = nil
-        activeSourceAudioURL = nil
-        speechReadyCaptureID = nil
-        finishRequestedCaptureID = nil
-        captureStartTask = nil
-        captureFinishTask = nil
-        history?.setInputActive(false)
-        memoryLearning?.setInputActive(false)
     }
 
     private func startAudioMaintenanceLoopIfNeeded() {
@@ -964,7 +577,5 @@ final class AppController: ObservableObject {
         alert.runModal()
     }
 
-    private func label(_ sessionID: UUID) -> String {
-        String(sessionID.uuidString.prefix(8))
-    }
+
 }
