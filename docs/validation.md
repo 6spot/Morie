@@ -382,3 +382,40 @@ When validation is complete, update:
 - the current task branch/PR with the tested environment and results (PR #3 remains the merged implementation-baseline reference).
 
 Do not replace device/runtime evidence with assumptions, Type4Me history, or compile success.
+
+
+## M-018 Expression Profile
+
+With **学习我的表达习惯** disabled:
+
+- no post-insertion observation should run solely for Expression Profile;
+- existing learned directives must not be sent to cleanup;
+- dictionary correction observation may still run independently if its own toggle is enabled.
+
+With Expression Profile enabled, validate supported non-secure text fields:
+
+- punctuation-only edit;
+- line-break/paragraph edit;
+- explicit list-marker edit;
+- Chinese/English spacing edit;
+- lexical word correction;
+- numeric change;
+- substantive rewrite;
+- undo back to Morie's inserted text;
+- leave the field;
+- start another recording during observation.
+
+Expected:
+
+- only style-only edits with unchanged lexical content add profile evidence;
+- word/content/number changes do not;
+- each feature requires its own repeated directional edit evidence; unrelated edits do not make another feature stable;
+- starting a new capture stops the old observer;
+- raw edited text is not persisted in Expression Profile storage;
+- fewer than 10 directional edits for a feature or fewer than 3 days of evidence produces no stable directive;
+- once stable, at most four style directives enter cleanup and appear in saved refinement provenance;
+- current explicit wording/structure always beats historical style;
+- clearing Expression Profile removes the aggregate profile without touching History, Dictionary or Personal Memory;
+- Terminal/iTerm/Keychain/secure fields are not observed in this first slice.
+
+Real-model acceptance should compare the same dictated text with Expression Profile disabled/enabled after stable evidence. Confirm the difference is presentation-only and does not change facts, numbers, negation, requests or stance.
