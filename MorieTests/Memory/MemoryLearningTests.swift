@@ -4,9 +4,11 @@ import XCTest
 
 @MainActor
 final class MemoryLearningTests: XCTestCase {
-    func testSavedFinalTextAutomaticallyCreatesPersonalMemoryAndSurvivesRestart() throws {
+    func testSavedFinalTextAutomaticallyCreatesPersonalMemoryAndSurvivesRestart() async throws {
         let fixture = try LearningFixture()
         let source = try fixture.capture("I work on Morie.", recognition: "I work on more e.")
+        try await fixture.captures.flushPersistence(for: source)
+        fixture.captures.releaseCaptureOwnership(source)
         try fixture.learn(source)
         let record = try XCTUnwrap(fixture.memory.entries.first)
         XCTAssertEqual(record.origin, .automatic)
@@ -21,7 +23,9 @@ final class MemoryLearningTests: XCTestCase {
         XCTAssertEqual(memory.analyses.first?.sourceText, "I work on Morie.")
         XCTAssertEqual(memory.analyses.first?.state, .completed)
         XCTAssertEqual(try memory.relevantContext(for: "Morie").map(\.id), [record.id])
-        XCTAssertTrue(try DictionaryStore(container: reopened.container).speechHints().isEmpty)
+        let dictionary = DictionaryStore(container: reopened.container)
+        try dictionary.load()
+        XCTAssertTrue(dictionary.entries.isEmpty, "Automatic Memory learning must not create user Dictionary entries.")
     }
 
     func testOnlyCompletedCurrentAppInputEntersQueue() throws {
@@ -228,7 +232,9 @@ final class MemoryLearningTests: XCTestCase {
 
     func testModelFailureUsesFixedPrivateMessageAndAutomaticRetry() async throws {
         let fixture = try LearningFixture()
-        _ = try fixture.capture("I work on Morie.")
+        let source = try fixture.capture("I work on Morie.")
+        try await fixture.captures.flushPersistence(for: source)
+        fixture.captures.releaseCaptureOwnership(source)
         let controller = MemoryLearningController(store: fixture.memory, idleDelay: .milliseconds(1), analyze: { _ in
             throw NSError(domain: "private input text", code: 1, userInfo: [NSLocalizedDescriptionKey: "PRIVATE MODEL CONTENT"])
         })
