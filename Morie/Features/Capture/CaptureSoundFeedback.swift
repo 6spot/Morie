@@ -6,8 +6,7 @@ final class CaptureSoundFeedback {
     static let enabledDefaultsKey = "capture.soundFeedback.enabled"
 
     private struct Tone {
-        let startFrequency: Double
-        let endFrequency: Double
+        let frequency: Double
         let duration: Double
         let gain: Double
     }
@@ -16,24 +15,27 @@ final class CaptureSoundFeedback {
         case start
         case stop
 
+        // Tuned from the owner's reference recording: a quiet rising two-note
+        // start chime and an even softer falling two-note finish chime.
         var tones: [Tone] {
             switch self {
             case .start:
                 [
-                    Tone(startFrequency: 1_520, endFrequency: 1_760, duration: 0.030, gain: 0.82),
-                    Tone(startFrequency: 2_060, endFrequency: 2_320, duration: 0.042, gain: 1.0),
+                    Tone(frequency: 392.0, duration: 0.055, gain: 0.82),
+                    Tone(frequency: 523.25, duration: 0.082, gain: 1.0),
                 ]
             case .stop:
                 [
-                    Tone(startFrequency: 1_180, endFrequency: 920, duration: 0.048, gain: 0.72),
+                    Tone(frequency: 392.0, duration: 0.045, gain: 0.66),
+                    Tone(frequency: 293.66, duration: 0.064, gain: 0.72),
                 ]
             }
         }
 
         var volume: Float {
             switch self {
-            case .start: 0.18
-            case .stop: 0.10
+            case .start: 0.14
+            case .stop: 0.085
             }
         }
     }
@@ -78,9 +80,9 @@ final class CaptureSoundFeedback {
     private func wavData(
         for tones: [Tone]
     ) -> Data? {
-        let attack = 0.0012
-        let release = 0.008
-        let interToneGapFrames = Int(0.003 * sampleRate)
+        let attack = 0.0015
+        let release = 0.010
+        let interToneGapFrames = Int(0.007 * sampleRate)
         var samples: [Int16] = []
 
         for (toneIndex, tone) in tones.enumerated() {
@@ -89,25 +91,22 @@ final class CaptureSoundFeedback {
             }
 
             let frameCount = max(1, Int(tone.duration * sampleRate))
-            var phase = 0.0
-
             for index in 0..<frameCount {
                 let t = Double(index) / sampleRate
                 let progress = Double(index) / Double(max(frameCount - 1, 1))
-                let frequency = tone.startFrequency
-                    + (tone.endFrequency - tone.startFrequency) * progress
-                phase += 2 * .pi * frequency / sampleRate
-
                 let remaining = tone.duration - t
+
                 let attackEnvelope = min(1, t / attack)
                 let releaseEnvelope = min(1, max(0, remaining / release))
-                let decay = exp(-5.4 * progress)
+                let decay = exp(-3.2 * progress)
+                let phase = 2 * .pi * tone.frequency * t
 
+                // Mostly a clean musical tone with just enough upper harmonic
+                // energy to feel crisp on laptop speakers at low volume.
                 let fundamental = sin(phase)
-                let second = sin(phase * 2.0) * 0.16
-                let third = sin(phase * 3.0) * 0.035
-                let transient = sin(phase * 4.0) * 0.018 * (1 - progress)
-                let timbre = (fundamental + second + third + transient) / 1.213
+                let second = sin(phase * 2.0) * 0.12
+                let third = sin(phase * 3.0) * 0.025
+                let timbre = (fundamental + second + third) / 1.145
 
                 let value = timbre
                     * attackEnvelope
