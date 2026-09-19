@@ -102,6 +102,14 @@ final class CaptureHistoryController: ObservableObject {
                 self.recognitionTask = nil
             }
             do {
+                // A terminal Capture may become visible from the live/main context before
+                // its last active-session snapshot reaches the background writer. Drain
+                // that revision first so an older queued snapshot cannot overwrite a
+                // subsequent History retry result.
+                try await self.store.flushPersistence(for: id)
+                try Task.checkCancellation()
+                guard !self.isInputActive else { throw CancellationError() }
+
                 let text = try await recognizeFile(url, locale)
                 try Task.checkCancellation()
                 guard !self.isInputActive else { throw CancellationError() }
@@ -144,6 +152,9 @@ final class CaptureHistoryController: ObservableObject {
     func deleteCapture(_ id: UUID) async throws {
         if recognizingCaptureID == id { await cancelRecognitionAndWait() }
         if selectedCaptureID == id { releasePlayer() }
+        // Serialize deletion after any queued active-session snapshots for the
+        // same Capture so a late writer cannot race this History mutation.
+        try await store.flushPersistence(for: id)
         try store.deleteCapture(id)
     }
 
