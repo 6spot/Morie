@@ -59,7 +59,7 @@ enum InputRefiner {
         return String(decoding: data, as: UTF8.self)
     }
 
-    static func generate    static func generate(_ input: RefinementInput) async throws -> String {
+    static func generate(_ input: RefinementInput) async throws -> String {
         try Task.checkCancellation()
         let model = SystemLanguageModel.default
         guard model.availability == .available else { throw RefinementReason.unavailable }
