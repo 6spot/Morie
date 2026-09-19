@@ -52,12 +52,13 @@ final class MemoryStore: ObservableObject {
         return source
     }
 
-    func analysis(for source: MemoryAnalysisSource) -> MemoryAnalysisRecord? {
+    func analysis(for source: MemoryAnalysisSource) -> MemoryAnalysisSnapshot? {
         let reader = makeContext()
-        return try? analysis(in: reader, for: source)
+        guard let record = try? analysis(in: reader, for: source), let record else { return nil }
+        return MemoryAnalysisSnapshot(record)
     }
 
-    func analyses(for captureID: UUID, linkedTo memoryID: UUID? = nil) -> [MemoryAnalysisRecord] {
+    func analyses(for captureID: UUID, linkedTo memoryID: UUID? = nil) -> [MemoryAnalysisSnapshot] {
         let reader = makeContext()
         var descriptor = FetchDescriptor<MemoryAnalysisRecord>(
             predicate: #Predicate { $0.sourceCaptureID == captureID },
@@ -65,10 +66,15 @@ final class MemoryStore: ObservableObject {
         )
         descriptor.fetchLimit = 8
         guard let records = try? reader.fetch(descriptor) else { return [] }
-        guard let memoryID else { return records }
-        return records.filter { analysis in
-            analysis.observations.contains { $0.memoryID == memoryID }
+        let filtered: [MemoryAnalysisRecord]
+        if let memoryID {
+            filtered = records.filter { analysis in
+                analysis.observations.contains { $0.memoryID == memoryID }
+            }
+        } else {
+            filtered = records
         }
+        return filtered.map(MemoryAnalysisSnapshot.init)
     }
 
     var analyses: [MemoryAnalysisRecord] {
