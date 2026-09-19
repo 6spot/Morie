@@ -619,11 +619,12 @@ private struct ProcessingSweep: View {
 
     @State private var sweepProgress: CGFloat = 0
 
-    private let sweepDuration: TimeInterval = 2.20
+    private let sweepDuration: TimeInterval = 2.40
+    private let pauseDuration: TimeInterval = 0.60
 
     var body: some View {
         GeometryReader { geometry in
-            let bandWidth = max(30, geometry.size.width * 0.52)
+            let bandWidth = max(28, geometry.size.width * 0.44)
             let travel = geometry.size.width + bandWidth
             let offset = -bandWidth + travel * sweepProgress
 
@@ -631,9 +632,9 @@ private struct ProcessingSweep: View {
                 LinearGradient(
                     colors: [
                         .clear,
-                        Color.secondary.opacity(0.025),
-                        Color.white.opacity(0.11),
-                        Color.secondary.opacity(0.025),
+                        Color.secondary.opacity(0.055),
+                        Color.primary.opacity(0.16),
+                        Color.secondary.opacity(0.055),
                         .clear,
                     ],
                     startPoint: .leading,
@@ -643,15 +644,25 @@ private struct ProcessingSweep: View {
                 .offset(x: offset)
                 .clipShape(Capsule())
                 .task {
-                    sweepProgress = 0
-                    await Task.yield()
-                    guard !Task.isCancelled else { return }
+                    while !Task.isCancelled {
+                        sweepProgress = 0
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
 
-                    // This is intentionally a single calm glass highlight, not
-                    // a progress fill. If processing outlives the sweep, the
-                    // capsule simply remains in its native glass state.
-                    withAnimation(.easeInOut(duration: sweepDuration)) {
-                        sweepProgress = 1
+                        // A slow, repeating activity shimmer. It deliberately
+                        // leaves no filled track behind, so this communicates
+                        // "still working" rather than synthetic completion.
+                        withAnimation(.easeInOut(duration: sweepDuration)) {
+                            sweepProgress = 1
+                        }
+
+                        do {
+                            try await Task.sleep(
+                                for: .seconds(sweepDuration + pauseDuration)
+                            )
+                        } catch {
+                            return
+                        }
                     }
                 }
             }
