@@ -44,6 +44,7 @@ enum InputRefiner {
 
         # 上下文
         - 字典只是正确写法候选，不是机械替换规则。
+        - confirmedCorrections 是用户此前明确确认过的“错误识别 → 正确词”关系，可信度高于普通字典提示。当前文本出现同一错误形态时应优先使用已确认写法；若只是相似但语境并不指向该词，不得强行套用。
         - 个人记忆只用于理解当前输入已经指向的对象或主题；当前输入本身没有指向某条记忆时忽略它。不得补入本次没有说出的背景，也不得覆盖本次实际表达。
         - 表达习惯只是排版和措辞节奏偏好，只能在不改变原意、语气、结构事实和本次明确表达的前提下参考；本次输入与表达习惯冲突时，以本次输入为准。
 
@@ -53,6 +54,10 @@ enum InputRefiner {
         字典：[GitHub]
         输入：Gethab
         输出：GitHub
+
+        confirmedCorrections：[Athers → Issues]
+        输入：现在 GitHub 里的 Athers 可以关掉了
+        输出：现在 GitHub 里的 Issues 可以关掉了
 
         输入：嗯那个这个这个问题先处理
         输出：这个问题先处理。
@@ -88,8 +93,14 @@ enum InputRefiner {
     private struct PromptInputData: Encodable {
         let transcript: String
         let dictionary: [String]
+        let confirmedCorrections: [PromptCorrection]
         let personalContext: [PromptMemory]
         let expressionStyle: [String]
+    }
+
+    private struct PromptCorrection: Encodable {
+        let observed: String
+        let correct: String
     }
 
     private struct PromptMemory: Encodable {
@@ -101,6 +112,9 @@ enum InputRefiner {
         let data = try JSONEncoder().encode(PromptInputData(
             transcript: input.prepared.text,
             dictionary: input.dictionary.map(\.name),
+            confirmedCorrections: input.confirmedCorrections.map {
+                PromptCorrection(observed: $0.original, correct: $0.replacement)
+            },
             personalContext: input.context.map {
                 PromptMemory(name: $0.memory.name, notes: $0.memory.notes)
             },

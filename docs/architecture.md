@@ -170,7 +170,9 @@ finish Speech analysis for consumed audio
 recognized text in live state
   ├─ enqueue recognized/audio snapshot
   ↓
-dictionary corrections + bounded optional AI cleanup
+confirmed user correction mappings
+  ↓
+canonical dictionary spelling + bounded optional AI cleanup
   ↓
 final text + refinement provenance in live state
   ├─ enqueue final snapshot
@@ -242,6 +244,34 @@ Owns application-level orchestration and the UI-facing state surface:
 - application-level failure presentation and scheduled audio maintenance.
 
 It no longer owns the authoritative capture UUID/task bookkeeping, Speech lifecycle, HUD state or text delivery. Those belong to the Capture feature.
+
+### `DictionaryStore` / confirmed corrections
+
+The visible Dictionary continues to own **canonical words**, not a list of noisy ASR misspellings. Canonical user/system words are passed to Apple Speech as bounded contextual hints.
+
+M-027 adds a separate internal `DictionaryCorrectionRule` model for user-confirmed observed-ASR → canonical-word relations. The normal Dictionary UI does not render these aliases.
+
+Processing order is:
+
+```text
+Apple Speech + canonical hotwords
+        ↓
+raw transcript
+        ↓
+exact confirmed correction mappings
+        ↓
+canonical spelling normalization
+        ↓
+optional Foundation Models cleanup
+```
+
+Exact confirmed mappings are deterministic even when AI cleanup is disabled or unavailable. Latin/technical mappings use token boundaries; CJK mappings may replace an exact confirmed substring inside a longer phrase such as `总版页面 → 总览页面`. Code/URL/path/identifier protected ranges are excluded.
+
+`RefinementInput` snapshots the bounded correction set together with dictionary/context provenance. If Dictionary or correction rules change during cleanup, the result is treated as stale rather than applying against a different knowledge snapshot.
+
+`PostInsertionLearningController` still observes only the already-verified Morie insertion and still requires a stable bounded word-level user edit. Confirmation now saves the full relation (`Athers → Issues`) rather than discarding the observed wrong form after adding only `Issues`. Existing canonical words—including system built-ins—do not suppress learning. If the canonical word does not yet exist, the confirmation adds it as a user correction word first.
+
+One normalized observed form owns one current canonical replacement. A later explicit confirmation may update it. Deleting a user canonical word removes internal mappings that target it. Morie does not ship a large hard-coded alias list copied from a different ASR engine.
 
 ### `CaptureSessionController`
 

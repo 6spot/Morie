@@ -65,6 +65,38 @@ struct DictionarySnapshot: Codable, Equatable, Identifiable, Sendable {
     let updatedAt: Date
 }
 
+
+struct DictionaryCorrectionSnapshot: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    let original: String
+    let replacement: String
+    let updatedAt: Date
+}
+
+@Model
+final class DictionaryCorrectionRule {
+    var id: UUID = UUID()
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+    var original: String = ""
+    var replacement: String = ""
+    var confirmationCount: Int = 1
+
+    init(original: String, replacement: String) {
+        self.original = original
+        self.replacement = replacement
+    }
+
+    var snapshot: DictionaryCorrectionSnapshot {
+        DictionaryCorrectionSnapshot(
+            id: id,
+            original: original,
+            replacement: replacement,
+            updatedAt: updatedAt
+        )
+    }
+}
+
 @Model
 final class DictionaryEntry {
     var id: UUID = UUID()
@@ -141,7 +173,71 @@ final class DictionaryStore: ObservableObject {
         try save()
     }
 
-    func delete(_ id: UUID) throws { context.delete(try entry(id)); try save() }
+    func delete(_ id: UUID) throws {
+        let removed = try entry(id)
+        let removedKey = Self.correctionKey(removed.name)
+        let rules = try context.fetch(FetchDescriptor<DictionaryCorrectionRule>())
+        for rule in rules where Self.correctionKey(rule.replacement) == removedKey {
+            context.delete(rule)
+        }
+        context.delete(removed)
+        try save()
+    }
+
+    @discardableResult
+    func saveConfirmedCorrection(original: String, replacement: String) throws -> UUID {
+        let original = try validateCorrectionText(original)
+        let replacement = try validateCorrectionText(replacement)
+        guard Self.correctionKey(original) != Self.correctionKey(replacement) else {
+            throw StoreError.invalidName
+        }
+
+        if try !containsEffectiveWord(replacement) {
+            _ = try create(DictionaryDraft(name: replacement), source: .correction)
+        }
+
+        let originalKey = Self.correctionKey(original)
+        let rules = try context.fetch(FetchDescriptor<DictionaryCorrectionRule>())
+        if let existing = rules.first(where: { Self.correctionKey($0.original) == originalKey }) {
+            existing.original = original
+            existing.replacement = replacement
+            existing.updatedAt = Date()
+            existing.confirmationCount += 1
+            try save()
+            return existing.id
+        }
+
+        let rule = DictionaryCorrectionRule(original: original, replacement: replacement)
+        context.insert(rule)
+        try save()
+        return rule.id
+    }
+
+    func confirmedCorrections() throws -> [DictionaryCorrectionSnapshot] {
+        let rules = try context.fetch(
+            FetchDescriptor<DictionaryCorrectionRule>(
+                sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+            )
+        )
+        var characters = 0
+        return rules.prefix(100).compactMap { rule in
+            let cost = rule.original.count + rule.replacement.count
+            guard characters + cost <= 2_000 else { return nil }
+            characters += cost
+            return rule.snapshot
+        }
+    }
+
+
+    func hasConfirmedCorrection(original: String, replacement: String) throws -> Bool {
+        let originalKey = Self.correctionKey(original)
+        let replacementKey = Self.correctionKey(replacement)
+        return try context.fetch(FetchDescriptor<DictionaryCorrectionRule>()).contains {
+            Self.correctionKey($0.original) == originalKey
+                && Self.correctionKey($0.replacement) == replacementKey
+        }
+    }
+
 
     func relevantEntries(for text: String) throws -> [DictionarySnapshot] {
         _ = text
@@ -189,6 +285,17 @@ final class DictionaryStore: ObservableObject {
         return DictionaryDraft(name: name)
     }
 
+
+    private func validateCorrectionText(_ text: String) throws -> String {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let invalidCharacters = CharacterSet.controlCharacters.union(.newlines)
+        guard (2...64).contains(text.count),
+              !text.unicodeScalars.contains(where: invalidCharacters.contains) else {
+            throw StoreError.invalidName
+        }
+        return text
+    }
+
     private func requireNewWord(_ name: String, excluding id: UUID? = nil) throws {
         try load()
         let key = Self.wordKey(name)
@@ -201,10 +308,107 @@ final class DictionaryStore: ObservableObject {
         text.folding(options: [.caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
     }
 
+
+    private static func correctionKey(_ text: String) -> String {
+        text
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+    }
+
     private func save() throws {
         do { try context.save() }
         catch { context.rollback(); throw error }
         try load()
+    }
+}
+
+enum DictionaryCorrections {
+    static func apply(
+        _ text: String,
+        using rules: [DictionaryCorrectionSnapshot]
+    ) -> ValidatedRefinement {
+        guard !rules.isEmpty, !text.isEmpty else {
+            return ValidatedRefinement(text: text, edits: [])
+        }
+
+        let protected = InputText.technicalRanges(in: text)
+        let wordRanges = InputText.words(in: text)
+        var candidates: [(range: Range<String.Index>, rule: DictionaryCorrectionSnapshot)] = []
+
+        for rule in rules {
+            let ranges: [Range<String.Index>]
+            if containsCJK(rule.original) {
+                ranges = literalSubstringRanges(of: rule.original, in: text)
+            } else {
+                ranges = InputText.literalRanges(of: rule.original, in: text, wordRanges: wordRanges)
+            }
+            for range in ranges {
+                guard !protected.contains(where: { $0.overlaps(range) }) else { continue }
+                candidates.append((range, rule))
+            }
+        }
+
+        candidates.sort {
+            if $0.range.lowerBound != $1.range.lowerBound {
+                return $0.range.lowerBound < $1.range.lowerBound
+            }
+            let lhs = text.distance(from: $0.range.lowerBound, to: $0.range.upperBound)
+            let rhs = text.distance(from: $1.range.lowerBound, to: $1.range.upperBound)
+            return lhs > rhs
+        }
+
+        var selected: [(range: Range<String.Index>, rule: DictionaryCorrectionSnapshot)] = []
+        for candidate in candidates where !selected.contains(where: { $0.range.overlaps(candidate.range) }) {
+            selected.append(candidate)
+        }
+
+        var output = text
+        var edits: [RefinementEdit] = []
+        for match in selected.reversed() {
+            let original = String(text[match.range])
+            guard original != match.rule.replacement else { continue }
+            output.replaceSubrange(match.range, with: match.rule.replacement)
+            edits.append(
+                RefinementEdit(
+                    original: original,
+                    replacement: match.rule.replacement,
+                    correctionRuleID: match.rule.id
+                )
+            )
+        }
+        edits.reverse()
+        return ValidatedRefinement(text: output, edits: edits)
+    }
+
+    private static func literalSubstringRanges(
+        of term: String,
+        in text: String
+    ) -> [Range<String.Index>] {
+        guard !term.isEmpty else { return [] }
+        var start = text.startIndex
+        var ranges: [Range<String.Index>] = []
+        while start < text.endIndex,
+              let range = text.range(
+                of: term,
+                options: [.caseInsensitive, .diacriticInsensitive],
+                range: start..<text.endIndex
+              ) {
+            ranges.append(range)
+            start = range.upperBound
+        }
+        return ranges
+    }
+
+    private static func containsCJK(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
+                true
+            default:
+                false
+            }
+        }
     }
 }
 

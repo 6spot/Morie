@@ -15,9 +15,9 @@ final class PostInsertionLearningController {
     private var expiryTask: Task<Void, Never>?
     private var observationID: UUID?
     private var panel: NSPanel?
-    private var suggestedWords = Set<String>()
-    private var suggestedWordOrder: [String] = []
-    private let maximumSuggestedWords = 256
+    private var suggestedCorrections = Set<String>()
+    private var suggestedCorrectionOrder: [String] = []
+    private let maximumSuggestedCorrections = 256
 
     init(dictionary: DictionaryStore, expressionProfile: ExpressionProfileStore) {
         self.dictionary = dictionary
@@ -105,21 +105,31 @@ final class PostInsertionLearningController {
 
     private func present(_ correction: DictionaryCorrection) {
         guard let observationID else { return }
-        let key = MemoryText.normalized(correction.replacement)
-        guard !suggestedWords.contains(key) else { return }
+        let key = [
+            MemoryText.normalized(correction.original),
+            MemoryText.normalized(correction.replacement),
+        ].joined(separator: "→")
+        guard !suggestedCorrections.contains(key) else { return }
         do {
-            guard try !dictionary.containsEffectiveWord(correction.replacement) else { return }
+            guard try !dictionary.hasConfirmedCorrection(
+                original: correction.original,
+                replacement: correction.replacement
+            ) else { return }
         } catch { return }
-        suggestedWords.insert(key)
-        suggestedWordOrder.append(key)
-        if suggestedWordOrder.count > maximumSuggestedWords {
-            let removed = suggestedWordOrder.removeFirst()
-            suggestedWords.remove(removed)
+
+        suggestedCorrections.insert(key)
+        suggestedCorrectionOrder.append(key)
+        if suggestedCorrectionOrder.count > maximumSuggestedCorrections {
+            let removed = suggestedCorrectionOrder.removeFirst()
+            suggestedCorrections.remove(removed)
         }
+
         let content = DictionaryCorrectionPrompt(correction: correction, save: { [weak self] in
             guard let self else { return }
-            // Save the same single word as the dictionary editor.
-            try self.dictionary.create(DictionaryDraft(name: correction.replacement), source: .correction)
+            try self.dictionary.saveConfirmedCorrection(
+                original: correction.original,
+                replacement: correction.replacement
+            )
             self.dismiss()
         }, dismiss: { [weak self] in self?.dismiss() })
             .frame(width: 370)
@@ -130,7 +140,7 @@ final class PostInsertionLearningController {
             }
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 370, height: 180),
                             styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.title = "加入字典"
+        panel.title = "记住纠错"
         panel.isReleasedWhenClosed = false
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
@@ -167,16 +177,19 @@ struct DictionaryCorrectionPrompt: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("将“\(correction.replacement)”加入字典？").font(.headline)
-            Text("\(correction.original) → \(correction.replacement)").textSelection(.enabled)
-            Text("以后识别语音时，将这个词语作为拼写提示。").font(.callout).foregroundStyle(.secondary)
+            Text("记住这次纠错？").font(.headline)
+            Text("\(correction.original) → \(correction.replacement)")
+                .textSelection(.enabled)
+            Text("以后再次出现相同识别错误时，Morie 会优先纠正为这个词；正确词也会继续作为语音识别提示。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
             if let error { Text(error).font(.caption).foregroundStyle(.secondary) }
             HStack {
                 Spacer()
-                Button("暂不添加", action: dismiss)
-                Button("加入字典") {
+                Button("暂不记住", action: dismiss)
+                Button("记住纠错") {
                     do { try save() }
-                    catch { self.error = "无法保存词语，请重试。" }
+                    catch { self.error = "无法保存纠错，请重试。" }
                 }
             }
         }

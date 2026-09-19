@@ -67,6 +67,8 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(InputRefiner.instructionsText.contains("不要因为用户没有明确说“第一、第二”"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("中文、英文或中英文混合"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("当前输入本身没有指向某条记忆时忽略它"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("confirmedCorrections"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("Athers → Issues"))
         XCTAssertFalse(InputRefiner.instructionsText.contains("已输入我觉得有必要存在吗"))
         XCTAssertFalse(InputRefiner.instructionsText.contains("授权的时候我们的窗口授权完之后"))
     }
@@ -121,11 +123,20 @@ final class PersonalizationTests: XCTestCase {
             dictionary: [
                 DictionarySnapshot(id: dictionaryID, name: "GitHub", updatedAt: updatedAt)
             ],
+            corrections: [
+                DictionaryCorrectionSnapshot(
+                    id: UUID(),
+                    original: "Athers",
+                    replacement: "Issues",
+                    updatedAt: updatedAt
+                )
+            ],
             expressionStyle: ["倾向保留句末标点。"]
         )
 
         let prompt = try InputRefiner.promptText(for: input)
         XCTAssertTrue(prompt.contains(#""dictionary":["GitHub"]"#))
+        XCTAssertTrue(prompt.contains(#""confirmedCorrections":[{"observed":"Athers","correct":"Issues"}]"#))
         XCTAssertTrue(prompt.contains(#""name":"Morie""#))
         XCTAssertTrue(prompt.contains(#""notes":"Morie is a voice input project.""#))
         XCTAssertTrue(prompt.contains(#""expressionStyle":["倾向保留句末标点。"]"#))
@@ -136,6 +147,23 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertFalse(prompt.contains("origin"))
         XCTAssertFalse(prompt.contains("status"))
         XCTAssertFalse(prompt.contains("kind"))
+    }
+
+    func testConfirmedCorrectionPreparesTextBeforeOptionalModelCleanup() throws {
+        let correction = DictionaryCorrectionSnapshot(
+            id: UUID(),
+            original: "Athers",
+            replacement: "Issues",
+            updatedAt: Date()
+        )
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "GitHub 里的 Athers 可以关闭了",
+            corrections: [correction]
+        )
+
+        XCTAssertEqual(input.prepared.text, "GitHub 里的 Issues 可以关闭了")
+        XCTAssertEqual(input.prepared.edits.first?.correctionRuleID, correction.id)
     }
 
     func testDictionaryNormalizesSavedSpellingBeforeCleanupWithoutMemory() throws {
