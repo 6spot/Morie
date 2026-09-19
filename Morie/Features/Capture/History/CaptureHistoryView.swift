@@ -116,8 +116,6 @@ struct CaptureDetailView: View {
     let capture: CaptureRecord
     let captureID: UUID
     @ObservedObject var history: CaptureHistoryController
-    let memory: MemoryStore
-    let learning: MemoryLearningController
     let canRecognize: Bool
     let onRecognize: (UUID) -> Void
 
@@ -161,7 +159,6 @@ struct CaptureDetailView: View {
                 }
             }
 
-            CaptureMemorySection(store: memory, controller: learning, capture: capture)
 
             DisclosureGroup("识别与润色") {
                 VStack(alignment: .leading, spacing: 16) {
@@ -216,7 +213,7 @@ struct CaptureDetailView: View {
                 }
             }
         } message: {
-            Text("此记录的文字、原始录音和记忆分析快照将被永久删除。已单独保存的个人记忆会保留。")
+            Text("此记录的文字、识别与润色信息和原始录音将被永久删除。")
         }
         .alert("无法删除记录", isPresented: Binding(
             get: { deletionError != nil },
