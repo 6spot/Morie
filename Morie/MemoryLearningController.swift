@@ -15,7 +15,9 @@ final class MemoryLearningController: ObservableObject {
     private let idleDelay: Duration
     private let batchSize: Int
     private var workerTask: Task<Void, Never>?
+    private var workerID: UUID?
     private var isRunning = false
+    private var didReconcileAtStartup = false
 
     var isModelBusy: Bool { analyzingCaptureID != nil }
 
@@ -31,40 +33,110 @@ final class MemoryLearningController: ObservableObject {
         self.analyze = analyze
     }
 
-    func start() { isRunning = true; schedule() }
+    func start() {
+        guard !isRunning else { return }
+        isRunning = true
 
-    func stop() { isRunning = false; workerTask?.cancel() }
+        if !didReconcileAtStartup {
+            do {
+                try store.reconcileCompletedInputs()
+                didReconcileAtStartup = true
+            } catch {
+                message = "个人记忆队列恢复失败，将在下次启动时重试。"
+            }
+        }
+
+        schedule(minimumDelay: idleDelay)
+    }
+
+    func stop() {
+        isRunning = false
+        cancelWorker()
+    }
 
     func setInputActive(_ active: Bool) {
         isInputActive = active
-        if active { workerTask?.cancel() }
-        else { schedule() }
+        if active {
+            cancelWorker()
+        } else {
+            schedule(minimumDelay: idleDelay)
+        }
+    }
+
+    /// Called when one Capture reaches a durable terminal delivery state.
+    /// This is the normal enqueue path; it avoids rescanning the entire Capture history.
+    func captureDidComplete(_ captureID: UUID) {
+        do {
+            try store.enqueueCompletedInput(captureID: captureID)
+            message = nil
+        } catch {
+            message = "个人记忆学习暂未排队，你的输入已保存。"
+        }
+
+        if !isInputActive {
+            cancelWorker()
+            schedule(minimumDelay: idleDelay)
+        }
     }
 
     /// Optional explicit retry; ordinary input uses the same durable queue automatically.
     func retry(_ source: MemoryAnalysisSource) {
-        do { try store.retry(source); message = nil; schedule() }
-        catch { message = "无法安排个人记忆学习，你的输入已保存。" }
+        do {
+            try store.retry(source)
+            message = nil
+            if !isInputActive {
+                cancelWorker()
+                schedule()
+            }
+        } catch {
+            message = "无法安排个人记忆学习，你的输入已保存。"
+        }
     }
 
     // The input path never awaits this. Tests/shutdown can observe draining model work.
     func waitForCurrentBatch() async { await workerTask?.value }
 
-    private func schedule() {
+    private func schedule(minimumDelay: Duration = .zero) {
         guard isRunning, !isInputActive, workerTask == nil else { return }
-        workerTask = Task { [weak self, idleDelay] in
-            do { try await Task.sleep(for: idleDelay) }
-            catch { self?.workerFinished(); return }
+
+        let nextAttemptAt: Date
+        do {
+            guard let date = try store.nextPendingAttemptDate() else { return }
+            nextAttemptAt = date
+        } catch {
+            message = "个人记忆队列暂不可用，将在后续输入或重试时再次检查。"
+            return
+        }
+
+        let retryDelay = Duration.seconds(max(0, nextAttemptAt.timeIntervalSinceNow))
+        let delay = max(minimumDelay, retryDelay)
+        let id = UUID()
+        workerID = id
+        workerTask = Task { [weak self, delay] in
+            do {
+                try await Task.sleep(for: delay)
+                try Task.checkCancellation()
+            } catch {
+                self?.workerFinished(id)
+                return
+            }
+
             guard let self else { return }
             await self.processBatch()
-            self.workerFinished()
+            self.workerFinished(id)
         }
+    }
+
+    private func cancelWorker() {
+        workerID = nil
+        workerTask?.cancel()
+        workerTask = nil
+        analyzingCaptureID = nil
     }
 
     private func processBatch() async {
         guard !Task.isCancelled, !isInputActive, canUseModel() else { return }
         do {
-            try store.enqueueCompletedInputs()
             let sources = try store.pendingSources(limit: batchSize)
             for source in sources {
                 try Task.checkCancellation()
@@ -96,9 +168,11 @@ final class MemoryLearningController: ObservableObject {
         }
     }
 
-    private func workerFinished() {
+    private func workerFinished(_ id: UUID) {
+        guard workerID == id else { return }
         analyzingCaptureID = nil
         workerTask = nil
+        workerID = nil
         schedule()
     }
 }
