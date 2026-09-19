@@ -34,6 +34,8 @@ final class AppController: ObservableObject {
     @Published private(set) var inputRefinementEnabled: Bool
     @Published private(set) var correctionSuggestionsEnabled: Bool
     @Published private(set) var expressionLearningEnabled: Bool
+    @Published private(set) var iCloudSyncEnabled: Bool
+    @Published private(set) var iCloudSyncState: ICloudSyncState
     @Published private(set) var needsSetup = false
     @Published private(set) var setupError: String?
     @Published private(set) var isBootstrapping = false
@@ -55,6 +57,7 @@ final class AppController: ObservableObject {
     private let personalizer: CapturePersonalizer?
     private let postInsertionLearning: PostInsertionLearningController?
     private let persistenceError: Error?
+    private let cloudSyncStartupError: Error?
     private let speechLocale = Locale(identifier: "zh-CN")
 
     private var hotkey: PushToTalkHotkey?
@@ -68,10 +71,16 @@ final class AppController: ObservableObject {
     private var stoppingCaptureID: UUID?
     private var activeSourceAudioURL: URL?
     private var lastPresentedFailure: String?
+    private var iCloudStatusTask: Task<Void, Never>?
 
-    init(captureStore: CaptureStore?, persistenceError: Error? = nil) {
+    init(
+        captureStore: CaptureStore?,
+        persistenceError: Error? = nil,
+        cloudSyncStartupError: Error? = nil
+    ) {
         self.captureStore = captureStore
         self.persistenceError = persistenceError
+        self.cloudSyncStartupError = cloudSyncStartupError
         history = captureStore.map { CaptureHistoryController(store: $0, locale: Locale(identifier: "zh-CN")) }
         memory = captureStore.map { MemoryStore(container: $0.container) }
         dictionary = captureStore.map { DictionaryStore(container: $0.container) }
@@ -108,6 +117,23 @@ final class AppController: ObservableObject {
             forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
         )
         expressionLearningEnabled = UserDefaults.standard.bool(forKey: ExpressionProfileStore.enabledDefaultsKey)
+        iCloudSyncEnabled = ICloudSyncSettings.isEnabled
+        if let cloudSyncStartupError {
+            iCloudSyncState = .unavailable("iCloud 同步未能启动，当前继续使用本地数据。")
+            Diagnostics.record(
+                "iCloud",
+                "Managed CloudKit store failed to open; using local store: \(cloudSyncStartupError.localizedDescription)",
+                level: .error
+            )
+        } else if iCloudSyncEnabled {
+            iCloudSyncState = captureStore?.cloudSyncEnabled == true
+                ? .checking
+                : .restartRequired("已开启，重启 Morie 后开始 iCloud 同步。")
+        } else {
+            iCloudSyncState = captureStore?.cloudSyncEnabled == true
+                ? .restartRequired("已关闭，重启 Morie 后停止 iCloud 同步。")
+                : .off
+        }
 
         hud.onCancel = { [weak self] in
             Task { @MainActor in
@@ -127,6 +153,7 @@ final class AppController: ObservableObject {
         Task { @MainActor [weak self] in
             await self?.bootstrap()
         }
+        refreshICloudSyncState()
     }
 
     var statusTitle: String {
@@ -179,6 +206,89 @@ final class AppController: ObservableObject {
             Diagnostics.record("ExpressionProfile", "Cleared learned expression profile")
         } catch {
             Diagnostics.record("ExpressionProfile", "Could not clear learned expression profile", level: .error)
+        }
+    }
+
+    func setICloudSyncEnabled(_ enabled: Bool) {
+        iCloudStatusTask?.cancel()
+        iCloudStatusTask = nil
+
+        if !enabled {
+            ICloudSyncSettings.setEnabled(false)
+            iCloudSyncEnabled = false
+            iCloudSyncState = captureStore?.cloudSyncEnabled == true
+                ? .restartRequired("已关闭，重启 Morie 后停止 iCloud 同步。")
+                : .off
+            return
+        }
+
+        iCloudSyncState = .checking
+        iCloudStatusTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result = await ICloudAccountInspector.status()
+            guard !Task.isCancelled else { return }
+
+            switch result {
+            case .success(let status):
+                if let message = ICloudAccountInspector.unavailableMessage(for: status) {
+                    self.iCloudSyncEnabled = false
+                    self.iCloudSyncState = .unavailable(message)
+                    return
+                }
+                ICloudSyncSettings.setEnabled(true)
+                self.iCloudSyncEnabled = true
+                self.iCloudSyncState = self.captureStore?.cloudSyncEnabled == true
+                    ? .ready
+                    : .restartRequired("已开启，重启 Morie 后开始 iCloud 同步。")
+            case .failure(let error):
+                self.iCloudSyncEnabled = false
+                self.iCloudSyncState = .unavailable("无法连接 iCloud，请确认账户状态后重试。")
+                Diagnostics.record(
+                    "iCloud",
+                    "Account status check failed: \(error.localizedDescription)",
+                    level: .warning
+                )
+            }
+            self.iCloudStatusTask = nil
+        }
+    }
+
+    func refreshICloudSyncState() {
+        iCloudStatusTask?.cancel()
+        guard iCloudSyncEnabled else {
+            iCloudSyncState = captureStore?.cloudSyncEnabled == true
+                ? .restartRequired("已关闭，重启 Morie 后停止 iCloud 同步。")
+                : .off
+            return
+        }
+        if cloudSyncStartupError != nil {
+            iCloudSyncState = .unavailable("iCloud 同步未能启动，当前继续使用本地数据。")
+            return
+        }
+
+        iCloudSyncState = .checking
+        iCloudStatusTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result = await ICloudAccountInspector.status()
+            guard !Task.isCancelled else { return }
+            switch result {
+            case .success(let status):
+                if let message = ICloudAccountInspector.unavailableMessage(for: status) {
+                    self.iCloudSyncState = .unavailable(message)
+                } else {
+                    self.iCloudSyncState = self.captureStore?.cloudSyncEnabled == true
+                        ? .ready
+                        : .restartRequired("已开启，重启 Morie 后开始 iCloud 同步。")
+                }
+            case .failure(let error):
+                self.iCloudSyncState = .unavailable("无法连接 iCloud，请确认账户状态后重试。")
+                Diagnostics.record(
+                    "iCloud",
+                    "Account status refresh failed: \(error.localizedDescription)",
+                    level: .warning
+                )
+            }
+            self.iCloudStatusTask = nil
         }
     }
 
