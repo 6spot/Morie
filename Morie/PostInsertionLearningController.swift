@@ -3,11 +3,14 @@ import AppKit
 import Carbon
 import SwiftUI
 
-/// An opt-in, short-lived observer of a verified Morie insertion. No keyboard events or document-wide reads.
+/// One short-lived observer of a verified Morie insertion. It powers explicit
+/// dictionary suggestions and aggregate Expression Profile learning without
+/// monitoring arbitrary keyboard input or persisting the surrounding document.
 @MainActor
-final class DictionaryCorrectionController {
-    static let enabledDefaultsKey = "dictionaryCorrectionSuggestionsEnabled"
+final class PostInsertionLearningController {
+    static let dictionarySuggestionsDefaultsKey = "dictionaryCorrectionSuggestionsEnabled"
     private let dictionary: DictionaryStore
+    private let expressionProfile: ExpressionProfileStore
     private var observationTask: Task<Void, Never>?
     private var expiryTask: Task<Void, Never>?
     private var observationID: UUID?
@@ -16,7 +19,10 @@ final class DictionaryCorrectionController {
     private var suggestedWordOrder: [String] = []
     private let maximumSuggestedWords = 256
 
-    init(dictionary: DictionaryStore) { self.dictionary = dictionary }
+    init(dictionary: DictionaryStore, expressionProfile: ExpressionProfileStore) {
+        self.dictionary = dictionary
+        self.expressionProfile = expressionProfile
+    }
 
     func stop() {
         observationID = nil
@@ -25,9 +31,15 @@ final class DictionaryCorrectionController {
         dismiss()
     }
 
-    func observeInsertion(_ text: String, in application: NSRunningApplication?) {
+    func observeInsertion(
+        _ text: String,
+        in application: NSRunningApplication?,
+        dictionarySuggestionsEnabled: Bool,
+        expressionLearningEnabled: Bool
+    ) {
         stop()
-        guard let application, !application.isTerminated,
+        guard dictionarySuggestionsEnabled || expressionLearningEnabled,
+              let application, !application.isTerminated,
               application.bundleIdentifier != Bundle.main.bundleIdentifier,
               !["com.apple.Terminal", "com.googlecode.iterm2", "com.apple.keychainaccess"].contains(application.bundleIdentifier ?? ""),
               !(application.bundleIdentifier ?? "").localizedCaseInsensitiveContains("password"),
@@ -36,7 +48,7 @@ final class DictionaryCorrectionController {
         let pid = application.processIdentifier
         observationID = id
         observationTask = Task { [weak self] in
-            let reader = CorrectionFieldReader()
+            let reader = InsertedFieldReader()
             let deadline = ContinuousClock.now + .seconds(30)
             defer {
                 if self?.observationID == id {
@@ -53,7 +65,9 @@ final class DictionaryCorrectionController {
                     if await reader.anchor(text, pid: pid) { anchored = true; break }
                 }
                 guard anchored else { return }
-                var tracker = DictionaryCorrectionTracker(original: text)
+                var correctionTracker = DictionaryCorrectionTracker(original: text)
+                var styleTracker = StableInsertedEditTracker(original: text)
+                var expressionRecorded = false
                 var offeredText: String?
                 while ContinuousClock.now < deadline {
                     try await Task.sleep(for: .milliseconds(750))
@@ -64,7 +78,22 @@ final class DictionaryCorrectionController {
                         guard sample == offeredText, self?.panel != nil else { return }
                         continue
                     }
-                    if let correction = tracker.observe(sample, at: Date()) {
+                    let now = Date()
+                    if expressionLearningEnabled, !expressionRecorded,
+                       let stableEdit = styleTracker.observe(sample, at: now),
+                       ExpressionStyleExtractor.extract(injected: text, edited: stableEdit) != nil,
+                       let self {
+                        do {
+                            try self.expressionProfile.record(injected: text, edited: stableEdit, at: now)
+                            expressionRecorded = true
+                            Diagnostics.record("ExpressionProfile", "Recorded one bounded style-edit sample")
+                        } catch {
+                            Diagnostics.record("ExpressionProfile", "Could not save style sample", level: .warning)
+                        }
+                    }
+
+                    if dictionarySuggestionsEnabled,
+                       let correction = correctionTracker.observe(sample, at: now) {
                         self?.present(correction)
                         guard self?.panel != nil else { return }
                         offeredText = sample
@@ -155,8 +184,32 @@ struct DictionaryCorrectionPrompt: View {
     }
 }
 
+
+private struct StableInsertedEditTracker {
+    let original: String
+    private var lastText: String?
+    private var changedAt: Date?
+
+    init(original: String) { self.original = original }
+
+    mutating func observe(_ text: String, at now: Date) -> String? {
+        if text == original {
+            lastText = nil
+            changedAt = nil
+            return nil
+        }
+        if lastText != text {
+            lastText = text
+            changedAt = now
+            return nil
+        }
+        guard let changedAt, now.timeIntervalSince(changedAt) >= 2 else { return nil }
+        return text
+    }
+}
+
 /// Blocking Accessibility IPC stays off the main actor and each message has a short native deadline.
-private actor CorrectionFieldReader {
+private actor InsertedFieldReader {
     private struct Field {
         let element: AXUIElement
         let start: Int

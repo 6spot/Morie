@@ -139,6 +139,7 @@ private struct MorieMenuContent: View {
 @MainActor
 struct MorieSettingsView: View {
     @ObservedObject var controller: AppController
+    @State private var confirmsExpressionReset = false
 
     var body: some View {
         Form {
@@ -160,6 +161,20 @@ struct MorieSettingsView: View {
                 Text("输入完成后的 30 秒内，检查当前文本框中的词语修改，并询问是否加入字典。离开文本框或开始下一次输入即停止检查。默认关闭。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("表达习惯") {
+                Toggle("学习我的表达习惯", isOn: Binding(
+                    get: { controller.expressionLearningEnabled },
+                    set: { controller.setExpressionLearningEnabled($0) }
+                ))
+                Text("只观察 Morie 刚输入的文字是否被你修改；仅学习标点、分段、列表和中英文空格等表达习惯，不保存修改后的原文。默认关闭。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button("清除已学习的表达习惯…", role: .destructive) {
+                    confirmsExpressionReset = true
+                }
             }
 
             Section("快捷键") {
@@ -197,6 +212,17 @@ struct MorieSettingsView: View {
 
         }
         .formStyle(.grouped)
+        .confirmationDialog(
+            "清除已学习的表达习惯？",
+            isPresented: $confirmsExpressionReset,
+            titleVisibility: .visible
+        ) {
+            Button("清除", role: .destructive) {
+                controller.clearExpressionProfile()
+            }
+        } message: {
+            Text("只会清除表达习惯统计，不会删除历史记录、字典或个人记忆。")
+        }
         .frame(maxWidth: 700)
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

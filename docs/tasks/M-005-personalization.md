@@ -21,7 +21,7 @@ Voice input should be immediately useful and readable while retaining the user's
 - Input priority, deadline/cancellation, save-error and stale-source/context handling.
 - Opt-in word-correction suggestions to the separate user dictionary (M-009).
 
-Excluded: answering/executing dictated content, generic rewrites, unexpressed background, automatic style imitation, inspiration/follow-up, external runtimes, cloud providers and compatibility layers.
+Excluded from M-005 itself: answering/executing dictated content, generic rewrites, unexpressed background, inspiration/follow-up, external runtimes, cloud providers and compatibility layers. Aggregate style learning is now owned separately by [M-018](M-018-expression-profile.md) and may influence presentation only after stable evidence.
 
 ## Acceptance criteria
 

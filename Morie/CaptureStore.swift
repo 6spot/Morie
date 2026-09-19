@@ -45,7 +45,14 @@ final class CaptureStore {
         commitRefinement: @escaping (ModelContext) throws -> Void = { try $0.save() }
     ) throws {
         self.commitRefinement = commitRefinement
-        let schema = Schema([CaptureRecord.self, DictionaryEntry.self, MemoryRecord.self, MemoryAnalysisRecord.self, MemoryLearningBlock.self])
+        let schema = Schema([
+            CaptureRecord.self,
+            DictionaryEntry.self,
+            MemoryRecord.self,
+            MemoryAnalysisRecord.self,
+            MemoryLearningBlock.self,
+            ExpressionProfileRecord.self,
+        ])
         precondition(!(inMemory && storageURL != nil), "An in-memory store cannot also use a storage URL.")
 
         let configuration: ModelConfiguration
@@ -156,10 +163,21 @@ final class CaptureStore {
         return deliveryMode
     }
 
-    func refinementInput(for id: UUID, context: [MemoryContextMatch], dictionary: [DictionarySnapshot] = []) throws -> RefinementInput {
+    func refinementInput(
+        for id: UUID,
+        context: [MemoryContextMatch],
+        dictionary: [DictionarySnapshot] = [],
+        expressionStyle: [String] = []
+    ) throws -> RefinementInput {
         let record = try capture(id)
         guard record.refinement == nil else { throw StoreError.refinementSourceChanged }
-        let input = RefinementInput(captureID: id, text: record.finalText, context: context, dictionary: dictionary)
+        let input = RefinementInput(
+            captureID: id,
+            text: record.finalText,
+            context: context,
+            dictionary: dictionary,
+            expressionStyle: expressionStyle
+        )
         try requireRefinementSource(input)
         return input
     }

@@ -42,6 +42,7 @@ enum InputRefiner {
         # 上下文
         - 字典只是正确写法候选，不是机械替换规则。
         - 个人记忆只用于理解当前输入已经指向的对象或主题；当前输入本身没有指向某条记忆时忽略它。不得补入本次没有说出的背景，也不得覆盖本次实际表达。
+        - 表达习惯只是排版和措辞节奏偏好，只能在不改变原意、语气、结构事实和本次明确表达的前提下参考；本次输入与表达习惯冲突时，以本次输入为准。
 
         # 示例
         示例只说明规则，不得把示例中的词句、语气或观点带到其他输入中。
@@ -77,6 +78,7 @@ enum InputRefiner {
         let transcript: String
         let dictionary: [String]
         let personalContext: [PromptMemory]
+        let expressionStyle: [String]
     }
 
     private struct PromptMemory: Encodable {
@@ -90,7 +92,8 @@ enum InputRefiner {
             dictionary: input.dictionary.map(\.name),
             personalContext: input.context.map {
                 PromptMemory(name: $0.memory.name, notes: $0.memory.notes)
-            }
+            },
+            expressionStyle: input.expressionStyle
         ))
         return String(decoding: data, as: UTF8.self)
     }

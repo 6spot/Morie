@@ -9,18 +9,31 @@ final class CapturePersonalizer {
     private let store: CaptureStore
     private let memory: MemoryStore
     private let dictionary: DictionaryStore
+    private let expressionProfile: ExpressionProfileStore?
     private let runner: InputRefinementRunner
 
     var isModelBusy: Bool { runner.isBusy }
 
-    init(store: CaptureStore, memory: MemoryStore, dictionary: DictionaryStore, runner: InputRefinementRunner = InputRefinementRunner()) {
+    init(
+        store: CaptureStore,
+        memory: MemoryStore,
+        dictionary: DictionaryStore,
+        expressionProfile: ExpressionProfileStore? = nil,
+        runner: InputRefinementRunner = InputRefinementRunner()
+    ) {
         self.store = store
         self.memory = memory
         self.dictionary = dictionary
+        self.expressionProfile = expressionProfile
         self.runner = runner
     }
 
-    func refine(_ captureID: UUID, enabled: Bool, otherModelWorkActive: Bool = false) async throws -> String {
+    func refine(
+        _ captureID: UUID,
+        enabled: Bool,
+        expressionStyleEnabled: Bool = false,
+        otherModelWorkActive: Bool = false
+    ) async throws -> String {
         try Task.checkCancellation()
         let started = ContinuousClock.now
         var skip: RefinementReason? = enabled ? nil : .disabled
@@ -32,7 +45,15 @@ final class CapturePersonalizer {
         let context = skip == nil
             ? ((try? memory.relevantContext(for: prepared, limit: Self.cleanupMemoryContextLimit)) ?? [])
             : []
-        let input = try store.refinementInput(for: captureID, context: context, dictionary: dictionaryEntries)
+        let expressionStyle = skip == nil && expressionStyleEnabled
+            ? ((try? expressionProfile?.directives()) ?? [])
+            : []
+        let input = try store.refinementInput(
+            for: captureID,
+            context: context,
+            dictionary: dictionaryEntries,
+            expressionStyle: expressionStyle
+        )
 
         do {
             try store.beginRefinement(input)
@@ -58,6 +79,12 @@ final class CapturePersonalizer {
                 )) ?? []
                 guard current == input.context else {
                     return try keepOriginal(input, reason: .memoryChanged, started: started)
+                }
+                let currentStyle = expressionStyleEnabled
+                    ? ((try? expressionProfile?.directives()) ?? [])
+                    : []
+                guard currentStyle == input.expressionStyle else {
+                    return try keepOriginal(input, reason: .expressionStyleChanged, started: started)
                 }
                 let result: ValidatedRefinement
                 do {

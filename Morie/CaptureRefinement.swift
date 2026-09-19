@@ -6,6 +6,7 @@ struct RefinementInput: Codable, Equatable, Sendable {
     let text: String
     var context: [MemoryContextMatch] = []
     var dictionary: [DictionarySnapshot] = []
+    var expressionStyle: [String] = []
 
     var prepared: ValidatedRefinement { DictionarySpelling.normalize(text, using: dictionary) }
 }
@@ -34,7 +35,7 @@ enum RefinementStatus: String, Codable, Sendable {
 
 enum RefinementReason: String, Codable, Error, Sendable {
     case disabled, modelBusy, unavailable, unsupportedLanguage, textTooLong
-    case declined, generationFailed, invalidEdits, memoryChanged, dictionaryChanged
+    case declined, generationFailed, invalidEdits, memoryChanged, dictionaryChanged, expressionStyleChanged
     case timeLimit, interrupted, saveFailed
 
     var message: String {
@@ -49,6 +50,7 @@ enum RefinementReason: String, Codable, Error, Sendable {
         case .invalidEdits: "AI 未返回有效文字，已使用字典修正后的文字继续输入。"
         case .memoryChanged: "润色期间个人记忆发生变化，已使用字典修正后的文字继续输入。"
         case .dictionaryChanged: "润色期间字典发生变化，已保留识别文字。"
+        case .expressionStyleChanged: "润色期间表达习惯发生变化，已使用当前保存的文字继续输入。"
         case .timeLimit: "AI 润色超时，已使用字典修正后的文字继续输入。"
         case .interrupted: "输入处理已中断，已保存的文字和录音均已保留。"
         case .saveFailed: "无法保存处理结果，已保留此前保存的文字。"

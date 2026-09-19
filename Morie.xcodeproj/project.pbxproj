@@ -60,7 +60,7 @@
 		A20000000000000000000017 /* DictionaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* DictionaryTests.swift */; };
 		A1000000000000000000001E /* DictionaryCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000032 /* DictionaryCorrection.swift */; };
 		A20000000000000000000018 /* DictionaryCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000032 /* DictionaryCorrection.swift */; };
-		A1000000000000000000001F /* DictionaryCorrectionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000033 /* DictionaryCorrectionController.swift */; };
+		A1000000000000000000001F /* PostInsertionLearningController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000033 /* PostInsertionLearningController.swift */; };
 		A20000000000000000000019 /* DictionaryCorrectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000010 /* DictionaryCorrectionTests.swift */; };
 		A10000000000000000000020 /* PermissionSetupController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* PermissionSetupController.swift */; };
 		A10000000000000000000021 /* MorieSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000035 /* MorieSetupView.swift */; };
@@ -69,6 +69,9 @@
 		A2000000000000000000001C /* CapabilityGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* CapabilityGate.swift */; };
 		A2000000000000000000001D /* CaptureHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* CaptureHUD.swift */; };
 		A2000000000000000000001E /* CaptureHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000012 /* CaptureHUDTests.swift */; };
+		A10000000000000000000023 /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
+		A2000000000000000000001F /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
+		A20000000000000000000020 /* ExpressionProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000013 /* ExpressionProfileTests.swift */; };
 		A10000000000000000000022 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
@@ -114,12 +117,14 @@
 		B10000000000000000000031 /* DictionaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryView.swift; sourceTree = "<group>"; };
 		B20000000000000000000009 /* DictionaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000032 /* DictionaryCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryCorrection.swift; sourceTree = "<group>"; };
-		B10000000000000000000033 /* DictionaryCorrectionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryCorrectionController.swift; sourceTree = "<group>"; };
+		B10000000000000000000033 /* PostInsertionLearningController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostInsertionLearningController.swift; sourceTree = "<group>"; };
 		B20000000000000000000010 /* DictionaryCorrectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryCorrectionTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000034 /* PermissionSetupController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSetupController.swift; sourceTree = "<group>"; };
 		B10000000000000000000035 /* MorieSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieSetupView.swift; sourceTree = "<group>"; };
 		B20000000000000000000011 /* PermissionSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSetupTests.swift; sourceTree = "<group>"; };
 		B20000000000000000000012 /* CaptureHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHUDTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000037 /* ExpressionProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpressionProfile.swift; sourceTree = "<group>"; };
+		B20000000000000000000013 /* ExpressionProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpressionProfileTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000036 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -182,7 +187,8 @@
 				B10000000000000000000027 /* CaptureRefinement.swift */,
 				B10000000000000000000028 /* InputRefiner.swift */,
 				B10000000000000000000029 /* CapturePersonalizer.swift */,
-				B10000000000000000000033 /* DictionaryCorrectionController.swift */,
+				B10000000000000000000037 /* ExpressionProfile.swift */,
+				B10000000000000000000033 /* PostInsertionLearningController.swift */,
 				B10000000000000000000032 /* DictionaryCorrection.swift */,
 				B10000000000000000000031 /* DictionaryView.swift */,
 				B10000000000000000000030 /* DictionaryStore.swift */,
@@ -202,6 +208,7 @@
 				B20000000000000000000006 /* MemoryTests.swift */,
 				B20000000000000000000007 /* MemoryLearningTests.swift */,
 				B20000000000000000000008 /* PersonalizationTests.swift */,
+				B20000000000000000000013 /* ExpressionProfileTests.swift */,
 				B20000000000000000000010 /* DictionaryCorrectionTests.swift */,
 				B20000000000000000000009 /* DictionaryTests.swift */,
 			);
@@ -342,7 +349,8 @@
 				A10000000000000000000019 /* CaptureRefinement.swift in Sources */,
 				A1000000000000000000001A /* InputRefiner.swift in Sources */,
 				A1000000000000000000001B /* CapturePersonalizer.swift in Sources */,
-				A1000000000000000000001F /* DictionaryCorrectionController.swift in Sources */,
+				A10000000000000000000023 /* ExpressionProfile.swift in Sources */,
+				A1000000000000000000001F /* PostInsertionLearningController.swift in Sources */,
 				A1000000000000000000001E /* DictionaryCorrection.swift in Sources */,
 				A1000000000000000000001D /* DictionaryView.swift in Sources */,
 				A1000000000000000000001C /* DictionaryStore.swift in Sources */,
@@ -379,6 +387,8 @@
 				A20000000000000000000013 /* InputRefiner.swift in Sources */,
 				A20000000000000000000014 /* CapturePersonalizer.swift in Sources */,
 				A20000000000000000000015 /* PersonalizationTests.swift in Sources */,
+				A2000000000000000000001F /* ExpressionProfile.swift in Sources */,
+				A20000000000000000000020 /* ExpressionProfileTests.swift in Sources */,
 				A20000000000000000000019 /* DictionaryCorrectionTests.swift in Sources */,
 				A20000000000000000000018 /* DictionaryCorrection.swift in Sources */,
 				A20000000000000000000017 /* DictionaryTests.swift in Sources */,
