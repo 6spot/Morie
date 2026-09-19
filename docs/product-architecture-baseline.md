@@ -15,7 +15,7 @@ Historical phase numbers identify task areas, not an order that puts sync or man
 - macOS first, targeting **macOS 27+**, Apple Intelligence-capable Macs and the current Swift/Xcode toolchain for that platform.
 - Apple frameworks and repository-owned Swift are the default implementation. Recognition uses `SpeechAnalyzer`, `SpeechTranscriber`, `AssetInventory` and current capture APIs. `SFSpeechRecognizer` is permitted only for authorization, never a recognition fallback. Foundation Models capability checks use `SystemLanguageModel`.
 - Required Apple Intelligence, Speech/language/assets and permission capabilities gate Private Mode. Unsupported capabilities block input; there is no old-platform compatibility route or cloud fallback.
-- V0 has no Morie backend. Current persistence and intelligence are local to one Mac. iCloud/CloudKit belongs to a later scheduled cross-device milestone using each user's private database; enrollment/container configuration is not a current dependency. Do not create a separate Device Only mode.
+- V0 has no Morie backend. M-019 now begins the explicitly scheduled iCloud/CloudKit milestone: sync/backup is default-off, uses each user's private database and never creates a separate Device Only product mode. The repository does not invent a container identifier; signed runtime acceptance still depends on configuring the real Apple Developer/Xcode CloudKit capability/container. Original audio remains local in this slice.
 - Only intentional input enters Capture. Ordinary typing is not monitored. The separate opt-in correction feature reads a bounded, verified recent Morie insertion; it does not log keystrokes, read whole documents or send external field text to AI.
 - iOS, mobile inspiration/follow-up, Morie Cloud, public APIs/MCP and generalized provider runtimes are outside the active milestone. Existing `captureOnly` storage remains without expanding that experience.
 
@@ -76,4 +76,4 @@ This is a development-stage product with no legacy contract. Implement current s
 
 Success means reliable, responsive daily input; selective and inspectable personal context; and measured improvement in future expression. Actual model fidelity, latency/energy, microphone/TCC behavior, keyboard/focus, native UI and cross-app delivery require supported-Mac evidence in [validation](validation.md).
 
-Task completion requires its applicable acceptance criteria. Phase 0 must not merge before the required real-device matrix is complete unless the owner explicitly narrows it. Future sync, iOS and Cloud are scheduled after the useful single-Mac loop, not automatically because a phase number or local database exists.
+Task completion requires its applicable acceptance criteria. Phase 0 must not merge before the required real-device matrix is complete unless the owner explicitly narrows it. Optional iCloud sync/backup now follows the useful single-Mac loop through M-019; iOS and Morie Cloud remain later work.
