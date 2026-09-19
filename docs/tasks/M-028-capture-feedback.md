@@ -66,5 +66,11 @@ The old indeterminate `ProgressView` is removed. Processing uses a compact `Thin
 - [x] capsule opens/closes from center;
 - [x] Reduce Motion bypasses the morph;
 - [x] processing state contains no spinner;
-- [ ] Xcode 27 / macOS 27 Release compile passes;
+- [x] Xcode 27 / macOS 27 Release compile passes;
 - [ ] owner verifies cue volume/tone and capsule motion on-device.
+
+## Validation
+
+GitHub Actions `macOS 27 CI` run #94 passed the Release product compile on Xcode 27/macOS 27.
+
+Owner-device validation remains open for cue loudness/tone, Bluetooth behavior, and the subjective center-morph feel.
