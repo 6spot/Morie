@@ -6,7 +6,7 @@ import SwiftUI
 final class CaptureHUDController {
     private let model = CaptureHUDModel()
     private var panel: NSPanel?
-    private weak var animatedRootView: NSView?
+    private weak var animatedCapsuleView: NSView?
     private var hideTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
 
@@ -110,7 +110,7 @@ final class CaptureHUDController {
         hideTask = nil
         collapseTask?.cancel()
 
-        guard panel != nil, let rootView = animatedRootView else {
+        guard panel != nil, let rootView = animatedCapsuleView else {
             releasePanel()
             return
         }
@@ -148,7 +148,7 @@ final class CaptureHUDController {
 
         if !panel.isVisible {
             panel.orderFrontRegardless()
-            if let rootView = animatedRootView {
+            if let rootView = animatedCapsuleView {
                 if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
                     setPresentation(rootView, scale: 1, opacity: 1)
                 } else {
@@ -164,7 +164,7 @@ final class CaptureHUDController {
                 }
             }
         } else {
-            if let rootView = animatedRootView {
+            if let rootView = animatedCapsuleView {
                 rootView.layer?.removeAllAnimations()
                 setPresentation(rootView, scale: 1, opacity: 1)
             }
@@ -195,8 +195,6 @@ final class CaptureHUDController {
 
         let rootView = NSView(frame: NSRect(origin: .zero, size: size))
         rootView.autoresizingMask = [.width, .height]
-        rootView.wantsLayer = true
-        animatedRootView = rootView
 
         let glassFrame = NSRect(
             x: Layout.effectInset,
@@ -210,6 +208,7 @@ final class CaptureHUDController {
         glassView.cornerRadius = Layout.contentHeight / 2
         glassView.tintColor = NSColor.black.withAlphaComponent(0.38)
         glassView.effectIsInteractive = true
+        glassView.wantsLayer = true
 
         let hostingView = NSHostingView(rootView: CaptureHUDView(model: model))
         hostingView.sizingOptions = []
@@ -220,6 +219,8 @@ final class CaptureHUDController {
         hostingView.autoresizingMask = [.width, .height]
         glassView.contentView = hostingView
         rootView.addSubview(glassView)
+        configureCenterAnchor(for: glassView)
+        animatedCapsuleView = glassView
         panel.contentView = rootView
 
         return panel
@@ -232,11 +233,21 @@ final class CaptureHUDController {
         // Releasing the NSHostingView stops the hidden waveform TimelineView.
         panel?.contentView = nil
         panel = nil
-        animatedRootView = nil
+        animatedCapsuleView = nil
         model.hide()
         Diagnostics.record("HUD", "Capture HUD hidden")
     }
 
+    private func configureCenterAnchor(for view: NSView) {
+        guard let layer = view.layer else { return }
+        let frame = view.frame
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        layer.bounds = CGRect(origin: .zero, size: frame.size)
+        layer.position = CGPoint(x: frame.midX, y: frame.midY)
+        CATransaction.commit()
+    }
     private func animate(
         _ view: NSView,
         fromScale: CGFloat,
@@ -449,10 +460,14 @@ private struct CaptureHUDView: View {
             .padding(Layout.contentInset)
 
         case .processing:
-            Label("Thinking", systemImage: "sparkles")
-                .font(.system(size: 11, weight: .medium))
+            Text("Thinking")
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay {
+                    ProcessingBorder(reduceMotion: reduceMotion)
+                        .allowsHitTesting(false)
+                }
                 .accessibilityLabel("正在整理输入")
 
         case .success, .saved:
@@ -487,6 +502,36 @@ private struct CaptureHUDView: View {
     }
 }
 
+private struct ProcessingBorder: View {
+    let reduceMotion: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            let cycle = reduceMotion
+                ? 0.0
+                : timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: 1.6) / 1.6
+            Capsule()
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            .clear,
+                            .white.opacity(0.10),
+                            .white.opacity(0.72),
+                            .white.opacity(0.16),
+                            .clear,
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(cycle * 360),
+                        endAngle: .degrees(cycle * 360 + 360)
+                    ),
+                    lineWidth: 1.15
+                )
+                .padding(0.75)
+                .opacity(reduceMotion ? 0.38 : 1)
+        }
+    }
+}
 @MainActor
 private final class CompactWaveDynamics {
     private var displayedLevel: CGFloat = 0
