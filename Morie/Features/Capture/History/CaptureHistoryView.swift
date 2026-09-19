@@ -166,7 +166,7 @@ struct CaptureDetailView: View {
             DisclosureGroup("识别与润色") {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("语音识别").font(.headline)
+                        Text("原始语音识别").font(.headline)
                         Text(capture.recognizedText.isEmpty ? "暂无识别文字。" : capture.recognizedText)
                             .textSelection(.enabled)
                         if let date = capture.lastRecognitionAttemptAt {
@@ -278,59 +278,24 @@ struct CaptureRefinementSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("输入润色").font(.headline)
+            Text("输入润色")
+                .font(.headline)
+
             LabeledContent("处理结果", value: refinement.status.title)
-            if let reason = refinement.reason {
-                Text(reason.message).foregroundStyle(.secondary)
-            }
+
             if let seconds = refinement.durationSeconds {
-                LabeledContent("耗时", value: "\(seconds.formatted(.number.precision(.fractionLength(2)))) 秒")
+                LabeledContent(
+                    "耗时",
+                    value: "\(seconds.formatted(.number.precision(.fractionLength(2)))) 秒"
+                )
             }
-            if !refinement.edits.isEmpty {
-                DisclosureGroup("修改内容") {
-                    ForEach(Array(refinement.edits.enumerated()), id: \.offset) { _, edit in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(edit.original) → \(edit.replacement)")
-                                .textSelection(.enabled)
-                            Text(edit.dictionaryEntryID == nil ? "AI 润色" : "自定义字典")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
-            DisclosureGroup("润色前的文字") {
-                Text(refinement.input.text)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            if !refinement.input.dictionary.isEmpty {
-                DisclosureGroup("本次使用的字典") {
-                    ForEach(refinement.input.dictionary) { entry in
-                        Text(entry.name).font(.headline)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    Text("这里保留本次输入使用的字典内容，后续编辑字典不会改变这条记录。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            if !refinement.input.context.isEmpty {
-                DisclosureGroup("本次参考的个人记忆") {
-                    ForEach(refinement.input.context) { match in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Label(match.memory.name, systemImage: match.memory.kind.systemImage)
-                            if !match.memory.notes.isEmpty { Text(match.memory.notes) }
-                        }
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    Text("这里保留本次输入参考的个人记忆，后续编辑记忆不会改变这条记录。")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+
+            if let reason = refinement.reason {
+                Text(reason.message)
+                    .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
