@@ -5,7 +5,7 @@
 ## Status
 
 - **State:** IN PROGRESS
-- **Last updated:** 2026-09-18
+- **Last updated:** 2026-09-19
 - **Branch:** `feature/m-010-native-chinese-setup`
 - **Follow-up branch:** `fix/m-010-speech-authorization`
 - **Depends on:** M-008 native management and M-009 single-Mac input.
@@ -46,6 +46,7 @@ Schema changes, data resets, legacy compatibility, iOS, cross-device sync, third
 - [x] Complete isolated checks, layout verification and documentation.
 - [x] Reproduce and fix the Speech authorization callback's actor-isolation crash.
 - [x] Simplify setup title/status/footer presentation and verify native layouts.
+- [x] Reassert the originating Morie window after explicit permission completion so a late System Settings/TCC activation transition cannot leave another app covering the next authorization action.
 - [ ] Complete signed-app permission/keyboard/VoiceOver acceptance.
 
 ## Implementation notes
@@ -88,7 +89,7 @@ The completion is now explicitly `@Sendable` and captures only its thread-safe c
 
 ### 2026-09-19 permission-window focus follow-up
 
-- Explicit Microphone/Speech requests remember the originating Morie window and restore it as key/front after the native authorization dialog completes.
+- Explicit Microphone/Speech requests remember the originating Morie window and restore it as key/front after the native authorization dialog completes. The restore is asserted again after a short main-run-loop handoff because macOS can finish a TCC/System Settings activation transition after the permission callback; this prevents another app from ending up above the next Morie authorization action.
 - Opening a Privacy pane starts a bounded 500 ms permission-status wait only for that explicit action. It stops immediately when access is granted, when the user returns to Morie without granting, on cancellation, or after five minutes; it is not an idle/background poll. On grant, Morie activates and restores the originating setup or Control Center window.
 - Follow-up correction: `prompt: false` does not register a new signed app in the Accessibility list. One Morie **授权** action now calls the public registration route, `AXIsProcessTrustedWithOptions` with `prompt: true`, then opens the Accessibility pane after a 250 ms handoff. This also handles TCC states where the registration prompt no longer reappears, without requiring a second Morie click. The system confirmation itself cannot be bypassed with public APIs.
 - A one-time read-only inspection from the menu-bar label automatically opens the welcome guide on launch when setup is incomplete. A fully configured launch remains menu-bar-only; **打开 Morie** uses the same setup gate.
