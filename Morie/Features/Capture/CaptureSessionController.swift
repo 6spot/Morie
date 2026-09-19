@@ -407,6 +407,7 @@ final class CaptureSessionController {
 
             if deliveryMode == .captureOnly {
                 try await captureStore.flushPersistence(for: sessionID)
+                captureStore.releaseCaptureOwnership(sessionID)
                 Diagnostics.record(
                     "CapturePersistence",
                     "Capture-only final state is durable for \(label(sessionID))"
