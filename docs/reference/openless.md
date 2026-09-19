@@ -16,7 +16,7 @@ Inspected paths:
 ## Morie decisions
 
 - **ADAPT:** wait for stable edits; offer a small, explicit Remember / Not Now decision; expire the suggestion; stop observing when ownership/focus changes.
-- **ADAPT:** dictionary confirmation is separate from automatic personal Memory. Saving the correct spelling must not silently turn the old word into an always-replace alias.
+- **ADAPT:** dictionary confirmation is separate from automatic personal Memory. The visible Dictionary remains canonical-word only. After explicit confirmation Morie may retain the bounded observed-ASR → canonical-word relation internally; it must never infer a broad/unconfirmed replacement rule.
 - **DROP:** a web/Tauri UI, whole-document observation, model/provider machinery and passive general keyboard tracking. Morie uses repository-owned Swift and native AppKit/SwiftUI.
 - **VERIFY:** native Accessibility range support, field identity, selection behavior, password/secure-input exclusion, focus preservation, pointer/keyboard/VoiceOver interaction and useful correction precision on the actual macOS 27 app matrix.
 
@@ -28,6 +28,6 @@ A dedicated actor reads only a bounded range using `AXStringForRange`, with nati
 
 The pure detector expands differences to aligned native word boundaries, including Chinese/mixed language, added/deleted letters and joined words. It accepts small word-like changes after two seconds of stable samples, rejecting appended sentences, punctuation/numbers/code/URL edits and broad rewrites. This heuristic cannot prove whether a changed word is a recognition correction; explicit confirmation is intentional.
 
-A nonactivating native `NSPanel` contains standard Text and Buttons. Remember saves only the corrected spelling. Not Now/20-second expiry saves nothing, and a normalized word is offered at most once per process. Observed external text is not sent to AI, logged or persisted into Capture.
+A nonactivating native `NSPanel` contains standard Text and Buttons. Explicit confirmation keeps/adds the canonical spelling and, under M-027, may also persist the detected observed-ASR → canonical-word mapping in the internal correction-rule store. The wrong form is not shown as a normal Dictionary row. Not Now/20-second expiry saves nothing, and a normalized word is offered at most once per process. Observed external text is not sent to AI, logged or persisted into Capture.
 
 See [M-009](../tasks/M-009-macos-input-memory.md) for current evidence and the [validation matrix](../validation.md#m-009-correction-suggestions) for uncompleted device checks.
