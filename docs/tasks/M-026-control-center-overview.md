@@ -68,9 +68,15 @@ No telemetry service, analytics SDK, schema migration or remote backend is added
 - [x] Dictation fallback is visibly labelled **回退**.
 - [x] Foundation Models cleanup surface and availability are shown.
 - [x] Overview query exists only in the visible feature view.
-- [ ] Xcode 27 / macOS 27 Release compile passes.
+- [x] Xcode 27 / macOS 27 Release compile passes.
 - [ ] Owner visual check confirms the dashboard is readable at the 960 × 600 minimum window size.
 
 ## Follow-up
 
 A future real **识别纠错率 / WER-like** metric requires a trustworthy correction signal with enough observations. Do not derive it from `finalText != recognizedText`; that would incorrectly count filler removal, punctuation, paragraphing and other intended cleanup as recognition mistakes.
+
+## Validation
+
+GitHub Actions `macOS 27 CI` run #86 passed the Release product compile on Xcode 27/macOS 27.
+
+The hosted workflow still does not perform owner-window visual inspection. Issue #31 remains open until the Overview is checked at the minimum Control Center size and the chosen first-slice metrics are reviewed with real usage data.
