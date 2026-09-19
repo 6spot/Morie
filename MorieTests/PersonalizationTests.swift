@@ -88,7 +88,7 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertEqual(saved.recognizedText, "morie is my project")
         XCTAssertEqual(saved.refinement?.input.dictionary.map(\.id), [dictionaryID])
         try fixture.store.markDelivered(id)
-        try fixture.memory.enqueueCompletedInputs()
+        try fixture.memory.enqueueCompletedInput(captureID: id)
         XCTAssertEqual(try fixture.memory.analysisSource(for: id).text, result)
     }
 
@@ -196,7 +196,7 @@ final class PersonalizationTests: XCTestCase {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("saved input")
         let model = PendingCleanup()
-        let work = Task { try await fixture.personalizer(InputRefinementRunner(budget: .seconds(3), generate: { try await model.run($0) })).refine(id, enabled: true) }
+        let work = Task { try await fixture.personalizer(InputRefinementRunner(generate: { try await model.run($0) })).refine(id, enabled: true) }
         await waitUntilStarted(model)
         XCTAssertThrowsError(try fixture.store.saveReRecognition("new text", for: id))
         XCTAssertThrowsError(try fixture.store.deleteCapture(id))
@@ -209,7 +209,7 @@ final class PersonalizationTests: XCTestCase {
         let dictionaryID = try fixture.addWord()
         let id = try fixture.capture("morie is my project")
         let model = PendingCleanup()
-        let work = Task { try await fixture.personalizer(InputRefinementRunner(budget: .seconds(3), generate: { try await model.run($0) })).refine(id, enabled: true) }
+        let work = Task { try await fixture.personalizer(InputRefinementRunner(generate: { try await model.run($0) })).refine(id, enabled: true) }
         await waitUntilStarted(model)
         try fixture.dictionary.delete(dictionaryID)
         await model.finish("Morie is my project.")
@@ -223,7 +223,7 @@ final class PersonalizationTests: XCTestCase {
         let memoryID = try fixture.memory.create(MemoryDraft(kind: .project, name: "Morie", notes: "I work on Morie."))
         let id = try fixture.capture("Morie is my project")
         let model = PendingCleanup()
-        let work = Task { try await fixture.personalizer(InputRefinementRunner(budget: .seconds(3), generate: { try await model.run($0) })).refine(id, enabled: true) }
+        let work = Task { try await fixture.personalizer(InputRefinementRunner(generate: { try await model.run($0) })).refine(id, enabled: true) }
         await waitUntilStarted(model)
         try fixture.memory.archive(memoryID)
         await model.finish("Morie is my project.")
@@ -232,30 +232,27 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertEqual(try fixture.saved(id).refinement?.reason, .memoryChanged)
     }
 
-    func testDeadlineReleasesCallerBeforeUncooperativeModelAndPreventsOverlap() async throws {
+    func testRefinementWaitsForModelWithoutAnArbitraryDeadline() async throws {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("saved input")
         let model = PendingCleanup()
-        let runner = InputRefinementRunner(budget: .milliseconds(30), generate: { try await model.run($0) })
-        let result = try await fixture.personalizer(runner).refine(id, enabled: true)
-        XCTAssertEqual(result, "saved input")
+        let runner = InputRefinementRunner(generate: { try await model.run($0) })
+        let work = Task { try await fixture.personalizer(runner).refine(id, enabled: true) }
+        await waitUntilStarted(model)
+        try await Task.sleep(for: .milliseconds(80))
         XCTAssertTrue(runner.isBusy)
-        XCTAssertEqual(try fixture.saved(id).refinement?.reason, .timeLimit)
-        let other = try fixture.capture("another input")
-        let next = try await fixture.personalizer(runner).refine(other, enabled: true)
-        XCTAssertEqual(next, "another input")
-        XCTAssertEqual(try fixture.saved(other).refinement?.reason, .modelBusy)
         await model.finish("Saved input.")
-        await runner.waitForModelToFinish()
+        let result = try await work.value
+        XCTAssertEqual(result, "Saved input.")
         XCTAssertFalse(runner.isBusy)
-        XCTAssertEqual(try fixture.saved(id).finalText, "saved input")
+        XCTAssertEqual(try fixture.saved(id).finalText, "Saved input.")
     }
 
     func testCallerCancellationDoesNotWaitForModelOrReturnDeliverableText() async throws {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("saved input")
         let model = PendingCleanup()
-        let runner = InputRefinementRunner(budget: .seconds(3), generate: { try await model.run($0) })
+        let runner = InputRefinementRunner(generate: { try await model.run($0) })
         let work = Task { try await fixture.personalizer(runner).refine(id, enabled: true) }
         await waitUntilStarted(model)
         work.cancel()

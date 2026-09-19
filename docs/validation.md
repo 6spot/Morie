@@ -125,7 +125,7 @@ Historical foundation/candidate build and fixture evidence remains in [M-004](ta
 - [ ] Speech retry preserves completed final output and its old processing evidence, including existing capture-only records. Capture-only completion still does not paste/copy or restore another app.
 - [ ] Dictionary/Memory/source changes during inference invalidate stale results. Exercise unavailable/declined/oversized/slow models and save errors; unsaved AI text never reaches delivery.
 - [ ] Refresh setup during refinement without interrupting normal completion. Separately exercise cancellation and resume recording: no late paste, overlapping optional models or stuck processing. Relaunch recovers saved Capture without replaying a paste; pending personal analysis may resume separately.
-- [ ] Measure spelling-hint benefit, unintended edits, applied/skipped/timeout rates, real model time and final-to-delivery latency with cleanup on/off. Two seconds is a provisional model-wait budget, not an end-to-end guarantee.
+- [ ] Measure spelling-hint benefit, unintended edits, applied/skipped/failure rates, real model time and final-to-delivery latency with cleanup on/off across short and long input. There is no elapsed-time cutoff; verify explicit cancellation remains responsive and that model completion is not discarded solely for taking longer.
 - [ ] Validate Settings persistence and native History/provenance/copy controls with keyboard, VoiceOver, long text and system appearance.
 
 Earlier narrow-refinement evidence is retained in [M-005](tasks/M-005-personalization.md#validation-evidence); M-009 holds the current suite/build evidence. Device/model acceptance remains open.

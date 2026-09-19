@@ -49,7 +49,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 
 `CapturePersonalizer` saves dictionary-corrected fallback even if cleanup is off/busy/fails. Stale dictionary or failed final save uses verified durable original text. `CaptureRefinement` stores original input, dictionary/personal snapshots, edits, outcome/reason and elapsed time; Speech recognition remains separate from final output.
 
-The provisional model-wait limit is two seconds. The caller resumes on deadline/cancellation without joining an uncooperative model; no new optional model task overlaps draining work. Storage and scheduling add overhead outside this budget. Idle personal Memory learns from the completed current-app Capture after final save; it has no confirmation inbox.
+Cleanup has no elapsed-time deadline. Foundation Models completion/failure or explicit caller cancellation ends the operation, allowing duration to scale with the input and actual model work. Cancellation resumes without joining an uncooperative model; no new optional model task overlaps draining cancelled work. Idle personal Memory learns from the completed current-app Capture after final save; it has no confirmation inbox.
 
 Existing capture-only persistence/refinement remains without expanding inspiration or admitting it to daily-input learning. Native word-correction prompts require separate opt-in and explicit spelling confirmation; they do not create global aliases or personal facts.
 

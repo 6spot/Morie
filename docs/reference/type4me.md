@@ -331,7 +331,7 @@ Morie requirement: use confirmed relevant Vocabulary/Project context to improve 
 
 - **ADAPT:** treat transcript/context as data rather than instructions; preserve technical tokens, negation, facts and tone; do not answer dictated requests; do not remove acknowledgments such as 嗯/OK/好的 through a filler-word list. Record the actual input and change provenance when refinement happens.
 - **DROP:** scene/provider routing, prompt-variable frameworks, clipboard/selection context reads, translation modes, generalized rewriting, old-build inference and Type4Me's lock/detached-AX timeout machinery. Morie uses one current native model session, a native structured result and a Swift-concurrency deadline owner; no source was copied.
-- **VERIFY:** real on-device terminology benefit, punctuation quality, mixed-language fidelity and latency versus unrefined input. A provisional 2-second model-wait deadline and deterministic cancellation tests establish a control-flow bound, not measured Foundation Models performance or a guarantee that punctuation always preserves meaning.
+- **VERIFY:** real on-device terminology benefit, punctuation quality, mixed-language fidelity and latency versus unrefined input. Morie initially added a provisional two-second deadline, but owner review rejected elapsed time as a correctness condition because work scales with input length. Cleanup now waits for model completion/failure or explicit cancellation; deterministic tests cover cancellation ownership, not a model-duration limit.
 
 ## M-009 dictionary and automatic Memory amendment — 2026-09-18
 

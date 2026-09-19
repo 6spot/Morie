@@ -77,15 +77,14 @@ enum RefinementGeneration: Sendable {
     case keptOriginal(RefinementReason)
 }
 
-/// One explicitly owned model task. The caller's deadline never waits for model cancellation to drain.
+/// One explicitly owned model task. Completion is model-driven; caller cancellation
+/// still releases the input path without waiting for model cancellation to drain.
 @MainActor
 final class InputRefinementRunner {
     typealias Generate = @Sendable (RefinementInput) async throws -> String
 
     private let generate: Generate
-    private let budget: Duration
     private var generationTask: Task<Void, Never>?
-    private var deadlineTask: Task<Void, Never>?
     private var modelID: UUID?
     private var waitingID: UUID?
     private var continuation: CheckedContinuation<RefinementGeneration, Error>?
@@ -95,8 +94,7 @@ final class InputRefinementRunner {
     // Observation for shutdown/validation only. The live input path never awaits model teardown.
     func waitForModelToFinish() async { await generationTask?.value }
 
-    init(budget: Duration = .seconds(2), generate: @escaping Generate = InputRefiner.generate) {
-        self.budget = budget
+    init(generate: @escaping Generate = InputRefiner.generate) {
         self.generate = generate
     }
 
@@ -122,13 +120,6 @@ final class InputRefinementRunner {
                     }
                     self?.modelFinished(id, outcome: outcome)
                 }
-                deadlineTask = Task { [weak self, budget] in
-                    do {
-                        try await Task.sleep(for: budget)
-                        try Task.checkCancellation()
-                        self?.finishWaiting(id, result: .success(.keptOriginal(.timeLimit)), cancelModel: true)
-                    } catch { }
-                }
             }
         } onCancel: {
             Task { @MainActor [weak self] in
@@ -148,8 +139,6 @@ final class InputRefinementRunner {
         guard waitingID == id, let continuation else { return }
         self.continuation = nil
         waitingID = nil
-        deadlineTask?.cancel()
-        deadlineTask = nil
         if cancelModel { generationTask?.cancel() }
         continuation.resume(with: result)
         // generationTask remains owned until it actually ends. New optional work must skip while busy.
