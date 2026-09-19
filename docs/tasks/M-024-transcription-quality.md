@@ -205,7 +205,7 @@ Morie therefore does **not** copy either prompt wholesale. The Apple Foundation 
 
 - Speech keeps the full bounded canonical hint list; ASR biasing is unchanged.
 - Foundation Models cleanup gets at most 16 canonical terms that are actually present or a close Latin spelling neighbor of a transcript token.
-- Confirmed correction mappings reach cleanup only when their observed wrong form is present in this transcript. Exact deterministic correction still runs before the model.
+- Confirmed correction mappings are loaded only when their observed wrong form is present, applied deterministically before the model, and are **not serialized into the Foundation Models prompt**.
 - Prompt field `dictionary` is renamed to `spellingCandidates` to make its role explicit.
 - The system prompt states that helper fields may only correct/disambiguate text already expressed and can never create a sentence/topic.
 - `@Guide` repeats the same closed-world rule at the generated field boundary.
