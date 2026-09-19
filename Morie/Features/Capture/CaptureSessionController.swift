@@ -104,6 +104,10 @@ final class CaptureSessionController {
         try await speech.prepare(locale: speechLocale)
     }
 
+    func preparedSpeechBackend() async -> SpeechRecognitionBackend? {
+        await speech.preparedBackendStatus()
+    }
+
     func hideHUD() {
         hud.hide()
     }
