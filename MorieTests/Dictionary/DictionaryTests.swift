@@ -129,6 +129,79 @@ final class DictionaryTests: XCTestCase {
         XCTAssertEqual(loaded.entries.first(where: { $0.id == correctionID })?.source, .correction)
     }
 
+    func testConfirmedCorrectionsApplyDeterministicallyBeforeCleanup() {
+        let latin = DictionaryCorrectionSnapshot(
+            id: UUID(), original: "Athers", replacement: "Issues", updatedAt: Date()
+        )
+        let chinese = DictionaryCorrectionSnapshot(
+            id: UUID(), original: "总版", replacement: "总览", updatedAt: Date()
+        )
+
+        let result = DictionaryCorrections.apply(
+            "GitHub 里的 Athers 可以关闭，这个总版页面保留。https://example.com/Athers /总版/run",
+            using: [latin, chinese]
+        )
+
+        XCTAssertEqual(
+            result.text,
+            "GitHub 里的 Issues 可以关闭，这个总览页面保留。https://example.com/Athers /总版/run"
+        )
+        XCTAssertEqual(result.edits.map(\.correctionRuleID), [latin.id, chinese.id])
+    }
+
+    func testConfirmedCorrectionCanTargetExistingBuiltinWithoutCreatingUserDuplicate() throws {
+        let captures = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
+        let store = DictionaryStore(container: captures.container)
+
+        let ruleID = try store.saveConfirmedCorrection(
+            original: "get hub",
+            replacement: "GitHub"
+        )
+
+        XCTAssertTrue(store.entries.isEmpty)
+        let rules = try store.confirmedCorrections()
+        XCTAssertEqual(rules.count, 1)
+        XCTAssertEqual(rules.first?.id, ruleID)
+        XCTAssertEqual(rules.first?.original, "get hub")
+        XCTAssertEqual(rules.first?.replacement, "GitHub")
+        XCTAssertTrue(try store.speechHints().contains("GitHub"))
+    }
+
+    func testConfirmedCorrectionCreatesCanonicalWordAndUpdatesObservedMapping() throws {
+        let captures = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
+        let store = DictionaryStore(container: captures.container)
+
+        let firstID = try store.saveConfirmedCorrection(
+            original: "Athers",
+            replacement: "Issues"
+        )
+        let canonical = try XCTUnwrap(store.entries.first(where: { $0.name == "Issues" }))
+        XCTAssertEqual(canonical.source, .correction)
+        XCTAssertTrue(try store.speechHints().contains("Issues"))
+
+        let updatedID = try store.saveConfirmedCorrection(
+            original: "athers",
+            replacement: "Issue"
+        )
+        XCTAssertEqual(updatedID, firstID)
+        let rules = try store.confirmedCorrections()
+        XCTAssertEqual(rules.count, 1)
+        XCTAssertEqual(rules.first?.replacement, "Issue")
+    }
+
+    func testDeletingUserCanonicalWordRemovesItsConfirmedCorrections() throws {
+        let captures = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
+        let store = DictionaryStore(container: captures.container)
+
+        _ = try store.saveConfirmedCorrection(original: "Athers", replacement: "Issues")
+        let canonical = try XCTUnwrap(store.entries.first(where: { $0.name == "Issues" }))
+        try store.delete(canonical.id)
+
+        XCTAssertTrue(try store.confirmedCorrections().isEmpty)
+    }
     func testSpeechHintsRespectWordAndCharacterBudgets() throws {
         let captures = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
