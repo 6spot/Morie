@@ -60,6 +60,7 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(InputRefiner.instructionsText.contains("9:00 → 9点"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("同一词在后续分句中再次指代对象"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("非正式内容以自然表达为主"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("当前输入本身没有指向某条记忆时忽略它"))
         XCTAssertFalse(InputRefiner.instructionsText.contains("已输入我觉得有必要存在吗"))
         XCTAssertFalse(InputRefiner.instructionsText.contains("授权的时候我们的窗口授权完之后"))
     }
@@ -169,6 +170,21 @@ final class PersonalizationTests: XCTestCase {
             return "我想先做设置。"
         }).refine(id, enabled: true)
         XCTAssertEqual(result, "我想先做设置。")
+    }
+
+    func testCleanupUsesAtMostFourRelevantMemoryItems() async throws {
+        let fixture = try RefinementFixture()
+        let names = (0..<6).map { "Topic\($0)" }
+        for name in names {
+            _ = try fixture.memory.create(MemoryDraft(kind: .project, name: name, notes: "关于 \(name) 的个人项目。"))
+        }
+        let id = try fixture.capture(names.joined(separator: " "))
+        let result = try await fixture.personalizer(InputRefinementRunner { input in
+            XCTAssertEqual(input.context.count, 4)
+            XCTAssertTrue(Set(input.context.map(\.memory.name)).isSubset(of: Set(names)))
+            return input.prepared.text
+        }).refine(id, enabled: true)
+        XCTAssertEqual(result, names.joined(separator: " "))
     }
 
     func testModelErrorsAndInvalidPayloadPreserveDictionaryTextWithoutPrivateErrorDetails() async throws {
