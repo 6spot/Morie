@@ -6,8 +6,12 @@ struct RefinementInput: Codable, Equatable, Sendable {
     let text: String
     var context: [MemoryContextMatch] = []
     var dictionary: [DictionarySnapshot] = []
-    var expressionStyle: [String] = []
+    // Optional by design: refinements created before Expression Profile, or
+    // refinements that did not use a stable style profile, have no directives.
+    // Treat absence exactly like an empty directive list.
+    var expressionStyle: [String]?
 
+    var effectiveExpressionStyle: [String] { expressionStyle ?? [] }
     var prepared: ValidatedRefinement { DictionarySpelling.normalize(text, using: dictionary) }
 }
 
