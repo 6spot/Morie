@@ -186,13 +186,17 @@ private struct HistoryFixture {
         store = try CaptureStore(storageURL: storeURL)
         audioURL = try store.beginVoiceCapture(
             id: id, deliveryMode: deliveryMode,
-            applicationName: "Notes", bundleIdentifier: "com.apple.Notes", windowNumber: nil
+            applicationName: "Notes", bundleIdentifier: "com.apple.Notes"
         )
         try Self.audioData.write(to: audioURL)
         try store.attachSourceAudio(CapturedSourceAudio(url: audioURL, duration: 2), for: id)
         if let deliveredText {
             try store.completeRecognition(deliveredText, for: id)
-            try store.markDelivered(id)
+            try store.markDelivered(
+                id,
+                applicationName: "Notes",
+                bundleIdentifier: "com.apple.Notes"
+            )
         } else {
             try store.markFailed(id, error: "Initial recognition failed")
         }

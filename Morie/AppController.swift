@@ -56,8 +56,6 @@ final class AppController: ObservableObject {
     private let speechLocale = Locale(identifier: "zh-CN")
 
     private var hotkey: PushToTalkHotkey?
-    private var targetApplication: NSRunningApplication?
-    private var targetWindowNumber: CGWindowID?
     private var activeCaptureID: UUID?
     private var speechReadyCaptureID: UUID?
     private var finishRequestedCaptureID: UUID?
@@ -338,25 +336,16 @@ final class AppController: ObservableObject {
         lastPresentedFailure = nil
 
         let sessionID = UUID()
-        let sourceApplication: NSRunningApplication?
-        switch deliveryMode {
-        case .currentApp:
-            sourceApplication = NSWorkspace.shared.frontmostApplication
-            targetApplication = sourceApplication
-            targetWindowNumber = TextInjector.frontmostWindowNumber(for: targetApplication)
-        case .captureOnly:
-            sourceApplication = .current
-            targetApplication = nil
-            targetWindowNumber = nil
-        }
+        // Interactive input intentionally does not pin an application at record
+        // start. The destination is resolved only when final text is ready.
+        let sourceApplication: NSRunningApplication? = deliveryMode == .captureOnly ? .current : nil
 
         do {
             activeSourceAudioURL = try captureStore.beginVoiceCapture(
                 id: sessionID,
                 deliveryMode: deliveryMode,
                 applicationName: sourceApplication?.localizedName,
-                bundleIdentifier: sourceApplication?.bundleIdentifier,
-                windowNumber: targetWindowNumber
+                bundleIdentifier: sourceApplication?.bundleIdentifier
             )
         } catch {
             let message = error.localizedDescription
@@ -378,11 +367,9 @@ final class AppController: ObservableObject {
         hotkey?.setCancellationEnabled(true)
         hud.showRecording()
 
-        let targetName = targetApplication?.localizedName ?? "unknown"
-        let targetBundle = targetApplication?.bundleIdentifier ?? "unknown"
         Diagnostics.record(
             "Session",
-            "Capture \(label(sessionID)) started; mode=\(deliveryMode.rawValue); target=\(targetName) (\(targetBundle)); window=\(targetWindowNumber.map(String.init) ?? "unknown"); locale=\(speechLocale.identifier)"
+            "Capture \(label(sessionID)) started; mode=\(deliveryMode.rawValue); deliveryTarget=currentKeyboardFocus; locale=\(speechLocale.identifier)"
         )
         Diagnostics.recordMemory("capture-start \(label(sessionID))")
 
@@ -570,22 +557,27 @@ final class AppController: ObservableObject {
             state = .delivering
             hud.showProcessing()
 
-            let targetName = targetApplication?.localizedName ?? "unknown"
-            let targetBundle = targetApplication?.bundleIdentifier ?? "unknown"
-            Diagnostics.record("Delivery", "Injecting \(finalText.count) characters into \(targetName) (\(targetBundle))")
-
-            try await injector.deliver(
-                finalText,
-                to: targetApplication,
-                originalWindowNumber: targetWindowNumber
+            Diagnostics.record(
+                "Delivery",
+                "Resolving current keyboard focus for \(finalText.count)-character input"
             )
-            Diagnostics.record("Delivery", "Injection completed for \(label(sessionID))")
+            let deliveryApplication = try injector.deliver(finalText)
+            let deliveredName = deliveryApplication.localizedName
+            let deliveredBundle = deliveryApplication.bundleIdentifier
+            Diagnostics.record(
+                "Delivery",
+                "Injection completed for \(label(sessionID)); app=\(deliveredName ?? "unknown") (\(deliveredBundle ?? "unknown"))"
+            )
             if correctionSuggestionsEnabled, !Task.isCancelled, stoppingCaptureID == nil {
-                dictionaryCorrections?.observeInsertion(finalText, in: targetApplication)
+                dictionaryCorrections?.observeInsertion(finalText, in: deliveryApplication)
             }
             // Delivery may already have dispatched before cancellation arrived.
             // Record that outcome even when interruption now owns the UI.
-            try captureStore.markDelivered(sessionID)
+            try captureStore.markDelivered(
+                sessionID,
+                applicationName: deliveredName,
+                bundleIdentifier: deliveredBundle
+            )
             memoryLearning?.captureDidComplete(sessionID)
             completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
         } catch {
@@ -774,8 +766,6 @@ final class AppController: ObservableObject {
         finishRequestedCaptureID = nil
         captureStartTask = nil
         captureFinishTask = nil
-        targetApplication = nil
-        targetWindowNumber = nil
         history?.setInputActive(false)
         memoryLearning?.setInputActive(false)
     }

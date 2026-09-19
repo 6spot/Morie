@@ -76,7 +76,7 @@ final class MemoryStoreTests: XCTestCase {
         let (captures, memory) = try temporaryStore()
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let sourceID = UUID()
-        _ = try captures.beginVoiceCapture(id: sourceID, deliveryMode: .captureOnly, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        _ = try captures.beginVoiceCapture(id: sourceID, deliveryMode: .captureOnly, applicationName: nil, bundleIdentifier: nil)
         try captures.updateRecognizedText("in progress", for: sourceID)
         XCTAssertThrowsError(try memory.create(MemoryDraft(name: "Morie", notes: "personal information"), sourceCaptureID: sourceID))
         XCTAssertThrowsError(try memory.create(MemoryDraft(name: "Morie", notes: "personal information"), sourceCaptureID: UUID()))
@@ -180,9 +180,13 @@ final class MemoryStoreTests: XCTestCase {
 
     private func completedCapture(in store: CaptureStore) throws -> UUID {
         let id = UUID()
-        _ = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: "Test", bundleIdentifier: "me.morie.tests", windowNumber: nil)
+        _ = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: "Test", bundleIdentifier: "me.morie.tests")
         try store.completeRecognition("Morie source text", for: id)
-        try store.markDelivered(id)
+        try store.markDelivered(
+            id,
+            applicationName: "Test",
+            bundleIdentifier: "me.morie.tests"
+        )
         return id
     }
 

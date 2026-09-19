@@ -380,3 +380,15 @@ The owner asked whether Morie should keep a small baseline after reviewing Type4
 - **VERIFY:** actual Apple Speech benefit and any unintended bias from the small baseline on signed macOS 27 hardware. The baseline must stay small enough that user-specific words retain priority.
 
 This narrows the earlier M-004 decision that dropped built-in dictionaries entirely; that older decision rejected Type4Me's large file/provider machinery, not a later owner-approved tiny Morie-native baseline.
+
+## M-014 current-keyboard-focus delivery audit — 2026-09-19
+
+Morie requirement: ordinary interactive dictation should behave like a keyboard/input method, not like an asynchronous task that later drags the user back to an app remembered at record start. Inspected Type4Me's implemented current-focus design in `docs/features/current-focus-injection/product-design.md`, `RecognitionSession.swift` and `TextInjectionEngine.swift` on current `main`.
+
+- **ADAPT:** resolve the external frontmost application only when final text is ready, never activate/switch back to the record-start app, and let the target application's normal first-responder path route one standard `Cmd+V`.
+- **ADAPT:** treat successful paste-event dispatch as delivery. Accessibility can support bounded post-insertion learning, but it must not block ordinary input merely because an editor exposes an incomplete AX tree.
+- **ADAPT:** keep change-count-aware clipboard restoration and clipboard fallback when there is no external target.
+- **DROP:** original-app/window pinning, window-existence checks, focus-handoff sleeps, AX editability proof, app-specific target recovery and Type4Me's automation/headless dual target machinery. Morie currently has only ordinary interactive delivery plus capture-only History.
+- **VERIFY:** switching apps/fields while Speech or Foundation Models is still processing, custom-rendered editors, terminals, selected-text replacement, clipboard managers and rapid repeated captures on the signed macOS 27 app.
+
+Morie removes its superseded original-window persistence directly. Development data compatibility is not a product requirement at this stage; no compatibility adapter is retained.

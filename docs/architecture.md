@@ -131,9 +131,7 @@ Ready
 
 solo configured shortcut activation (Fn / Globe release by default)
   ↓
-create authoritative capture UUID
-  ↓
-capture original target application; cancel optional learning/word observation
+create authoritative capture UUID; cancel optional learning/word observation
   ↓
 save Capture identity and audio destination
   ↓
@@ -153,9 +151,9 @@ dictionary corrections + bounded optional AI cleanup
   ↓
 durable final text and processing provenance
   ↓
-restore original target
+resolve the external app that currently owns keyboard focus
   ↓
-safe synthetic Cmd+V using temporary clipboard value
+safe synthetic Cmd+V using temporary clipboard value; macOS first-responder routing chooses the field
   ↓
 restore clipboard only if user did not change it
   ↓
@@ -207,7 +205,7 @@ Owns Phase 0 orchestration:
 - Speech asset preparation before Ready;
 - hotkey installation;
 - authoritative capture UUID;
-- original target-app capture;
+- current-keyboard-focus delivery at final paste time;
 - start/finish/cancel coordination;
 - dictionary hints, independent cleanup and durable final text;
 - delivery transition and opt-in correction observation;
@@ -301,24 +299,24 @@ There is no legacy recognition fallback and no provider abstraction.
 
 ### `TextInjector`
 
-Delivery is intentionally generic and macOS 27 evidence-driven:
+Delivery is intentionally generic and follows the system-input model:
 
-- rejects missing/terminated/self target;
-- captures the original on-screen window identity and refuses delivery if that window closes before paste;
-- preserves undelivered transcript on clipboard;
-- restores the original app;
-- snapshots the clipboard, writes the final transcript, and uses synthetic Cmd+V;
+- resolves the external frontmost application only when final text is ready;
+- never activates or restores the application/window that was frontmost at recording start;
+- rejects missing/terminated/self current targets and preserves undelivered text on the ordinary clipboard;
+- snapshots the clipboard, writes the final transcript, and posts one synthetic Cmd+V;
+- lets macOS and the receiving application's first-responder chain choose the actual field;
 - tags synthetic key events so Morie's own hotkey path ignores them;
 - snapshots only safe text-like clipboard representations;
 - restores the previous clipboard only when `changeCount` proves no newer user/app clipboard write occurred.
 
-There is no Electron-specific or per-app compatibility branch. Such behavior can be added only after reproduction on macOS 27 and recording the evidence in the active task.
+Accessibility is not an editability gate for ordinary delivery. There is no Electron-specific or per-app compatibility branch. Such behavior can be added only after reproduction on macOS 27 and recording the evidence in the active task.
 
-Delivery checks cancellation before activation and after the asynchronous focus handoff. Clipboard staging and paste dispatch then run synchronously on the main actor, so an interruption cannot resume a pending paste afterward. Successful dispatch is persisted even if cancellation reaches the caller before it resumes.
+Target resolution, clipboard staging and paste dispatch run synchronously on the main actor once delivery starts. There is no focus-handoff sleep or delayed app activation. Successful dispatch records the actual frontmost app/bundle and supplies that same application to the bounded correction observer.
 
 ### `CaptureHUD`
 
-Owns a native, non-activating recording surface that does not replace the original target application:
+Owns a native, non-activating recording surface that does not become the keyboard target:
 
 - system `NSPanel` placement and focus behavior;
 - one AppKit `NSGlassEffectView` that embeds the complete HUD content and samples behind the transparent panel;
@@ -344,9 +342,9 @@ M-003 introduces the first durable product boundary using Apple SwiftData:
 - final recognition, delivery success, clipboard-preserved delivery failure, and operational failure become explicit durable lifecycle states;
 - explicit user cancellation discards the in-progress record; an empty transcript only discards audio confirmed to contain no signal/no input, while uncertain audio remains retryable;
 - source-audio filenames are saved before recording, and interrupted records with audio or checkpointed text become recoverable failures when the store opens;
-- source application name, bundle identifier and original window identity are the current minimal App Context.
+- the actual successful delivery application name and bundle identifier are the current minimal App Context; capture-only records retain Morie as their source context.
 
-Every new voice Capture has an explicit, durably saved delivery mode. The global shortcut creates `currentApp`; History's **Record Capture** action creates `captureOnly`. Both use the same capture UUID, microphone session, Speech pipeline, cancellation and History preemption. An in-app capture records Morie as the source and has no external target/window. Recognition completion returns the saved mode: capture-only completion ends as `recognized` and releases recording/discard ownership; a running refinement separately blocks History mutation and extraction. Current-app completion retains ownership through delivery. Both modes refine the saved text before success. Capture-only success never enters `TextInjector` or the clipboard/focus path and reports “已保存” in the shared HUD.
+Every new voice Capture has an explicit, durably saved delivery mode. The global shortcut creates `currentApp`; History's **Record Capture** action creates `captureOnly`. Both use the same capture UUID, microphone session, Speech pipeline, cancellation and History preemption. An in-app capture records Morie as the source and never enters external delivery. Recognition completion returns the saved mode: capture-only completion ends as `recognized` and releases recording/discard ownership; a running refinement separately blocks History mutation and extraction. Current-app completion retains ownership through delivery. Both modes refine the saved text before success. Capture-only success never enters `TextInjector` or the clipboard/focus path and reports “已保存” in the shared HUD.
 
 The local `ModelConfiguration` explicitly disables CloudKit. The single-Mac milestone does not depend on sync, enrollment or a container. A later scheduled cross-device milestone uses each user's own iCloud private database within Morie's app container; this is not a separate Device Only product mode. The current schema contains `CaptureRecord`, `DictionaryEntry`, `MemoryRecord`, `MemoryAnalysisRecord` and `MemoryLearningBlock`, with no old-schema migration.
 
@@ -501,7 +499,7 @@ CI compilation does **not** validate:
 - microphone routing;
 - physical keyboard event behavior;
 - Apple Intelligence/Speech asset runtime availability;
-- real focus restoration;
+- real current-focus routing;
 - target-app injection;
 - Liquid Glass visual behavior;
 - latency/energy use.

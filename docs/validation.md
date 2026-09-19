@@ -2,7 +2,7 @@
 
 This document defines the real-device acceptance checks for **M-002 — macOS Input Foundation**.
 
-Phase 0 cannot be marked `DONE` solely from static review or compilation. Global keyboard capture, microphone behavior, permission lifecycle, focus restoration, Accessibility APIs, and editor insertion must be exercised on a supported Mac.
+Phase 0 cannot be marked `DONE` solely from static review or compilation. Global keyboard capture, microphone behavior, permission lifecycle, current-focus routing, Accessibility APIs, and editor insertion must be exercised on a supported Mac.
 
 Owner scheduling decision, 2026-09-18: defer interactive device validation until the evening and continue independent development now. Keep the checklist open; no device result is inferred from this deferral.
 
@@ -218,8 +218,8 @@ Also test:
 - key-up events do not start, finish, or cancel capture;
 - `Escape` is consumed only while recording and behaves normally otherwise;
 - HUD cancel matches `Escape`; HUD confirm matches the second shortcut press;
-- switching/closing target app during recording;
-- closing the original target window while its app remains running preserves the transcript on the ordinary clipboard instead of reporting a false successful paste;
+- switch between apps and input fields while recording and while recognition/cleanup is still processing; delivery must follow the field that owns keyboard focus when final text is dispatched;
+- close or leave the app where recording began; Morie must not reactivate it or treat that old window as a required target;
 - Accessibility revocation after Morie has reached Ready;
 - microphone interruption where practical;
 - capture/transcription error followed by another successful attempt.
@@ -271,7 +271,7 @@ Validate the HUD over light, dark, detailed, and full-screen backgrounds:
 - normal speech produces clearly visible changes; the Debug log reports a nonzero audio-channel count and changing average/peak/normalized meter values rather than a missing-channel or floor-pinned warning;
 - processing, success, and failure states are distinguishable and do not block immediate subsequent input;
 - successful delivery shows an animated, labelled “已输入” result rather than an isolated static checkmark;
-- when delivery cannot reach the original input location but preserves the transcript, the same HUD reports “已复制到剪贴板” and does not steal focus with a modal alert;
+- when there is no external current-focus destination or paste dispatch fails, the same HUD reports “已复制到剪贴板” and does not steal focus with a modal alert;
 - Reduce Motion keeps stationary level feedback and avoids unnecessary panel animation;
 - Reduce Transparency and Increase Contrast produce a legible system-controlled material;
 - VoiceOver announces cancel, microphone input level, finish, processing, success, and failure meaningfully;
@@ -285,13 +285,13 @@ Verify that the menu-bar waveform icon remains visually stable through checking,
 
 For every target app, validate:
 
-- correct original app is restored;
-- intended text field/editor receives focus again;
-- insertion occurs at the intended selection/caret;
+- Morie does not activate or restore the app that was frontmost when recording began;
+- the external app that is frontmost at delivery time receives the Cmd+V dispatch;
+- insertion follows that app's current first responder / intended selection or caret;
 - existing selected text replacement behaves predictably;
 - multiline text works where appropriate;
 - Chinese/English mixed text survives insertion;
-- repeated captures do not progressively lose focus;
+- repeated captures do not steal focus or switch applications;
 - undo behavior is acceptable;
 - clipboard fallback does not overwrite a newer clipboard change;
 - ordinary fallback restores the previous text-like clipboard value after delivery;
@@ -306,7 +306,7 @@ Do not add an app-specific workaround merely because an app fails once. Reproduc
 
 Use the following as the first representative matrix. The purpose is to validate Morie's generic path across common native/web/electron/editor surfaces, not to create a permanent per-app compatibility subsystem.
 
-| App | App/version | Focus restore | Paste delivery | Clipboard restore | Mixed text | Multiline | Repeat input | Undo | Result / notes |
+| App | App/version | Current-focus routing | Paste delivery | Clipboard restore | Mixed text | Multiline | Repeat input | Undo | Result / notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Safari | current test build | ☑ | ☑ | ☑ | ☐ | ☐ | ☐ | ☐ | One logged Fn capture completed; broader field/format coverage remains |
 | Chrome | TBD | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | Not tested |
@@ -346,7 +346,7 @@ Suggested initial baseline:
 
 - at least 50 consecutive captures across several target apps;
 - include rapid back-to-back captures, immediate finish, immediate cancel, and long captures;
-- record any lost capture, stuck recording state, duplicate delivery, wrong target, failed focus restore, orphan microphone session, or paste failure.
+- record any lost capture, stuck recording state, duplicate delivery, wrong current-focus target, unexpected app activation, orphan microphone session, or paste failure.
 
 This reliability run remains required as Dictionary, cleanup and automatic Memory are integrated; model tests cannot replace it.
 
