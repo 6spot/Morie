@@ -62,6 +62,7 @@ Morie/
 │   │   │   ├── CaptureAudioStream.swift
 │   │   │   ├── CaptureFileTranscriber.swift
 │   │   │   ├── SpeechPipeline.swift
+│   │   │   ├── SpeechRecognitionBackend.swift
 │   │   │   ├── CaptureRefinement.swift
 │   │   │   ├── InputRefiner.swift
 │   │   │   ├── CaptureHUD.swift
@@ -333,7 +334,7 @@ The owner-approved default is solo `Fn / Globe` release. Its interaction with th
 An actor owns the Apple-native speech session state:
 
 - unique active capture UUID;
-- `DictationTranscriber` with `.progressiveLongDictation`, preserving live volatile results while Apple supplies dictation punctuation;
+- runtime preference for Apple's newer `SpeechTranscriber` with `.progressiveTranscription`; `DictationTranscriber(.progressiveLongDictation)` is the Apple-native fallback only when the requested locale/device cannot use the newer model or its preparation fails;
 - `AssetInventory` preparation;
 - one `CaptureAudioSource` owning an AVFoundation data output and `AnalyzerInputConverter`;
 - `SpeechAnalyzer`;
@@ -348,7 +349,7 @@ Result passages are concatenated exactly as Apple emits them; Morie does not ins
 
 Native teardown always preserves the audio file and returns the best available text/audio snapshot. The snapshot remains available while normal finalization awaits Speech. Analyzer/result errors report to the controller during recording, so the microphone can stop without waiting for another user finish action. Capture-session runtime-error/interruption notifications end the input stream with an error. Session ownership is checked again after asynchronous converter creation, before constructing a microphone source.
 
-There is no legacy recognition fallback and no provider abstraction.
+There is no third-party/provider abstraction or legacy `SFSpeechRecognizer` path. The only fallback is between Apple's current native transcribers: `SpeechTranscriber` first, then `DictationTranscriber` when necessary.
 
 ### `CaptureAudioSource` / `CaptureAudioStream`
 
@@ -455,7 +456,7 @@ Re-recognition updates `recognizedText` only after successful file analysis. Del
 
 ### `CaptureFileTranscriber` / `CaptureHistoryController`
 
-`CaptureFileTranscriber` reads an existing `AVAudioFile` with `SpeechAnalyzer.analyzeSequence(from:)` and a final-result `SpeechTranscriber`, finalizes through the consumed audio, and closes native analysis on cancellation or failure. It creates no microphone session and uses the Speech assets prepared by bootstrap.
+`CaptureFileTranscriber` uses the same native backend preference as live input: `SpeechTranscriber(.transcription)` when the locale/device supports it, otherwise `DictationTranscriber(.longDictation)`. It reads an existing `AVAudioFile` with `SpeechAnalyzer.analyzeSequence(from:)`, finalizes through the consumed audio, and closes native analysis on cancellation or failure. A SpeechTranscriber asset-preparation failure can fall back to DictationTranscriber; recognition failure after analysis begins is not silently retried through another engine.
 
 `CaptureHistoryController` owns one selected recording's `AVPlayer` and one cancellable file-recognition task. Selection changes or leaving the detail cancel that task and release playback. Starting a live Capture pauses playback, cancels the retry, and awaits its termination before starting Speech. Every result checks task cancellation before persistence so a late retry cannot overwrite a newer interaction.
 

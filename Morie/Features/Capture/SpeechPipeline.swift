@@ -27,6 +27,12 @@ actor SpeechPipeline {
         let sourceAudio: CapturedSourceAudio
     }
 
+    private struct LiveBackendSetup {
+        let analyzer: SpeechAnalyzer
+        let source: CaptureAudioSource
+        let resultTask: Task<Void, Error>
+    }
+
     private var activeSessionID: UUID?
     private var analyzer: SpeechAnalyzer?
     private var audioSource: CaptureAudioSource?
@@ -38,24 +44,42 @@ actor SpeechPipeline {
     private var hasTranscriptEvidence = false
     private var isFinalizing = false
     private var reportedFailure = false
+    private var preparedBackend: SpeechRecognitionBackend?
 
     func prepare(locale requestedLocale: Locale) async throws {
         guard activeSessionID == nil else { throw PipelineError.alreadyRunning }
 
-        Diagnostics.record("Speech", "Preparing DictationTranscriber for locale \(requestedLocale.identifier)")
-        let transcriber = try await makeTranscriber(locale: requestedLocale)
-        try Task.checkCancellation()
-
-        if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            Diagnostics.record("Speech", "Speech asset installation required; starting download/install")
-            try await installation.downloadAndInstall()
-            Diagnostics.record("Speech", "Speech asset installation completed")
-        } else {
-            Diagnostics.record("Speech", "Speech assets already available")
+        guard let preferred = await SpeechRecognitionBackend.preferred(for: requestedLocale) else {
+            Diagnostics.record("Speech", "Unsupported requested locale: \(requestedLocale.identifier)", level: .error)
+            throw PipelineError.unsupportedLocale
         }
 
-        try Task.checkCancellation()
-        Diagnostics.record("Speech", "Speech preparation completed")
+        Diagnostics.record(
+            "Speech",
+            "Preparing \(preferred.logName) for locale \(preferred.locale.identifier)"
+        )
+
+        do {
+            try await prepareAssets(for: preferred)
+            try Task.checkCancellation()
+            preparedBackend = preferred
+            Diagnostics.record("Speech", "\(preferred.logName) preparation completed")
+        } catch {
+            guard case .speechTranscriber = preferred,
+                  let fallback = await SpeechRecognitionBackend.dictationFallback(for: requestedLocale) else {
+                throw error
+            }
+
+            Diagnostics.record(
+                "Speech",
+                "SpeechTranscriber preparation failed; falling back to DictationTranscriber: \(error.localizedDescription)",
+                level: .warning
+            )
+            try await prepareAssets(for: fallback)
+            try Task.checkCancellation()
+            preparedBackend = fallback
+            Diagnostics.record("Speech", "DictationTranscriber fallback preparation completed")
+        }
     }
 
     func start(
@@ -85,73 +109,45 @@ actor SpeechPipeline {
             }
             Diagnostics.record("Speech", "Default microphone resolved for \(session): \(microphone.localizedName)")
 
-            let transcriber = try await makeTranscriber(locale: requestedLocale)
-            try requireActiveSession(sessionID)
-            Diagnostics.record("Speech", "DictationTranscriber created for \(session)")
+            let backend: SpeechRecognitionBackend
+            if let preparedBackend {
+                backend = preparedBackend
+            } else if let resolved = await SpeechRecognitionBackend.preferred(for: requestedLocale) {
+                try await prepareAssets(for: resolved)
+                backend = resolved
+                preparedBackend = resolved
+            } else {
+                throw PipelineError.unsupportedLocale
+            }
 
-            let inputConverter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
             try requireActiveSession(sessionID)
-            let source = try CaptureAudioSource(
-                device: microphone,
-                converter: inputConverter,
-                destinationURL: sourceAudioURL,
-                onAudioLevel: { level in onAudioLevel(sessionID, level) }
+            Diagnostics.record(
+                "SpeechQuality",
+                "Session \(session) backend=\(backend.logName); locale=\(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count)"
             )
-            Diagnostics.record("Speech", "Single-output audio source created for \(session)")
 
-            let analyzer = SpeechAnalyzer(modules: [transcriber])
-            let analyzerInputs = source.analyzerInputs
+            let setup = try await configureLiveBackend(
+                backend,
+                sessionID: sessionID,
+                sessionLabel: session,
+                microphone: microphone,
+                sourceAudioURL: sourceAudioURL,
+                dictionaryWords: dictionaryWords,
+                onTranscript: onTranscript,
+                onAudioLevel: onAudioLevel,
+                onFailure: onFailure
+            )
+            try requireActiveSession(sessionID)
 
-            self.audioSource = source
-            self.analyzer = analyzer
+            audioSource = setup.source
+            analyzer = setup.analyzer
+            resultTask = setup.resultTask
 
-            if !dictionaryWords.isEmpty {
-                let context = AnalysisContext()
-                context.contextualStrings = [.general: dictionaryWords]
-                do { try await analyzer.setContext(context) }
-                catch {
-                    // Dictionary hints are optional; a rejected hint must not prevent intentional input.
-                    Diagnostics.record("Speech", "Dictionary context was unavailable; continuing recognition", level: .warning)
-                }
-                try requireActiveSession(sessionID)
-            }
-
-            resultTask = Task {
-                do {
-                    for try await result in transcriber.results {
-                        try Task.checkCancellation()
-                        guard activeSessionID == sessionID else { return }
-
-                        let text = String(result.text.characters)
-                        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            hasTranscriptEvidence = true
-                        }
-                        if result.isFinal {
-                            finalizedText = join(finalizedText, text)
-                            volatileText = ""
-                        } else {
-                            volatileText = text
-                        }
-
-                        let combined = join(finalizedText, volatileText)
-                        Diagnostics.record(
-                            "SpeechText",
-                            "Session \(session) transcriptCharacters=\(combined.count); final=\(result.isFinal)"
-                        )
-                        onTranscript(sessionID, combined)
-                    }
-
-                    Diagnostics.record("Speech", "Transcriber result stream ended for \(session)")
-                } catch {
-                    reportFailure(error, sessionID: sessionID, onFailure: onFailure)
-                    throw error
-                }
-            }
-
+            let analyzerInputs = setup.source.analyzerInputs
             analysisTask = Task {
                 do {
                     Diagnostics.record("Speech", "Analyzer sequence started for \(session)")
-                    let lastSampleTime = try await analyzer.analyzeSequence(analyzerInputs)
+                    let lastSampleTime = try await setup.analyzer.analyzeSequence(analyzerInputs)
                     Diagnostics.record("Speech", "Analyzer sequence ended for \(session)")
                     return lastSampleTime
                 } catch {
@@ -161,8 +157,11 @@ actor SpeechPipeline {
             }
 
             try requireActiveSession(sessionID)
-            source.start()
-            Diagnostics.record("Speech", "Single-output AVCaptureSession started for \(session)")
+            setup.source.start()
+            Diagnostics.record(
+                "Speech",
+                "Single-output AVCaptureSession started for \(session) using \(backend.logName)"
+            )
             try requireActiveSession(sessionID)
         } catch {
             Diagnostics.record("Speech", "Pipeline start failed for \(session): \(error.localizedDescription)", level: .error)
@@ -208,6 +207,10 @@ actor SpeechPipeline {
             try requireActiveSession(sessionID)
 
             let result = snapshot(sourceAudio: completion.sourceAudio)
+            Diagnostics.record(
+                "SpeechQuality",
+                "Session \(session) finalCharacters=\(result.transcript.count); backend=\(preparedBackend?.logName ?? "unknown")"
+            )
             Diagnostics.record("Speech", "Normal stop completed for \(session); finalCharacters=\(result.transcript.count)")
             reset(sessionID: sessionID)
             return result
@@ -216,7 +219,6 @@ actor SpeechPipeline {
             if let result = await stopImmediately(sessionID: sessionID) {
                 throw PipelineError.recognitionFailed(error.localizedDescription, result)
             }
-            // An external interruption already took ownership of the snapshot.
             throw CancellationError()
         }
     }
@@ -233,8 +235,6 @@ actor SpeechPipeline {
         let analysisTask = analysisTask
         let resultTask = resultTask
 
-        // Detach ownership before awaiting native teardown. A concurrent finish
-        // cannot cancel the analyzer twice or overwrite the next session.
         reset(sessionID: sessionID)
 
         if let analyzer {
@@ -245,6 +245,168 @@ actor SpeechPipeline {
 
         Diagnostics.record("Speech", "Pipeline stopped; source audio kept for \(session)", level: .warning)
         return result
+    }
+
+    private func configureLiveBackend(
+        _ backend: SpeechRecognitionBackend,
+        sessionID: UUID,
+        sessionLabel: String,
+        microphone: AVCaptureDevice,
+        sourceAudioURL: URL,
+        dictionaryWords: [String],
+        onTranscript: @escaping @Sendable (UUID, String) -> Void,
+        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void,
+        onFailure: @escaping @Sendable (UUID, String) -> Void
+    ) async throws -> LiveBackendSetup {
+        switch backend {
+        case .speechTranscriber(let locale):
+            let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+            let converter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
+            try requireActiveSession(sessionID)
+
+            let source = try CaptureAudioSource(
+                device: microphone,
+                converter: converter,
+                destinationURL: sourceAudioURL,
+                onAudioLevel: { level in onAudioLevel(sessionID, level) }
+            )
+            let analyzer = SpeechAnalyzer(modules: [transcriber])
+            try await applyDictionaryContext(dictionaryWords, analyzer: analyzer, sessionID: sessionID)
+
+            let task = Task {
+                do {
+                    for try await result in transcriber.results {
+                        try Task.checkCancellation()
+                        guard activeSessionID == sessionID else { return }
+                        consume(
+                            text: String(result.text.characters),
+                            isFinal: result.isFinal,
+                            sessionID: sessionID,
+                            sessionLabel: sessionLabel,
+                            onTranscript: onTranscript
+                        )
+                    }
+                    Diagnostics.record("Speech", "SpeechTranscriber result stream ended for \(sessionLabel)")
+                } catch {
+                    reportFailure(error, sessionID: sessionID, onFailure: onFailure)
+                    throw error
+                }
+            }
+
+            Diagnostics.record("Speech", "SpeechTranscriber configured for \(sessionLabel)")
+            return LiveBackendSetup(analyzer: analyzer, source: source, resultTask: task)
+
+        case .dictationTranscriber(let locale):
+            let transcriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
+            let converter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
+            try requireActiveSession(sessionID)
+
+            let source = try CaptureAudioSource(
+                device: microphone,
+                converter: converter,
+                destinationURL: sourceAudioURL,
+                onAudioLevel: { level in onAudioLevel(sessionID, level) }
+            )
+            let analyzer = SpeechAnalyzer(modules: [transcriber])
+            try await applyDictionaryContext(dictionaryWords, analyzer: analyzer, sessionID: sessionID)
+
+            let task = Task {
+                do {
+                    for try await result in transcriber.results {
+                        try Task.checkCancellation()
+                        guard activeSessionID == sessionID else { return }
+                        consume(
+                            text: String(result.text.characters),
+                            isFinal: result.isFinal,
+                            sessionID: sessionID,
+                            sessionLabel: sessionLabel,
+                            onTranscript: onTranscript
+                        )
+                    }
+                    Diagnostics.record("Speech", "DictationTranscriber result stream ended for \(sessionLabel)")
+                } catch {
+                    reportFailure(error, sessionID: sessionID, onFailure: onFailure)
+                    throw error
+                }
+            }
+
+            Diagnostics.record("Speech", "DictationTranscriber configured for \(sessionLabel)")
+            return LiveBackendSetup(analyzer: analyzer, source: source, resultTask: task)
+        }
+    }
+
+    private func consume(
+        text: String,
+        isFinal: Bool,
+        sessionID: UUID,
+        sessionLabel: String,
+        onTranscript: @escaping @Sendable (UUID, String) -> Void
+    ) {
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            hasTranscriptEvidence = true
+        }
+
+        if isFinal {
+            finalizedText = join(finalizedText, text)
+            volatileText = ""
+        } else {
+            volatileText = text
+        }
+
+        let combined = join(finalizedText, volatileText)
+        Diagnostics.record(
+            "SpeechText",
+            "Session \(sessionLabel) transcriptCharacters=\(combined.count); final=\(isFinal)"
+        )
+        onTranscript(sessionID, combined)
+    }
+
+    private func applyDictionaryContext(
+        _ dictionaryWords: [String],
+        analyzer: SpeechAnalyzer,
+        sessionID: UUID
+    ) async throws {
+        guard !dictionaryWords.isEmpty else { return }
+        let context = AnalysisContext()
+        context.contextualStrings = [.general: dictionaryWords]
+        do {
+            try await analyzer.setContext(context)
+            Diagnostics.record(
+                "SpeechQuality",
+                "Applied \(dictionaryWords.count) contextual dictionary strings for \(label(sessionID))"
+            )
+        } catch {
+            Diagnostics.record(
+                "Speech",
+                "Dictionary context was unavailable; continuing recognition: \(error.localizedDescription)",
+                level: .warning
+            )
+        }
+        try requireActiveSession(sessionID)
+    }
+
+    private func prepareAssets(for backend: SpeechRecognitionBackend) async throws {
+        switch backend {
+        case .speechTranscriber(let locale):
+            let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+            if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+                Diagnostics.record("Speech", "SpeechTranscriber asset installation required")
+                try await installation.downloadAndInstall()
+                Diagnostics.record("Speech", "SpeechTranscriber asset installation completed")
+            } else {
+                Diagnostics.record("Speech", "SpeechTranscriber assets already available")
+            }
+
+        case .dictationTranscriber(let locale):
+            let transcriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
+            if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+                Diagnostics.record("Speech", "DictationTranscriber asset installation required")
+                try await installation.downloadAndInstall()
+                Diagnostics.record("Speech", "DictationTranscriber asset installation completed")
+            } else {
+                Diagnostics.record("Speech", "DictationTranscriber assets already available")
+            }
+        }
     }
 
     private func snapshot(sourceAudio: CapturedSourceAudio) -> Result {
@@ -266,19 +428,6 @@ actor SpeechPipeline {
         guard activeSessionID == sessionID, !isFinalizing, !reportedFailure, !Task.isCancelled else { return }
         reportedFailure = true
         onFailure(sessionID, error.localizedDescription)
-    }
-
-    private func makeTranscriber(locale requestedLocale: Locale) async throws -> DictationTranscriber {
-        guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
-            Diagnostics.record("Speech", "Unsupported requested locale: \(requestedLocale.identifier)", level: .error)
-            throw PipelineError.unsupportedLocale
-        }
-
-        Diagnostics.record("Speech", "Resolved Dictation locale: \(locale.identifier)")
-        // Morie is an input method, so use Apple's dictation-oriented module.
-        // progressiveLongDictation keeps live volatile results while asking the
-        // native recognizer to supply punctuation for long-form speech.
-        return DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
     }
 
     private func requireActiveSession(_ sessionID: UUID) throws {

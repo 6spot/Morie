@@ -86,3 +86,36 @@ Do not attribute this sample to accent alone. Keep collecting controlled samples
 GitHub Actions `macOS 27 CI` run #75 passed the Release product compile for PR #28 on Xcode 27/macOS 27.
 
 The change is presentation-only: persisted `recognizedText`, `finalText`, refinement edits, dictionary snapshots and memory-context snapshots are unchanged.
+
+## 2026-09-19 native backend upgrade
+
+Repository review found that live input still selected `DictationTranscriber(.progressiveLongDictation)` unconditionally even on systems where Apple's newer `SpeechTranscriber` is available.
+
+Morie now resolves one Apple-native backend at runtime:
+
+```text
+requested locale
+    ↓
+SpeechTranscriber supported?
+    ├─ yes → SpeechTranscriber
+    │          live:  .progressiveTranscription
+    │          file:  .transcription
+    │
+    └─ no  → DictationTranscriber
+               live:  .progressiveLongDictation
+               file:  .longDictation
+```
+
+The newer model remains fully on-device. Existing `AnalysisContext.contextualStrings` dictionary hints are still applied to the live `SpeechAnalyzer`. There is no cloud recognizer and no third-party fallback.
+
+Bootstrap prepares the selected backend before Ready. If SpeechTranscriber reports support but its asset preparation fails, bootstrap can prepare DictationTranscriber instead so input remains available. Saved-audio recognition follows the same preference and only falls back during backend/asset setup, not after a recognition run has already begun.
+
+Diagnostics now record the selected backend, normalized locale and dictionary-hint count. This is intentionally left IN PROGRESS until the owner device confirms which backend zh-CN selects and supplies additional before/after samples.
+
+### Validation
+
+- [x] Xcode 27 / macOS 27 Release product compile passes for the new SpeechTranscriber APIs (CI run #81).
+- [ ] Owner device confirms `SpeechQuality ... backend=SpeechTranscriber` or records the Dictation fallback reason.
+- [ ] Controlled Mandarin sample after backend change.
+- [ ] Mixed Chinese/English sample after backend change.
+- [ ] Dictionary-term sample after backend change.
