@@ -177,18 +177,68 @@ struct MorieControlCenter: View {
 
 @MainActor
 private struct CaptureHistoryListPane: View {
-    @Query(sort: \CaptureRecord.createdAt, order: .reverse) private var captures: [CaptureRecord]
     @Binding var selection: UUID?
     let canStartCapture: Bool
     let onRecord: () -> Void
+    @State private var fetchLimit = 200
 
     var body: some View {
-        CaptureHistoryView(
-            captures: captures,
+        CaptureHistoryQueryPane(
+            limit: fetchLimit,
             selection: $selection,
             canStartCapture: canStartCapture,
-            onRecord: onRecord
+            onRecord: onRecord,
+            onLoadMore: { fetchLimit += 200 }
         )
+        .id(fetchLimit)
+    }
+}
+
+@MainActor
+private struct CaptureHistoryQueryPane: View {
+    @Query private var captures: [CaptureRecord]
+    @Binding var selection: UUID?
+    let limit: Int
+    let canStartCapture: Bool
+    let onRecord: () -> Void
+    let onLoadMore: () -> Void
+
+    init(
+        limit: Int,
+        selection: Binding<UUID?>,
+        canStartCapture: Bool,
+        onRecord: @escaping () -> Void,
+        onLoadMore: @escaping () -> Void
+    ) {
+        self.limit = limit
+        _selection = selection
+        self.canStartCapture = canStartCapture
+        self.onRecord = onRecord
+        self.onLoadMore = onLoadMore
+
+        var descriptor = FetchDescriptor<CaptureRecord>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        _captures = Query(descriptor)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            CaptureHistoryView(
+                captures: captures,
+                selection: $selection,
+                canStartCapture: canStartCapture,
+                onRecord: onRecord
+            )
+
+            if captures.count >= limit {
+                Divider()
+                Button("加载更早记录", action: onLoadMore)
+                    .buttonStyle(.link)
+                    .padding(.vertical, 8)
+            }
+        }
     }
 }
 
