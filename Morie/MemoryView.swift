@@ -104,7 +104,7 @@ struct MemoryDetailView: View {
                                     ManagementDetailContent {
                                         CaptureMemorySource(captureID: id)
                                         ForEach(store.analyses(for: id, linkedTo: memoryID)) { analysis in
-                                            MemoryAnalysisSourceView(analysis: analysis)
+                                            MemoryAnalysisSourceView(sourceText: analysis.sourceText)
                                         }
                                     }
                                     .navigationTitle("记忆来源")
