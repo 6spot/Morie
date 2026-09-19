@@ -1,5 +1,4 @@
 import Foundation
-import CoreGraphics
 import SwiftData
 
 @MainActor
@@ -91,15 +90,13 @@ final class CaptureStore {
         id: UUID,
         deliveryMode: CaptureDeliveryMode,
         applicationName: String?,
-        bundleIdentifier: String?,
-        windowNumber: CGWindowID?
+        bundleIdentifier: String?
     ) throws -> URL {
         let record = CaptureRecord(
             id: id,
             deliveryMode: deliveryMode,
             sourceApplicationName: applicationName,
-            sourceBundleIdentifier: bundleIdentifier,
-            originalWindowNumber: windowNumber
+            sourceBundleIdentifier: bundleIdentifier
         )
         record.sourceAudioRelativePath = "\(id.uuidString).m4a"
         record.sourceAudioExpiresAt = Calendar.current.date(
@@ -237,7 +234,14 @@ final class CaptureStore {
         }
     }
 
-    func markDelivered(_ id: UUID) throws {
+    func markDelivered(
+        _ id: UUID,
+        applicationName: String?,
+        bundleIdentifier: String?
+    ) throws {
+        guard let record = records[id] else { return }
+        record.sourceApplicationName = applicationName
+        record.sourceBundleIdentifier = bundleIdentifier
         try finish(id, lifecycle: .delivered, error: nil)
     }
 
