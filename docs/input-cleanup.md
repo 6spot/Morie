@@ -18,6 +18,20 @@ Owner-approved on 2026-09-18. Applies to the current Mac input loop, independent
 12. 无法确定如何整理时，优先保留原始表达。
 13. 只输出整理后的最终文本，不输出解释、说明或其他附加内容。
 
+## Prompt organization
+
+The native Foundation Models prompt follows the same contract in a compact, general structure:
+
+1. **Role / task goal:** speech cleanup that should read like the user carefully typed it, not generic rewriting.
+2. **Absolute boundaries:** no new meaning, stance, explanation, answer or execution; uncertain edits keep the source.
+3. **Spoken-language cleanup:** obvious ASR correction, filler/stutter removal, semantic repetition handling and explicit self-correction.
+4. **Natural Chinese formatting:** punctuation is mandatory; ordinary spoken clock forms may normalize from Speech-style `9:00` to `9点` when the context is conversational.
+5. **Structure and register:** structure only what the user already expressed. Formal content may receive clearer paragraph/list formatting when structure is explicit; informal content keeps meaningful emotion, rhetorical phrasing and uncertainty.
+6. **Context:** dictionary and Memory help interpretation but never supply unspoken content.
+7. **Generic examples:** examples teach behavior classes rather than owner-specific wording, and the prompt explicitly forbids example wording from leaking into unrelated input.
+
+Morie intentionally does **not** inherit Type4Me's more aggressive voice-polish behavior such as mandatory Arabic-number conversion for conversational time, mandatory total-summary/list formatting, generated section titles or inserted transition phrases.
+
 ## Acceptance examples
 
 - `嗯` / `好的` remain complete replies.
