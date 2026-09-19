@@ -77,10 +77,16 @@ The cleanup prompt also receives the bounded confirmed relations as high-confide
 - [x] Confirmed mappings are supplied to the cleanup prompt.
 - [x] Mapping changes participate in refinement staleness checks.
 - [x] Visible Dictionary remains canonical-word only.
-- [ ] macOS 27 Release product compile passes.
+- [x] macOS 27 Release product compile passes.
 - [ ] Dictionary/Personalization logic tests execute in a test-capable validation session.
 - [ ] Owner device confirms one learned real correction is applied on a later dictation.
 
 ## First real validation target
 
 The owner has already observed Apple Speech producing wrong technical/semantic forms such as `Athers` for `Issues` and `总版` for `总览`. The next time one of these is manually corrected after Morie inserts it, the confirmation should retain the full relation; a later matching recognition should be repaired before Foundation Models.
+
+## Validation
+
+GitHub Actions `macOS 27 CI` run #91 passed the Release product compile on Xcode 27/macOS 27 for the branch head containing the full M-027 implementation and task documentation.
+
+The hosted workflow still does not execute the MorieTests logic target. The new Dictionary/Personalization regression tests are present but remain an explicit test-capable validation item.
