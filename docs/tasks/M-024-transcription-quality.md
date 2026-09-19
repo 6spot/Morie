@@ -62,3 +62,20 @@ The normal History detail now has one user-facing comparison:
 ```
 
 Persisted provenance is intentionally unchanged.
+
+
+## Observed sample 1 — owner device, 2026-09-19
+
+A real Mandarin input about History timing produced a generally understandable raw transcript, but it inserted sentence-final question particles such as “吗” where the speaker was making statements and introduced an unrelated/noisy tail fragment before the final “我们继续呗”.
+
+The cleanup output removed those artifacts and restored the intended declarative structure.
+
+Current classification:
+
+- core lexical recognition: mostly usable;
+- punctuation / sentence-boundary interpretation: imperfect;
+- short particle insertion: observable;
+- tail-fragment recognition: observable;
+- cleanup recovery: useful on this sample.
+
+Do not attribute this sample to accent alone. Keep collecting controlled samples before changing Speech configuration.
