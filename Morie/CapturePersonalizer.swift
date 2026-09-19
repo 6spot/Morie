@@ -55,7 +55,7 @@ final class CapturePersonalizer {
                 }
                 let result: ValidatedRefinement
                 do {
-                    result = try RefinementValidator.validate(text, for: input)
+                    result = try ValidatedRefinement.accepting(text, for: input)
                 } catch {
                     return try keepOriginal(input, reason: .invalidEdits, started: started)
                 }

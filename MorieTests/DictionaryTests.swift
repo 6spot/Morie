@@ -3,6 +3,12 @@ import XCTest
 
 @MainActor
 final class DictionaryTests: XCTestCase {
+    func testSpeechSegmentsPreserveNativeSpacingWithoutInventingSeparators() {
+        XCTAssertEqual(SpeechTranscriptAssembler.join("常", "蚊"), "常蚊")
+        XCTAssertEqual(SpeechTranscriptAssembler.join("常蚊", "子"), "常蚊子")
+        XCTAssertEqual(SpeechTranscriptAssembler.join("hello ", "world"), "hello world")
+    }
+
     func testWordsSurviveRestartSeparatelyFromMemory() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "MorieDictionary-\(UUID())")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -30,10 +36,11 @@ final class DictionaryTests: XCTestCase {
         let store = DictionaryStore(container: captures.container)
         let first = try store.create(DictionaryDraft(name: "Morie"))
         XCTAssertThrowsError(try store.create(DictionaryDraft(name: " morie ")))
-        XCTAssertThrowsError(try store.create(DictionaryDraft(name: "ＭＯＲＩＥ")))
+        let fullWidth = try store.create(DictionaryDraft(name: "ＭＯＲＩＥ"))
         let second = try store.create(DictionaryDraft(name: "Second"))
         XCTAssertThrowsError(try store.update(second, draft: DictionaryDraft(name: "MORIE")))
-        XCTAssertEqual(store.entries.count, 2)
+        XCTAssertEqual(store.entries.count, 3)
+        XCTAssertEqual(store.entries.first(where: { $0.id == fullWidth })?.name, "ＭＯＲＩＥ")
         XCTAssertEqual(store.entries.first(where: { $0.id == second })?.name, "Second")
         try store.update(first, draft: DictionaryDraft(name: "MORIE"))
         XCTAssertEqual(store.entries.first(where: { $0.id == first })?.name, "MORIE")
@@ -56,9 +63,9 @@ final class DictionaryTests: XCTestCase {
         let entries = [snapshot("Morie"), snapshot("Git"), snapshot("项目")]
         let input = "不要发布 morie 2.0，用ＭＯＲＩＥ记录项目。GitHub more e 莫里。`morie` https://morie.app /morie/run morie_name"
         let result = DictionarySpelling.normalize(input, using: entries)
-        XCTAssertEqual(result.text, "不要发布 Morie 2.0，用Morie记录项目。GitHub more e 莫里。`morie` https://morie.app /morie/run morie_name")
-        XCTAssertEqual(result.edits.count, 2)
-        XCTAssertEqual(result.edits.map(\.dictionaryEntryID), [entries[0].id, entries[0].id])
+        XCTAssertEqual(result.text, "不要发布 Morie 2.0，用ＭＯＲＩＥ记录项目。GitHub more e 莫里。`morie` https://morie.app /morie/run morie_name")
+        XCTAssertEqual(result.edits.count, 1)
+        XCTAssertEqual(result.edits.map(\.dictionaryEntryID), [entries[0].id])
         XCTAssertTrue(DictionarySpelling.normalize("Morie more e 莫里 GitHub", using: entries).edits.isEmpty)
     }
 
@@ -70,14 +77,14 @@ final class DictionaryTests: XCTestCase {
         }
     }
 
-    func testSavedWordSuppliesHintsAndRelevantContextUntilDeleted() throws {
+    func testSavedWordSuppliesHintsAndCleanupContextEvenWhenRecognitionMisspellsIt() throws {
         let captures = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let store = DictionaryStore(container: captures.container)
         let id = try store.create(DictionaryDraft(name: "Morie"))
         XCTAssertEqual(try store.speechHints(), ["Morie"])
         XCTAssertEqual(try store.relevantEntries(for: "use morie").map(\.id), [id])
-        XCTAssertTrue(try store.relevantEntries(for: "more e moriename").isEmpty)
+        XCTAssertEqual(try store.relevantEntries(for: "use More E").map(\.id), [id])
         try store.delete(id)
         XCTAssertTrue(try store.speechHints().isEmpty)
         XCTAssertTrue(try store.relevantEntries(for: "Morie").isEmpty)

@@ -66,6 +66,9 @@
 		A10000000000000000000021 /* MorieSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000035 /* MorieSetupView.swift */; };
 		A2000000000000000000001A /* PermissionSetupController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* PermissionSetupController.swift */; };
 		A2000000000000000000001B /* PermissionSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000011 /* PermissionSetupTests.swift */; };
+		A2000000000000000000001C /* CapabilityGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* CapabilityGate.swift */; };
+		A2000000000000000000001D /* CaptureHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* CaptureHUD.swift */; };
+		A2000000000000000000001E /* CaptureHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000012 /* CaptureHUDTests.swift */; };
 		A10000000000000000000022 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
@@ -116,6 +119,7 @@
 		B10000000000000000000034 /* PermissionSetupController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSetupController.swift; sourceTree = "<group>"; };
 		B10000000000000000000035 /* MorieSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieSetupView.swift; sourceTree = "<group>"; };
 		B20000000000000000000011 /* PermissionSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSetupTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000012 /* CaptureHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHUDTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000036 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -189,6 +193,7 @@
 		D20000000000000000000001 /* MorieTests */ = {
 			isa = PBXGroup;
 			children = (
+				B20000000000000000000012 /* CaptureHUDTests.swift */,
 				B20000000000000000000011 /* PermissionSetupTests.swift */,
 				B20000000000000000000001 /* CaptureStoreTests.swift */,
 				B20000000000000000000003 /* CaptureHistoryTests.swift */,
@@ -348,8 +353,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2000000000000000000001D /* CaptureHUD.swift in Sources */,
+				A2000000000000000000001E /* CaptureHUDTests.swift in Sources */,
 				A2000000000000000000001A /* PermissionSetupController.swift in Sources */,
 				A2000000000000000000001B /* PermissionSetupTests.swift in Sources */,
+				A2000000000000000000001C /* CapabilityGate.swift in Sources */,
 				A20000000000000000000001 /* CaptureStoreTests.swift in Sources */,
 				A20000000000000000000002 /* CaptureRecord.swift in Sources */,
 				A20000000000000000000003 /* CaptureStore.swift in Sources */,

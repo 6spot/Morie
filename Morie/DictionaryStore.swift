@@ -3,6 +3,12 @@ import Foundation
 import NaturalLanguage
 import SwiftData
 
+enum SpeechTranscriptAssembler {
+    /// SpeechTranscriber owns whitespace and punctuation across result segments.
+    /// Inserting a separator here breaks Chinese into text such as "常 蚊 子".
+    static func join(_ lhs: String, _ rhs: String) -> String { lhs + rhs }
+}
+
 struct DictionaryDraft: Equatable, Sendable {
     var name = ""
 }
@@ -73,20 +79,24 @@ final class DictionaryStore: ObservableObject {
     func delete(_ id: UUID) throws { context.delete(try entry(id)); try save() }
 
     func relevantEntries(for text: String) throws -> [DictionarySnapshot] {
-        try load()
-        return entries.map(\.snapshot).filter { entry in
-            !InputText.literalRanges(of: entry.name, in: text).isEmpty
-        }
+        _ = text
+        return try contextualEntries()
     }
 
     func speechHints() throws -> [String] {
+        try contextualEntries().map(\.name)
+    }
+
+    /// Speech and cleanup receive the same bounded dictionary. Requiring an
+    /// exact transcript match here would hide the correct spelling precisely
+    /// when recognition produced a near-homophone such as Coldex for Codex.
+    private func contextualEntries() throws -> [DictionarySnapshot] {
         try load()
-        // A bounded native Speech context containing the user's saved words.
         var characters = 0
         return entries.sorted { $0.updatedAt > $1.updatedAt }.prefix(100).compactMap { entry in
             guard characters + entry.name.count <= 2_000 else { return nil }
             characters += entry.name.count
-            return entry.name
+            return entry.snapshot
         }
     }
 
@@ -106,10 +116,14 @@ final class DictionaryStore: ObservableObject {
 
     private func requireNewWord(_ name: String, excluding id: UUID? = nil) throws {
         try load()
-        let key = MemoryText.normalized(name)
+        let key = Self.wordKey(name)
         guard !entries.contains(where: { entry in
-            entry.id != id && MemoryText.normalized(entry.name) == key
+            entry.id != id && Self.wordKey(entry.name) == key
         }) else { throw StoreError.duplicateWord }
+    }
+
+    private static func wordKey(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
     }
 
     private func save() throws {
@@ -120,7 +134,7 @@ final class DictionaryStore: ObservableObject {
 }
 
 enum DictionarySpelling {
-    /// Normalize only the same word's case/width; a saved word never implies a substitution rule.
+    /// Normalize only the same word's letter case; a saved word never implies a substitution rule.
     static func normalize(_ text: String, using entries: [DictionarySnapshot]) -> ValidatedRefinement {
         let protected = InputText.technicalRanges(in: text)
         var matches: [(range: Range<String.Index>, entry: DictionarySnapshot)] = []
@@ -162,7 +176,7 @@ enum InputText {
         var start = text.startIndex
         var matches: [Range<String.Index>] = []
         while start < text.endIndex,
-              let range = text.range(of: term, options: [.caseInsensitive, .widthInsensitive], range: start..<text.endIndex) {
+              let range = text.range(of: term, options: [.caseInsensitive], range: start..<text.endIndex) {
             if !words.contains(where: {
                 ($0.lowerBound < range.lowerBound && range.lowerBound < $0.upperBound)
                     || ($0.lowerBound < range.upperBound && range.upperBound < $0.upperBound)

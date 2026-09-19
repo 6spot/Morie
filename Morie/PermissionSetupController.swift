@@ -72,7 +72,7 @@ struct CapabilityCheck: Equatable, Identifiable, Sendable {
 
         var title: String {
             switch self {
-            case .requestPermission: "允许访问"
+            case .requestPermission: "授权"
             case .openSettings: "打开系统设置"
             }
         }
@@ -85,9 +85,14 @@ struct CapabilityCheck: Equatable, Identifiable, Sendable {
 
     var id: SetupRequirement { requirement }
     var isReady: Bool { state == .ready }
+    var actionTitle: String? {
+        guard let action else { return nil }
+        if requirement == .accessibility, action == .openSettings { return "授权" }
+        return action.title
+    }
     var statusTitle: String {
         switch state {
-        case .ready: requirement.isPermission ? "已允许" : "已就绪"
+        case .ready: requirement.isPermission ? "已授权" : "已就绪"
         case .notDetermined: "待授权"
         case .denied: "未允许"
         case .restricted: "受系统限制"
@@ -106,13 +111,13 @@ final class PermissionSetupController: ObservableObject {
 
     private let inspect: @MainActor () async -> [CapabilityCheck]
     private let requestPermission: @MainActor (SetupRequirement) async -> Void
-    private let openSettings: @MainActor (SetupRequirement) -> Void
+    private let openSettings: @MainActor (SetupRequirement) async -> Void
     private var refreshTask: Task<Void, Never>?
 
     init(
         inspect: @escaping @MainActor () async -> [CapabilityCheck],
         requestPermission: @escaping @MainActor (SetupRequirement) async -> Void,
-        openSettings: @escaping @MainActor (SetupRequirement) -> Void
+        openSettings: @escaping @MainActor (SetupRequirement) async -> Void
     ) {
         self.inspect = inspect
         self.requestPermission = requestPermission
@@ -162,7 +167,7 @@ final class PermissionSetupController: ObservableObject {
         case .requestPermission:
             await requestPermission(requirement)
         case .openSettings:
-            openSettings(requirement)
+            await openSettings(requirement)
         }
         checks = await inspect()
     }

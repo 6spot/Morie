@@ -81,12 +81,18 @@ struct PermissionSetupContent: View {
                 } else {
                     Section("设备能力") {
                         ForEach(checks.filter { !$0.requirement.isPermission }) { check in
-                            requirementRow(check)
+                            PermissionRequirementRow(
+                                check: check, activeRequest: activeRequest, isBusy: isBusy,
+                                onAction: onAction
+                            )
                         }
                     }
                     Section {
                         ForEach(checks.filter { $0.requirement.isPermission }) { check in
-                            requirementRow(check)
+                            PermissionRequirementRow(
+                                check: check, activeRequest: activeRequest, isBusy: isBusy,
+                                onAction: onAction
+                            )
                         }
                     } header: {
                         Text("使用权限")
@@ -120,15 +126,15 @@ struct PermissionSetupContent: View {
                 }
 
                 HStack {
-                    Button("重新检查", systemImage: "arrow.clockwise", action: onRefresh)
-                        .disabled(isBusy)
-                    if isRefreshing {
-                        ProgressView().controlSize(.small).accessibilityLabel("正在检查")
-                    }
-                    Spacer()
                     Button("稍后设置", action: onLater)
                         .keyboardShortcut(.cancelAction)
                         .disabled(isPreparing)
+                    Spacer()
+                    if isRefreshing {
+                        ProgressView().controlSize(.small).accessibilityLabel("正在检查")
+                    }
+                    Button("重新检查", systemImage: "arrow.clockwise", action: onRefresh)
+                        .disabled(isBusy)
                     Button("开始使用", action: onFinish)
                         .keyboardShortcut(.defaultAction)
                         .disabled(!canFinish)
@@ -139,7 +145,15 @@ struct PermissionSetupContent: View {
         .frame(minWidth: 640, minHeight: 680)
     }
 
-    private func requirementRow(_ check: CapabilityCheck) -> some View {
+}
+
+private struct PermissionRequirementRow: View {
+    let check: CapabilityCheck
+    let activeRequest: SetupRequirement?
+    let isBusy: Bool
+    let onAction: (SetupRequirement) -> Void
+
+    var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: check.requirement.systemImage)
                 .font(.title3)
@@ -158,14 +172,16 @@ struct PermissionSetupContent: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .trailing, spacing: 8) {
-                Label(check.statusTitle, systemImage: check.isReady ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(check.isReady ? Color.green : Color.secondary)
-                    .font(.callout)
+                if check.isReady || !check.requirement.isPermission || check.action == nil {
+                    Label(check.statusTitle, systemImage: check.isReady ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(check.isReady ? Color.green : Color.secondary)
+                        .font(.callout)
+                }
                 if let action = check.action, !check.isReady {
-                    Button(action.title) { onAction(check.requirement) }
+                    Button(check.actionTitle ?? action.title) { onAction(check.requirement) }
                         .controlSize(.small)
                         .disabled(isBusy)
-                        .accessibilityLabel("\(check.requirement.title)：\(action.title)")
+                        .accessibilityLabel("\(check.requirement.title)：\(check.actionTitle ?? action.title)")
                 }
                 if activeRequest == check.requirement {
                     ProgressView().controlSize(.small).accessibilityLabel("正在等待授权结果")
@@ -173,5 +189,71 @@ struct PermissionSetupContent: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+@MainActor
+struct PermissionManagementView: View {
+    @ObservedObject var controller: AppController
+    @ObservedObject private var setup: PermissionSetupController
+
+    init(controller: AppController) {
+        self.controller = controller
+        _setup = ObservedObject(wrappedValue: controller.setup)
+    }
+
+    private var isBusy: Bool {
+        setup.isRefreshing || setup.activeRequest != nil || controller.isBootstrapping
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                if setup.checks.isEmpty {
+                    ProgressView("正在检查设备和权限…")
+                } else {
+                    ForEach(setup.checks) { check in
+                        PermissionRequirementRow(
+                            check: check,
+                            activeRequest: setup.activeRequest,
+                            isBusy: isBusy,
+                            onAction: { requirement in
+                                Task { await setup.performAction(for: requirement) }
+                            }
+                        )
+                    }
+                }
+            } footer: {
+                Text("权限由 macOS 管理。从系统设置返回后，状态会自动更新。")
+            }
+
+            if let error = controller.setupError {
+                Section {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("权限")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button("重新检查", systemImage: "arrow.clockwise") {
+                    Task { await setup.refresh() }
+                }
+                .disabled(isBusy)
+
+                if setup.isReady && !controller.canStartCapture {
+                    Button("重新启用 Morie") {
+                        Task { await controller.bootstrap(completingSetup: true) }
+                    }
+                    .disabled(isBusy || controller.isCaptureActive)
+                }
+            }
+        }
+        .task { await setup.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await setup.refresh() }
+        }
     }
 }

@@ -3,8 +3,8 @@
 ## Status
 
 - **State:** IN PROGRESS
-- **Last updated:** 2026-09-18
-- **Branch:** `feature/m-009-input-dictionary-memory`
+- **Last updated:** 2026-09-19
+- **Branch:** `feature/m-013-control-center`
 - **Depends on:** existing M-002 input, M-003 durable Capture, M-004/M-005 foundations and M-008 native management.
 - **Issue / PR:** —
 
@@ -29,8 +29,8 @@ iOS, inspiration capture/follow-up, CloudKit/enrollment/container configuration,
 
 ## Acceptance criteria
 
-1. Cleanup works with an empty/unavailable Memory store, preserves meaningful tone and uncertainty, and never answers the dictated request.
-2. User-defined dictionary words persist, reject normalized duplicates and supply Speech hints. Same-word case/width normalization preserves unrelated words and technical content; M-011 removes explicit-alias rules.
+1. Cleanup works with an empty/unavailable Memory store, uses sentence context to repair bounded and unambiguous Chinese recognition errors, preserves meaningful tone and uncertainty, and never answers the dictated request.
+2. User-defined dictionary words persist, reject letter-case duplicates and supply Speech hints. Same-word letter-case normalization preserves full-/half-width spelling, unrelated words and technical content; M-011 removes explicit-alias rules.
 3. Recognized text is saved before processing; final text and actual dictionary/Memory context are saved before insertion and learning.
 4. Completed current-app input automatically enters local learning. Restart/cancellation/model failure does not silently drop unfinished work; new input never waits for background analysis.
 5. Personal information is distinct from dictionary rules. Only supported, durable personal information is admitted; incidental, quoted, temporary or uncertain text must not become asserted user facts.
@@ -52,7 +52,7 @@ iOS, inspiration capture/follow-up, CloudKit/enrollment/container configuration,
 ## Implementation notes
 
 - Separate SwiftData dictionary/personal-Memory records and non-autosaving write contexts preserve the Capture checkpoint boundary. The old candidate schema/workflow is removed directly.
-- Dictionary supplies bounded native Speech hints and same-word spelling normalization; M-011 removes the earlier explicit-alias fields and behavior. Cleanup generates full final text under the approved contract and keeps original/input/context/changes before delivery.
+- Dictionary supplies bounded native Speech hints and same-word letter-case normalization; M-011 removes the earlier explicit-alias fields and behavior. Cleanup generates full final text under the approved contract, permits a bounded number of contextually unambiguous Chinese-character recognition corrections, and keeps original/input/context/changes before delivery.
 - Personal analysis uses a durable final-text queue, idle batches, evidence/lifecycle filters and immediate cancellation for new input. User edits and forgotten/archived topics take priority.
 - Correction observation is independently opt-in and bounded to a verified recent insertion. The native panel confirms only a spelling, sizes to long content/errors and dismisses when its observation becomes invalid.
 
@@ -72,6 +72,13 @@ iOS, inspiration capture/follow-up, CloudKit/enrollment/container configuration,
 - The prompt initially truncated long spellings. It now uses the hosting view's fitting size and native geometry updates; long text and save errors render fully. Fixtures use synthetic data, injected controller/model actions and a memory-only logger, with prohibited app activation and no ordered windows/AX observation. Offscreen images establish layout/content, not system glass, focus, keyboard or VoiceOver acceptance.
 - `git diff --check` and local documentation path/heading-link checks passed. No external dependency or legacy compatibility layer was added.
 
+2026-09-19 contextual-correction follow-up:
+
+- The owner requires cleanup to trust Foundation Models' contextual understanding and structured result. The prompt explicitly requests clear Chinese ASR correction while preserving meaning, but Morie no longer applies mechanical character-count, word-order, number, negation or dictionary-presence checks afterward. Only empty/malformed payloads are rejected; snapshot freshness and durable saving remain independent safeguards.
+- Focused coverage accepts **我再次尝试常文字效果怎么样？ → 我再次尝试长文字效果怎么样？**, dictionary-assisted **现在我再来试一试长蚊子 → 现在我再来试一试长文字**, and arbitrary valid structured text without local semantic rejection. Empty/control-character payloads still fall back safely.
+- The complete **107-test** suite passed with 0 failures, skips or runtime warnings after removing the mechanical validator. Result: `/tmp/morie-startup-permission/Logs/Test/Test-MorieTests-2026.09.19_07-45-53-+0800.xcresult`. The isolated unsigned Morie app build also passed from the same DerivedData.
+- **Codex/Coldex follow-up:** Apple Speech receives saved words through `contextualStrings`, but this is a recognition hint and may still miss. Morie's cleanup context previously selected only dictionary entries already present literally in the recognized text, which hid **Codex** after the exact error it needed to repair. Speech and cleanup now share the same recent 100-word/2,000-character snapshot; Foundation Models chooses the contextual correction without a local alias or mechanical replacement rule. The complete **107-test** suite and isolated unsigned app build pass after this change; result: `/tmp/morie-startup-permission/Logs/Test/Test-MorieTests-2026.09.19_07-55-22-+0800.xcresult`.
+
 ### 2026-09-18 compiler and startup investigation
 
 - The reported `Cannot find type 'MemoryAnalysisRecord' in scope` was not reproduced by a fresh app build or the fresh logic-test target (**91 passed, 0 failed**). Both targets include `MemoryAnalysisRecord.swift`. The owner's latest completed IDE build also had zero errors; SourceKit logs separately showed attempts to read the removed `MemoryExtractionRecord.swift`. The original diagnostic's file/location was no longer available, so an exact cause for that editor report is not claimed.
@@ -84,7 +91,7 @@ iOS, inspiration capture/follow-up, CloudKit/enrollment/container configuration,
 
 ## Known issues / deferred acceptance
 
-- Actual model accuracy, topic consistency, system Speech-hint benefit, cancellation/energy/latency and native AX/prompt interactions remain unverified. The cleanup validator is a lexical guard, not proof of semantic equivalence. Deleted-topic blocks use normalized topic identity; evaluate semantic relabelling with real outputs.
+- Actual model accuracy, topic consistency, system Speech-hint benefit, cancellation/energy/latency and native AX/prompt interactions remain unverified. Morie intentionally relies on the cleanup instructions and structured model result rather than a local semantic verifier. Deleted-topic blocks use normalized topic identity; evaluate semantic relabelling with real outputs.
 - Background model work has no separate deadline in this slice; an uncooperative task retains ownership while new input proceeds and cleanup can skip. AX range length uses bounded character-count deltas and in-range selection checks, so unrelated document edits and field-specific range behavior remain explicit device checks.
 
 ## Follow-up

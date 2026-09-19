@@ -24,6 +24,8 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-009 | Mac input loop | Independent cleanup, custom dictionary and automatic personal Memory | IN PROGRESS | — | [`M-009`](./tasks/M-009-macos-input-memory.md) |
 | M-010 | macOS usability | Simplified Chinese, native menus/sidebar and permission setup | IN PROGRESS | — | [`M-010`](./tasks/M-010-macos-native-setup.md) |
 | M-011 | Dictionary usability | Add a single word without alias configuration | IN PROGRESS | — | [`M-011`](./tasks/M-011-simple-dictionary.md) |
+| M-012 | Performance | Stop hidden HUD rendering and establish idle CPU/RSS baseline | IN PROGRESS | — | [`M-012`](./tasks/M-012-idle-performance.md) |
+| M-013 | macOS UX | Simplify menu, setup, filters, Settings and Dictionary navigation | IN PROGRESS | — | [`M-013`](./tasks/M-013-control-center.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
@@ -36,6 +38,8 @@ The owner's amended priority is **one Mac's input → dictionary/cleanup → aut
 M-009 connects custom dictionary/Speech hints, independent cleanup, automatic personal-Memory learning and opt-in correction suggestions. It replaces the old mandatory-review design directly. M-002/M-003 continue to own reliable capture, delivery and recovery; ambient-noise classification and device interactions remain open.
 
 Current management follows the native M-008 structure with separate History, Dictionary and Personal Memory sections. M-010 adds Simplified Chinese, a system menu, shared Command-comma Settings, native sidebar controls and explicit permission setup. M-011 removes dictionary alias configuration and keeps one word per entry. Its task record holds the latest dictionary build/test/layout evidence; earlier counts remain historical evidence for their respective implementations.
+
+M-010 also fixes the owner-observed Speech authorization callback crash and simplifies the setup window's title, permission state and footer actions. Signed-app permission and interaction retesting remains open; regression/build/layout evidence is in its task record.
 
 The owner deferred interactive validation until the evening of 2026-09-18. Actual model fidelity/latency, correction prompts across supported fields, keyboard/VoiceOver, microphone/recovery and the delivery matrix must be tested before completion. CloudKit is deferred to a later cross-device milestone; no enrollment/container IDs are required for current work.
 

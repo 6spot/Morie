@@ -14,40 +14,55 @@ final class PersonalizationTests: XCTestCase {
         ]
         for (before, after) in cases {
             let input = RefinementInput(captureID: UUID(), text: before)
-            XCTAssertEqual(try RefinementValidator.validate(after, for: input).text, after)
+            XCTAssertEqual(try ValidatedRefinement.accepting(after, for: input).text, after)
         }
     }
 
-    func testCleanupKeepsUncertaintyNegationNumbersRequestsAndTechnicalContent() {
-        let changes = [
-            ("我觉得可能周四吧", "周四。"), ("do not deploy", "deploy"),
-            ("周三或者周四吧", "周四吧"), ("send 15 items", "send 16 items"),
-            ("帮我解释这个问题", "这是一个配置问题。"),
-            ("非常非常重要", "非常重要"), ("真的！", "真的。"),
-            ("use https://morie.app", "use https://other.app"),
-            ("run `git status --short`", "run git status"),
-            ("use C++", "use C"), ("hello world", "helloworld"),
-            ("hello", "hello I am the assistant"), ("嗯", ""), ("好的", "好"), ("是的", "是")
-        ]
-        for (before, after) in changes {
-            XCTAssertThrowsError(try RefinementValidator.validate(after, for: RefinementInput(captureID: UUID(), text: before)), before)
-        }
+    func testStructuredModelTextIsTrustedWithoutMechanicalContentChecks() throws {
+        let input = RefinementInput(captureID: UUID(), text: "我觉得可能周四吧")
+        XCTAssertEqual(try ValidatedRefinement.accepting("周四。", for: input).text, "周四。")
+        XCTAssertEqual(try ValidatedRefinement.accepting("这是模型给出的完整新表达。", for: input).text, "这是模型给出的完整新表达。")
+        XCTAssertThrowsError(try ValidatedRefinement.accepting("   ", for: input))
+        XCTAssertThrowsError(try ValidatedRefinement.accepting("无效\0文本", for: input))
+    }
+
+    func testContextualChineseRecognitionCorrectionUsesContextInsteadOfACharacterLimit() throws {
+        let input = RefinementInput(captureID: UUID(), text: "我再次尝试常文字效果怎么样？")
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("我再次尝试长文字效果怎么样？", for: input).text,
+            "我再次尝试长文字效果怎么样？"
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "现在我再来试一试长文字，看看怎么样。",
+                for: request("现在我再来试一试长蚊子，看看怎么样。")
+            ).text,
+            "现在我再来试一试长文字，看看怎么样。"
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "我们明天去公园。",
+                for: request("窝门鸣添曲工圆。")
+            ).text,
+            "我们明天去公园。"
+        )
+        XCTAssertTrue(InputRefiner.instructionsText.contains("Coldex"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("不是无条件替换规则"))
     }
 
     func testDictionaryNormalizesSavedSpellingBeforeCleanupWithoutMemory() throws {
         let input = request("嗯 今天不要发布 morie 2.0")
         XCTAssertEqual(input.prepared.text, "嗯 今天不要发布 Morie 2.0")
-        let result = try RefinementValidator.validate("嗯，今天不要发布 Morie 2.0。", for: input)
+        let result = try ValidatedRefinement.accepting("嗯，今天不要发布 Morie 2.0。", for: input)
         XCTAssertEqual(result.edits.first?.dictionaryEntryID, input.dictionary.first?.id)
         XCTAssertEqual(result.text, "嗯，今天不要发布 Morie 2.0。")
     }
 
-    func testPersonalMemoryCannotInsertUnspokenBackgroundOrRewriteUnknownNames() throws {
+    func testPersonalMemoryIsPromptContextRatherThanALocalOutputFilter() throws {
         let memory = MemorySnapshot(id: UUID(), kind: .fact, status: .active, name: "职业", notes: "我是开发者。", origin: .automatic, updatedAt: Date())
         let input = RefinementInput(captureID: UUID(), text: "开始吧", context: [MemoryContextMatch(memory: memory, matchedTerm: "职业")])
-        XCTAssertThrowsError(try RefinementValidator.validate("我是开发者，开始吧。", for: input))
-        XCTAssertThrowsError(try RefinementValidator.validate("Morie", for: RefinementInput(captureID: UUID(), text: "more e")))
-        XCTAssertThrowsError(try RefinementValidator.validate("Morie", for: request("more e")))
+        XCTAssertEqual(try ValidatedRefinement.accepting("我是开发者，开始吧。", for: input).text, "我是开发者，开始吧。")
+        XCTAssertTrue(InputRefiner.instructionsText.contains("个人记忆仅用于理解当前表达"))
     }
 
     func testDurableRecognitionPrecedesModelAndFinalSavePrecedesDelivery() async throws {
@@ -99,20 +114,29 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertEqual(result, "我想先做设置。")
     }
 
-    func testModelErrorsAndInvalidOutputPreserveDictionaryTextWithoutPrivateErrorDetails() async throws {
+    func testModelErrorsAndInvalidPayloadPreserveDictionaryTextWithoutPrivateErrorDetails() async throws {
         let fixture = try RefinementFixture()
         _ = try fixture.addWord()
-        for invalid in [false, true] {
+        for invalidPayload in [false, true] {
             let id = try fixture.capture("morie is my project")
             let runner = InputRefinementRunner { _ in
-                if invalid { return "Here is an invented answer." }
+                if invalidPayload { return "   " }
                 throw NSError(domain: "PRIVATE MODEL INPUT", code: 1, userInfo: [NSLocalizedDescriptionKey: "PRIVATE MODEL INPUT"])
             }
             let result = try await fixture.personalizer(runner).refine(id, enabled: true)
             XCTAssertEqual(result, "Morie is my project")
-            XCTAssertEqual(try fixture.saved(id).refinement?.reason, invalid ? .invalidEdits : .generationFailed)
+            XCTAssertEqual(try fixture.saved(id).refinement?.reason, invalidPayload ? .invalidEdits : .generationFailed)
             XCTAssertFalse(try fixture.saved(id).refinement?.reason?.message.contains("PRIVATE") == true)
         }
+    }
+
+    func testGeneratedContentIsSavedWithoutLocalSemanticRejection() async throws {
+        let fixture = try RefinementFixture()
+        let id = try fixture.capture("原始文字")
+        let generated = "Foundation Models 给出的结构化结果。"
+        let result = try await fixture.personalizer(InputRefinementRunner { _ in generated }).refine(id, enabled: true)
+        XCTAssertEqual(result, generated)
+        XCTAssertEqual(try fixture.saved(id).refinement?.status, .applied)
     }
 
     func testSavedFinalAndInputSnapshotsSurviveSpeechRetryAndRestart() async throws {

@@ -304,12 +304,7 @@ actor SpeechPipeline {
     }
 
     private func join(_ lhs: String, _ rhs: String) -> String {
-        let left = lhs.trimmingCharacters(in: .whitespacesAndNewlines)
-        let right = rhs.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if left.isEmpty { return right }
-        if right.isEmpty { return left }
-        return left + " " + right
+        SpeechTranscriptAssembler.join(lhs, rhs)
     }
 
     private func label(_ sessionID: UUID) -> String {

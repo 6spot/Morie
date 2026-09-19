@@ -5,6 +5,8 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
     case history
     case memory
     case dictionary
+    case settings
+    case permissions
     case diagnostics
 
     var id: Self { self }
@@ -14,6 +16,8 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         case .history: "历史记录"
         case .memory: "个人记忆"
         case .dictionary: "字典"
+        case .settings: "设置"
+        case .permissions: "权限"
         case .diagnostics: "诊断"
         }
     }
@@ -23,6 +27,8 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         case .history: "clock.arrow.circlepath"
         case .memory: "person.text.rectangle"
         case .dictionary: "character.book.closed"
+        case .settings: "gearshape"
+        case .permissions: "lock.shield"
         case .diagnostics: "ladybug"
         }
     }
@@ -41,11 +47,18 @@ struct MorieControlCenter: View {
     @State private var isSidebarVisible = true
     @AppStorage("sidebar.libraryExpanded") private var libraryExpanded = true
     @AppStorage("sidebar.appExpanded") private var appExpanded = true
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
-            if (selection ?? .history).isLibrary {
+            if selection == .dictionary {
+                NavigationSplitView(columnVisibility: columnVisibility(isLibrary: false)) {
+                    sidebar
+                } detail: {
+                    if let dictionary = controller.dictionary {
+                        DictionaryView(store: dictionary, selection: $selectedDictionaryEntry)
+                    }
+                }
+            } else if (selection ?? .history).isLibrary {
                 NavigationSplitView(columnVisibility: columnVisibility(isLibrary: true)) {
                     sidebar
                 } content: {
@@ -60,6 +73,10 @@ struct MorieControlCenter: View {
                     sidebar
                 } detail: {
                     switch selection {
+                    case .settings:
+                        MorieSettingsView(controller: controller)
+                    case .permissions:
+                        PermissionManagementView(controller: controller)
                     case .diagnostics:
                         DiagnosticLogView()
                     default:
@@ -70,12 +87,8 @@ struct MorieControlCenter: View {
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
-        .toolbar {
-            if controller.needsSetup {
-                Button("完成使用引导", systemImage: "checklist") {
-                    openWindow(id: "setup")
-                }
-            }
+        .onReceive(NotificationCenter.default.publisher(for: .morieShowSettings)) { _ in
+            selection = .settings
         }
     }
 
@@ -99,14 +112,8 @@ struct MorieControlCenter: View {
                 sidebarItem(.memory)
             }
             Section("应用", isExpanded: $appExpanded) {
-                SettingsLink { Label("设置", systemImage: "gearshape") }
-                    .buttonStyle(.plain)
-                Button {
-                    openWindow(id: "setup")
-                } label: {
-                    Label("使用引导与权限", systemImage: "checklist")
-                }
-                .buttonStyle(.plain)
+                sidebarItem(.settings)
+                sidebarItem(.permissions)
                 sidebarItem(.diagnostics)
             }
         }
@@ -130,9 +137,7 @@ struct MorieControlCenter: View {
                 onRecord: controller.startCaptureOnly
             )
         case .dictionary:
-            if let dictionary = controller.dictionary {
-                DictionaryView(store: dictionary, selection: $selectedDictionaryEntry)
-            }
+            EmptyView()
         case .memory:
             if let memory = controller.memory {
                 MemoryView(store: memory, selection: $selectedMemory)
@@ -184,15 +189,7 @@ struct MorieControlCenter: View {
             }
             .id(selectedMemory)
         case .dictionary:
-            NavigationStack {
-                if let dictionary = controller.dictionary, let id = selectedDictionaryEntry {
-                    DictionaryDetailView(store: dictionary, entryID: id, onDelete: { selectedDictionaryEntry = nil })
-                } else {
-                    ContentUnavailableView("选择一个词语", systemImage: "character.book.closed",
-                                           description: Text("在这里管理人名、产品名和专业术语。"))
-                }
-            }
-            .id(selectedDictionaryEntry)
+            EmptyView()
         default:
             EmptyView()
         }

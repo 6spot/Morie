@@ -15,7 +15,7 @@ Voice input should be immediately useful and readable while retaining the user's
 ## Scope
 
 - The [approved independent cleanup contract](../input-cleanup.md): meaningless filler/repetition removal, clear self-corrections, punctuation, paragraphs and lists only for existing structure.
-- Dictionary spelling normalization of the same word's case/width before optional AI processing; [M-011](M-011-simple-dictionary.md) removes alias rules.
+- Dictionary spelling normalization of the same word's letter case before optional AI processing; full-/half-width forms remain distinct and [M-011](M-011-simple-dictionary.md) removes alias rules.
 - Bounded native Foundation Models cleanup, independently useful with empty Memory.
 - Durable original/final text and exact dictionary/context/outcome provenance.
 - Input priority, deadline/cancellation, save-error and stale-source/context handling.
@@ -31,7 +31,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 4. Original recognition is durable before processing; final text and its actual processing context are durable before insertion and idle learning.
 5. Changed/deleted sources and stale dictionary/Memory snapshots cannot deliver a late AI result. Save failure cannot expose unsaved output.
 6. New recording does not wait for optional model teardown. Recover current-version interruptions without replaying a paste; preserve existing final output during Speech retry.
-7. Actual quality and latency are measured with supported hardware before completion; lexical guards and unit tests are not proof of semantic equivalence.
+7. Actual quality and latency are measured with supported hardware before completion; prompt assertions and unit tests are not proof of semantic equivalence.
 
 ## Progress
 
@@ -45,7 +45,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 
 ## Implementation notes
 
-`InputRefiner` supplies JSON input/context as data under the Chinese cleanup contract, uses current Apple `LanguageModelSession` and `@Generable`, and bounds the entire request with native token accounting. It returns complete final text. The validator permits approved structural/removal changes while guarding content-unit order, numbers/technical spans and selected tone/uncertainty markers. It remains a conservative lexical check, not a complete semantic verifier.
+`InputRefiner` supplies JSON input/context as data under the Chinese cleanup contract, uses current Apple `LanguageModelSession` and `@Generable`, and bounds the entire request with native token accounting. It returns complete final text. Morie trusts that structured model result instead of applying a second mechanical language validator; the save boundary rejects only empty or malformed text, while stale snapshots and save failures remain protected independently.
 
 `CapturePersonalizer` saves dictionary-corrected fallback even if cleanup is off/busy/fails. Stale dictionary or failed final save uses verified durable original text. `CaptureRefinement` stores original input, dictionary/personal snapshots, edits, outcome/reason and elapsed time; Speech recognition remains separate from final output.
 
@@ -66,7 +66,7 @@ The dated results below belong to the earlier confirmed-term/anchored-edit slice
 
 ## Quality and latency acceptance
 
-Use [the cleanup/model checklist](../validation.md#m-005-input-personalization) with disposable Chinese, English and mixed-language samples. Compare cleanup with an empty personal profile, dictionary hints, same-word case/width variants, related Memory, and cleanup disabled.
+Use [the cleanup/model checklist](../validation.md#m-005-input-personalization) with disposable Chinese, English and mixed-language samples. Compare cleanup with an empty personal profile, dictionary hints, same-word letter-case variants, distinct full-/half-width forms, related Memory, and cleanup disabled.
 
 Include meaningful 嗯/好的/OK replies, emphatic repetitions, unclear alternatives, dates/numbers, questions/requests, names, code, commands/URLs and long inputs. Confirm no summary, answer, new background or changed stance. Measure actual Speech hint benefit separately from deterministic spelling normalization. Record model outcomes and the final-to-delivery latency/timeout rate instead of inferring quality from test runtimes.
 

@@ -1,4 +1,5 @@
 import Foundation
+import Speech
 import XCTest
 
 @MainActor
@@ -64,6 +65,48 @@ final class PermissionSetupTests: XCTestCase {
         await fixture.controller.refresh()
         XCTAssertTrue(fixture.controller.isReady)
         XCTAssertEqual(fixture.settingsOpened.count, 1)
+    }
+
+    func testAccessibilityUsesAuthorizationLabelForNativeRegistrationFlow() {
+        let check = CapabilityCheck(requirement: .accessibility, state: .denied, action: .openSettings)
+        XCTAssertEqual(check.actionTitle, "授权")
+        XCTAssertEqual(
+            CapabilityCheck(requirement: .microphone, state: .denied, action: .openSettings).actionTitle,
+            "打开系统设置"
+        )
+    }
+
+    func testSpeechAuthorizationBackgroundCallbackResumesSetupForAllowAndDeny() async {
+        let cases: [(SFSpeechRecognizer.Type, Bool)] = [
+            (BackgroundSpeechRecognizer.self, true),
+            (DeniedSpeechRecognizer.self, false)
+        ]
+        for (recognizer, authorized) in cases {
+            let fixture = SetupFixture()
+            fixture.set(.speechRecognition, state: .notDetermined, action: .requestPermission)
+            fixture.requestAction = { requirement in
+                await CapabilityGate.requestSpeechAuthorization(using: recognizer)
+                MainActor.assertIsolated()
+                fixture.set(requirement, state: authorized ? .ready : .denied,
+                            action: authorized ? nil : .openSettings)
+            }
+
+            await fixture.controller.performAction(for: .speechRecognition)
+            XCTAssertEqual(fixture.requests, [.speechRecognition])
+            XCTAssertEqual(fixture.inspections, 2)
+            XCTAssertEqual(fixture.controller.isReady, authorized)
+            XCTAssertFalse(fixture.controller.isBusy)
+            XCTAssertNil(fixture.controller.activeRequest)
+            XCTAssertTrue(fixture.settingsOpened.isEmpty)
+            if !authorized {
+                XCTAssertEqual(fixture.controller.firstIssue?.action, .openSettings)
+            }
+        }
+    }
+
+    func testSpeechAuthorizationAlsoAcceptsASynchronousCallback() async {
+        await CapabilityGate.requestSpeechAuthorization(using: SynchronousSpeechRecognizer.self)
+        MainActor.assertIsolated()
     }
 
     func testActionRechecksPermissionInsteadOfUsingAnOutdatedButton() async {
@@ -138,6 +181,36 @@ final class PermissionSetupTests: XCTestCase {
         XCTAssertFalse(fixture.controller.isBusy)
         XCTAssertEqual(fixture.inspections, 2)
         XCTAssertTrue(fixture.settingsOpened.isEmpty)
+    }
+}
+
+// Model the SDK's unannotated Objective-C callback transfer. The production
+// completion must be safe on the background queue; the fake must not hop actors.
+private struct UnannotatedSpeechCallback: @unchecked Sendable {
+    let handler: (SFSpeechRecognizerAuthorizationStatus) -> Void
+}
+
+private class BackgroundSpeechRecognizer: SFSpeechRecognizer {
+    class var result: SFSpeechRecognizerAuthorizationStatus { .authorized }
+
+    override class func requestAuthorization(_ handler: @escaping (SFSpeechRecognizerAuthorizationStatus) -> Void) {
+        let callback = UnannotatedSpeechCallback(handler: handler)
+        let status = result
+        DispatchQueue.global(qos: .default).async {
+            dispatchPrecondition(condition: .notOnQueue(.main))
+            callback.handler(status)
+        }
+    }
+}
+
+private final class DeniedSpeechRecognizer: BackgroundSpeechRecognizer {
+    override class var result: SFSpeechRecognizerAuthorizationStatus { .denied }
+}
+
+private final class SynchronousSpeechRecognizer: SFSpeechRecognizer {
+    override class func requestAuthorization(_ handler: @escaping (SFSpeechRecognizerAuthorizationStatus) -> Void) {
+        MainActor.assertIsolated()
+        handler(.authorized)
     }
 }
 

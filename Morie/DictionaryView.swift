@@ -5,7 +5,14 @@ struct DictionaryView: View {
     @Binding var selection: UUID?
     @State private var search = ""
     @State private var showingEditor = false
+    @State private var editingEntryID: UUID?
+    @State private var confirmsDeletion = false
     @State private var errorMessage: String?
+
+    private var selectedEntry: DictionaryEntry? {
+        guard let selection else { return nil }
+        return store.entries.first { $0.id == selection }
+    }
 
     private var visibleEntries: [DictionaryEntry] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -18,7 +25,17 @@ struct DictionaryView: View {
         List(selection: $selection) {
             if let errorMessage { Label(errorMessage, systemImage: "exclamationmark.triangle") }
             ForEach(visibleEntries) { entry in
-                Text(entry.name).lineLimit(2).padding(.vertical, 6).tag(entry.id)
+                Text(entry.name)
+                    .lineLimit(2)
+                    .padding(.vertical, 6)
+                    .tag(entry.id)
+                    .contextMenu {
+                        Button("编辑") { edit(entry.id) }
+                        Button("删除…", role: .destructive) {
+                            selection = entry.id
+                            confirmsDeletion = true
+                        }
+                    }
             }
         }
         .listStyle(.inset)
@@ -29,15 +46,42 @@ struct DictionaryView: View {
                 } description: {
                     Text(search.isEmpty ? "添加人名、产品名和专业术语，帮助 Morie 正确识别。" : "试试其他搜索词。")
                 } actions: {
-                    if search.isEmpty { Button("添加词语", systemImage: "plus") { showingEditor = true } }
+                    if search.isEmpty { Button("添加词语", systemImage: "plus", action: add) }
                 }
             }
         }
         .navigationTitle("字典")
         .navigationSubtitle("\(visibleEntries.count) 个词语")
         .searchable(text: $search, prompt: "搜索词语")
-        .toolbar { Button("添加词语", systemImage: "plus") { showingEditor = true } }
-        .sheet(isPresented: $showingEditor) { DictionaryEditorSheet(store: store) }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button("编辑词语", systemImage: "pencil") {
+                    if let selectedEntry { edit(selectedEntry.id) }
+                }
+                .disabled(selectedEntry == nil)
+                Button("删除词语…", systemImage: "trash", role: .destructive) {
+                    confirmsDeletion = true
+                }
+                .disabled(selectedEntry == nil)
+                Button("添加词语", systemImage: "plus", action: add)
+            }
+        }
+        .sheet(isPresented: $showingEditor) {
+            DictionaryEditorSheet(store: store, entryID: editingEntryID)
+        }
+        .confirmationDialog("删除这个字典词语？", isPresented: $confirmsDeletion, titleVisibility: .visible) {
+            Button("删除词语", role: .destructive) {
+                guard let id = selectedEntry?.id else { return }
+                do {
+                    try store.delete(id)
+                    selection = nil
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        } message: {
+            Text("已保存的输入和个人记忆会保留。")
+        }
         .onAppear {
             do { try store.load(); errorMessage = nil }
             catch { errorMessage = "无法加载字典。" }
@@ -46,44 +90,15 @@ struct DictionaryView: View {
             if let selection, !ids.contains(selection) { self.selection = nil }
         }
     }
-}
 
-struct DictionaryDetailView: View {
-    @ObservedObject var store: DictionaryStore
-    let entryID: UUID
-    let onDelete: () -> Void
-    @State private var showingEditor = false
-    @State private var confirmsDeletion = false
-    @State private var errorMessage: String?
+    private func add() {
+        editingEntryID = nil
+        showingEditor = true
+    }
 
-    var body: some View {
-        Group {
-            if let entry = store.entries.first(where: { $0.id == entryID }) {
-                ManagementDetailContent {
-                    Label("自定义词语", systemImage: "character.book.closed").foregroundStyle(.secondary)
-                    Text(entry.name).font(.title).textSelection(.enabled)
-                    Text("Morie 会在语音识别时参考这个词语。").foregroundStyle(.secondary)
-                    LabeledContent("更新时间", value: entry.updatedAt.formatted(.dateTime.locale(Locale(identifier: "zh-Hans")).year().month().day().hour().minute()))
-                }
-                .toolbar {
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        Button("编辑词语", systemImage: "pencil") { showingEditor = true }
-                        Button("删除词语…", systemImage: "trash", role: .destructive) { confirmsDeletion = true }
-                    }
-                }
-            } else { ContentUnavailableView("此词语已不存在", systemImage: "character.book.closed") }
-        }
-        .navigationTitle("字典")
-        .sheet(isPresented: $showingEditor) { DictionaryEditorSheet(store: store, entryID: entryID) }
-        .confirmationDialog("删除这个字典词语？", isPresented: $confirmsDeletion, titleVisibility: .visible) {
-            Button("删除词语", role: .destructive) {
-                do { try store.delete(entryID); onDelete() }
-                catch { errorMessage = error.localizedDescription }
-            }
-        } message: { Text("已保存的输入和个人记忆会保留。") }
-        .alert("无法更新字典", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-            Button("好", role: .cancel) { errorMessage = nil }
-        } message: { Text(errorMessage ?? "") }
+    private func edit(_ id: UUID) {
+        editingEntryID = id
+        showingEditor = true
     }
 }
 

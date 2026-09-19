@@ -82,11 +82,11 @@ Audio stream tests use synthetic 16 kHz mono PCM and Apple's real AAC writer/dec
 
 Memory tests use isolated SwiftData containers and native NaturalLanguage tokenization to check provenance, lifecycle and bounded personal-context retrieval. Memory and Dictionary write through separate contexts in the same container; development requires no legacy schema or migration setup.
 
-Dictionary tests cover word-only persistence, normalized duplicates, invalid-input protection, bounded Speech hints, same-word case/width normalization, overlap and technical-content protection. Correction detector tests cover Chinese/mixed words, shared letters, added/deleted/joined letters, stable-edit timing and undo. They do not observe real Accessibility fields or display prompts.
+Dictionary tests cover word-only persistence, letter-case duplicates, distinct full-/half-width forms, invalid-input protection, bounded Speech hints, same-word letter-case normalization, overlap and technical-content protection. Correction detector tests cover Chinese/mixed words, shared letters, added/deleted/joined letters, stable-edit timing and undo. They do not observe real Accessibility fields or display prompts.
 
 Learning tests inject structured evidence and delayed models. They verify exact committed final-text sources, idle queue/restart discovery, automatic admission/accumulation, merging/updates, user edits/archive/delete, atomic failure/backoff and input preemption. A cancelled model cannot create late Memory. Personalization tests inject full final text and uncooperative models to check independent cleanup, dictionary fallback, original/final save ordering, provenance, stale source/context, History retry, deadline/cancellation and current-version recovery.
 
-Permission setup tests inject read-only snapshots and authorization/settings actions. They verify complete mandatory checks, explicit actions, denied/restricted/unsupported states, revocation/recovery, stale buttons and concurrent refresh/request behavior without linking the live TCC gate.
+Permission setup tests inject read-only snapshots and authorization/settings actions. They verify complete mandatory checks, explicit actions, denied/restricted/unsupported states, revocation/recovery, stale buttons and concurrent refresh/request behavior. The real Speech authorization bridge is tested with injected `SFSpeechRecognizer` subclasses that return background allow/deny callbacks or a synchronous callback, without querying or requesting real TCC. Preserve this Objective-C call boundary in regression tests: a plain Swift closure fake does not reproduce the SDK callback's runtime isolation check.
 
 The actual Foundation Models and native Speech-hint paths compile. Logic tests never invoke a real model, microphone, clipboard or product app, and cannot establish semantic quality or cross-app acceptance.
 
@@ -109,9 +109,11 @@ CI is **not** runtime acceptance. A hosted build cannot prove real microphone/TC
 
 The current input loop requires Apple Intelligence, Chinese Speech transcription, Microphone authorization, Speech Recognition authorization and Accessibility trust.
 
-The first launch opens **使用引导与权限** and inspects every requirement without prompting. Use each permission's explicit **允许访问** action for undetermined Microphone/Speech authorization. Denied access links to its native privacy pane. **辅助功能 → 打开系统设置** registers the signed app with TCC and opens its native pane; Morie does not add a second consent alert. Restricted or unavailable capabilities keep input blocked.
+The first launch opens **使用引导与权限** and inspects every requirement without prompting. Use each permission's explicit **授权** action for undetermined Microphone/Speech authorization. Denied access links to its native privacy pane. **辅助功能 → 打开系统设置** registers the signed app with TCC and opens its native pane; Morie does not add a second consent alert. Unauthorized rows show the available action without a duplicate status label; granted rows show **已授权**. Restricted or unavailable capabilities keep input blocked.
 
 Return from System Settings to refresh status automatically, or choose **重新检查**. Refresh never calls bootstrap, stops recording, prepares a model or installs a hotkey. Once all requirements pass, click **开始使用** to prepare Speech assets and enable the shortcut. The completion action is disabled during recording/requests/preparation, and requirements are rechecked after asset preparation. Closing the guide with **稍后设置** does not complete setup. Subsequent launches still inspect actual permissions, regardless of the saved setup-completed preference.
+
+The setup window uses the native hidden-title-bar style. Its footer places **稍后设置** at the far left and **重新检查 / 开始使用** on the right; Escape and Return retain their cancel/default meanings.
 
 Use the normal signed app for TCC validation; compile/test/preview tools must not reset the owner's permissions or replace that app. Intentional permission-reset testing belongs in a separately authorized disposable test setup. CloudKit and Apple Developer enrollment are not part of this guide.
 
@@ -207,7 +209,7 @@ Mode persistence, terminal capture-only storage, cancellation and retry are cove
 Interactive checks remain deferred to the evening of 2026-09-18. Use disposable data in the owner's normal signed app when resuming:
 
 1. In **字典 → 添加词语**, enter a word such as **Morie**, **Claude** or a Chinese technical term in the single **词语** field. Relaunch and verify persistence; duplicate/invalid words keep the editor open, and Cancel preserves saved values. Check initial field focus, Return to save and Escape to cancel.
-2. Compare Speech recognition with/without a saved word. Check case/width normalization of the same word (for example, **morie → Morie**) with **自动润色语音输入** off. A saved **Morie** must not unconditionally replace **more e**, **莫里**, code or URLs.
+2. Compare Speech recognition with/without a saved word. Check letter-case normalization of the same word (for example, **morie → Morie**) with **自动润色语音输入** off; full-/half-width forms remain untouched. A saved **Morie** must not unconditionally replace **more e**, **莫里**, code or URLs.
 3. With an empty Personal Memory profile and cleanup on, test [the cleanup examples](input-cleanup.md): fillers, repeats, clear self-correction, uncertainty, short replies and clear ordered items. No invented content, summary, translation, answer or executed request.
 4. Verify the target receives the exact saved **最终文字**. Inspect recognition, dictionary/Memory snapshots and accepted changes in **识别与润色**.
 5. Re-recognize the saved audio; the delivered final output and its old processing provenance remain available. Exercise cancellation, unavailable/slow AI and save recovery with disposable captures.
@@ -319,6 +321,8 @@ Prefer structured Swift Concurrency:
 Avoid arbitrary dispatch queues unless a platform API requires them.
 
 Native C frameworks that lack Swift 6 concurrency annotations may use an explicit `@preconcurrency import` boundary when justified. Do not disable strict concurrency globally to silence such errors.
+
+`SFSpeechRecognizer.requestAuthorization` does not guarantee a main-queue callback. Its completion in the main-actor capability gate must remain explicitly `@Sendable`, capture only the checked continuation and resume it without touching actor-isolated state. The awaiting setup controller then inspects status on the main actor. The background-callback test reproduces the owner's dispatch assertion if that annotation is removed.
 
 ## Logging and diagnostics
 

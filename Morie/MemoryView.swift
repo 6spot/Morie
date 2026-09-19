@@ -44,9 +44,10 @@ struct MemoryView: View {
         .searchable(text: $search, prompt: "搜索个人记忆")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Menu("筛选个人记忆", systemImage: "line.3.horizontal.decrease") {
-                    Picker("状态", selection: $status) { ForEach(MemoryStatus.allCases) { Text($0.title).tag($0) } }
+                Picker("筛选个人记忆", selection: $status) {
+                    ForEach(MemoryStatus.allCases) { Text($0.title).tag($0) }
                 }
+                .pickerStyle(.menu)
                 Button("新增个人记忆", systemImage: "plus") { editor = .create }
             }
         }

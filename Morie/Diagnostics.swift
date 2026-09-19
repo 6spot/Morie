@@ -206,14 +206,13 @@ struct DiagnosticLogView: View {
         .searchable(text: $search, prompt: "搜索诊断日志")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Menu("筛选日志", systemImage: "line.3.horizontal.decrease") {
-                    Picker("级别", selection: $level) {
-                        Text("全部日志").tag(nil as DiagnosticLevel?)
-                        ForEach([DiagnosticLevel.info, .warning, .error], id: \.self) {
-                            Text($0.title).tag(Optional($0))
-                        }
+                Picker("筛选日志", selection: $level) {
+                    Text("全部日志").tag(nil as DiagnosticLevel?)
+                    ForEach([DiagnosticLevel.info, .warning, .error], id: \.self) {
+                        Text($0.title).tag(Optional($0))
                     }
                 }
+                .pickerStyle(.menu)
                 Button("复制全部日志", systemImage: "doc.on.doc") {
                     let pasteboard = NSPasteboard.general
                     pasteboard.clearContents()

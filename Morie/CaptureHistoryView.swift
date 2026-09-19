@@ -90,11 +90,10 @@ struct CaptureHistoryView: View {
         .searchable(text: $search, prompt: "搜索历史记录")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Menu("筛选记录", systemImage: "line.3.horizontal.decrease") {
-                    Picker("记录", selection: $filter) {
-                        ForEach(CaptureHistoryFilter.allCases) { Text($0.title).tag($0) }
-                    }
+                Picker("筛选记录", selection: $filter) {
+                    ForEach(CaptureHistoryFilter.allCases) { Text($0.title).tag($0) }
                 }
+                .pickerStyle(.menu)
                 .help(filter.title)
                 Button("开始录音", systemImage: "mic", action: onRecord)
                     .disabled(!canStartCapture)

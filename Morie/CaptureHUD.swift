@@ -106,7 +106,14 @@ final class CaptureHUDController {
         hideTask?.cancel()
         hideTask = nil
         panel?.orderOut(nil)
-        model.resetAudioLevel()
+        // `orderOut` does not tear down an NSHostingView. Keeping the hidden
+        // panel alive therefore also kept CompactWaveform's 60 Hz
+        // TimelineView rendering while Morie was idle. Release the view tree
+        // so both the display-driven work and its render resources end with
+        // the HUD's visible lifetime.
+        panel?.contentView = nil
+        panel = nil
+        model.hide()
         Diagnostics.record("HUD", "Capture HUD hidden")
     }
 
@@ -198,13 +205,14 @@ final class CaptureHUDController {
     }
 }
 
-private final class CaptureAudioLevelMeter {
+final class CaptureAudioLevelMeter {
     var current: Double = 0
 }
 
 @MainActor
-private final class CaptureHUDModel: ObservableObject {
+final class CaptureHUDModel: ObservableObject {
     enum Phase: Equatable {
+        case hidden
         case recording
         case processing
         case success
@@ -214,7 +222,7 @@ private final class CaptureHUDModel: ObservableObject {
         case failure
     }
 
-    @Published var phase: Phase = .recording
+    @Published var phase: Phase = .hidden
     @Published private(set) var recordingGeneration = UUID()
     @Published private(set) var feedbackGeneration = 0
 
@@ -233,8 +241,9 @@ private final class CaptureHUDModel: ObservableObject {
         audioLevel.current = min(max(level, 0), 1)
     }
 
-    func resetAudioLevel() {
+    func hide() {
         audioLevel.current = 0
+        phase = .hidden
     }
 
     func showFeedback(_ feedback: Phase) {
@@ -283,6 +292,9 @@ private struct CaptureHUDView: View {
     @ViewBuilder
     private var phaseContent: some View {
         switch model.phase {
+        case .hidden:
+            EmptyView()
+
         case .recording:
             HStack(spacing: 0) {
                 Button(action: model.cancel) {

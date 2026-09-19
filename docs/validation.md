@@ -117,9 +117,10 @@ Historical foundation/candidate build and fixture evidence remains in [M-004](ta
 ## M-005 input personalization
 
 - [ ] With no personal Memory, cleanup removes meaningless speech redundancy and formats existing structure under [the approved contract](input-cleanup.md).
-- [ ] Saved dictionary words supply useful Speech hints; same-word case/width variants normalize to their saved spelling even with cleanup disabled. Other words and technical spans remain unchanged; no alias rules exist.
+- [ ] Saved dictionary words supply useful Speech hints; same-word letter-case variants normalize to their saved spelling even with cleanup disabled. Full-/half-width spelling, other words and technical spans remain unchanged; no alias rules exist.
 - [ ] Cover Chinese/English/mixed input, 嗯/好的/OK replies, meaningful repetitions, uncertainty/alternatives, clear self-corrections, questions, requests, steps and ordinary narrative. No changed viewpoint, summary, invented heading, answer, explanation, translation or unspoken background.
-- [ ] Preserve people/product names, numbers/dates, negation, conditions, technical commands/paths/URLs/versions and code. Compare actual model output, not just validator acceptance.
+- [ ] Verify contextually unambiguous Chinese ASR corrections such as **尝试常文字效果 → 尝试长文字效果** and dictionary-assisted **试一试长蚊子 → 试一试长文字** occur, while ambiguous homophones remain unchanged. Corrections must follow whole-utterance meaning rather than a changed-character quota; confirm dictionary terms, names, numbers, negation, code and URLs remain protected.
+- [ ] Preserve people/product names, numbers/dates, negation, conditions, technical commands/paths/URLs/versions and code. Judge actual Foundation Models output on supported hardware; Morie does not use a second mechanical language validator.
 - [ ] Final text is saved before insertion; the target receives exactly that output. Original recognition, actual input, dictionary/Memory snapshots, changes, outcome and duration remain truthful.
 - [ ] Speech retry preserves completed final output and its old processing evidence, including existing capture-only records. Capture-only completion still does not paste/copy or restore another app.
 - [ ] Dictionary/Memory/source changes during inference invalidate stale results. Exercise unavailable/declined/oversized/slow models and save errors; unsaved AI text never reaches delivery.
@@ -161,26 +162,32 @@ Earlier M-008 compilation/tests/layout fixtures are documented in [its task reco
 
 These signed-app checks remain open; isolated logic/layout evidence does not establish permission or keyboard behavior.
 
-- [ ] On first use, the native guide opens without any permission prompt. On a subsequent permitted launch, Morie prepares normally; a missing required capability or startup error reopens the guide.
-- [ ] Review all five requirements together. Microphone/Speech consent occurs only after **允许访问**. Repeated clicks and returning from a native consent dialog do not produce duplicate requests.
+- [ ] On first use, the native guide opens automatically without first opening Control Center and without any permission prompt. A fully configured launch stays menu-bar-only; a missing required capability or startup error reopens the guide.
+- [ ] Review all five requirements together. Microphone/Speech consent occurs only after **授权**. Repeated clicks and returning from a native consent dialog do not produce duplicate requests.
+- [ ] Complete Speech consent with Allow and Deny in an authorized disposable permission setup. The callback must not stop in `_dispatch_assert_queue_fail`; the request indicator clears, Allow refreshes the permission to **已授权**, and Deny keeps input blocked with **打开系统设置**. If the earlier crashing run already saved consent, relaunch/recheck must reflect it without another prompt.
+- [ ] The native setup window shows its standard traffic-light controls without title text beside them. Unauthorized permission rows show the available action only; authorized rows show **已授权**. Restricted permissions retain an explanation. At default/minimum size, **稍后设置** stays at the far left and **重新检查 / 开始使用** at the right; verify Escape, Return, VoiceOver and waiting/refresh indicators.
 - [ ] Denied access opens the corresponding native privacy pane. Accessibility opens its pane with Morie's signed identity registered. Returning updates status without a second Morie consent alert or a relaunch workaround.
+- [ ] After allowing Microphone/Speech in the native dialog, the originating Morie window becomes key/front instead of remaining behind another window. After enabling access in an explicitly opened Privacy pane, the same originating window returns to the front and shows the refreshed state.
+- [ ] One Morie click on Accessibility **授权** invokes native registration and opens the correct Settings pane with the signed Morie present in the list; a second Morie click must not be required. The required macOS confirmation may still appear. Closing/returning without granting stops the bounded wait and leaves the page usable.
 - [ ] Restricted permissions, unsupported hardware/language and unready Apple Intelligence remain blocked with useful Chinese explanations. No required check can be skipped.
-- [ ] **稍后设置** closes the guide without enabling recording; menu/sidebar/Settings can reopen it. Completing setup prepares Speech assets and enables input only after a fresh complete check. Test revocation during asset preparation with disposable permission state.
+- [ ] **稍后设置** closes the guide without enabling recording; **打开 Morie** reopens it while setup is incomplete, and routine repair remains available on the Control Center Permissions page. Completing setup prepares Speech assets and enables input only after a fresh complete check. Test revocation during asset preparation with disposable permission state.
 - [ ] During recording/startup/refinement, opening or refreshing setup leaves input intact and disables **开始使用**. Explicit failure/cancellation still preserves the existing Capture-first semantics.
-- [ ] **⌘,**, sidebar **设置** and menu **设置…** reuse one native Settings window. The shortcut is app-scoped and does not replace the global recording shortcut or intercept another app's Settings command.
+- [ ] **⌘,** and sidebar **设置** open the embedded Control Center Settings page. The shortcut is app-scoped and does not replace the global recording shortcut or intercept another app's Settings command.
 - [ ] The system sidebar toolbar/View command hides and restores navigation across library/Diagnostics switches. Native **资料库 / 应用** headers fold/unfold and remember their state.
-- [ ] The menu-bar extra is a system menu. Management, Settings, setup and Quit actions work with pointer/keyboard and VoiceOver.
+- [ ] The menu-bar extra is a system menu. Its icon-free **打开 Morie** and **退出 Morie** actions, status and shortcut guidance work with pointer/keyboard and VoiceOver; it has no duplicate Settings or permanent setup destination.
 - [ ] With English first in macOS language preferences, app-owned labels/status/errors/privacy text and dates are Chinese. User input, dictionary names, model prompts and technical diagnostic identifiers retain their content.
 - [ ] At default/minimum sizes, scroll the setup and Settings Forms to the bottom. Long explanations, save/preparation errors and correction-word prompts remain readable and actionable; verify light/dark, native materials and VoiceOver in the actual windows.
+
+2026-09-18: sampling the owner's paused process confirmed a background Speech authorization callback violating inherited main-actor isolation. The regression reproduces the same dispatch assertion before the explicit `@Sendable` fix; all **102 logic tests** and the isolated Debug build pass afterward, including the final title/status/footer changes. Background Allow/Deny and synchronous completion are covered without real TCC access. Eight offscreen native fixtures verify default/minimum layout, permission states, preparation/refresh feedback and footer placement. [M-010](tasks/M-010-macos-native-setup.md#validation-evidence) records the evidence; actual consent-dialog and keyboard acceptance above remain open.
 
 Evidence and remaining limits are tracked in [M-010](tasks/M-010-macos-native-setup.md).
 
 ## M-011 single-word dictionary
 
 - [ ] **字典 → 添加词语** opens a compact native sheet with only **词语**. The field has initial focus; Return adds the word and Escape cancels. Edit shows the same field and saves the changed word.
-- [ ] Empty/whitespace input disables Add/Save. Duplicate words (including case/width variants), invalid input and save failures show readable inline feedback without discarding edits or overwriting another word.
-- [ ] Add Chinese names, English product names and multiword technical terms. Search/list/detail show just the words. Relaunch preserves them; deletion removes their future Speech hints while saved input and personal Memory remain.
-- [ ] Compare recognition with/without saved words. With cleanup off, only case/width variants of the same whole word normalize. **Morie** must not create unconditional **more e / 莫里 → Morie** substitutions or change code/URLs.
+- [ ] Empty/whitespace input disables Add/Save. Duplicate words (including letter-case variants), invalid input and save failures show readable inline feedback without discarding edits or overwriting another word. Full-/half-width forms are not treated as equivalent.
+- [ ] Add Chinese names, English product names and multiword technical terms. Search rows show just the words; there is no dictionary detail/source/time explanation. Relaunch preserves them; deletion removes their future Speech hints while saved input and personal Memory remain.
+- [ ] Compare recognition with/without saved words. With **文字** saved, dictate **再来试一试长文字吧**; with **Codex** saved, reproduce Speech returning **Coldex** and confirm enabled cleanup receives **Codex** and can correct it from context. Finalized Chinese segments must not acquire Morie-inserted spaces such as **常 蚊 子**. With cleanup off, only letter-case variants of the same whole word normalize; full-/half-width spelling remains untouched. Dictionary context must not become an unconditional alias rule or change code/URLs.
 - [ ] History's **本次使用的字典** shows the exact saved words used for refinement, even after later dictionary edits/deletion. Final text remains saved before insertion and Memory learning.
 - [ ] Opt-in correction suggestions still offer **加入字典 / 暂不添加**, save one word and preserve typing focus. Validate keyboard, VoiceOver, long words/errors and native appearance in the signed app.
 

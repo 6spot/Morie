@@ -52,6 +52,7 @@ struct CapabilityGate {
     }
 
     func requestPermission(_ requirement: SetupRequirement) async {
+        let permissionWindow = NSApplication.shared.keyWindow
         switch requirement {
         case .microphone:
             guard AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined else { return }
@@ -60,23 +61,78 @@ struct CapabilityGate {
         case .speechRecognition:
             guard SFSpeechRecognizer.authorizationStatus() == .notDetermined else { return }
             Diagnostics.record("Permission", "Requesting Speech authorization from setup")
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                SFSpeechRecognizer.requestAuthorization { _ in continuation.resume() }
-            }
+            await Self.requestSpeechAuthorization()
         default:
             break
         }
+        restore(window: permissionWindow)
     }
 
-    func openSettings(for requirement: SetupRequirement) {
+    static func requestSpeechAuthorization(
+        using recognizer: SFSpeechRecognizer.Type = SFSpeechRecognizer.self
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            // Speech may call this Objective-C handler on a background queue.
+            // Only resume the thread-safe continuation; do not inherit MainActor.
+            recognizer.requestAuthorization { @Sendable _ in continuation.resume() }
+        }
+    }
+
+    func openSettings(for requirement: SetupRequirement) async {
         guard let url = requirement.settingsURL else { return }
-        Diagnostics.record("Permission", "Opening System Settings for \(requirement)")
+        let permissionWindow = NSApplication.shared.keyWindow
+        Diagnostics.record("Permission", "Opening permission flow for \(requirement)")
         if requirement == .accessibility, !AXIsProcessTrusted() {
-            // Register this signed app with TCC only after the explicit action.
+            // This is the only public API that registers the current signed
+            // app in the Accessibility list. Let its single native prompt own
+            // navigation to Settings instead of opening a second window here.
             let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
             _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+            // Some TCC states register the app without presenting the prompt
+            // again. Open the pane as part of the same click after registration
+            // so the user never has to press Morie's button twice.
+            try? await Task.sleep(for: .milliseconds(250))
+            NSWorkspace.shared.open(url)
+        } else {
+            NSWorkspace.shared.open(url)
         }
-        NSWorkspace.shared.open(url)
+
+        guard requirement.isPermission else { return }
+        // macOS does not publish a TCC-change notification. Poll only while an
+        // explicit Settings action is outstanding, then stop as soon as the
+        // permission is granted or after five minutes.
+        var didLeaveMorie = false
+        for _ in 0..<600 {
+            if permissionIsGranted(requirement) {
+                Diagnostics.record("Permission", "Permission granted in System Settings for \(requirement)")
+                restore(window: permissionWindow)
+                return
+            }
+            do { try await Task.sleep(for: .milliseconds(500)) }
+            catch { return }
+            // Returning to Morie without granting is also terminal; let the
+            // controller perform its normal final inspection immediately.
+            if NSApplication.shared.isActive {
+                if didLeaveMorie { return }
+            } else {
+                didLeaveMorie = true
+            }
+        }
+        Diagnostics.record("Permission", "Stopped waiting for System Settings permission for \(requirement)", level: .warning)
+    }
+
+    private func permissionIsGranted(_ requirement: SetupRequirement) -> Bool {
+        switch requirement {
+        case .microphone: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        case .speechRecognition: SFSpeechRecognizer.authorizationStatus() == .authorized
+        case .accessibility: AXIsProcessTrusted()
+        default: false
+        }
+    }
+
+    private func restore(window: NSWindow?) {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
     }
 
     private func inspectAppleIntelligence(locale: Locale) -> CapabilityCheck {
@@ -122,7 +178,7 @@ extension PermissionSetupController {
         self.init(
             inspect: { await gate.inspect(locale: locale) },
             requestPermission: { await gate.requestPermission($0) },
-            openSettings: { gate.openSettings(for: $0) }
+            openSettings: { await gate.openSettings(for: $0) }
         )
     }
 }

@@ -21,8 +21,10 @@ struct MorieApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Morie", systemImage: "waveform") {
+        MenuBarExtra {
             MorieMenuContent(controller: controller)
+        } label: {
+            MorieMenuBarLabel(controller: controller)
         }
         .menuBarExtraStyle(.menu)
 
@@ -46,39 +48,57 @@ struct MorieApp: App {
             SidebarCommands()
             MorieCommands()
         }
-        .onChange(of: controller.needsSetup, initial: true) { _, needsSetup in
-            if needsSetup {
-                openWindow(id: "setup")
-                NSApplication.shared.activate(ignoringOtherApps: true)
-            }
-        }
 
-        Window("使用引导与权限", id: "setup") {
+        Window("欢迎使用 Morie", id: "setup") {
             MorieSetupView(controller: controller)
                 .environment(\.locale, Locale(identifier: "zh-Hans"))
         }
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 700, height: 740)
         .defaultPosition(.center)
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
 
-        Settings {
-            MorieSettingsView(controller: controller)
-                .environment(\.locale, Locale(identifier: "zh-Hans"))
-                .frame(width: 640, height: 600)
-        }
     }
+}
+
+@MainActor
+private struct MorieMenuBarLabel: View {
+    @ObservedObject var controller: AppController
+    @Environment(\.openWindow) private var openWindow
+    @State private var inspectedStartup = false
+
+    var body: some View {
+        Label("Morie", systemImage: "waveform")
+            .task {
+                guard !inspectedStartup else { return }
+                inspectedStartup = true
+                await controller.setup.refresh()
+                guard controller.needsSetup || !controller.setup.isReady else { return }
+                openWindow(id: "setup")
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
+    }
+}
+
+extension Notification.Name {
+    static let morieShowSettings = Notification.Name("MorieShowSettings")
 }
 
 private struct MorieCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
-        CommandGroup(after: .appSettings) {
-            Button("使用引导与权限…") {
-                openWindow(id: "setup")
-                NSApplication.shared.activate(ignoringOtherApps: true)
+        CommandGroup(replacing: .appSettings) {
+            Button("设置…") {
+                Task { @MainActor in
+                    openWindow(id: "control-center")
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    await Task.yield()
+                    NotificationCenter.default.post(name: .morieShowSettings, object: nil)
+                }
             }
+            .keyboardShortcut(",", modifiers: .command)
         }
     }
 }
@@ -93,20 +113,14 @@ private struct MorieMenuContent: View {
 
         Divider()
 
-        Button("打开 Morie", systemImage: "macwindow") {
-            openWindow(id: "control-center")
-            NSApplication.shared.activate(ignoringOtherApps: true)
+        Button("打开 Morie") {
+            Task {
+                await controller.setup.refresh()
+                openWindow(id: controller.needsSetup || !controller.setup.isReady ? "setup" : "control-center")
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
         }
-
-        SettingsLink {
-            Label("设置…", systemImage: "gearshape")
-        }
-        .keyboardShortcut(",", modifiers: .command)
-
-        Button("使用引导与权限…", systemImage: "checklist") {
-            openWindow(id: "setup")
-            NSApplication.shared.activate(ignoringOtherApps: true)
-        }
+        .disabled(controller.isBootstrapping)
 
         Divider()
 
@@ -125,7 +139,6 @@ private struct MorieMenuContent: View {
 @MainActor
 struct MorieSettingsView: View {
     @ObservedObject var controller: AppController
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Form {
@@ -182,11 +195,6 @@ struct MorieSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("使用引导与权限") {
-                Button("查看设备与权限状态", systemImage: "checklist") {
-                    openWindow(id: "setup")
-                }
-            }
         }
         .formStyle(.grouped)
         .frame(maxWidth: 700)

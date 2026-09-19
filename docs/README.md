@@ -1,37 +1,41 @@
-# Morie Documentation
+# Documentation Map
 
-This directory is the maintained engineering documentation for Morie.
+Choose the document that owns the question. Routine edits do not require reading every guide. Start with [README](../README.md) if unfamiliar with Morie, or the [task index](tasks.md) when continuing implementation.
 
-## Start here
+## Current requirements and implementation
 
-- [`design/apple-native-first-v0-baseline-v2.md`](./design/apple-native-first-v0-baseline-v2.md) — repository transcription of the project-owner supplied V0 design baseline, plus explicitly approved amendments.
-- [`product-architecture-baseline.md`](./product-architecture-baseline.md) — concise implementation baseline and hard constraints.
-- [`ui-design.md`](./ui-design.md) — macOS 27 Native UI Only / Liquid Glass rules and owner-approval gate.
-- [`input-cleanup.md`](./input-cleanup.md) — approved meaning-preserving cleanup contract.
-- [`reference/type4me.md`](./reference/type4me.md) — input-foundation reference and selective adaptation boundary.
-- [`reference/openless.md`](./reference/openless.md) — opt-in correction-to-dictionary behavior reference; no source copied.
-- [`tasks.md`](./tasks.md) — master task plan and overall progress.
-- [`tasks/`](./tasks/README.md) — detailed task records and execution history.
-- [`architecture.md`](./architecture.md) — code/module boundaries and current technical architecture.
-- [`development.md`](./development.md) — local development workflow, conventions, permissions, and debugging.
-- [`validation.md`](./validation.md) — Phase 0 real-device test and compatibility matrix.
-- [`deployment.md`](./deployment.md) — signing, build, packaging, release, and deployment process.
+| Question | Source of truth |
+| --- | --- |
+| What is in scope, and what requires owner approval? | [Current product baseline](product-architecture-baseline.md) |
+| Which component owns this state or behavior? | [Architecture map](architecture.md), then [input/setup](architecture/input.md), [Capture/recovery](architecture/capture.md), or [dictionary/cleanup/Memory](architecture/intelligence.md) |
+| How should a native screen or control behave? | [UI design](ui-design.md) |
+| What may cleanup change in the user's words? | [Approved cleanup contract](input-cleanup.md) |
+| How do I build, test or diagnose locally? | [Development guide](development.md) |
+| Which device/model/UI checks remain? | Relevant section of [validation](validation.md) |
+| How do signing, packaging and release work? | [Deployment guide](deployment.md) |
+| What task is active or complete? | [Task index](tasks.md); [detail-record convention](tasks/README.md) |
 
-## Documentation ownership
+## Decisions and historical evidence
 
-Documentation changes with the code. A behavior, architecture, UI rule, task status, build process, permission requirement, reference-migration decision, or release process that changes in implementation must be updated here in the same pull request.
+| Need | Read |
+| --- | --- |
+| Why generic paste delivery? | [ADR 0001](decisions/0001-universal-text-delivery.md) |
+| Why toggle capture and a nonactivating HUD? | [ADR 0002](decisions/0002-toggle-capture-hud.md) |
+| Which Type4Me failure modes have already been audited? | Matching section of [Type4Me reference](reference/type4me.md) |
+| Where did correction suggestions come from? | [OpenLess behavior audit](reference/openless.md) |
+| What did the owner originally approve or later amend? | [Original V0 design and amendments](design/apple-native-first-v0-baseline-v2.md) |
+| What was built or actually tested in a change? | Its `tasks/M-xxx-*.md` record, linked from the task index |
 
-`docs/tasks.md` is the concise project-level task overview. Detailed execution history belongs in `docs/tasks/M-xxx-*.md`.
+The original design body and dated task evidence may describe superseded implementations. They preserve provenance, not a second current specification. Explicit owner amendments win; current requirements are summarized in the product baseline. Current code explains how an approved requirement is implemented, but does not override the requirement.
 
-## Hard implementation rules
+## Keep each fact in its owning document
 
-- UI uses Apple system components and native macOS 27 Liquid Glass behavior.
-- If native UI cannot satisfy a requirement, implementation stops until the project owner explicitly approves an exception.
-- External dependencies require explicit owner approval; they are never introduced unilaterally.
-- Phase 0 input infrastructure must audit/adapt proven Type4Me behavior rather than re-inventing solved recording/hotkey/focus/injection problems.
+- **Policy** belongs in the product baseline; **agent navigation and execution boundaries** belong in [AGENTS.md](../AGENTS.md).
+- **Current mechanics** belong in subsystem architecture; **visible behavior/layout** belongs in UI design.
+- **Repeatable local commands** belong in development; **release operations** belong in deployment.
+- **Device checklists and matrix results** belong in validation; **dated logs, measurements, failures and approvals** belong in task records. Link evidence rather than copying it into every guide.
+- Keep the task index to scope/status/links. New work within an existing task updates that record; a new formal task gets a stable ID and detail file.
 
-## Current product stage
+Update affected documents with the implementation. Preserve historical evidence, label superseded behavior, and correct stale current summaries instead of appending another competing rule. Prefer a short route to an existing explanation over a new checklist. Documentation-only work calls for link/anchor and consistency checks, not an unrelated app build.
 
-[M-009](tasks/M-009-macos-input-memory.md) is the active single-Mac milestone: independent cleanup, custom dictionary, automatic personal Memory and an opt-in native prompt after a word correction. Final text is saved before insertion and idle learning. Current implementation evidence and remaining acceptance are in the task record.
-
-Interactive device and real-model checks remain deferred to the evening of 2026-09-18, not waived. iCloud/CloudKit belongs to later cross-device work; iOS/mobile inspiration and Morie Cloud are unscheduled. No compatibility or migration layer is required during development.
+This organization follows [OpenAI's guidance on skills and prompts](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra): task-specific context, progressive disclosure and explicit completion/decision boundaries. It does not change Morie's product approvals or require a particular coding model.
