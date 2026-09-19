@@ -84,7 +84,7 @@ These changes remain synthesized/prepared once at `CaptureSoundFeedback` initial
 
 The Thinking animation was then refined to match the reference more closely: instead of an angular highlight orbiting the capsule border, a low-contrast fill advances from left to right over ~1.05 s, briefly settles/fades, pauses, and repeats while processing remains active. Reduced Motion shows only a static subtle treatment.
 
-macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for the reference-motion/sound implementation. The left-to-right Thinking sweep requires the same CI gate before merge.
+macOS 27 CI #149 passed both the Release product compile and the full MorieTests gate for the reference-motion/sound implementation. The left-to-right Thinking sweep then passed macOS 27 CI #152: Release compile and the full MorieTests gate both succeeded.
 
 ## Validation boundary
 
