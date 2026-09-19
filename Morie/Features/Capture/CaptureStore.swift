@@ -39,6 +39,8 @@ final class CaptureStore {
 
     private var records: [UUID: CaptureRecord] = [:]
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
+    private var persistenceRevision: [UUID: Int] = [:]
+    private let persistenceWriter: CapturePersistenceWriter
     private let commitRefinement: (ModelContext) throws -> Void
 
     init(
@@ -80,6 +82,7 @@ final class CaptureStore {
             )
         }
         container = try ModelContainer(for: schema, configurations: [configuration])
+        persistenceWriter = CapturePersistenceWriter(container: container)
         if let audioDirectory {
             self.audioDirectory = audioDirectory
         } else if let storageURL {
@@ -120,6 +123,7 @@ final class CaptureStore {
         container.mainContext.insert(record)
         records[id] = record
         try container.mainContext.save()
+        persistenceRevision[id] = 0
         Diagnostics.record("CaptureStore", "Durably created voice Capture \(label(id))")
         return audioDirectory.appending(path: "\(id.uuidString).m4a")
     }
@@ -134,8 +138,8 @@ final class CaptureStore {
         record.sourceAudioExpiresAt = Calendar.current.date(byAdding: .day, value: Self.audioRetentionDays, to: Date())
         record.sourceAudioHasMeaningfulContent = source.hasMeaningfulAudio
         record.updatedAt = Date()
-        try container.mainContext.save()
-        Diagnostics.record("CaptureStore", "Source audio saved for \(label(id)); bytes=\(size)")
+        schedulePersistence(for: record)
+        Diagnostics.record("CaptureStore", "Source audio queued for \(label(id)); bytes=\(size)")
     }
 
     func updateRecognizedText(_ text: String, for id: UUID) throws {
@@ -148,7 +152,7 @@ final class CaptureStore {
             return
         }
 
-        try container.mainContext.save()
+        schedulePersistence(for: record)
         lastProgressiveSave[id] = now
     }
 
@@ -162,7 +166,7 @@ final class CaptureStore {
         record.finalText = text
         record.lifecycle = .recognized
         record.updatedAt = Date()
-        try container.mainContext.save()
+        schedulePersistence(for: record)
         lastProgressiveSave[id] = nil
         if deliveryMode == .captureOnly {
             records[id] = nil
@@ -195,7 +199,7 @@ final class CaptureStore {
         guard record.refinement == nil else { throw StoreError.refinementSourceChanged }
         record.refinement = CaptureRefinement(input: input, startedAt: Date())
         record.updatedAt = Date()
-        try saveRefinementChanges()
+        schedulePersistence(for: record)
     }
 
     @discardableResult
@@ -217,7 +221,7 @@ final class CaptureStore {
         record.finalText = result?.text ?? input.text
         record.refinement = refinement
         record.updatedAt = Date()
-        try saveRefinementChanges()
+        schedulePersistence(for: record)
         Diagnostics.record("Refinement", "Capture \(label(input.captureID)); status=\(refinement.status.rawValue); edits=\(refinement.edits.count); milliseconds=\(Int(durationSeconds * 1_000))")
         return record.finalText
     }
@@ -230,34 +234,20 @@ final class CaptureStore {
         refinement.reason = .interrupted
         record.refinement = refinement
         record.updatedAt = Date()
-        try saveRefinementChanges()
+        schedulePersistence(for: record)
     }
 
     @discardableResult
     func requireRefinementSource(_ input: RefinementInput) throws -> CaptureRecord {
         let record = try capture(input.captureID)
-        let id = input.captureID
-        let reader = ModelContext(container)
-        let request = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
-        guard let saved = try reader.fetch(request).first,
-              record.lifecycle == .recognized, saved.lifecycle == .recognized,
+        guard record.lifecycle == .recognized,
               !input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              record.recognizedText == input.text, saved.recognizedText == input.text,
-              record.finalText == input.text, saved.finalText == input.text,
-              record.refinement == saved.refinement,
+              record.recognizedText == input.text,
+              record.finalText == input.text,
               record.refinement == nil || record.refinement?.input == input else {
             throw StoreError.refinementSourceChanged
         }
         return record
-    }
-
-    private func saveRefinementChanges() throws {
-        do {
-            try commitRefinement(container.mainContext)
-        } catch {
-            container.mainContext.rollback()
-            throw error
-        }
     }
 
     func markDelivered(
@@ -378,9 +368,9 @@ final class CaptureStore {
         try deleteAudio(for: record)
         lastProgressiveSave[id] = nil
         container.mainContext.delete(record)
-        try container.mainContext.save()
+        scheduleDelete(id)
         records[id] = nil
-        Diagnostics.record("CaptureStore", "Cancelled Capture \(label(id)) removed")
+        Diagnostics.record("CaptureStore", "Cancelled Capture \(label(id)) queued for removal")
     }
 
     private func finish(_ id: UUID, lifecycle: CaptureLifecycle, error: String?) throws {
@@ -395,10 +385,79 @@ final class CaptureStore {
         record.lifecycle = lifecycle
         record.deliveryErrorDescription = error
         record.updatedAt = Date()
-        try container.mainContext.save()
+        schedulePersistence(for: record)
         records[id] = nil
         lastProgressiveSave[id] = nil
-        Diagnostics.record("CaptureStore", "Capture \(label(id)) saved with lifecycle=\(lifecycle.rawValue)")
+        Diagnostics.record("CaptureStore", "Capture \(label(id)) queued with lifecycle=\(lifecycle.rawValue)")
+    }
+
+    func flushPersistence(for id: UUID) async throws {
+        let record = try capture(id)
+        let revision = persistenceRevision[id] ?? 0
+        let snapshot = persistenceSnapshot(for: record, revision: revision)
+        try await persistenceWriter.persist(snapshot)
+    }
+
+    private func schedulePersistence(for record: CaptureRecord) {
+        let id = record.id
+        let revision = (persistenceRevision[id] ?? 0) + 1
+        persistenceRevision[id] = revision
+        let snapshot = persistenceSnapshot(for: record, revision: revision)
+        Task(priority: .utility) { [persistenceWriter] in
+            do {
+                try await persistenceWriter.persist(snapshot)
+            } catch {
+                Diagnostics.record(
+                    "CapturePersistence",
+                    "Background persist failed for \(String(id.uuidString.prefix(8))) revision=\(revision): \(error.localizedDescription)",
+                    level: .error
+                )
+            }
+        }
+    }
+
+    private func scheduleDelete(_ id: UUID) {
+        let revision = (persistenceRevision[id] ?? 0) + 1
+        persistenceRevision[id] = revision
+        Task(priority: .utility) { [persistenceWriter] in
+            do {
+                try await persistenceWriter.delete(id, revision: revision)
+            } catch {
+                Diagnostics.record(
+                    "CapturePersistence",
+                    "Background delete failed for \(String(id.uuidString.prefix(8))) revision=\(revision): \(error.localizedDescription)",
+                    level: .error
+                )
+            }
+        }
+    }
+
+    private func persistenceSnapshot(
+        for record: CaptureRecord,
+        revision: Int
+    ) -> CapturePersistenceSnapshot {
+        CapturePersistenceSnapshot(
+            id: record.id,
+            revision: revision,
+            enqueuedAt: Date(),
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+            lifecycleRawValue: record.lifecycleRawValue,
+            deliveryModeRawValue: record.deliveryModeRawValue,
+            recognizedText: record.recognizedText,
+            finalText: record.finalText,
+            sourceApplicationName: record.sourceApplicationName,
+            sourceBundleIdentifier: record.sourceBundleIdentifier,
+            deliveryErrorDescription: record.deliveryErrorDescription,
+            sourceAudioRelativePath: record.sourceAudioRelativePath,
+            sourceAudioDurationSeconds: record.sourceAudioDurationSeconds,
+            sourceAudioByteCount: record.sourceAudioByteCount,
+            sourceAudioExpiresAt: record.sourceAudioExpiresAt,
+            sourceAudioHasMeaningfulContent: record.sourceAudioHasMeaningfulContent,
+            lastRecognitionAttemptAt: record.lastRecognitionAttemptAt,
+            lastRecognitionErrorDescription: record.lastRecognitionErrorDescription,
+            refinement: record.refinement
+        )
     }
 
     func pruneExpiredAudio(now: Date = Date()) throws {
