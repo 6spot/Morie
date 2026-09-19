@@ -46,6 +46,10 @@ actor SpeechPipeline {
     private var reportedFailure = false
     private var preparedBackend: SpeechRecognitionBackend?
 
+    func preparedBackendStatus() -> SpeechRecognitionBackend? {
+        preparedBackend
+    }
+
     func prepare(locale requestedLocale: Locale) async throws {
         guard activeSessionID == nil else { throw PipelineError.alreadyRunning }
 
