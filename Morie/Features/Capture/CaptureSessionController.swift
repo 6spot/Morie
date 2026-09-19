@@ -156,6 +156,9 @@ final class CaptureSessionController {
 
         onCancellationEnabledChange?(true)
         hud.showRecording()
+        if soundFeedbackEnabled {
+            soundFeedback.playStart()
+        }
 
         Diagnostics.record(
             "Session",
@@ -190,6 +193,9 @@ final class CaptureSessionController {
 
         finishRequestedCaptureID = sessionID
         finishRequestedAt = ContinuousClock.now
+        if soundFeedbackEnabled {
+            soundFeedback.playStop()
+        }
         setPhase(.finalizing)
         onCancellationEnabledChange?(false)
         hud.showProcessing()
@@ -327,9 +333,6 @@ final class CaptureSessionController {
 
             speechReadyCaptureID = sessionID
             captureStartTask = nil
-            if soundFeedbackEnabled {
-                soundFeedback.playStart()
-            }
             Diagnostics.record("Speech", "Speech session \(label(sessionID)) is recording")
 
             if finishRequestedCaptureID == sessionID {
@@ -597,9 +600,6 @@ final class CaptureSessionController {
         onCancellationEnabledChange?(false)
         resetSessionIdentity()
         setPhase(.idle)
-        if soundFeedbackEnabled {
-            soundFeedback.playStop()
-        }
         hud.showSuccess(deliveryMode: deliveryMode)
 
         let completedLabel = label(sessionID)
