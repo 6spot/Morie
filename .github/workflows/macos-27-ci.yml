@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "Morie/**"
+      - "MorieTests/**"
       - "Morie.xcodeproj/**"
       - ".github/workflows/macos-27-ci.yml"
       - ".github/workflows/macos-27-package.yml"
@@ -12,6 +13,7 @@ on:
       - main
     paths:
       - "Morie/**"
+      - "MorieTests/**"
       - "Morie.xcodeproj/**"
       - ".github/workflows/macos-27-ci.yml"
       - ".github/workflows/macos-27-package.yml"
@@ -46,3 +48,33 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
+
+  logic-tests:
+    name: MorieTests
+    runs-on: xcode-27
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+
+      - name: Run logic tests
+        run: |
+          set -o pipefail
+          validation_dir="$(mktemp -d /tmp/morie-ci-tests.XXXXXX)"
+          trap 'rm -rf "$validation_dir"' EXIT
+          xcodebuild \
+            -project Morie.xcodeproj \
+            -scheme MorieTests \
+            -configuration Debug \
+            -sdk macosx27.0 \
+            -destination "platform=macOS" \
+            -derivedDataPath "$validation_dir" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test

@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class CaptureHistoryTests: XCTestCase {
-    func testHistoryQueryExcludesLiveCaptureUntilTerminalState() throws {
+    func testHistoryQueryExcludesLiveCaptureUntilTerminalState() async throws {
         let store = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
 
@@ -35,6 +35,7 @@ final class CaptureHistoryTests: XCTestCase {
                        "Progressive durability must not expose the in-progress row in normal History.")
 
         try store.markFailed(liveID, error: "recognition stopped")
+        try await store.flushPersistence(for: liveID)
         visible = try reader.fetch(CaptureHistoryQuery.descriptor(limit: 200))
         XCTAssertEqual(Set(visible.map(\.id)), [completedID, liveID],
                        "A retained terminal Capture should enter History exactly after it stops being live.")

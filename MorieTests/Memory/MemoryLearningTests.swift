@@ -4,9 +4,11 @@ import XCTest
 
 @MainActor
 final class MemoryLearningTests: XCTestCase {
-    func testSavedFinalTextAutomaticallyCreatesPersonalMemoryAndSurvivesRestart() throws {
+    func testSavedFinalTextAutomaticallyCreatesPersonalMemoryAndSurvivesRestart() async throws {
         let fixture = try LearningFixture()
         let source = try fixture.capture("I work on Morie.", recognition: "I work on more e.")
+        try await fixture.captures.flushPersistence(for: source)
+        fixture.captures.releaseCaptureOwnership(source)
         try fixture.learn(source)
         let record = try XCTUnwrap(fixture.memory.entries.first)
         XCTAssertEqual(record.origin, .automatic)
@@ -21,7 +23,9 @@ final class MemoryLearningTests: XCTestCase {
         XCTAssertEqual(memory.analyses.first?.sourceText, "I work on Morie.")
         XCTAssertEqual(memory.analyses.first?.state, .completed)
         XCTAssertEqual(try memory.relevantContext(for: "Morie").map(\.id), [record.id])
-        XCTAssertTrue(try DictionaryStore(container: reopened.container).speechHints().isEmpty)
+        let dictionary = DictionaryStore(container: reopened.container)
+        try dictionary.load()
+        XCTAssertTrue(dictionary.entries.isEmpty, "Automatic Memory learning must not create user Dictionary entries.")
     }
 
     func testOnlyCompletedCurrentAppInputEntersQueue() throws {
@@ -34,6 +38,9 @@ final class MemoryLearningTests: XCTestCase {
         XCTAssertTrue(fixture.memory.analyses.isEmpty)
         XCTAssertThrowsError(try fixture.memory.analysisSource(for: pending))
         try fixture.captures.markDeliveryFailed(pending, error: "test clipboard fallback")
+        // This fixture is testing Memory admission, not background Capture I/O.
+        // Make the terminal test source durable before a separate Memory context reads it.
+        try fixture.captures.container.mainContext.save()
         try fixture.memory.reconcileCompletedInputs()
         XCTAssertEqual(fixture.memory.analyses.map(\.sourceCaptureID), [pending])
     }
@@ -225,7 +232,9 @@ final class MemoryLearningTests: XCTestCase {
 
     func testModelFailureUsesFixedPrivateMessageAndAutomaticRetry() async throws {
         let fixture = try LearningFixture()
-        _ = try fixture.capture("I work on Morie.")
+        let source = try fixture.capture("I work on Morie.")
+        try await fixture.captures.flushPersistence(for: source)
+        fixture.captures.releaseCaptureOwnership(source)
         let controller = MemoryLearningController(store: fixture.memory, idleDelay: .milliseconds(1), analyze: { _ in
             throw NSError(domain: "private input text", code: 1, userInfo: [NSLocalizedDescriptionKey: "PRIVATE MODEL CONTENT"])
         })
@@ -293,6 +302,10 @@ private final class LearningFixture {
                 applicationName: "Test",
                 bundleIdentifier: "me.morie.tests"
             )
+            // Production starts Memory only after CapturePersistenceWriter has
+            // flushed. This synchronous fixture setup establishes that same
+            // durable precondition without testing the writer in every Memory test.
+            try captures.container.mainContext.save()
         }
         return id
     }
