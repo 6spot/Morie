@@ -17,7 +17,8 @@ The owner clarified that adding a dictionary entry should require only one word.
 ## Scope
 
 - A compact native add/edit sheet containing one **词语** field.
-- Word-only storage, search, detail and retained processing snapshots; remove alias configuration and replacement semantics directly.
+- Word-only storage, search and retained processing snapshots; remove alias configuration and replacement semantics directly.
+- Keep a very small code-owned built-in baseline separate from user persistence. Persist user words with origin provenance (`manual` or explicit correction confirmation) while presenting effective words together.
 - Keep native Speech hints and normalize only the same word's letter case to its saved spelling, independently of optional AI cleanup.
 - Keep explicit **加入字典** confirmation after a supported manual correction; save just the corrected word.
 - Update current product/task documentation and verify compilation, persistence, input fallback and native layout.
@@ -39,15 +40,16 @@ Fuzzy or inferred substitutions, unconditional homophone replacement rules, pers
 
 - [x] Record the owner's one-word dictionary decision.
 - [x] Simplify native dictionary UI and word storage/processing.
+- [x] Add a small read-only built-in baseline, persist manual/correction provenance separately, and replace one-word-per-row presentation with a compact adaptive native grid.
 - [x] Update current design, architecture and validation documentation.
 - [x] Complete isolated build, logic, cold-open and layout verification.
 - [ ] Complete deferred signed-app acceptance.
 
 ## Implementation notes
 
-The native sheet uses a columns Form with one **词语** field and **取消 / 添加** (or **保存**). FocusState, native default/cancel keyboard actions, empty-input disablement and inline error feedback keep the interaction compact. Search, list/detail and History show words only.
+The native sheet uses a columns Form with one **词语** field and **取消 / 添加** (or **保存**). FocusState, native default/cancel keyboard actions, empty-input disablement and inline error feedback keep the interaction compact. Search and History show words only. The Dictionary page uses an adaptive native button grid so short terms pack across each row instead of consuming one full list row. Built-in and user words are shown together; built-in words are read-only.
 
-`DictionaryDraft`, `DictionaryEntry` and `DictionarySnapshot` no longer contain aliases. Duplicate validation is case-insensitive but does not equate full-/half-width spelling; internal control characters and line separators are invalid. `DictionarySpelling` applies same-word letter-case normalization before optional cleanup, protects technical spans and gives longer names precedence even when already spelled correctly. Correction confirmation saves through the same single-word store.
+`DictionaryDraft`, `DictionaryEntry` and `DictionarySnapshot` contain no aliases. `DictionaryEntry` now records user-entry provenance as manual or correction-confirmed; entries written before provenance tracking read as manual without a dedicated compatibility adapter. The small built-in baseline is code-owned and not persisted as user data. Effective display/hints de-duplicate by case-insensitive spelling with an explicit user entry taking precedence over the matching built-in term. Duplicate validation among user records remains case-insensitive but does not equate full-/half-width spelling; internal control characters and line separators are invalid. `DictionarySpelling` applies same-word letter-case normalization before optional cleanup, protects technical spans and gives longer names precedence even when already spelled correctly. Correction confirmation saves through the same single-word store.
 
 Each capture loads the current bounded word list into macOS 27 `AnalysisContext.contextualStrings`. Result text and its native whitespace are appended verbatim; Morie does not insert separators between Apple's finalized segments. This prevents Chinese output such as **常 蚊 子** while preserving spaces Apple actually emitted.
 
@@ -56,6 +58,7 @@ The separate non-autosaving dictionary write context and Capture-first save orde
 ## Reference decisions
 
 - **ADAPT:** native Speech contextual strings; Type4Me's direct, separator-free composition of recognized segments; duplicate/save-error handling and action-time provenance audited in [Type4Me](../reference/type4me.md); explicit one-word confirmation from the [OpenLess behavior reference](../reference/openless.md).
+- **ADAPT:** Type4Me's lesson that a product may benefit from a small baseline vocabulary, but keep Morie's baseline intentionally tiny and code-owned. Unlike Type4Me's earlier large built-in hotword file, user words keep priority and correction/manual provenance remains explicit.
 - **DROP:** canonical-word/alias configuration, provider hotword machinery, global homophone replacement tables and cross-entry alias conflicts. They are unnecessary or unsafe for the owner's word-only dictionary.
 - **VERIFY:** on a signed macOS 27 device, actual contextual-string benefit for spoken **长文字吧**, separator-free Chinese output and native focus/keyboard/VoiceOver behavior. Automated tests cannot establish model behavior.
 
