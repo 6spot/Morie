@@ -104,7 +104,60 @@ extension ValidatedRefinement {
               !output.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) && $0 != "\n" && $0 != "\t" && $0 != "\r" })
         else { throw RefinementReason.invalidEdits }
         if output == prepared.text { return prepared }
+        guard isGrounded(output, in: prepared.text) else {
+            throw RefinementReason.invalidEdits
+        }
         let cleanup = RefinementEdit(original: prepared.text, replacement: output)
         return ValidatedRefinement(text: output, edits: prepared.edits + [cleanup])
+    }
+
+    private static func isGrounded(_ output: String, in source: String) -> Bool {
+        let sourceCharacters = semanticCharacters(in: source)
+        guard !sourceCharacters.isEmpty else { return false }
+
+        let sentenceSeparators = CharacterSet(charactersIn: "。！？!?；;\n\r")
+        let sentences = output.components(separatedBy: sentenceSeparators)
+        for sentence in sentences {
+            let candidate = semanticCharacters(in: sentence)
+            // Short corrections are where ASR cleanup legitimately changes the
+            // highest percentage of characters. The guard targets whole new
+            // clauses/sentences, not a two-character homophone repair.
+            guard candidate.count >= 8 else { continue }
+            let overlap = longestCommonSubsequenceLength(candidate, sourceCharacters)
+            let ratio = Double(overlap) / Double(candidate.count)
+            guard ratio >= 0.42 else { return false }
+        }
+        return true
+    }
+
+    private static func semanticCharacters(in text: String) -> [Character] {
+        text.filter { character in
+            character.unicodeScalars.contains { scalar in
+                CharacterSet.alphanumerics.contains(scalar)
+                    || (0x3400...0x4DBF).contains(scalar.value)
+                    || (0x4E00...0x9FFF).contains(scalar.value)
+                    || (0xF900...0xFAFF).contains(scalar.value)
+            }
+        }
+    }
+
+    private static func longestCommonSubsequenceLength(
+        _ lhs: [Character],
+        _ rhs: [Character]
+    ) -> Int {
+        guard !lhs.isEmpty, !rhs.isEmpty else { return 0 }
+        var previous = Array(repeating: 0, count: rhs.count + 1)
+        for left in lhs {
+            var current = Array(repeating: 0, count: rhs.count + 1)
+            for (index, right) in rhs.enumerated() {
+                if left == right {
+                    current[index + 1] = previous[index] + 1
+                } else {
+                    current[index + 1] = max(current[index], previous[index + 1])
+                }
+            }
+            previous = current
+        }
+        return previous[rhs.count]
     }
 }
