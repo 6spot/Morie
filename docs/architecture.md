@@ -40,6 +40,8 @@ There is no third-party design-system or homemade-glass fallback. If the Apple-n
 
 ## Current repository shape
 
+The app and tests remain single Xcode targets. Directories express ownership and navigation boundaries; they are not separate Swift modules or packages.
+
 ```text
 Morie/
 ├── AGENTS.md
@@ -47,51 +49,61 @@ Morie/
 ├── README.md
 ├── Morie.xcodeproj/
 ├── Morie/
-│   ├── MorieApp.swift
-│   ├── AppController.swift
-│   ├── CapabilityGate.swift
-│   ├── PermissionSetupController.swift
-│   ├── MorieSetupView.swift
-│   ├── zh-Hans.lproj/InfoPlist.strings
-│   ├── CaptureRecord.swift
-│   ├── CaptureStore.swift
-│   ├── CaptureHistoryView.swift
-│   ├── CaptureHistoryController.swift
-│   ├── CaptureFileTranscriber.swift
-│   ├── CaptureAudioSource.swift
-│   ├── CaptureAudioStream.swift
-│   ├── MemoryRecord.swift
-│   ├── MemoryStore.swift
-│   ├── MemoryContextRetriever.swift
-│   ├── MemoryView.swift
-│   ├── MemoryAnalysisRecord.swift
-│   ├── MemoryLearner.swift
-│   ├── MemoryLearningController.swift
-│   ├── MemoryLearningView.swift
-│   ├── DictionaryStore.swift
-│   ├── DictionaryView.swift
-│   ├── DictionaryCorrection.swift
-│   ├── DictionaryCorrectionController.swift
-│   ├── CaptureRefinement.swift
-│   ├── InputRefiner.swift
-│   ├── CapturePersonalizer.swift
-│   ├── MorieControlCenter.swift
-│   ├── CaptureHUD.swift
-│   ├── Diagnostics.swift
-│   ├── PushToTalkHotkey.swift
-│   ├── SpeechPipeline.swift
-│   └── TextInjector.swift
+│   ├── App/
+│   │   ├── MorieApp.swift
+│   │   ├── AppController.swift
+│   │   └── MorieControlCenter.swift
+│   ├── Features/
+│   │   ├── Capture/
+│   │   │   ├── CaptureRecord.swift
+│   │   │   ├── CaptureStore.swift
+│   │   │   ├── CaptureAudioSource.swift
+│   │   │   ├── CaptureAudioStream.swift
+│   │   │   ├── CaptureFileTranscriber.swift
+│   │   │   ├── SpeechPipeline.swift
+│   │   │   ├── CaptureRefinement.swift
+│   │   │   ├── InputRefiner.swift
+│   │   │   ├── CaptureHUD.swift
+│   │   │   └── History/
+│   │   │       ├── CaptureHistoryController.swift
+│   │   │       └── CaptureHistoryView.swift
+│   │   ├── Memory/
+│   │   │   ├── MemoryRecord.swift
+│   │   │   ├── MemoryAnalysisRecord.swift
+│   │   │   ├── MemoryStore.swift
+│   │   │   ├── MemoryContextRetriever.swift
+│   │   │   ├── MemoryLearner.swift
+│   │   │   ├── MemoryLearningController.swift
+│   │   │   ├── MemoryLearningView.swift
+│   │   │   └── MemoryView.swift
+│   │   ├── Dictionary/
+│   │   │   ├── DictionaryStore.swift
+│   │   │   ├── DictionaryCorrection.swift
+│   │   │   └── DictionaryView.swift
+│   │   ├── Personalization/
+│   │   │   ├── CapturePersonalizer.swift
+│   │   │   ├── ExpressionProfile.swift
+│   │   │   └── PostInsertionLearningController.swift
+│   │   └── Setup/
+│   │       ├── PermissionSetupController.swift
+│   │       └── MorieSetupView.swift
+│   ├── Platform/
+│   │   ├── Capabilities/CapabilityGate.swift
+│   │   ├── Input/PushToTalkHotkey.swift
+│   │   ├── TextDelivery/TextInjector.swift
+│   │   └── Cloud/ICloudSyncSettings.swift
+│   ├── Support/
+│   │   └── Diagnostics.swift
+│   ├── Resources/
+│   │   └── zh-Hans.lproj/InfoPlist.strings
+│   └── Morie.entitlements
 ├── MorieTests/
-│   ├── CaptureStoreTests.swift
-│   ├── CaptureHistoryTests.swift
-│   ├── CaptureAudioStreamTests.swift
-│   ├── MemoryTests.swift
-│   ├── MemoryLearningTests.swift
-│   ├── DictionaryTests.swift
-│   ├── DictionaryCorrectionTests.swift
-│   ├── PersonalizationTests.swift
-│   ├── PermissionSetupTests.swift
-│   └── TestDiagnostics.swift
+│   ├── Capture/
+│   ├── Memory/
+│   ├── Dictionary/
+│   ├── Personalization/
+│   ├── Setup/
+│   └── Support/
 ├── .github/workflows/
 │   ├── macos-27-ci.yml
 │   └── macos-27-package.yml
@@ -107,6 +119,8 @@ Morie/
     ├── reference/
     └── tasks/
 ```
+
+The feature-first layout keeps files that change together near each other. `Platform/` owns macOS/Apple integration that is not itself a product feature, `Support/` holds cross-cutting diagnostics, and `App/` remains the composition/orchestration shell. Tests mirror the same feature boundaries. This is organizational only: target membership, runtime ownership and visibility do not change.
 
 Do not extract shared packages merely to match a future diagram. New modules need real ownership/reuse pressure first.
 
