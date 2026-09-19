@@ -443,28 +443,7 @@ final class CaptureStore {
         for record: CaptureRecord,
         revision: Int
     ) -> CapturePersistenceSnapshot {
-        CapturePersistenceSnapshot(
-            id: record.id,
-            revision: revision,
-            enqueuedAt: Date(),
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt,
-            lifecycleRawValue: record.lifecycleRawValue,
-            deliveryModeRawValue: record.deliveryModeRawValue,
-            recognizedText: record.recognizedText,
-            finalText: record.finalText,
-            sourceApplicationName: record.sourceApplicationName,
-            sourceBundleIdentifier: record.sourceBundleIdentifier,
-            deliveryErrorDescription: record.deliveryErrorDescription,
-            sourceAudioRelativePath: record.sourceAudioRelativePath,
-            sourceAudioDurationSeconds: record.sourceAudioDurationSeconds,
-            sourceAudioByteCount: record.sourceAudioByteCount,
-            sourceAudioExpiresAt: record.sourceAudioExpiresAt,
-            sourceAudioHasMeaningfulContent: record.sourceAudioHasMeaningfulContent,
-            lastRecognitionAttemptAt: record.lastRecognitionAttemptAt,
-            lastRecognitionErrorDescription: record.lastRecognitionErrorDescription,
-            refinement: record.refinement
-        )
+        CapturePersistenceSnapshot(record: record, revision: revision)
     }
 
     func pruneExpiredAudio(now: Date = Date()) throws {
