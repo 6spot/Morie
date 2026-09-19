@@ -117,7 +117,8 @@ final class AppController: ObservableObject {
             forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
         )
         expressionLearningEnabled = UserDefaults.standard.bool(forKey: ExpressionProfileStore.enabledDefaultsKey)
-        iCloudSyncEnabled = ICloudSyncSettings.isEnabled
+        let savedICloudSyncEnabled = ICloudSyncSettings.isEnabled
+        iCloudSyncEnabled = savedICloudSyncEnabled
         if let cloudSyncStartupError {
             iCloudSyncState = .unavailable("iCloud 同步未能启动，当前继续使用本地数据。")
             Diagnostics.record(
@@ -125,7 +126,7 @@ final class AppController: ObservableObject {
                 "Managed CloudKit store failed to open; using local store: \(cloudSyncStartupError.localizedDescription)",
                 level: .error
             )
-        } else if iCloudSyncEnabled {
+        } else if savedICloudSyncEnabled {
             iCloudSyncState = captureStore?.cloudSyncEnabled == true
                 ? .checking
                 : .restartRequired("已开启，重启 Morie 后开始 iCloud 同步。")
