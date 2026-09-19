@@ -252,11 +252,12 @@ Test at least:
 - English;
 - Simplified Chinese where supported/configured;
 - Chinese + English mixed sentence;
-- common punctuation behavior;
+- natural Chinese comma/period/question boundaries across several spoken clauses;
+- a long utterance with several pauses to confirm native dictation does not collapse passages into one punctuation-free run;
 - project/product names with and without dictionary Speech hints;
 - quiet and normal office acoustic conditions.
 
-Record whether partial/volatile text is sensible, whether finalization changes it materially, and whether the end of a short utterance is ever lost after the finish action.
+M-015 uses Apple's `DictationTranscriber(.progressiveLongDictation)` for live input and `.longDictation` for History re-recognition. Result segments are concatenated exactly as Apple emits them; Morie does not invent spaces or guessed punctuation between segments. Record whether partial/volatile punctuation is sensible, whether finalization changes it materially, whether punctuation survives segment boundaries, and whether the end of a short utterance is ever lost after the finish action.
 
 ## Capture HUD and Liquid Glass
 
