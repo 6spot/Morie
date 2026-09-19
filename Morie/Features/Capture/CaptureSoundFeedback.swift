@@ -86,12 +86,16 @@ final class CaptureSoundFeedback {
     private func wavData(
         for tones: [Tone]
     ) -> Data? {
-        let attack = 0.0024
+        let attack = 0.0032
         let release = 0.026
+        // Give Core Audio a tiny silent runway before the first audible frame.
+        // This is short enough to be imperceptible as latency, but prevents the
+        // first cue after app launch from starting while the output path is cold.
+        let leadingSilenceFrames = Int(0.018 * sampleRate)
         // The reference changes pitch directly rather than inserting an
         // audible pause between notes.
         let interToneGapFrames = 0
-        var samples: [Int16] = []
+        var samples: [Int16] = Array(repeating: 0, count: leadingSilenceFrames)
 
         for (toneIndex, tone) in tones.enumerated() {
             if toneIndex > 0 {
