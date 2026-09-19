@@ -26,7 +26,7 @@ The native Foundation Models prompt follows the same contract in a shorter **clo
 1. **Transcript is the only content source:** every output fact, request, judgment, question, attitude and topic must already be expressed in `transcript`.
 2. **Light polish only:** remove filler/stutter/abandoned restarts, repair punctuation and small word-order problems, and apply only high-confidence ASR spelling corrections. 润色，不是重写，更不是扩写。
 3. **Helper fields are non-content:** `spellingCandidates`, related Memory and Expression Profile may only disambiguate or repair text already expressed. They can never create a new sentence/topic.
-4. **Formatting hint:** `compact`, `semanticParagraphs` and `explicitList` control layout only; they do not authorize new headings/items/content.
+4. **Formatting hint:** `compact`, `semanticParagraphs` and `explicitList` control layout only; they do not authorize new headings/items/content. When deterministic structure detection selects `semanticParagraphs` or `explicitList`, layout is a required output contract rather than an optional preference: real semantic blocks must stay separated, and explicit spoken items must be emitted one-per-line in original order.
 5. **Protected literals:** numbers, dates, negation, conditions, versions, code, commands, URLs, paths and uncertain proper nouns stay intact.
 6. **Output:** final cleaned text only.
 
@@ -54,3 +54,10 @@ Morie intentionally does **not** copy Type4Me/OpenLess prompts wholesale. It bor
 ## Persistence and scope
 
 Save recognized text before processing, then save final text and actual processing/context snapshots before insertion. Background Memory learning reads that saved final text and retains its exact source. Failures keep usable saved input. Real-model meaning preservation, cleanup quality and latency require the deferred supported-Mac acceptance run.
+
+
+### Stronger semantic-structure detection — 2026-09-20
+
+Owner-device output exposed a remaining formatting weakness: cleanup semantics were good, but medium-length speech with an obvious turn from positive evaluation to “但是有一个问题…” could still classify as `compact`, and natural enumerations such as “有三个问题，一个是…另一个是…还有一个…” were not reliably promoted to `explicitList`.
+
+The heuristic now treats those patterns as real structural evidence while preserving conservative counterexamples. A short ordinary contrast such as “这个按钮颜色可以，但是大小不用改。” remains `compact`. Once `semanticParagraphs` or `explicitList` is selected, the model must execute that layout instead of flattening the content back into one paragraph. This strengthens presentation only; it does not authorize headings, new items, renamed items, summaries, or inferred content.
