@@ -4,7 +4,8 @@
 
 **IN PROGRESS** — 2026-09-19
 
-Issue: [#24](https://github.com/6spot/Morie/issues/24)
+Issue: [#24](https://github.com/6spot/Morie/issues/24)  
+Pull request: [#64](https://github.com/6spot/Morie/pull/64)
 
 ## Goal
 
