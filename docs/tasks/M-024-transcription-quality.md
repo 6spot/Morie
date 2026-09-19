@@ -119,3 +119,26 @@ Diagnostics now record the selected backend, normalized locale and dictionary-hi
 - [ ] Controlled Mandarin sample after backend change.
 - [ ] Mixed Chinese/English sample after backend change.
 - [ ] Dictionary-term sample after backend change.
+
+## 2026-09-19 owner follow-up — paragraphing and History simplification
+
+The owner-device log confirms the preferred zh-CN backend is now active:
+
+```text
+Preferred Speech backend for zh-CN: SpeechTranscriber (zh_CN)
+Session 151BA616 backend=SpeechTranscriber; locale=zh_CN; dictionaryHints=13
+```
+
+This closes the backend-selection question for the current owner device. The next quality issue is cleanup formatting rather than backend selection: long continuous Chinese speech was semantically cleaned but still returned as one dense paragraph.
+
+Changes in this follow-up:
+
+- long-input paragraphing is now an explicit cleanup requirement, not merely an optional newline hint;
+- paragraph boundaries follow semantic/topic transitions rather than fixed character counts;
+- 2–4 natural paragraphs are preferred for long multi-topic speech;
+- headings/lists are still forbidden unless the speaker actually expressed that structure;
+- a long-form Chinese example is included in the system instructions;
+- History no longer renders the per-Capture Personal Memory section or memory-analysis source text;
+- the underlying Memory feature and stored analysis data are intentionally untouched.
+
+Owner validation still needs to check whether the stronger cleanup instruction produces natural paragraphs on ordinary unscripted speech.
