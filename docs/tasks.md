@@ -40,8 +40,8 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-025 | Input latency | Move History persistence off the normal input hot path | IN PROGRESS | [#26](https://github.com/6spot/Morie/issues/26) / [PR #27](https://github.com/6spot/Morie/pull/27) | [`M-025`](./tasks/M-025-async-capture-persistence.md) |
 | M-026 | Control Center | Add Overview with local usage metrics and actual runtime model status | IN PROGRESS | [#31](https://github.com/6spot/Morie/issues/31) | [`M-026`](./tasks/M-026-control-center-overview.md) |
 | M-027 | Dictionary learning | Learn confirmed ASR error → canonical word mappings | IN PROGRESS | [#35](https://github.com/6spot/Morie/issues/35) / [PR #36](https://github.com/6spot/Morie/pull/36) | [`M-027`](./tasks/M-027-confirmed-dictionary-corrections.md) |
-| M-028 | Capture UX | Add native start/stop cues and center-morph capsule feedback | IN PROGRESS | [#37](https://github.com/6spot/Morie/issues/37) | [`M-028`](./tasks/M-028-capture-feedback.md) |
-| M-029 | No-speech handling | Discard true no-speech captures while retaining retryable speech audio | IN PROGRESS | [#44](https://github.com/6spot/Morie/issues/44) | [`M-029`](./tasks/M-029-no-speech-retention.md) |
+| M-028 | Capture UX | Add native start/stop cues and center-morph capsule feedback | DONE | [#37](https://github.com/6spot/Morie/issues/37) | [`M-028`](./tasks/M-028-capture-feedback.md) |
+| M-029 | No-speech handling | Discard true no-speech captures while retaining retryable speech audio | DONE | [#44](https://github.com/6spot/Morie/issues/44) | [`M-029`](./tasks/M-029-no-speech-retention.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 

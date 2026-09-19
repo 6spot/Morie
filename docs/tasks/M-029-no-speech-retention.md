@@ -2,7 +2,7 @@
 
 ## Status
 
-**IN PROGRESS** — 2026-09-19
+**DONE** — 2026-09-19
 
 Issue: [#44](https://github.com/6spot/Morie/issues/44)
 
@@ -47,6 +47,14 @@ Operational microphone/Speech failures keep their existing recovery behavior.
 - [x] sustained speech-like signal remains meaningful;
 - [x] discarded no-speech Capture does not remain in History;
 - [x] user feedback no longer says `录音已保存` for confirmed no-speech;
-- [ ] Xcode 27 / macOS 27 Release compile passes;
+- [x] Xcode 27 / macOS 27 Release compile passes;
 - [ ] test-capable run executes audio/store tests;
-- [ ] owner device confirms normal silent/accidental capture no longer creates History.
+- [x] owner device confirms normal silent/accidental capture no longer creates History.
+
+## Validation / closure
+
+GitHub Actions `macOS 27 CI` run #119 passed the Release product compile. Repository CI does not execute `MorieTests`, so the test-capable-run checkbox above remains intentionally unchecked rather than being claimed as run.
+
+Owner-device validation on 2026-09-19 confirmed that a no-speech attempt no longer creates the previous `未识别，录音已保存` History entry and requested closure.
+
+M-029 is complete. Issue #44 may be closed as completed.

@@ -2,7 +2,7 @@
 
 ## Status
 
-**IN PROGRESS** — 2026-09-19
+**DONE** — 2026-09-19
 
 Issue: [#37](https://github.com/6spot/Morie/issues/37)
 
@@ -21,12 +21,12 @@ Morie keeps the slice smaller: two synthesized in-memory tones, one boolean sett
 
 ## Audio semantics
 
-- **Start**: play only after `SpeechPipeline.start` succeeds and the session is truly recording.
-- **Finish**: the stop cue no longer represents microphone shutdown. It plays only after refinement/delivery has succeeded and Morie is transitioning from `Thinking` to the success/close state.
-- **Cancel**: no normal stop cue.
-- **Startup failure**: no start cue.
+- **Start**: play immediately when a valid start action is accepted and the capture session/HUD is established.
+- **Finish**: play immediately when a valid finish action is accepted, before Morie enters `Thinking`.
+- **Cancel**: no normal finish cue.
+- Duplicate/ignored finish actions do not replay the cue.
 
-This means the start cue confirms recording readiness, while the much quieter finish cue confirms the **whole input transaction** has completed. The finish cue cannot be captured in the retained audio tail because it happens well after microphone shutdown.
+The sounds are **action acknowledgement**, not Speech/cleanup completion notifications. Both cues are synthesized once when `CaptureSoundFeedback` is initialized, retained as prepared `AVAudioPlayer` instances, then rewound/replayed on each accepted action. They are not regenerated per hotkey press.
 
 Settings adds **录音开始和结束提示音**, default on.
 
@@ -37,12 +37,12 @@ The existing fixed-size native panel remains; only its visible content root morp
 ```text
 hidden
   ↓
-tiny center point (~6%)
-  ↓ 180 ms ease-out
+tiny center point (~10%)
+  ↓ 220 ms ease-out
 full capsule
   ↓ lifecycle states stay full size
 success / saved / failure timeout
-  ↓ 140 ms ease-in
+  ↓ 160 ms ease-in
 tiny center point
   ↓
 release NSHostingView + panel
@@ -54,20 +54,20 @@ Reduce Motion skips the scale animation.
 
 ## Processing state
 
-The old indeterminate `ProgressView` is removed. Processing uses a compact `Thinking` + sparkles label. This avoids suggesting that Morie is waiting on a network request.
+The old indeterminate `ProgressView` is removed. Processing uses a larger plain `Thinking` label with a visible accent-color highlight flowing around the capsule border. This avoids network-loading semantics while still showing that local processing is active.
 
 ## Acceptance criteria
 
 - [x] default-on setting exists;
-- [x] start cue is tied to successful capture startup;
-- [x] finish cue occurs only after successful capture-only save or successful current-app delivery;
+- [x] start cue is immediate feedback for an accepted start action;
+- [x] finish cue is immediate feedback for an accepted finish action, before `Thinking`;
 - [x] cancel does not use the stop cue;
 - [x] no bundled/external audio dependency;
 - [x] capsule opens/closes from center;
 - [x] Reduce Motion bypasses the morph;
 - [x] processing state contains no spinner;
 - [x] Xcode 27 / macOS 27 Release compile passes;
-- [ ] owner verifies cue volume/tone and capsule motion on-device.
+- [x] owner verifies cue volume/tone and capsule motion on-device.
 
 ## Validation
 
@@ -188,3 +188,9 @@ This tuning keeps the same two-note contour but:
 - lowers overall volume slightly;
 - lengthens the finish pair, especially its second note;
 - keeps finish quieter than start.
+
+## Closure
+
+Owner-device validation on 2026-09-19 accepted the final cue character and behavior and requested that completed tasks be closed. The final reference-style chime tuning passed GitHub Actions `macOS 27 CI` run #118 before merge.
+
+M-028 is complete. Issue #37 may be closed as completed.
