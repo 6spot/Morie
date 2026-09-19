@@ -609,14 +609,28 @@ final class CaptureSessionController {
         do {
             if preservedOnClipboard {
                 try captureStore?.markDeliveryFailed(sessionID, error: message)
-                memoryLearning?.captureDidComplete(sessionID)
+                if let captureStore {
+                    Task { @MainActor [weak self, weak captureStore] in
+                        guard let self, let captureStore else { return }
+                        do {
+                            try await captureStore.flushPersistence(for: sessionID)
+                            self.memoryLearning?.captureDidComplete(sessionID)
+                        } catch {
+                            Diagnostics.record(
+                                "CapturePersistence",
+                                "Clipboard-fallback flush failed for \(self.label(sessionID)): \(error.localizedDescription)",
+                                level: .error
+                            )
+                        }
+                    }
+                }
             } else if stoppingCaptureID != sessionID {
                 try captureStore?.markFailed(sessionID, error: message)
             }
         } catch {
             Diagnostics.record(
                 "CaptureStore",
-                "Failure state save failed: \(error.localizedDescription)",
+                "Failure state update failed: \(error.localizedDescription)",
                 level: .error
             )
         }
