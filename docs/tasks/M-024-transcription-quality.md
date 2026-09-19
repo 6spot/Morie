@@ -142,3 +142,34 @@ Changes in this follow-up:
 - the underlying Memory feature and stored analysis data are intentionally untouched.
 
 Owner validation still needs to check whether the stronger cleanup instruction produces natural paragraphs on ordinary unscripted speech.
+
+## 2026-09-19 semantic formatting follow-up
+
+Review of current Type4Me/OpenLess behavior changed the paragraphing direction:
+
+- Type4Me's prompt-evaluation notes show that long work reports / technical discussions become more readable when topic blocks are preserved and explicit multi-item speech can become lists, but aggressive headings/lists are not appropriate for every input.
+- OpenLess's current prompt language is closer to Morie's default use case: short/single-topic text stays as a coherent paragraph; long speech gets punctuation and sentence boundaries; scattered speech must not be merged back into one large block; event/topic boundaries should be preserved; complex content may use a few natural paragraphs, while short content should not be over-structured.
+
+Morie therefore removes the rigid `2–4 paragraphs` preference and adds a per-input deterministic formatting hint instead of another model call.
+
+### Runtime hint
+
+`InputRefiner.formattingHint(for:)` produces one of:
+
+- `compact` — short/single-topic input; prefer one coherent paragraph;
+- `semanticParagraphs` — long input with repeated topic-transition cues / multiple sentence boundaries; separate real topic, event or request blocks with blank lines;
+- `explicitList` — the speaker explicitly enumerated multiple items (`第一/第二/第三`, `首先/其次/最后`, `一是/二是/...`).
+
+The hint is serialized with the prompt and reinforced in the Foundation Models `@Guide`. It is only a presentation hint: it cannot add facts, headings, categories or extra list items.
+
+This specifically targets owner samples that contain several independent intentions in one natural spoken turn (for example: project status → new audio-feedback request → discussion of Morie's own paragraphing quality). The user should not need to speak in pre-written paragraphs for Morie to preserve those boundaries.
+
+### Validation
+
+- [x] short single-topic sample classifies as `compact`;
+- [x] explicit enumeration classifies as `explicitList`;
+- [x] owner-style long multi-topic sample classifies as `semanticParagraphs`;
+- [x] macOS 27 Release compile passes;
+- [ ] owner-device unscripted speech confirms the hint improves real paragraph output without over-fragmenting short messages.
+
+Semantic-format implementation head `57a0f3d435c855ae03114f5b0efb19d60ee64820` passed GitHub Actions `macOS 27 CI` run #97.

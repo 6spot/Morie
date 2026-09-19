@@ -62,9 +62,9 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(InputRefiner.instructionsText.contains("非正式内容以自然表达为主"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("明显中途改口 / 句子重启"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("废弃半句"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("分段也是长输入的必做项"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("通常整理成 2–4 个自然段"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("不要因为用户没有明确说“第一、第二”"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("不要把零碎口语重新合并成一个大段"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("semanticParagraphs"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("只有两个紧密相关的小点时优先保持连贯段落"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("中文、英文或中英文混合"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("当前输入本身没有指向某条记忆时忽略它"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("confirmedCorrections"))
@@ -135,6 +135,7 @@ final class PersonalizationTests: XCTestCase {
         )
 
         let prompt = try InputRefiner.promptText(for: input)
+        XCTAssertTrue(prompt.contains(#""formattingHint":"compact""#))
         XCTAssertTrue(prompt.contains(#""dictionary":["GitHub"]"#))
         XCTAssertTrue(prompt.contains(#""confirmedCorrections":[{"observed":"Athers","correct":"Issues"}]"#))
         XCTAssertTrue(prompt.contains(#""name":"Morie""#))
@@ -149,6 +150,24 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertFalse(prompt.contains("kind"))
     }
 
+    func testFormattingHintKeepsShortSingleTopicInputCompact() {
+        XCTAssertEqual(
+            InputRefiner.formattingHint(for: "这个按钮放左边，这个按钮后面的时间保留。"),
+            "compact"
+        )
+    }
+
+    func testFormattingHintDetectsExplicitEnumeration() {
+        XCTAssertEqual(
+            InputRefiner.formattingHint(for: "今天三件事，第一修登录问题，第二看 issue，第三打包测试。"),
+            "explicitList"
+        )
+    }
+
+    func testFormattingHintDetectsLongMultiTopicVoiceInput() {
+        let text = "目前我们在其他地方已经完成了一部分，你可以看一下最新代码，然后确认现在还有哪些需要改进。尤其我觉得现在需要加一个录音提示音，开始和结束最好都有声音，不然只有动画用户感知比较弱。然后这是我刚才语音口述的，我感觉现在的分段还是不太理想，想确认这一整段有没有必要整理后拆段，还是主要是我的描述比较散。"
+        XCTAssertEqual(InputRefiner.formattingHint(for: text), "semanticParagraphs")
+    }
     func testConfirmedCorrectionPreparesTextBeforeOptionalModelCleanup() throws {
         let correction = DictionaryCorrectionSnapshot(
             id: UUID(),
