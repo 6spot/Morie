@@ -151,19 +151,23 @@ final class ExpressionProfileStore {
         snapshot.lastObservedAt = max(snapshot.lastObservedAt ?? date, date)
 
         for feature in ExpressionFeature.allCases {
-            guard let value = sample.values[feature] else { continue }
+            guard let value = sample.values[feature],
+                  let direction = sample.directions[feature],
+                  direction != 0
+            else { continue }
+
             var accumulator = snapshot.features[feature.rawValue] ?? ExpressionFeatureAccumulator()
             let totalWeight = accumulator.totalWeight + 1
             accumulator.weightedMean = ((accumulator.weightedMean * accumulator.totalWeight) + value) / totalWeight
             accumulator.totalWeight = totalWeight
-            switch sample.directions[feature] ?? 0 {
-            case 1: accumulator.positiveEvidence += 1
-            case -1: accumulator.negativeEvidence += 1
-            default: accumulator.neutralEvidence += 1
+            if direction > 0 {
+                accumulator.positiveEvidence += 1
+            } else {
+                accumulator.negativeEvidence += 1
             }
             accumulator.firstObservedAt = min(accumulator.firstObservedAt ?? date, date)
             accumulator.updatedAt = date
-            accumulator.state = learningState(for: accumulator, snapshot: snapshot)
+            accumulator.state = learningState(for: accumulator)
             snapshot.features[feature.rawValue] = accumulator
         }
 
@@ -221,20 +225,17 @@ final class ExpressionProfileStore {
     }
 
     private func learningState(
-        for accumulator: ExpressionFeatureAccumulator,
-        snapshot: ExpressionProfileSnapshot
+        for accumulator: ExpressionFeatureAccumulator
     ) -> ExpressionLearningState {
-        guard snapshot.sampleCount >= learningSamples else { return .insufficient }
-        guard snapshot.sampleCount >= stableSamples,
-              let first = snapshot.firstObservedAt,
-              let last = snapshot.lastObservedAt,
-              Calendar.current.dateComponents([.day], from: first, to: last).day ?? 0 >= stableDaySpan
+        let evidence = accumulator.positiveEvidence + accumulator.negativeEvidence
+        guard evidence >= learningSamples else { return .insufficient }
+        guard evidence >= stableSamples,
+              let first = accumulator.firstObservedAt,
+              Calendar.current.dateComponents([.day], from: first, to: accumulator.updatedAt).day ?? 0 >= stableDaySpan
         else { return .learning }
 
-        let directional = accumulator.positiveEvidence + accumulator.negativeEvidence
-        guard directional > 0 else { return .stable }
         let dominant = max(accumulator.positiveEvidence, accumulator.negativeEvidence)
-        return Double(dominant) / Double(directional) >= 0.7 ? .stable : .learning
+        return Double(dominant) / Double(evidence) >= 0.7 ? .stable : .learning
     }
 
     private func profileRecord() throws -> ExpressionProfileRecord {
