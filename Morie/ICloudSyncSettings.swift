@@ -21,7 +21,8 @@ enum ICloudSyncState: Equatable {
     case unavailable(String)
 
     var isChecking: Bool {
-        if case .checking = self { true } else { false }
+        if case .checking = self { return true }
+        return false
     }
 
     var detail: String {
@@ -40,6 +41,7 @@ enum ICloudSyncState: Equatable {
     }
 }
 
+@MainActor
 enum ICloudAccountInspector {
     static func status() async -> Result<CKAccountStatus, Error> {
         do {
