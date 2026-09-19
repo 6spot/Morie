@@ -68,6 +68,7 @@ Morie/
 │   │   │   ├── CaptureRefinement.swift
 │   │   │   ├── InputRefiner.swift
 │   │   │   ├── CaptureHUD.swift
+│   │   │   ├── CaptureSoundFeedback.swift
 │   │   │   ├── CaptureSessionController.swift
 │   │   │   └── History/
 │   │   │       ├── CaptureHistoryController.swift
@@ -157,6 +158,8 @@ durably save the minimal Capture shell + audio destination
   ↓
 start Apple capture + Speech with bounded dictionary hints
   ↓
+play optional native start cue after capture is actually ready
+  ↓
 progressive / volatile transcript
   ├─ update live Capture state immediately
   └─ enqueue bounded History checkpoints on CapturePersistenceWriter
@@ -164,6 +167,7 @@ progressive / volatile transcript
 second configured shortcut activation (or HUD confirm)
   ↓
 stop capture input
+  ├─ play optional stop cue only after microphone capture has closed
   ↓
 finish Speech analysis for consumed audio
   ↓
@@ -440,7 +444,7 @@ Accessibility is not an editability gate for ordinary delivery. There is no Elec
 
 Target resolution, clipboard staging and paste dispatch run synchronously on the main actor once delivery starts. There is no focus-handoff sleep or delayed app activation. Successful dispatch records the actual frontmost app/bundle and supplies that same application to the bounded correction observer.
 
-### `CaptureHUD`
+### `CaptureHUD` / `CaptureSoundFeedback`
 
 Owns a native, non-activating recording surface that does not become the keyboard target:
 
@@ -453,6 +457,12 @@ Owns a native, non-activating recording surface that does not become the keyboar
 - animated, labelled successful-input feedback instead of an isolated static status glyph;
 - stationary level feedback when Reduce Motion is enabled;
 - no custom glass imitation or third-party UI.
+
+The visible capsule now morphs from a tiny center point into the full pill on first presentation and collapses back to the center before its hosting tree is released. The AppKit panel geometry itself stays fixed, so there is no monitor re-position or layout jump. Reduce Motion bypasses this scale animation.
+
+The processing state intentionally uses a compact `Thinking` + sparkles label rather than an indeterminate spinner, avoiding network-loading semantics for local Speech/foundation-model work.
+
+`CaptureSoundFeedback` owns short synthesized in-memory start/stop tones through pre-prepared `AVAudioPlayer` instances. No bundled sound file or third-party dependency is required. Start feedback is emitted only after Speech capture starts successfully; normal stop feedback is emitted only after `CaptureAudioSource.finish` has already closed the microphone stream, before analyzer finalization continues. Cancellation does not play the normal stop cue.
 
 The microphone waveform is the only custom-drawn control because macOS does not provide a system live-audio waveform component. It renders a complete center-weighted envelope from the first frame—low at both edges and tallest in the middle—then smoothly changes the middle bars with actual microphone level. Its silence threshold and restrained gain curve retain the relevant proven behavior from Type4Me without importing Type4Me's scrolling-history presentation or UI system.
 

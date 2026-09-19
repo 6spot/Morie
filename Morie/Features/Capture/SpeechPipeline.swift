@@ -176,7 +176,10 @@ actor SpeechPipeline {
         }
     }
 
-    func stop(sessionID: UUID) async throws -> Result {
+    func stop(
+        sessionID: UUID,
+        onCaptureStopped: (@Sendable () -> Void)? = nil
+    ) async throws -> Result {
         try requireActiveSession(sessionID)
         guard let analyzer, let analysisTask else {
             throw PipelineError.notRunning
@@ -189,6 +192,7 @@ actor SpeechPipeline {
         guard let completion = audioSource?.finish() else { throw PipelineError.notRunning }
         finalizedSourceAudio = completion.sourceAudio
         self.audioSource = nil
+        onCaptureStopped?()
         Diagnostics.record("Speech", "Capture session stopped and source audio finalized for \(session)")
 
         do {

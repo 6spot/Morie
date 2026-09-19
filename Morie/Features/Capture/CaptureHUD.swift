@@ -1,11 +1,14 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 @MainActor
 final class CaptureHUDController {
     private let model = CaptureHUDModel()
     private var panel: NSPanel?
+    private weak var animatedRootView: NSView?
     private var hideTask: Task<Void, Never>?
+    private var collapseTask: Task<Void, Never>?
 
     private enum Layout {
         static let contentWidth: CGFloat = 142
@@ -105,32 +108,66 @@ final class CaptureHUDController {
     func hide() {
         hideTask?.cancel()
         hideTask = nil
-        panel?.orderOut(nil)
-        // `orderOut` does not tear down an NSHostingView. Keeping the hidden
-        // panel alive therefore also kept CompactWaveform's 60 Hz
-        // TimelineView rendering while Morie was idle. Release the view tree
-        // so both the display-driven work and its render resources end with
-        // the HUD's visible lifetime.
-        panel?.contentView = nil
-        panel = nil
-        model.hide()
-        Diagnostics.record("HUD", "Capture HUD hidden")
+        collapseTask?.cancel()
+
+        guard panel != nil, let rootView = animatedRootView else {
+            releasePanel()
+            return
+        }
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            releasePanel()
+            return
+        }
+
+        let duration = 0.14
+        animate(
+            rootView,
+            fromScale: currentScale(of: rootView),
+            toScale: 0.06,
+            fromOpacity: rootView.layer?.presentation()?.opacity ?? 1,
+            toOpacity: 0,
+            duration: duration,
+            timing: .easeIn
+        )
+
+        collapseTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            self?.releasePanel()
+        }
     }
 
     private func showPanel() {
+        collapseTask?.cancel()
+        collapseTask = nil
+
         let panel = panel ?? makePanel()
         self.panel = panel
         position(panel)
 
         if !panel.isVisible {
-            panel.alphaValue = 0
             panel.orderFrontRegardless()
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.14
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().alphaValue = 1
+            if let rootView = animatedRootView {
+                if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                    setPresentation(rootView, scale: 1, opacity: 1)
+                } else {
+                    animate(
+                        rootView,
+                        fromScale: 0.06,
+                        toScale: 1,
+                        fromOpacity: 0,
+                        toOpacity: 1,
+                        duration: 0.18,
+                        timing: .easeOut
+                    )
+                }
             }
         } else {
+            if let rootView = animatedRootView {
+                rootView.layer?.removeAllAnimations()
+                setPresentation(rootView, scale: 1, opacity: 1)
+            }
             panel.orderFrontRegardless()
         }
     }
@@ -158,6 +195,8 @@ final class CaptureHUDController {
 
         let rootView = NSView(frame: NSRect(origin: .zero, size: size))
         rootView.autoresizingMask = [.width, .height]
+        rootView.wantsLayer = true
+        animatedRootView = rootView
 
         let glassFrame = NSRect(
             x: Layout.effectInset,
@@ -186,6 +225,67 @@ final class CaptureHUDController {
         return panel
     }
 
+    private func releasePanel() {
+        collapseTask?.cancel()
+        collapseTask = nil
+        panel?.orderOut(nil)
+        // Releasing the NSHostingView stops the hidden waveform TimelineView.
+        panel?.contentView = nil
+        panel = nil
+        animatedRootView = nil
+        model.hide()
+        Diagnostics.record("HUD", "Capture HUD hidden")
+    }
+
+    private func animate(
+        _ view: NSView,
+        fromScale: CGFloat,
+        toScale: CGFloat,
+        fromOpacity: Float,
+        toOpacity: Float,
+        duration: TimeInterval,
+        timing: CAMediaTimingFunctionName
+    ) {
+        guard let layer = view.layer else { return }
+
+        layer.removeAllAnimations()
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.setAffineTransform(CGAffineTransform(scaleX: toScale, y: toScale))
+        layer.opacity = toOpacity
+        CATransaction.commit()
+
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = fromScale
+        scale.toValue = toScale
+
+        let opacity = CABasicAnimation(keyPath: "opacity")
+        opacity.fromValue = fromOpacity
+        opacity.toValue = toOpacity
+
+        let group = CAAnimationGroup()
+        group.animations = [scale, opacity]
+        group.duration = duration
+        group.timingFunction = CAMediaTimingFunction(name: timing)
+        group.isRemovedOnCompletion = true
+        layer.add(group, forKey: "capture-capsule-morph")
+    }
+
+    private func setPresentation(_ view: NSView, scale: CGFloat, opacity: Float) {
+        guard let layer = view.layer else { return }
+        layer.removeAllAnimations()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
+        layer.opacity = opacity
+        CATransaction.commit()
+    }
+
+    private func currentScale(of view: NSView) -> CGFloat {
+        guard let transform = view.layer?.presentation()?.affineTransform() else { return 1 }
+        return max(0.06, sqrt(transform.a * transform.a + transform.c * transform.c))
+    }
     private func position(_ panel: NSPanel) {
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
@@ -349,10 +449,11 @@ private struct CaptureHUDView: View {
             .padding(Layout.contentInset)
 
         case .processing:
-            ProgressView()
-                .controlSize(.small)
-                .frame(width: Layout.waveformWidth, height: Layout.waveformHeight)
-                .accessibilityLabel("正在处理录音")
+            Label("Thinking", systemImage: "sparkles")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityLabel("正在整理输入")
 
         case .success, .saved:
             Label(model.phase == .saved ? "已保存" : "已输入", systemImage: "checkmark.circle.fill")

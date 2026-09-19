@@ -220,6 +220,16 @@ struct MorieSettingsView: View {
                 }
             }
 
+            Section("输入反馈") {
+                Toggle("录音开始和结束提示音", isOn: Binding(
+                    get: { controller.soundFeedbackEnabled },
+                    set: { controller.setSoundFeedbackEnabled($0) }
+                ))
+                Text("开始录音和正常结束录音时播放轻提示音，帮助确认 Morie 已进入或结束录音状态。取消录音不会播放结束提示音。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("快捷键") {
                 Picker(
                     "开始或结束录音",
