@@ -162,6 +162,16 @@ private struct MorieMenuContent: View {
 struct MorieSettingsView: View {
     @ObservedObject var controller: AppController
     @State private var confirmsExpressionReset = false
+    @State private var cloudBaseURL: String
+    @State private var cloudModelName: String
+    @State private var cloudAPIKey: String
+
+    init(controller: AppController) {
+        self.controller = controller
+        _cloudBaseURL = State(initialValue: controller.cloudRefinementBaseURL)
+        _cloudModelName = State(initialValue: controller.cloudRefinementModelName)
+        _cloudAPIKey = State(initialValue: controller.cloudRefinementAPIKey)
+    }
 
     var body: some View {
         Form {
@@ -170,7 +180,74 @@ struct MorieSettingsView: View {
                     get: { controller.inputRefinementEnabled },
                     set: { controller.setInputRefinementEnabled($0) }
                 ))
+
+                Picker(
+                    "润色模型",
+                    selection: Binding(
+                        get: { controller.refinementModelMode },
+                        set: { controller.setRefinementModelMode($0) }
+                    )
+                ) {
+                    ForEach(RefinementModelMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(controller.refinementModelMode.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Text("保留原意和语气，删除口头语，整理标点、段落和结构明确的列表。关闭 AI 润色后，字典仍然生效。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("外部模型 API") {
+                TextField(
+                    "Base URL",
+                    text: $cloudBaseURL,
+                    prompt: Text("https://api.example.com/v1")
+                )
+                .textFieldStyle(.roundedBorder)
+
+                TextField(
+                    "模型",
+                    text: $cloudModelName,
+                    prompt: Text("model-name")
+                )
+                .textFieldStyle(.roundedBorder)
+
+                SecureField(
+                    "API Key（可留空）",
+                    text: $cloudAPIKey,
+                    prompt: Text("sk-…")
+                )
+                .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    LabeledContent("状态", value: controller.cloudRefinementConfigurationStatusTitle)
+                    Spacer()
+                    Button("保存 API 配置") {
+                        controller.saveCloudRefinementConfiguration(
+                            baseURL: cloudBaseURL,
+                            modelName: cloudModelName,
+                            apiKey: cloudAPIKey
+                        )
+                    }
+                }
+
+                if let message = controller.cloudRefinementSettingsMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("兼容 OpenAI Chat Completions 的服务都可以接入。Base URL 填到服务根路径或 /v1 即可，不要包含 /chat/completions。API Key 仅保存于 macOS 钥匙串；无需鉴权的本地服务可以留空。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("选择“外部 API”或“自动”后，润色所需的识别文字、相关字典候选和少量个人上下文会发送到你配置的服务。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
