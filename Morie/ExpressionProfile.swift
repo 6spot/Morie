@@ -102,11 +102,10 @@ enum ExpressionStyleExtractor {
             options: [.caseInsensitive, .widthInsensitive],
             locale: Locale(identifier: "en_US_POSIX")
         )
-        return String(
-            folded.unicodeScalars.filter {
-                CharacterSet.alphanumerics.contains($0)
-            }
-        )
+        let scalars = folded.unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0)
+        }
+        return String(String.UnicodeScalarView(scalars))
     }
 
     private static func matches(_ pattern: String, in text: String) -> Int {
