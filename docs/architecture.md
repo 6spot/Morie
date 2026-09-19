@@ -2,7 +2,7 @@
 
 ## Current stage
 
-[M-009](tasks/M-009-macos-input-memory.md) integrates a useful single-Mac input loop: durable recognition, a separate custom dictionary, independent cleanup, durable final output, reliable insertion and automatic personal Memory during idle time. There is no required Memory candidate-review inbox. iOS, mobile inspiration/follow-up and cross-device sync are outside this milestone; interactive validation remains deferred, not waived.
+[M-009](tasks/M-009-macos-input-memory.md) integrates a useful single-Mac input loop: durable recovery capture, a separate custom dictionary, independent cleanup, low-latency final output, ordered asynchronous History persistence, reliable insertion and automatic personal Memory during idle time. There is no required Memory candidate-review inbox. iOS, mobile inspiration/follow-up and cross-device sync are outside this milestone; interactive validation remains deferred, not waived.
 
 Type4Me and the owner-supplied [OpenLess reference](reference/openless.md) supply bounded behavior lessons, not Morie's architecture or dependencies. Implement the current design directly without legacy schemas or compatibility adapters.
 
@@ -57,6 +57,7 @@ Morie/
 │   │   ├── Capture/
 │   │   │   ├── CaptureRecord.swift
 │   │   │   ├── CaptureStore.swift
+│   │   │   ├── CapturePersistenceWriter.swift
 │   │   │   ├── CaptureAudioSource.swift
 │   │   │   ├── CaptureAudioStream.swift
 │   │   │   ├── CaptureFileTranscriber.swift
@@ -127,7 +128,7 @@ Do not extract shared packages merely to match a future diagram. New modules nee
 
 ## Current input runtime flow
 
-```text
+\`\`\`text
 bootstrap
   ↓
 read-only capability/permission inspection
@@ -148,11 +149,14 @@ solo configured shortcut activation (Fn / Globe release by default)
   ↓
 create authoritative capture UUID; cancel optional learning/word observation
   ↓
-save Capture identity and audio destination
+durably save the minimal Capture shell + audio destination
+(the only required synchronous History write on the live-input path)
   ↓
 start Apple capture + Speech with bounded dictionary hints
   ↓
 progressive / volatile transcript
+  ├─ update live Capture state immediately
+  └─ enqueue bounded History checkpoints on CapturePersistenceWriter
   ↓
 second configured shortcut activation (or HUD confirm)
   ↓
@@ -160,24 +164,34 @@ stop capture input
   ↓
 finish Speech analysis for consumed audio
   ↓
-durable recognized text
+recognized text in live state
+  ├─ enqueue recognized/audio snapshot
   ↓
 dictionary corrections + bounded optional AI cleanup
   ↓
-durable final text and processing provenance
+final text + refinement provenance in live state
+  ├─ enqueue final snapshot
   ↓
+currentApp:
 resolve the external app that currently owns keyboard focus
   ↓
 safe synthetic Cmd+V using temporary clipboard value; macOS first-responder routing chooses the field
   ↓
 restore clipboard only if user did not change it
   ↓
-save delivery outcome, clear session identity and return Ready
+return Ready / success feedback without waiting for History I/O
+  ├─ enqueue delivery outcome
+  └─ after background flush, allow dependent Memory learning
+
+captureOnly:
+await the latest History snapshot
   ↓
-optional verified-insertion correction observation
-  +
-idle batch learning from saved final input
-```
+release active ownership and report “已保存”
+\`\`\`
+
+The first Capture shell remains a synchronous durability boundary because it is the recovery anchor for an intentional expression. After that point, current-app recognition, cleanup and delivery use live in-memory state. History is eventually consistent through a dedicated writer; it is not allowed to add database latency to the normal finish-to-paste path.
+
+Each queued snapshot carries a monotonically increasing per-Capture revision. The writer owns a separate SwiftData context and rejects stale revisions, so scheduling order cannot let an older progressive transcript overwrite a newer refined or delivered state. Explicit cancellation claims a higher tombstone revision before deletion I/O, preventing already-queued snapshots from resurrecting the Capture.
 
 Releasing the shortcut never finishes a toggle capture. If finish or cancel is requested while asynchronous Speech setup is still in flight, that request remains attached to the same capture UUID; late setup cannot create an orphaned recording.
 
@@ -231,17 +245,33 @@ It no longer owns the authoritative capture UUID/task bookkeeping, Speech lifecy
 Owns the authoritative live Capture lifecycle:
 
 - capture UUID and source-audio destination;
-- Speech asset preparation, start/finalization and progressive transcript persistence;
+- Speech asset preparation, start/finalization and live transcript state;
+- enqueueing bounded persistence snapshots without awaiting them on the current-app delivery path;
 - finish-during-Speech-startup coordination;
 - explicit cancel and interruption shutdown;
 - HUD recording/processing/success/failure state;
-- dictionary hints, independent cleanup and durable final text;
+- dictionary hints, independent cleanup and low-latency final text;
 - current-keyboard-focus delivery and bounded post-insertion observation;
 - terminal success/failure cleanup and preservation of interrupted text/audio.
 
 One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; shortcut failure, microphone interruption and Speech errors retain a failed Capture. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
 
 `AppController` receives phase/transcript/failure callbacks and keeps the app/setup state machine authoritative. Returning a Capture session to idle only returns the visible app state to Ready when the current state is capture-owned; a concurrent blocked/checking state is not overwritten.
+
+### \`CapturePersistenceWriter\`
+
+Owns post-shell History persistence for live input:
+
+- a SwiftData \`ModelContext\` separate from the main/live Capture context;
+- full value snapshots rather than cross-actor model objects;
+- monotonically increasing per-Capture revisions;
+- stale-write rejection when async tasks arrive out of scheduling order;
+- cancellation tombstones that block older queued snapshots even if deletion I/O fails;
+- queue/write latency diagnostics.
+
+\`CaptureStore\` keeps autosave disabled on its main context so mutating live Capture state cannot trigger an implicit disk write on the input actor. It performs the initial shell save explicitly, then snapshots live state and hands it to this writer.
+
+For \`currentApp\`, persistence failure is diagnostic/recoverable and does not turn a successful paste into an input failure. For \`captureOnly\`, the session explicitly flushes the newest revision before reporting success because saving is the user's requested destination.
 
 ### `CapabilityGate` / `PermissionSetupController`
 

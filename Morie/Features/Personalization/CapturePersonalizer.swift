@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Capture-first boundary between recognition and delivery. Model output is never returned before save.
+/// The Capture-first boundary between recognition and delivery. Live state is validated here; History persistence is queued independently.
 @MainActor
 final class CapturePersonalizer {
     static let enabledDefaultsKey = "inputRefinementEnabled"
@@ -58,7 +58,12 @@ final class CapturePersonalizer {
         do {
             try store.beginRefinement(input)
         } catch {
-            return try keepOriginal(input, reason: .saveFailed, started: started)
+            Diagnostics.record(
+                "Refinement",
+                "Could not attach refinement metadata to the current Capture; continuing from live text",
+                level: .warning
+            )
+            return input.prepared.text
         }
         if let skip { return try keepOriginal(input, reason: skip, started: started) }
         do {
@@ -95,7 +100,12 @@ final class CapturePersonalizer {
                 do {
                     return try store.saveRefinement(input, result: result, durationSeconds: elapsed(since: started))
                 } catch {
-                    return try keepOriginal(input, reason: .saveFailed, started: started)
+                    Diagnostics.record(
+                        "Refinement",
+                        "Refinement result became stale before it could attach to the live Capture; using dictionary-prepared text",
+                        level: .warning
+                    )
+                    return input.prepared.text
                 }
             }
         } catch {
@@ -113,9 +123,9 @@ final class CapturePersonalizer {
             let result = mayApplyDictionary ? input.prepared : ValidatedRefinement(text: input.text, edits: [])
             return try store.saveRefinement(input, result: result, reason: reason, durationSeconds: elapsed(since: started))
         } catch {
-            // saveRefinement rolls back. Verify the durable original again before returning it.
+            // The live Capture changed while attaching metadata. Do not make delivery wait for History bookkeeping.
             try store.requireRefinementSource(input)
-            Diagnostics.record("Refinement", "Could not save refinement metadata; using the durable original", level: .warning)
+            Diagnostics.record("Refinement", "Could not attach refinement metadata; using the live original", level: .warning)
             return input.text
         }
     }

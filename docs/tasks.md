@@ -37,6 +37,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-022 | History UX | Keep History stable during live persistence and right-align row time | IN PROGRESS | [#22](https://github.com/6spot/Morie/issues/22) / [PR #25](https://github.com/6spot/Morie/pull/25) | [`M-022`](./tasks/M-022-history-live-stability.md) |
 | M-023 | Dictionary UX | Split user terms from built-in read-only terms | TODO | [#23](https://github.com/6spot/Morie/issues/23) | [`M-023`](./tasks/M-023-dictionary-readonly-sections.md) |
 | M-024 | Speech quality | Improve transcription readability and diagnose native recognition quality | TODO | [#24](https://github.com/6spot/Morie/issues/24) | [`M-024`](./tasks/M-024-transcription-quality.md) |
+| M-025 | Input latency | Move History persistence off the normal input hot path | IN PROGRESS | [#26](https://github.com/6spot/Morie/issues/26) / [PR #27](https://github.com/6spot/Morie/pull/27) | [`M-025`](./tasks/M-025-async-capture-persistence.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
@@ -52,7 +53,7 @@ Current management follows the native M-008 structure with separate History, Dic
 
 M-010 also fixes the owner-observed Speech authorization callback crash and simplifies the setup window's title, permission state and footer actions. Signed-app permission and interaction retesting remains open; regression/build/layout evidence is in its task record.
 
-The owner deferred interactive validation until the evening of 2026-09-18. Actual model fidelity/latency, correction prompts across supported fields, keyboard/VoiceOver, microphone/recovery and the delivery matrix must be tested before completion. The current execution order is input routing → native dictation punctuation → Dictionary/Cleanup/Memory quality → Expression Profile → optional iCloud/CloudKit sync/backup. M-018 starts the Expression Profile stage with bounded local style learning. M-019 follows with explicit opt-in iCloud/CloudKit sync and backup; no local automatic-backup subsystem is planned, and development schema changes may discard old local development data.
+M-025 additionally treats finish-to-paste latency as a first-class input metric: after the initial recovery shell, History persistence must not gate normal current-app delivery. The owner deferred interactive validation until the evening of 2026-09-18. Actual model fidelity/latency, correction prompts across supported fields, keyboard/VoiceOver, microphone/recovery and the delivery matrix must be tested before completion. The current execution order is input routing → native dictation punctuation → Dictionary/Cleanup/Memory quality → Expression Profile → optional iCloud/CloudKit sync/backup. M-018 starts the Expression Profile stage with bounded local style learning. M-019 follows with explicit opt-in iCloud/CloudKit sync and backup; no local automatic-backup subsystem is planned, and development schema changes may discard old local development data.
 
 ## Maintenance rules
 

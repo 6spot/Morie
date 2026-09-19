@@ -4,6 +4,76 @@ import XCTest
 
 @MainActor
 final class CaptureStoreTests: XCTestCase {
+    func testPersistenceWriterDropsStaleRevisionAndCancellationTombstone() async throws {
+        let store = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
+        let id = UUID()
+        _ = try store.beginVoiceCapture(
+            id: id,
+            deliveryMode: .currentApp,
+            applicationName: "Notes",
+            bundleIdentifier: "com.apple.Notes"
+        )
+
+        let record = try store.capture(id)
+        record.recognizedText = "older"
+        record.finalText = "older"
+        record.lifecycle = .recognized
+        let stale = CapturePersistenceSnapshot(record: record, revision: 1)
+
+        record.recognizedText = "newer"
+        record.finalText = "newer"
+        record.lifecycle = .delivered
+        let newest = CapturePersistenceSnapshot(record: record, revision: 2)
+
+        let writer = CapturePersistenceWriter(container: store.container)
+        try await writer.persist(newest)
+        try await writer.persist(stale)
+
+        var reader = ModelContext(store.container)
+        var descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
+        var persisted = try XCTUnwrap(reader.fetch(descriptor).first)
+        XCTAssertEqual(persisted.lifecycle, .delivered)
+        XCTAssertEqual(persisted.finalText, "newer")
+
+        try await writer.delete(id, revision: 3)
+        try await writer.persist(newest)
+
+        reader = ModelContext(store.container)
+        descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
+        let deleted = try reader.fetch(descriptor).first
+        XCTAssertNil(deleted)
+    }
+
+    func testFlushPersistenceMakesLatestTerminalStateDurable() async throws {
+        let store = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
+        let id = UUID()
+        _ = try store.beginVoiceCapture(
+            id: id,
+            deliveryMode: .currentApp,
+            applicationName: "Notes",
+            bundleIdentifier: "com.apple.Notes"
+        )
+        try store.updateRecognizedText("partial", for: id)
+        _ = try store.completeRecognition("final text", for: id)
+        try store.markDelivered(
+            id,
+            applicationName: "Notes",
+            bundleIdentifier: "com.apple.Notes"
+        )
+
+        try await store.flushPersistence(for: id)
+
+        let reader = ModelContext(store.container)
+        let descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
+        let persisted = try XCTUnwrap(reader.fetch(descriptor).first)
+        XCTAssertEqual(persisted.lifecycle, .delivered)
+        XCTAssertEqual(persisted.recognizedText, "final text")
+        XCTAssertEqual(persisted.finalText, "final text")
+        XCTAssertEqual(persisted.sourceBundleIdentifier, "com.apple.Notes")
+    }
+
     func testIsolatedStoresNeverEnableManagedCloudSync() throws {
         let inMemory = try CaptureStore(inMemory: true, cloudSyncEnabled: true)
         defer { try? FileManager.default.removeItem(at: inMemory.audioDirectory) }
@@ -20,7 +90,7 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertFalse(explicit.cloudSyncEnabled)
     }
 
-    func testCaptureOnlyModeIsSavedBeforeRecognitionAndCompletesWithoutDelivery() throws {
+    func testCaptureOnlyModeIsSavedBeforeRecognitionAndCompletesWithoutDelivery() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieCaptureOnlyTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -43,8 +113,10 @@ final class CaptureStoreTests: XCTestCase {
         let destination = try store.completeRecognition("remember this idea", for: id)
 
         XCTAssertEqual(destination, .captureOnly)
+        try await store.flushPersistence(for: id)
+        store.releaseCaptureOwnership(id)
         XCTAssertEqual(try store.sourceAudioURL(for: id), audioURL,
-                       "Capture-only completion must release active-record ownership without a delivery step")
+                       "Capture-only completion releases active ownership only after its final state is durable.")
         try store.cancel(id)
         XCTAssertEqual(try store.capture(id).lifecycle, .recognized,
                        "Late cancellation must not discard a completed Capture")
