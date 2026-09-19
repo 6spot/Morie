@@ -26,8 +26,11 @@ final class CaptureAudioStreamTests: XCTestCase {
 
         XCTAssertEqual(completion.error as? Failure, .conversion)
         XCTAssertEqual(completion.sourceAudio.duration, 1, accuracy: 0.001)
-        XCTAssertNil(completion.sourceAudio.hasMeaningfulAudio,
-                     "Signal written before conversion failed must remain retryable")
+        XCTAssertEqual(
+            completion.sourceAudio.hasMeaningfulAudio,
+            true,
+            "Sustained speech-like energy before conversion failure must remain retryable"
+        )
         try assertReadableSignal(completion.sourceAudio.url)
         do {
             for try await _ in stream.analyzerInputs {}
@@ -81,6 +84,41 @@ final class CaptureAudioStreamTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: source.url), bytes,
                        "Late buffers and repeated teardown cannot change the finalized file")
         try assertReadableSignal(source.url)
+    }
+
+    func testQuietRoomNoiseIsNotClassifiedAsMeaningfulSpeech() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stream = try makeStream(at: directory.appending(path: "quiet.m4a"))
+        stream.append(try makeAudio(amplitude: 0.002, frames: 16_000))
+
+        let completion = stream.finish()
+
+        XCTAssertEqual(completion.sourceAudio.hasMeaningfulAudio, false)
+        XCTAssertEqual(completion.sourceAudio.duration, 1, accuracy: 0.001)
+    }
+
+    func testBriefLoudTransientIsNotClassifiedAsSpeech() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stream = try makeStream(at: directory.appending(path: "click.m4a"))
+        stream.append(try makeAudio(amplitude: 0.4, frames: 800))
+        stream.append(try makeAudio(amplitude: 0.001, frames: 7_200))
+
+        let completion = stream.finish()
+
+        XCTAssertEqual(completion.sourceAudio.hasMeaningfulAudio, false)
+    }
+
+    func testSustainedSpeechLikeSignalIsMeaningfulEvenWithoutTranscript() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stream = try makeStream(at: directory.appending(path: "speech-like.m4a"))
+        stream.append(try makeAudio(amplitude: 0.12, frames: 4_000))
+
+        let completion = stream.finish()
+
+        XCTAssertEqual(completion.sourceAudio.hasMeaningfulAudio, true)
     }
 
     func testRuntimeInterruptionPreservesAudioAndFirstError() throws {
@@ -214,13 +252,16 @@ final class CaptureAudioStreamTests: XCTestCase {
         )
     }
 
-    private func makeAudio() throws -> AVAudioPCMBuffer {
+    private func makeAudio(
+        amplitude: Float = 0.25,
+        frames: AVAudioFrameCount = 16_000
+    ) throws -> AVAudioPCMBuffer {
         let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
-        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 16_000))
-        buffer.frameLength = 16_000
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
+        buffer.frameLength = frames
         let channel = try XCTUnwrap(buffer.floatChannelData?[0])
         for index in 0..<Int(buffer.frameLength) {
-            channel[index] = 0.25 * sin(2 * .pi * 440 * Float(index) / 16_000)
+            channel[index] = amplitude * sin(2 * .pi * 440 * Float(index) / 16_000)
         }
         return buffer
     }
