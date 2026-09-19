@@ -4,12 +4,14 @@ import XCTest
 
 @MainActor
 final class MemoryStoreTests: XCTestCase {
-    func testUserMemoryAndProvenanceSurviveRestartWithoutChangingCapture() throws {
+    func testUserMemoryAndProvenanceSurviveRestartWithoutChangingCapture() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appending(path: "captures.store")
         let captures = try CaptureStore(storageURL: url)
         let sourceID = try completedCapture(in: captures)
+        try await captures.flushPersistence(for: sourceID)
+        captures.releaseCaptureOwnership(sourceID)
         let memory = MemoryStore(container: captures.container)
         try memory.load()
         XCTAssertTrue(memory.entries.isEmpty, "Saving input alone must not invent a personal fact before analysis")
