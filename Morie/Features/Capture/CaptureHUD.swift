@@ -288,7 +288,7 @@ final class CaptureHUDController {
         )
         let glassView = NSGlassEffectView(frame: glassFrame)
         glassView.autoresizingMask = []
-        glassView.style = .regular
+        glassView.style = .clear
         glassView.cornerRadius = Layout.contentHeight / 2
         glassView.effectIsInteractive = true
         glassView.wantsLayer = true
@@ -522,13 +522,13 @@ private struct CaptureHUDView: View {
                 Button(action: model.cancel) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(Color.secondary.opacity(0.88))
                         .frame(width: Layout.controlVisualSize, height: Layout.controlVisualSize)
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.circle)
                 .controlSize(.small)
-                .tint(.white.opacity(0.16))
+                .tint(Color.secondary.opacity(0.14))
                 .frame(width: Layout.controlLaneWidth, height: Layout.innerHeight)
                 .accessibilityLabel("取消录音")
                 .help("取消录音")
@@ -617,53 +617,40 @@ private struct CaptureHUDView: View {
 private struct ProcessingSweep: View {
     let reduceMotion: Bool
 
-    @State private var progress: CGFloat = 0
-    @State private var overlayOpacity: Double = 0.10
+    @State private var sweepOffset: CGFloat = 0
 
-    private let sweepDuration: TimeInterval = 1.05
-    private let settleDuration: TimeInterval = 0.18
+    private let sweepDuration: TimeInterval = 2.20
 
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                Capsule()
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            let bandWidth = max(30, geometry.size.width * 0.52)
 
-                Capsule()
-                    .fill(Color.primary.opacity(overlayOpacity))
-                    .mask(alignment: .leading) {
-                        Rectangle()
-                            .frame(
-                                width: reduceMotion
-                                    ? geometry.size.width
-                                    : geometry.size.width * progress
-                            )
+            if !reduceMotion {
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        Color.secondary.opacity(0.025),
+                        Color.white.opacity(0.11),
+                        Color.secondary.opacity(0.025),
+                        .clear,
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: bandWidth, height: geometry.size.height)
+                .offset(x: sweepOffset)
+                .clipShape(Capsule())
+                .task {
+                    sweepOffset = -bandWidth
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+
+                    // This is intentionally a single calm glass highlight, not
+                    // a progress fill. If processing outlives the sweep, the
+                    // capsule simply remains in its native glass state.
+                    withAnimation(.easeInOut(duration: sweepDuration)) {
+                        sweepOffset = geometry.size.width
                     }
-            }
-            .padding(0.5)
-            .task {
-                if reduceMotion {
-                    progress = 1
-                    overlayOpacity = 0.045
-                    return
-                }
-
-                progress = 0
-                overlayOpacity = 0.10
-
-                withAnimation(.easeInOut(duration: sweepDuration)) {
-                    progress = 1
-                }
-
-                do {
-                    try await Task.sleep(for: .seconds(sweepDuration))
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled else { return }
-
-                withAnimation(.easeOut(duration: settleDuration)) {
-                    overlayOpacity = 0.045
                 }
             }
         }
@@ -770,7 +757,9 @@ private struct CompactWaveform: View {
                     let activityWeight = 0.34 + 0.66 * pow(envelope, 1.55)
                     let barHeight = restingHeight
                         + activityWeight * historicalLevel * (maxHeight - restingHeight)
-                    let color: Color = levels[0] > 0.01 ? .primary : .secondary
+                    let color = levels[0] > 0.01
+                        ? Color.secondary.opacity(0.78)
+                        : Color.secondary.opacity(0.45)
 
                     let rect = CGRect(
                         x: leading + CGFloat(index) * pitch,
