@@ -220,6 +220,8 @@ The exact owner sample above is now a regression fixture: appending `GitHub é‡Œæ
 - [x] unrelated dictionary / confirmed-correction context is filtered out in logic tests;
 - [x] near Latin spelling `Gethab` still selects `GitHub` as a cleanup candidate;
 - [x] unrelated appended sentence is rejected by refinement validation;
-- [ ] Xcode 27 / macOS 27 Release compile passes;
+- [x] Xcode 27 / macOS 27 Release compile passes;
 - [ ] test-capable run executes Dictionary + Personalization logic tests;
 - [ ] owner device confirms the same class of short input no longer gains unrelated dictionary vocabulary.
+
+Cleanup-guardrail implementation head `754b9fc3d4aab84765e60d063d0b860ef18ccd7c` passed GitHub Actions `macOS 27 CI` run #110.
