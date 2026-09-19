@@ -297,6 +297,24 @@ There is no legacy recognition fallback and no provider abstraction.
 
 `CaptureAudioSource` owns the microphone session, native notifications and serial sample queue. `CaptureAudioStream` writes AAC before Speech conversion, owns the analyzer input stream, and finalizes the file even if conversion or flushing fails. Immediate stop skips converter flushing. Repeated stop/finish returns the same closed artifact; late buffers cannot append to it. Only the store applies explicit discard, empty no-input removal, expiry or History deletion. The stream boundary allows real Apple AAC encoding/error-path tests with synthetic PCM and no microphone/model access.
 
+### `ExpressionProfileStore` / `PostInsertionLearningController`
+
+Expression Profile is separate from personal Memory. Memory stores semantic facts/preferences/projects; Expression Profile stores only aggregate formatting/style tendencies learned from the user's edits to text Morie just inserted.
+
+The first slice is deliberately narrow:
+
+- learning is opt-in and local;
+- the observer anchors only the verified recently inserted range in the focused non-secure text field;
+- it stops on a new recording, field ownership loss, unsupported/sensitive targets or after 30 seconds;
+- raw edited text is never persisted as profile data;
+- only style-only edits whose lexical content is unchanged are admitted;
+- current features are sentence length, line-break density, list usage, terminal punctuation, exclamation usage and Chinese/English spacing;
+- at least 10 accepted style edits spanning at least 3 days are required before a feature can become stable;
+- cleanup receives at most four stable style directives and persists those directives in `RefinementInput` provenance;
+- disabling Expression Profile stops observation and stops applying learned directives; clearing deletes the aggregate profile without touching History, Dictionary or Memory.
+
+The same bounded observer also powers explicit dictionary suggestions, avoiding two competing Accessibility polling loops. Dictionary spelling corrections remain separate user-owned dictionary data and are not counted as style evidence.
+
 ### `TextInjector`
 
 Delivery is intentionally generic and follows the system-input model:
