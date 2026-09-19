@@ -8,7 +8,7 @@ Owner-approved on 2026-09-18. Applies to the current Mac input loop, independent
 2. 删除不承担语义、语气或强调作用的填充词、口吃式重复及停顿冗余；保留有意义的口语表达、强调、不确定性和完整的简短回复。界面标签、按钮、菜单、状态、字段、术语或用户正在讨论的词本身都属于语义内容，不能因为相邻重复而删字或改名。
 3. 修正因口语停顿、自我纠正或重复表达造成的不自然语句。仅在自我纠正明确时合并，不猜测数字、日期、数量、否定或条件。
 4. 根据整句上下文修正明显且含义唯一的中文语音识别错字或同音字。纠错必须局部且有唯一合理解释；不确定时保留原文，不借纠错改写措辞或事实。
-5. 补充合适的标点、换行和段落，使文本易于阅读。
+5. 标点整理是必做项。即使原始 Speech 转写缺少标点，也要按语义边界补齐自然的逗号、句号、问号、冒号、换行和段落，不能把长段口语原样保留成连续无标点文本。
 6. 当表达明显包含步骤、序号、事项、条件、并列内容或分类时，整理成合适的编号或列表。
 7. 只有在结构明确时才使用列表；不新增标题、分类或步骤，不改变顺序或逻辑关系，不强行改变普通叙述。
 8. 不总结、不扩写、不解释、不翻译、不回答用户表达的内容。
@@ -29,6 +29,7 @@ Owner-approved on 2026-09-18. Applies to the current Mac input loop, independent
 - If the user repeats a UI label to discuss that label, preserve it. For example, `后面把时间放到那个已输入位置，已输入我觉得有必要存在吗` must keep both references to `已输入`; cleanup may add punctuation/quotes but must not collapse the label to `输入`.
 - With `GitHub` saved in the dictionary, an otherwise clear recognition such as `Gethab` may be corrected to `GitHub`; the model receives the saved word itself, not its UUID/timestamps.
 - `我再次尝试常文字效果怎么样？` may become `我再次尝试长文字效果怎么样？`; with `文字` saved, `试一试长蚊子` may become `试一试长文字`. Corrections follow the whole utterance's meaning rather than a fixed changed-character quota; broad or ambiguous rewriting remains forbidden by the cleanup instructions.
+- Long unpunctuated speech such as `还有一个问题就是授权的时候我们的窗口授权完之后总是会被遮挡住然后我还得切回来再点下一个授权` should receive natural clause punctuation rather than remain one continuous sentence.
 
 ## Persistence and scope
 
