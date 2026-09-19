@@ -169,5 +169,7 @@ This specifically targets owner samples that contain several independent intenti
 - [x] short single-topic sample classifies as `compact`;
 - [x] explicit enumeration classifies as `explicitList`;
 - [x] owner-style long multi-topic sample classifies as `semanticParagraphs`;
-- [ ] macOS 27 Release compile passes;
+- [x] macOS 27 Release compile passes;
 - [ ] owner-device unscripted speech confirms the hint improves real paragraph output without over-fragmenting short messages.
+
+Semantic-format implementation head `57a0f3d435c855ae03114f5b0efb19d60ee64820` passed GitHub Actions `macOS 27 CI` run #97.
