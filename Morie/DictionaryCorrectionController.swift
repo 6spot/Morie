@@ -78,10 +78,9 @@ final class DictionaryCorrectionController {
         guard let observationID else { return }
         let key = MemoryText.normalized(correction.replacement)
         guard !suggestedWords.contains(key) else { return }
-        do { try dictionary.load() } catch { return }
-        guard !dictionary.entries.contains(where: {
-            MemoryText.normalized($0.name) == key
-        }) else { return }
+        do {
+            guard try !dictionary.containsEffectiveWord(correction.replacement) else { return }
+        } catch { return }
         suggestedWords.insert(key)
         suggestedWordOrder.append(key)
         if suggestedWordOrder.count > maximumSuggestedWords {
@@ -91,7 +90,7 @@ final class DictionaryCorrectionController {
         let content = DictionaryCorrectionPrompt(correction: correction, save: { [weak self] in
             guard let self else { return }
             // Save the same single word as the dictionary editor.
-            try self.dictionary.create(DictionaryDraft(name: correction.replacement))
+            try self.dictionary.create(DictionaryDraft(name: correction.replacement), source: .correction)
             self.dismiss()
         }, dismiss: { [weak self] in self?.dismiss() })
             .frame(width: 370)
