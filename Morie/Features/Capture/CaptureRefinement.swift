@@ -24,8 +24,8 @@ struct RefinementInput: Codable, Equatable, Sendable {
 struct RefinementEdit: Codable, Equatable, Sendable {
     let original: String
     let replacement: String
-    var dictionaryEntryID: UUID?
-    var correctionRuleID: UUID?
+    var dictionaryEntryID: UUID? = nil
+    var correctionRuleID: UUID? = nil
 }
 
 enum RefinementStatus: String, Codable, Sendable {
