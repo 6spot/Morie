@@ -99,6 +99,11 @@ final class CapturePersonalizer {
                 do {
                     result = try ValidatedRefinement.accepting(text, for: input)
                 } catch {
+                    Diagnostics.record(
+                        "Refinement",
+                        "Rejected cleanup output that was empty, invalid, or insufficiently grounded in the transcript",
+                        level: .warning
+                    )
                     return try keepOriginal(input, reason: .invalidEdits, started: started)
                 }
                 do {
