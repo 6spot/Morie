@@ -462,9 +462,9 @@ Owns a native, non-activating recording surface that does not become the keyboar
 
 The visible capsule now morphs from a tiny center point into the full pill on first presentation and collapses back to the center before its hosting tree is released. The AppKit panel geometry itself stays fixed, so there is no monitor re-position or layout jump. Reduce Motion bypasses this scale animation.
 
-The processing state intentionally uses a compact `Thinking` + sparkles label rather than an indeterminate spinner, avoiding network-loading semantics for local Speech/foundation-model work.
+The processing state intentionally uses a larger plain `Thinking` label plus a visible accent-color border flow rather than an indeterminate spinner, avoiding network-loading semantics for local Speech/foundation-model work.
 
-`CaptureSoundFeedback` owns short synthesized in-memory start/stop tones through pre-prepared `AVAudioPlayer` instances. No bundled sound file or third-party dependency is required. Start feedback is emitted only after Speech capture starts successfully; normal stop feedback is emitted only after `CaptureAudioSource.finish` has already closed the microphone stream, before analyzer finalization continues. Cancellation does not play the normal stop cue.
+`CaptureSoundFeedback` owns short synthesized in-memory start/finish tones through pre-prepared `AVAudioPlayer` instances. No bundled sound file or third-party dependency is required. Start feedback is emitted only after Speech capture starts successfully. The much quieter finish cue is emitted only after the whole input transaction succeeds—after capture-only persistence or successful current-app delivery—when the HUD leaves `Thinking` for its success/close state. Microphone shutdown itself is intentionally silent. Cancellation/failure do not play the finish cue.
 
 The microphone waveform is the only custom-drawn control because macOS does not provide a system live-audio waveform component. It renders a complete center-weighted envelope from the first frame—low at both edges and tallest in the middle—then smoothly changes the middle bars with actual microphone level. Its silence threshold and restrained gain curve retain the relevant proven behavior from Type4Me without importing Type4Me's scrolling-history presentation or UI system.
 
