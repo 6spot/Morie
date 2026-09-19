@@ -93,7 +93,7 @@ enum InputRefiner {
             personalContext: input.context.map {
                 PromptMemory(name: $0.memory.name, notes: $0.memory.notes)
             },
-            expressionStyle: input.expressionStyle
+            expressionStyle: input.effectiveExpressionStyle
         ))
         return String(decoding: data, as: UTF8.self)
     }
