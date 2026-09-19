@@ -49,6 +49,7 @@ final class CaptureStore {
         let schema = Schema([
             CaptureRecord.self,
             DictionaryEntry.self,
+            DictionaryCorrectionRule.self,
             MemoryRecord.self,
             MemoryAnalysisRecord.self,
             MemoryLearningBlock.self,
@@ -174,6 +175,7 @@ final class CaptureStore {
         for id: UUID,
         context: [MemoryContextMatch],
         dictionary: [DictionarySnapshot] = [],
+        corrections: [DictionaryCorrectionSnapshot] = [],
         expressionStyle: [String] = []
     ) throws -> RefinementInput {
         let record = try capture(id)
@@ -183,6 +185,7 @@ final class CaptureStore {
             text: record.finalText,
             context: context,
             dictionary: dictionary,
+            corrections: corrections,
             expressionStyle: expressionStyle
         )
         try requireRefinementSource(input)
