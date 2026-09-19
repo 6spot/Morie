@@ -23,6 +23,9 @@ final class DiagnosticLogStore: ObservableObject {
     @Published private(set) var entries: [Entry] = []
 
     private let maximumEntries = 1_000
+    private let fileFlushDelay: Duration = .milliseconds(400)
+    private var pendingFileText = ""
+    private var fileFlushTask: Task<Void, Never>?
     let logFileURL: URL
 
     private init() {
@@ -53,15 +56,24 @@ final class DiagnosticLogStore: ObservableObject {
             message: message
         )
         entries.append(entry)
-        appendToFile(entry)
+        pendingFileText += format(entry) + "\n"
 
         if entries.count > maximumEntries {
             entries.removeFirst(entries.count - maximumEntries)
+        }
+
+        if level == .error {
+            flushPendingFile()
+        } else {
+            scheduleFileFlush()
         }
     }
 
     func clear() {
         entries.removeAll(keepingCapacity: true)
+        pendingFileText.removeAll(keepingCapacity: true)
+        fileFlushTask?.cancel()
+        fileFlushTask = nil
         DiagnosticFileWriter.clear(logFileURL)
     }
 
@@ -70,8 +82,26 @@ final class DiagnosticLogStore: ObservableObject {
         .joined(separator: "\n")
     }
 
-    private func appendToFile(_ entry: Entry) {
-        DiagnosticFileWriter.append(format(entry) + "\n", to: logFileURL)
+    private func scheduleFileFlush() {
+        guard fileFlushTask == nil else { return }
+        fileFlushTask = Task { @MainActor [weak self, fileFlushDelay] in
+            do {
+                try await Task.sleep(for: fileFlushDelay)
+                try Task.checkCancellation()
+            } catch {
+                return
+            }
+            self?.flushPendingFile()
+        }
+    }
+
+    private func flushPendingFile() {
+        fileFlushTask?.cancel()
+        fileFlushTask = nil
+        guard !pendingFileText.isEmpty else { return }
+        let text = pendingFileText
+        pendingFileText.removeAll(keepingCapacity: true)
+        DiagnosticFileWriter.append(text, to: logFileURL)
     }
 
     private func format(_ entry: Entry) -> String {
@@ -85,6 +115,7 @@ final class DiagnosticLogStore: ObservableObject {
 
 private enum DiagnosticFileWriter {
     private static let queue = DispatchQueue(label: "com.sixspot.morie.diagnostics-file")
+    private static let maximumFileSize: UInt64 = 5 * 1_024 * 1_024
 
     static func append(_ text: String, to url: URL) {
         queue.async {
@@ -93,7 +124,11 @@ private enum DiagnosticFileWriter {
             else { return }
 
             do {
-                try handle.seekToEnd()
+                let size = try handle.seekToEnd()
+                if size >= maximumFileSize {
+                    try handle.truncate(atOffset: 0)
+                    try handle.seek(toOffset: 0)
+                }
                 try handle.write(contentsOf: data)
                 try handle.close()
             } catch {
