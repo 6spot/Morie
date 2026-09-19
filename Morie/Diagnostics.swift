@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 import SwiftUI
 
@@ -150,7 +151,42 @@ private enum DiagnosticFileWriter {
     }
 }
 
+private enum ProcessMemorySnapshot {
+    static func current() -> (residentBytes: UInt64, physicalFootprintBytes: UInt64)? {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size
+        )
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebound in
+                task_info(
+                    mach_task_self_,
+                    task_flavor_t(TASK_VM_INFO),
+                    rebound,
+                    &count
+                )
+            }
+        }
+        guard result == KERN_SUCCESS else { return nil }
+        return (UInt64(info.resident_size), UInt64(info.phys_footprint))
+    }
+}
+
 enum Diagnostics {
+    static func recordMemory(_ phase: String) {
+        guard let memory = ProcessMemorySnapshot.current() else { return }
+        let divisor = 1_048_576.0
+        record(
+            "Memory",
+            String(
+                format: "%@; resident=%.1fMB; footprint=%.1fMB",
+                phase,
+                Double(memory.residentBytes) / divisor,
+                Double(memory.physicalFootprintBytes) / divisor
+            )
+        )
+    }
+
     static func record(
         _ category: String,
         _ message: String,

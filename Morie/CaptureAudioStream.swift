@@ -12,9 +12,9 @@ final class CaptureAudioStream {
     let analyzerInputs: AsyncThrowingStream<AnalyzerInput, Error>
 
     private let destinationURL: URL
-    private let convert: (AVAudioPCMBuffer) throws -> [AnalyzerInput]
-    private let flush: () throws -> [AnalyzerInput]
-    private let onAudioLevel: @Sendable (Double) -> Void
+    private var convert: ((AVAudioPCMBuffer) throws -> [AnalyzerInput])?
+    private var flush: (() throws -> [AnalyzerInput])?
+    private var onAudioLevel: (@Sendable (Double) -> Void)?
     private let continuation: AsyncThrowingStream<AnalyzerInput, Error>.Continuation
     private var audioFile: AVAudioFile?
     private var writtenFrames: AVAudioFramePosition = 0
@@ -56,12 +56,13 @@ final class CaptureAudioStream {
             let decibels = Self.signalDecibels(buffer)
             // Record signal evidence before Speech conversion, which can fail.
             if decibels != -.infinity { hasAudioSignal = true }
+            guard let convert else { return }
             for input in try convert(buffer) {
                 continuation.yield(input)
             }
             callbackCount += 1
             if callbackCount.isMultiple(of: 3) {
-                onAudioLevel(Self.normalizedLevel(decibels))
+                onAudioLevel?(Self.normalizedLevel(decibels))
             }
         } catch {
             fail(error)
@@ -79,8 +80,10 @@ final class CaptureAudioStream {
         if let completion { return completion }
         if !ended {
             do {
-                for input in try flush() {
-                    continuation.yield(input)
+                if let flush {
+                    for input in try flush() {
+                        continuation.yield(input)
+                    }
                 }
             } catch {
                 fail(error)
@@ -102,6 +105,9 @@ final class CaptureAudioStream {
         // Closing finalizes the AAC container even when Speech conversion failed.
         // Only CaptureStore may delete it after an explicit discard or expiry.
         audioFile = nil
+        convert = nil
+        flush = nil
+        onAudioLevel = nil
         let result = Completion(
             sourceAudio: CapturedSourceAudio(
                 url: destinationURL,
@@ -112,6 +118,10 @@ final class CaptureAudioStream {
         )
         completion = result
         return result
+    }
+
+    deinit {
+        Diagnostics.record("AudioLifetime", "CaptureAudioStream released")
     }
 
     private static func signalDecibels(_ buffer: AVAudioPCMBuffer) -> Float {

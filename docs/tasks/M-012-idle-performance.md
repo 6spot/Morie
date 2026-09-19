@@ -55,6 +55,15 @@ No Type4Me source or external dependency is copied.
 - History initially retains at most 200 Capture rows and loads older records
   explicitly in 200-row increments.
 - The correction-suggestion suppression cache is capped at 256 words.
+- Repeated-use owner logs reached 300+ MB after only several live Captures and
+  repeatedly reported CMIO / AudioHardware / AudioConverter teardown errors.
+  CaptureAudioSource now detaches its AVCapture output/input explicitly after
+  stopping, and CaptureAudioStream drops AnalyzerInputConverter/callback
+  closures immediately after finalization.
+- Capture callbacks use per-work-item autorelease pools. Diagnostics record
+  resident + physical footprint at bootstrap, capture start, Speech stop,
+  refinement completion, capture completion, two-second settled state, and
+  background Memory-model stages; audio source/stream deinits are also logged.
 
 ## Validation
 
