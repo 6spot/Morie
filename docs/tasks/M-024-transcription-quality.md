@@ -225,3 +225,25 @@ The exact owner sample above is now a regression fixture: appending `GitHub 里�
 - [ ] owner device confirms the same class of short input no longer gains unrelated dictionary vocabulary.
 
 Cleanup-guardrail implementation head `754b9fc3d4aab84765e60d063d0b860ef18ccd7c` passed GitHub Actions `macOS 27 CI` run #110.
+
+
+## 2026-09-20 stronger semantic formatting follow-up
+
+Owner-device output confirmed that cleanup meaning preservation is now strong, but the formatting contract remained too conservative. A medium-length utterance could be cleaned correctly yet stay as one dense paragraph, and natural spoken enumeration was not always recognized unless the speaker used formal ordinal markers.
+
+Two concrete causes were found in `InputRefiner`:
+
+1. `explicitList` only recognized a narrow set of formal markers such as `第一/第二/第三`, `首先/其次/最后`, and `一是/二是`.
+2. `semanticParagraphs` mostly depended on large character-count thresholds (110–220 characters), so shorter but semantically obvious transitions such as evaluation → “但是有一个问题…” remained `compact`.
+
+This follow-up keeps the closed-world safety boundary but strengthens layout behavior:
+
+- `explicitList` also recognizes natural spoken item structure such as `一个是 / 另一个 / 还有一个`, `第一个 / 第二个`, and explicit count leads such as `三个问题` or `两件事` when corresponding item markers are present;
+- `semanticParagraphs` can trigger on medium-length speech when there is a strong semantic transition, without requiring a long transcript;
+- ordinary short contrast such as “这个按钮颜色可以，但是大小不用改。” remains `compact`;
+- prompt language now says formatting is **required** once the hint identifies real structure;
+- `explicitList` requires one numbered line per spoken item in original order;
+- `semanticParagraphs` requires blank-line separation at real semantic-block boundaries;
+- no headings, extra items, renamed items, or inferred content are authorized.
+
+Regression coverage includes natural three-item enumeration, count-led two-item enumeration, the owner's short semantic-shift pattern, and a compact short-contrast counterexample.
