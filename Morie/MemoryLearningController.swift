@@ -148,10 +148,13 @@ final class MemoryLearningController: ObservableObject {
                 do {
                     let input = try store.learningInput(for: source)
                     analyzingCaptureID = source.captureID
+                    Diagnostics.recordMemory("memory-learning-start \(String(source.captureID.uuidString.prefix(8)))")
                     let suggestions = try await analyze(input)
+                    Diagnostics.recordMemory("memory-learning-model-finish \(String(source.captureID.uuidString.prefix(8)))")
                     try Task.checkCancellation()
                     guard !isInputActive else { throw CancellationError() }
                     try store.apply(suggestions, from: input)
+                    Diagnostics.recordMemory("memory-learning-commit \(String(source.captureID.uuidString.prefix(8)))")
                     message = nil
                 } catch {
                     if Task.isCancelled || error is CancellationError { throw CancellationError() }
