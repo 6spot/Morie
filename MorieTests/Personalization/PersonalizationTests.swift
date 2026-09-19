@@ -180,6 +180,40 @@ final class PersonalizationTests: XCTestCase {
         let text = "目前我们在其他地方已经完成了一部分，你可以看一下最新代码，然后确认现在还有哪些需要改进。尤其我觉得现在需要加一个录音提示音，开始和结束最好都有声音，不然只有动画用户感知比较弱。然后这是我刚才语音口述的，我感觉现在的分段还是不太理想，想确认这一整段有没有必要整理后拆段，还是主要是我的描述比较散。"
         XCTAssertEqual(InputRefiner.formattingHint(for: text), "semanticParagraphs")
     }
+    func testFormattingHintDetectsNaturalSpokenEnumerationWithoutOrdinals() {
+        XCTAssertEqual(
+            InputRefiner.formattingHint(
+                for: "现在有三个问题，一个是首次提示音有点破，另一个是胶囊的玻璃效果不明显，还有一个是思考动画会重复。"
+            ),
+            "explicitList"
+        )
+        XCTAssertEqual(
+            InputRefiner.formattingHint(
+                for: "我有两个改动，一个是提示音需要再轻一点，另一个是胶囊需要恢复原生玻璃效果。"
+            ),
+            "explicitList"
+        )
+    }
+
+    func testFormattingHintDetectsShortButClearSemanticShift() {
+        let text = "我们上次参考了另外两个项目，我觉得现在提示词写得比之前都好，这是真的。但是有一个问题，它漏了一点：有规律的内容还是没有按结构排版。"
+        XCTAssertEqual(InputRefiner.formattingHint(for: text), "semanticParagraphs")
+    }
+
+    func testFormattingHintDoesNotSplitOrdinaryShortContrast() {
+        XCTAssertEqual(
+            InputRefiner.formattingHint(for: "这个按钮颜色可以，但是大小不用改。"),
+            "compact"
+        )
+    }
+
+    func testFormattingInstructionsRequireStructuredLayoutWhenHinted() {
+        XCTAssertTrue(InputRefiner.instructionsText.contains("# 排版（必须执行）"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("必须把每一项独立成行"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("1. / 2. / 3."))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("必须在主题 / 事件 / 请求 / 立场转换"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("不能因为保守而被压回一个自然段"))
+    }
     func testConfirmedCorrectionPreparesTextBeforeOptionalModelCleanup() throws {
         let correction = DictionaryCorrectionSnapshot(
             id: UUID(),
