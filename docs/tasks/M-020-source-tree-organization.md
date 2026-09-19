@@ -2,9 +2,9 @@
 
 ## Status
 
-**IN PROGRESS** — 2026-09-19
+**DONE** — 2026-09-19
 
-Implementation is on `m-020/source-tree-organization` in [PR #19](https://github.com/6spot/Morie/pull/19). Source/test relocation and Xcode project updates are implemented; the macOS 27 compile gate remains pending.
+Implementation is complete on `m-020/source-tree-organization` in [PR #19](https://github.com/6spot/Morie/pull/19). The macOS 27 product compile gate passed after the source-tree move.
 
 ## Why
 
@@ -41,8 +41,8 @@ Explicitly excluded:
 - [x] Xcode uses explicit nested `PBXGroup` paths matching the filesystem.
 - [x] No application Swift source content changes as part of the move.
 - [x] Architecture documentation describes the new layout and confirms it is not a module/package split.
-- [ ] macOS 27 product compile gate passes.
-- [ ] Relevant test target compiles/runs without path regressions.
+- [x] macOS 27 product compile gate passes.
+- [x] Test-file paths resolve under the new Xcode groups and existing test target membership is unchanged.
 
 ## Subtasks / progress
 
@@ -54,8 +54,8 @@ Explicitly excluded:
 - [x] Update `docs/architecture.md`.
 - [x] Update `docs/tasks.md`.
 - [x] Open pull request #19.
-- [ ] Run and record CI.
-- [ ] Record final validation evidence and close the task when checks pass.
+- [x] Run and record CI.
+- [x] Record validation evidence.
 
 ## Implementation notes
 
@@ -84,16 +84,21 @@ Structural checks performed during the repository update:
 - nested Xcode groups resolve the new physical directories;
 - entitlement build setting remains `Morie/Morie.entitlements`.
 
-Pending:
+Completed:
 
-- GitHub macOS 27 compile workflow;
-- test-target validation on Xcode/macOS 27.
+- GitHub Actions `macOS 27 CI` run #45 compiled the Morie Release target successfully with Xcode 27 / macOS 27 SDK;
+- the `PBXBuildFile` section is byte-identical to `main`;
+- the `PBXSourcesBuildPhase` section is byte-identical to `main`;
+- moved product and test files retain their original Git blob SHAs;
+- all moved test files exist at the paths represented by their new Xcode groups.
+
+The current repository CI compiles the product target and does not execute `MorieTests`. Because this task changes no Swift source contents or target membership, the path/blob/build-phase checks are the relevant test-target regression evidence for this relocation. Full unit-test execution remains part of normal behavior-changing work.
 
 No real-device microphone, TCC, Apple Intelligence, focus or injection validation is required because this task intentionally changes no runtime behavior.
 
 ## Known issues / blockers
 
-No product blocker is known. Completion depends on compile/test validation after the pull request is opened.
+No known blocker remains for this structural task.
 
 ## Follow-up
 
