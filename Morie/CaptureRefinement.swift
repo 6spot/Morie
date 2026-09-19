@@ -6,6 +6,7 @@ struct RefinementInput: Codable, Equatable, Sendable {
     let text: String
     var context: [MemoryContextMatch] = []
     var dictionary: [DictionarySnapshot] = []
+    var expressionStyle: [String] = []
 
     var prepared: ValidatedRefinement { DictionarySpelling.normalize(text, using: dictionary) }
 }
