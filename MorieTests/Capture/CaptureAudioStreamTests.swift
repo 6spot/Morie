@@ -173,7 +173,7 @@ final class CaptureAudioStreamTests: XCTestCase {
         )
     }
 
-    func testInterruptedCaptureKeepsTextAudioAndDestinationAcrossRestart() throws {
+    func testInterruptedCaptureKeepsTextAudioAndDestinationAcrossRestart() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let storeURL = directory.appending(path: "captures.store")
@@ -191,6 +191,7 @@ final class CaptureAudioStreamTests: XCTestCase {
             let source = stream.stopImmediately()
             try store.attachSourceAudio(source, for: id)
             try store.markFailed(id, error: "Microphone interrupted")
+            try await store.flushPersistence(for: id)
 
             let reopened = try CaptureStore(storageURL: storeURL)
             let record = try reopened.capture(id)
