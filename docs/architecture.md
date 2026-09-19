@@ -277,6 +277,8 @@ Exact confirmed mappings are deterministic even when AI cleanup is disabled or u
 
 One normalized observed form owns one current canonical replacement. A later explicit confirmation may update it. Deleting a user canonical word removes internal mappings that target it. Morie does not ship a large hard-coded alias list copied from a different ASR engine.
 
+Cleanup context is narrower than Speech hints. `speechHints()` still returns the full bounded canonical set because ASR needs candidates before the correct spelling appears. `relevantEntries(for:)` is intentionally transcript-scoped for Foundation Models: exact terms plus a small set of close Latin spelling neighbors, capped at 16. Confirmed correction rules are likewise passed to the model only when the observed form exists in the current transcript. This prevents unrelated dictionary vocabulary from becoming generation material.
+
 ### `CaptureSessionController`
 
 Owns the authoritative live Capture lifecycle:
@@ -553,6 +555,8 @@ Foundation Models owns cleanup and contextual correction through the approved in
 `CaptureRefinement` retains the exact input, dictionary/personal-context snapshots, accepted edits, status, fixed reason and duration. Current and separately committed source text must agree before inference and save. Source, dictionary and relevant Memory are rechecked after inference; stale model output cannot be delivered. Disabling/failing/timing out cleanup can still durably apply dictionary corrections. A changed dictionary or failed final save retains the verified durable original. No unsaved model result is returned for insertion.
 
 Running refinement blocks History mutations/playback/re-recognition. Speech retries preserve completed final output and its earlier processing provenance. Restart clears current-version interrupted refinement without replaying delivery or restarting that model. Existing capture-only processing remains but is excluded from automatic personal learning.
+
+The local Foundation Models prompt follows a **closed-world cleanup contract**: transcript is the only source of facts/topics; spelling candidates, confirmed corrections, Memory context and expression style may only disambiguate or repair content already expressed. The instructions are deliberately shorter than cloud-oriented reference prompts to reduce competing instruction/vocabulary priming on the on-device model. A final grounding validator rejects clearly unsupported longer clauses before they can become deliverable text.
 
 ### `MemoryRecord` / `MemoryStore`
 
