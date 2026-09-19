@@ -52,7 +52,7 @@ struct CapabilityGate {
     }
 
     func requestPermission(_ requirement: SetupRequirement) async {
-        let permissionWindow = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow ?? NSApplication.shared.mainWindow
+        let permissionWindow = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow
         switch requirement {
         case .microphone:
             guard AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined else { return }
@@ -80,7 +80,7 @@ struct CapabilityGate {
 
     func openSettings(for requirement: SetupRequirement) async {
         guard let url = requirement.settingsURL else { return }
-        let permissionWindow = NSApplication.shared.keyWindow
+        let permissionWindow = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow
         Diagnostics.record("Permission", "Opening permission flow for \(requirement)")
         if requirement == .accessibility, !AXIsProcessTrusted() {
             // This is the only public API that registers the current signed
