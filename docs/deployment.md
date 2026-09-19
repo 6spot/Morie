@@ -39,7 +39,7 @@ For Phase 0 testing:
 2. select the Morie target;
 3. configure a valid Development Team;
 4. run directly from Xcode on a supported Mac;
-5. grant required Microphone, Speech Recognition, and Accessibility permissions;
+5. complete **使用引导与权限**, explicitly authorize Microphone/Speech/Accessibility, then choose **开始使用**;
 6. execute the validation matrix in [`validation.md`](./validation.md).
 
 This remains the preferred path for debugging because Xcode exposes runtime diagnostics directly.
@@ -64,7 +64,7 @@ To test it:
 1. download the latest successful `Morie-macOS27-test-*` Actions artifact;
 2. extract the artifact archive, then extract `Morie-macOS27-test.zip`;
 3. move `Morie.app` to `/Applications` if desired;
-4. open Morie and grant Microphone, Speech Recognition, and Accessibility permissions when required;
+4. open Morie, complete **使用引导与权限** through its explicit native authorization actions, then choose **开始使用**;
 5. if Gatekeeper blocks the ad-hoc test build because it is not notarized, use the normal macOS Privacy & Security **Open Anyway** flow. For development-only troubleshooting, the downloaded app's quarantine attribute may also be removed explicitly before launching;
 6. execute the Phase 0 checks in [`validation.md`](./validation.md).
 
@@ -100,15 +100,23 @@ When that decision is made, document:
 
 Do not introduce an updater framework before the distribution strategy requires it.
 
-## CloudKit deployment — Phase 1
+## Language and setup packaging
 
-Phase 1 will add the actual iCloud/CloudKit environment. At that point this guide must include:
+Keep `CFBundleDevelopmentRegion = zh-Hans` and the bundled `zh-Hans.lproj/InfoPlist.strings` in both Debug and Release artifacts. Privacy descriptions must match the Chinese setup page. A packaged first launch must inspect requirements without automatically prompting, and all Settings entry points must open the native Command-comma Settings scene. Validate these using the signed test artifact; unsigned compile output must not replace the owner's installed app.
+
+## CloudKit deployment — later cross-device milestone
+
+On 2026-09-18, the owner corrected the delivery order: complete the single-Mac input/dictionary/Memory loop before cross-device sync. CloudKit is outside the current milestone, not a prerequisite for local persistence or task completion. Apple Developer enrollment/container setup is also not ready; do not request it until an actual cross-device milestone is scheduled.
+
+The intended storage is each user's own iCloud private database within Morie's app container. The developer team provisions the app's CloudKit capability and container once. End users use their own iCloud accounts and do not need developer accounts. Morie operates no shared cloud backend in V0.
+
+That later milestone will add the actual iCloud/CloudKit environment. At that point this guide must include:
 
 - iCloud container identifier;
 - required entitlements;
 - Development vs Production CloudKit environment handling;
 - schema/container initialization and promotion procedure;
-- compatibility/migration rules for persisted Capture data;
+- current Capture schema and conflict/deletion semantics;
 - release validation for cross-device synchronization.
 
 Do not hard-code fake container identifiers or declare CloudKit ready before the actual Apple Developer configuration exists.

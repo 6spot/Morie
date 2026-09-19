@@ -1,45 +1,88 @@
-# M-005 — Context-aware Personalization
+# M-005 — Input Cleanup and Personalization
 
 ## Status
 
-- **State:** TODO
-- **Phase:** Phase 3
-- **Starts after:** M-004 can retrieve trustworthy relevant context
+- **State:** IN PROGRESS
+- **Last updated:** 2026-09-18
+- **Phase:** Phase 3 (task area, not execution order)
+- **Active integration:** [M-009](M-009-macos-input-memory.md), branch `feature/m-009-input-dictionary-memory`.
+- **Dependency:** durable Capture. Basic cleanup does not require personal Memory.
 
 ## Why
 
-Stored Memory is only useful when it improves the user's next expression. This phase closes the loop by feeding relevant Personal Context back into correction and rewriting.
+Voice input should be immediately useful and readable while retaining the user's meaning and tone. Dictionary spellings improve words, and relevant personal context can help interpret the current expression without adding historical background.
 
 ## Scope
 
-Planned:
+- The [approved independent cleanup contract](../input-cleanup.md): meaningless filler/repetition removal, clear self-corrections, punctuation, paragraphs and lists only for existing structure.
+- Dictionary spelling normalization of the same word's letter case before optional AI processing; full-/half-width forms remain distinct and [M-011](M-011-simple-dictionary.md) removes alias rules.
+- Bounded native Foundation Models cleanup, independently useful with empty Memory.
+- Durable original/final text and exact dictionary/context/outcome provenance.
+- Input priority, deadline/cancellation, save-error and stale-source/context handling.
+- Opt-in word-correction suggestions to the separate user dictionary (M-009).
 
-- context-aware correction;
-- project/person/vocabulary-aware terminology recovery;
-- restrained rewrite/cleanup;
-- writing-style context;
-- learning from explicit user corrections where appropriate;
-- latency/quality measurement versus the Phase 0 baseline.
-
-Excluded:
-
-- generic AI assistant behavior unrelated to capture/input;
-- autonomous task execution;
-- cloud-only personalization requirements.
+Excluded: answering/executing dictated content, generic rewrites, unexpressed background, automatic style imitation, inspiration/follow-up, external runtimes, cloud providers and compatibility layers.
 
 ## Acceptance criteria
 
-1. Relevant Memory measurably improves terminology/correction on representative user captures.
-2. Basic voice input remains fast and reliable when personalization is unavailable or unnecessary.
-3. Rewriting preserves user intent and trends toward the user's own expression rather than generic AI prose.
-4. Incorrect/stale Memory can be excluded or superseded without persistent contamination.
-5. Personalization latency and failure behavior are documented.
+1. Basic cleanup works without Memory and preserves meaning, tone, terminology, uncertainty and complete short replies.
+2. Clear fillers/redundancy/self-corrections can be removed; clear structure can become paragraphs/lists without new content, summary, explanation, translation or answers.
+3. Saved dictionary words supply Speech hints and same-word spelling normalization even when AI is disabled, busy, unavailable or timed out. No alias or inferred substitution rules remain.
+4. Original recognition is durable before processing; final text and its actual processing context are durable before insertion and idle learning.
+5. Changed/deleted sources and stale dictionary/Memory snapshots cannot deliver a late AI result. Save failure cannot expose unsaved output.
+6. New recording does not wait for optional model teardown. Recover current-version interruptions without replaying a paste; preserve existing final output during Speech retry.
+7. Actual quality and latency are measured with supported hardware before completion; prompt assertions and unit tests are not proof of semantic equivalence.
 
 ## Progress
 
-Not started. Exact quality metrics will be defined using data from Phases 0–2.
+- [x] Replace anchored punctuation-only proposals with independent cleanup under approved instructions.
+- [x] Normalize saved dictionary spellings first and keep dictionary fallback independent of model availability.
+- [x] Retain deadline/cancellation ownership and durable source/final/provenance checks.
+- [x] Recheck source/dictionary/Memory after generation; preserve Capture through errors/restart/retry.
+- [x] Connect native Settings/History and automatic analysis of saved final input through M-009.
+- [x] Verify with isolated model stubs, persistence tests and actual SDK compilation.
+- [ ] Measure fidelity, unintended changes, hint benefit, timeout rate, final-to-delivery latency and native interactions.
+
+## Implementation notes
+
+`InputRefiner` supplies JSON input/context as data under the Chinese cleanup contract, uses current Apple `LanguageModelSession` and `@Generable`, and bounds the entire request with native token accounting. It returns complete final text. Morie trusts that structured model result instead of applying a second mechanical language validator; the save boundary rejects only empty or malformed text, while stale snapshots and save failures remain protected independently.
+
+`CapturePersonalizer` saves dictionary-corrected fallback even if cleanup is off/busy/fails. Stale dictionary or failed final save uses verified durable original text. `CaptureRefinement` stores original input, dictionary/personal snapshots, edits, outcome/reason and elapsed time; Speech recognition remains separate from final output.
+
+The provisional model-wait limit is two seconds. The caller resumes on deadline/cancellation without joining an uncooperative model; no new optional model task overlaps draining work. Storage and scheduling add overhead outside this budget. Idle personal Memory learns from the completed current-app Capture after final save; it has no confirmation inbox.
+
+Existing capture-only persistence/refinement remains without expanding inspiration or admitting it to daily-input learning. Native word-correction prompts require separate opt-in and explicit spelling confirmation; they do not create global aliases or personal facts.
+
+## Validation evidence
+
+The dated results below belong to the earlier confirmed-term/anchored-edit slice. M-009 directly replaces its narrow cleanup and mandatory candidate review. Current behavior/tests are recorded in [M-009](M-009-macos-input-memory.md#validation-evidence).
+
+- Isolated macOS 27/Xcode 27 Debug app build passed, including the final native disclosure alignment: `/tmp/morie-personalization-build.Jdqg9D/verified-build.log`.
+- All **91 tests passed, 0 failed, 0 skipped**, confirmed with `xcresulttool get test-results summary` for `/tmp/morie-personalization-tests.sAsng6/FinalLogic.xcresult`; log `/tmp/morie-personalization-tests.sAsng6/final-tests.log`.
+- The 26 new personalization tests cover grounded edits and content protection; durable original/final ordering and provenance; disabled/busy/error outcomes; save rollback and preservation of delivery outcomes; History retry and late discard; recovery; source/Memory changes; blocked running-source actions; automatic final-text extraction and stale candidates; timeout/cancellation with a deliberately uncooperative model. Existing 65 Capture/History/audio/Memory/candidate tests still pass.
+- Tests inject model results and use temporary storage and a test diagnostics sink. They do not open the microphone, invoke Apple Intelligence, paste/copy, launch the product app, or touch production History/logs. Compilation covers the real native model implementation.
+- Four native views were rendered and inspected with synthetic data: final/recognized Capture detail, expanded refinement provenance, original text after timeout and Settings. PNGs: `/tmp/morie-personalization-preview.D1Aqw5/verified/`; harness: `/tmp/morie-personalization-preview.D1Aqw5/PersonalizationPreview.swift`; render log: `/tmp/morie-personalization-preview.D1Aqw5/verified-render.log`. Temporary presentation copies expose the detail and bind disclosure state for layout checks; Settings uses a memory-only controller so app bootstrap is never invoked. No visible window, model, microphone, clipboard, production store or product logger was used. Offscreen rendering checks layout, not interactive/material acceptance.
+- Interactive hardware and real-model quality/latency checks remain deferred to tonight by the owner; they are not waived. M-005 is not `DONE`.
+
+## Quality and latency acceptance
+
+Use [the cleanup/model checklist](../validation.md#m-005-input-personalization) with disposable Chinese, English and mixed-language samples. Compare cleanup with an empty personal profile, dictionary hints, same-word letter-case variants, distinct full-/half-width forms, related Memory, and cleanup disabled.
+
+Include meaningful 嗯/好的/OK replies, emphatic repetitions, unclear alternatives, dates/numbers, questions/requests, names, code, commands/URLs and long inputs. Confirm no summary, answer, new background or changed stance. Measure actual Speech hint benefit separately from deterministic spelling normalization. Record model outcomes and the final-to-delivery latency/timeout rate instead of inferring quality from test runtimes.
+
+## Blockers and follow-up
+
+- Device and actual model acceptance remain open, together with M-002/M-003/M-004/M-008/M-009.
+- Validate useful correction suggestions and focus behavior across current macOS fields.
+- iOS/mobile inspiration and cross-device sync remain unscheduled. No current enrollment/container IDs are required.
+
+## Issue / PR
+
+No new Issue/PR. M-009 owns the current integration; the earlier slice used `feature/m-005-personalization`.
 
 ## References
 
-- [`../product-architecture-baseline.md`](../product-architecture-baseline.md)
-- predecessor: [`M-004-memory.md`](./M-004-memory.md)
+- [Product baseline](../product-architecture-baseline.md)
+- [Cleanup contract](../input-cleanup.md)
+- [M-004](M-004-memory.md)
+- [M-009](M-009-macos-input-memory.md)

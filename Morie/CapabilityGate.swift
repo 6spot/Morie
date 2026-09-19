@@ -1,150 +1,184 @@
+import AppKit
 @preconcurrency import ApplicationServices
 import AVFoundation
-import Foundation
 import FoundationModels
 import Speech
 
+/// All probes are read-only; TCC prompts are limited to explicit setup actions.
+@MainActor
 struct CapabilityGate {
-    enum GateError: LocalizedError {
-        case appleIntelligenceUnsupportedDevice
-        case appleIntelligenceNotEnabled
-        case appleIntelligenceModelNotReady
-        case appleIntelligenceLocaleUnsupported(String)
-        case appleIntelligenceUnavailable(String)
-        case speechUnavailable
-        case localeUnsupported(String)
-        case microphoneDenied
-        case speechPermissionDenied
-        case accessibilityDenied
+    func inspect(locale: Locale) async -> [CapabilityCheck] {
+        let intelligence = inspectAppleIntelligence(locale: locale)
+        let transcription = await inspectSpeech(locale: locale)
+        let microphone: CapabilityCheck
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            microphone = .init(requirement: .microphone, state: .ready)
+        case .notDetermined:
+            microphone = .init(requirement: .microphone, state: .notDetermined, action: .requestPermission)
+        case .denied:
+            microphone = .init(requirement: .microphone, state: .denied,
+                               detail: "在“隐私与安全性 → 麦克风”中允许 Morie 访问。", action: .openSettings)
+        case .restricted:
+            microphone = .init(requirement: .microphone, state: .restricted,
+                               detail: "麦克风访问受系统或设备管理策略限制，请检查相关限制。")
+        @unknown default:
+            microphone = .init(requirement: .microphone, state: .unavailable, detail: "暂时无法读取麦克风权限，请重新检查。")
+        }
 
-        var errorDescription: String? {
-            switch self {
-            case .appleIntelligenceUnsupportedDevice:
-                "This Mac does not support Apple Intelligence, which is required for Morie Private Mode."
-            case .appleIntelligenceNotEnabled:
-                "Apple Intelligence is supported on this Mac but is not enabled. Turn it on in System Settings, then recheck Morie."
-            case .appleIntelligenceModelNotReady:
-                "Apple Intelligence is enabled, but the on-device model is not ready yet. It may still be downloading or preparing."
-            case .appleIntelligenceLocaleUnsupported(let locale):
-                "Apple Intelligence does not support the current locale (\(locale)) for Morie Private Mode."
-            case .appleIntelligenceUnavailable(let reason):
-                "Apple Intelligence is unavailable: \(reason)"
-            case .speechUnavailable:
-                "SpeechTranscriber is unavailable on this Mac."
-            case .localeUnsupported(let locale):
-                "Speech transcription does not support the current locale (\(locale))."
-            case .microphoneDenied:
-                "Microphone permission is required."
-            case .speechPermissionDenied:
-                "Speech recognition permission is required."
-            case .accessibilityDenied:
-                "Accessibility permission is required for the global shortcut and text delivery."
-            }
+        let recognition: CapabilityCheck
+        switch SFSpeechRecognizer.authorizationStatus() {
+        case .authorized:
+            recognition = .init(requirement: .speechRecognition, state: .ready)
+        case .notDetermined:
+            recognition = .init(requirement: .speechRecognition, state: .notDetermined, action: .requestPermission)
+        case .denied:
+            recognition = .init(requirement: .speechRecognition, state: .denied,
+                                detail: "在“隐私与安全性 → 语音识别”中允许 Morie 访问。", action: .openSettings)
+        case .restricted:
+            recognition = .init(requirement: .speechRecognition, state: .restricted,
+                                detail: "语音识别受系统或设备管理策略限制，请检查相关限制。")
+        @unknown default:
+            recognition = .init(requirement: .speechRecognition, state: .unavailable, detail: "暂时无法读取语音识别权限，请重新检查。")
+        }
+
+        let accessibility: CapabilityCheck = AXIsProcessTrusted()
+            ? .init(requirement: .accessibility, state: .ready)
+            : .init(requirement: .accessibility, state: .denied,
+                    detail: "在“隐私与安全性 → 辅助功能”中开启 Morie，然后返回这里。", action: .openSettings)
+        let checks = [intelligence, transcription, microphone, recognition, accessibility]
+        Diagnostics.record("Capability", checks.map { "\($0.requirement)=\($0.state)" }.joined(separator: "; "))
+        return checks
+    }
+
+    func requestPermission(_ requirement: SetupRequirement) async {
+        let permissionWindow = NSApplication.shared.keyWindow
+        switch requirement {
+        case .microphone:
+            guard AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined else { return }
+            Diagnostics.record("Permission", "Requesting microphone access from setup")
+            _ = await AVCaptureDevice.requestAccess(for: .audio)
+        case .speechRecognition:
+            guard SFSpeechRecognizer.authorizationStatus() == .notDetermined else { return }
+            Diagnostics.record("Permission", "Requesting Speech authorization from setup")
+            await Self.requestSpeechAuthorization()
+        default:
+            break
+        }
+        restore(window: permissionWindow)
+    }
+
+    static func requestSpeechAuthorization(
+        using recognizer: SFSpeechRecognizer.Type = SFSpeechRecognizer.self
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            // Speech may call this Objective-C handler on a background queue.
+            // Only resume the thread-safe continuation; do not inherit MainActor.
+            recognizer.requestAuthorization { @Sendable _ in continuation.resume() }
         }
     }
 
-    func requirePrivateMode() async throws {
-        Diagnostics.record("Capability", "Starting capability checks")
-        try requireAppleIntelligence()
-        try await requireSpeech()
-        try await requireMicrophone()
-        try await requireSpeechAuthorization()
-        try requireAccessibility()
-        Diagnostics.record("Capability", "All Phase 0 capability checks passed")
+    func openSettings(for requirement: SetupRequirement) async {
+        guard let url = requirement.settingsURL else { return }
+        let permissionWindow = NSApplication.shared.keyWindow
+        Diagnostics.record("Permission", "Opening permission flow for \(requirement)")
+        if requirement == .accessibility, !AXIsProcessTrusted() {
+            // This is the only public API that registers the current signed
+            // app in the Accessibility list. Let its single native prompt own
+            // navigation to Settings instead of opening a second window here.
+            let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+            _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+            // Some TCC states register the app without presenting the prompt
+            // again. Open the pane as part of the same click after registration
+            // so the user never has to press Morie's button twice.
+            try? await Task.sleep(for: .milliseconds(250))
+            NSWorkspace.shared.open(url)
+        } else {
+            NSWorkspace.shared.open(url)
+        }
+
+        guard requirement.isPermission else { return }
+        // macOS does not publish a TCC-change notification. Poll only while an
+        // explicit Settings action is outstanding, then stop as soon as the
+        // permission is granted or after five minutes.
+        var didLeaveMorie = false
+        for _ in 0..<600 {
+            if permissionIsGranted(requirement) {
+                Diagnostics.record("Permission", "Permission granted in System Settings for \(requirement)")
+                restore(window: permissionWindow)
+                return
+            }
+            do { try await Task.sleep(for: .milliseconds(500)) }
+            catch { return }
+            // Returning to Morie without granting is also terminal; let the
+            // controller perform its normal final inspection immediately.
+            if NSApplication.shared.isActive {
+                if didLeaveMorie { return }
+            } else {
+                didLeaveMorie = true
+            }
+        }
+        Diagnostics.record("Permission", "Stopped waiting for System Settings permission for \(requirement)", level: .warning)
     }
 
-    private func requireAppleIntelligence() throws {
-        let model = SystemLanguageModel.default
-        Diagnostics.record("Capability", "Apple Intelligence availability: \(String(describing: model.availability))")
+    private func permissionIsGranted(_ requirement: SetupRequirement) -> Bool {
+        switch requirement {
+        case .microphone: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        case .speechRecognition: SFSpeechRecognizer.authorizationStatus() == .authorized
+        case .accessibility: AXIsProcessTrusted()
+        default: false
+        }
+    }
 
+    private func restore(window: NSWindow?) {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+    }
+
+    private func inspectAppleIntelligence(locale: Locale) -> CapabilityCheck {
+        let model = SystemLanguageModel.default
         switch model.availability {
         case .available:
-            guard model.supportsLocale(.current) else {
-                Diagnostics.record("Capability", "Apple Intelligence locale unsupported: \(Locale.current.identifier)", level: .error)
-                throw GateError.appleIntelligenceLocaleUnsupported(Locale.current.identifier)
+            guard model.supportsLocale(locale) else {
+                return .init(requirement: .appleIntelligence, state: .unavailable,
+                             detail: "Apple 智能暂不支持当前输入语言（\(locale.identifier)）。")
             }
-            Diagnostics.record("Capability", "Apple Intelligence ready for locale \(Locale.current.identifier)")
+            return .init(requirement: .appleIntelligence, state: .ready)
         case .unavailable(.deviceNotEligible):
-            Diagnostics.record("Capability", "Apple Intelligence unavailable: device not eligible", level: .error)
-            throw GateError.appleIntelligenceUnsupportedDevice
+            return .init(requirement: .appleIntelligence, state: .unavailable,
+                         detail: "这台 Mac 不支持 Apple 智能，无法运行 Morie 所需的本机智能功能。")
         case .unavailable(.appleIntelligenceNotEnabled):
-            Diagnostics.record("Capability", "Apple Intelligence unavailable: not enabled", level: .error)
-            throw GateError.appleIntelligenceNotEnabled
+            return .init(requirement: .appleIntelligence, state: .unavailable,
+                         detail: "请在系统设置中开启 Apple 智能。", action: .openSettings)
         case .unavailable(.modelNotReady):
-            Diagnostics.record("Capability", "Apple Intelligence unavailable: model not ready", level: .warning)
-            throw GateError.appleIntelligenceModelNotReady
-        case .unavailable(let reason):
-            Diagnostics.record("Capability", "Apple Intelligence unavailable: \(String(describing: reason))", level: .error)
-            throw GateError.appleIntelligenceUnavailable(String(describing: reason))
+            return .init(requirement: .appleIntelligence, state: .unavailable,
+                         detail: "本机模型仍在下载或准备中，完成后请重新检查。", action: .openSettings)
+        case .unavailable:
+            return .init(requirement: .appleIntelligence, state: .unavailable,
+                         detail: "Apple 智能暂时不可用，请检查系统设置后重试。", action: .openSettings)
         }
     }
 
-    private func requireSpeech() async throws {
-        Diagnostics.record("Capability", "SpeechTranscriber availability: \(SpeechTranscriber.isAvailable)")
+    private func inspectSpeech(locale: Locale) async -> CapabilityCheck {
         guard SpeechTranscriber.isAvailable else {
-            throw GateError.speechUnavailable
+            return .init(requirement: .speechTranscription, state: .unavailable,
+                         detail: "这台 Mac 暂时无法使用 Apple 本机语音转写。")
         }
-
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) else {
-            Diagnostics.record("Capability", "Speech locale unsupported: \(Locale.current.identifier)", level: .error)
-            throw GateError.localeUnsupported(Locale.current.identifier)
+        guard await SpeechTranscriber.supportedLocale(equivalentTo: locale) != nil else {
+            return .init(requirement: .speechTranscription, state: .unavailable,
+                         detail: "Apple 语音转写暂不支持当前输入语言（\(locale.identifier)）。")
         }
-
-        Diagnostics.record("Capability", "Speech locale resolved: \(locale.identifier)")
+        return .init(requirement: .speechTranscription, state: .ready)
     }
+}
 
-    private func requireMicrophone() async throws {
-        let initialStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        Diagnostics.record("Permission", "Microphone authorization: \(String(describing: initialStatus))")
-
-        let allowed: Bool
-        switch initialStatus {
-        case .authorized:
-            allowed = true
-        case .notDetermined:
-            Diagnostics.record("Permission", "Requesting microphone access")
-            allowed = await AVCaptureDevice.requestAccess(for: .audio)
-            Diagnostics.record("Permission", "Microphone request result: \(allowed)")
-        default:
-            allowed = false
-        }
-
-        guard allowed else {
-            Diagnostics.record("Permission", "Microphone permission denied", level: .error)
-            throw GateError.microphoneDenied
-        }
-    }
-
-    private func requireSpeechAuthorization() async throws {
-        let initialStatus = SFSpeechRecognizer.authorizationStatus()
-        Diagnostics.record("Permission", "Speech authorization: \(String(describing: initialStatus))")
-
-        let status: SFSpeechRecognizerAuthorizationStatus
-        if initialStatus == .notDetermined {
-            Diagnostics.record("Permission", "Requesting Speech recognition authorization")
-            status = await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
-            }
-            Diagnostics.record("Permission", "Speech authorization result: \(String(describing: status))")
-        } else {
-            status = initialStatus
-        }
-
-        guard status == .authorized else {
-            Diagnostics.record("Permission", "Speech recognition permission denied", level: .error)
-            throw GateError.speechPermissionDenied
-        }
-    }
-
-    private func requireAccessibility() throws {
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let options = [promptKey: true] as CFDictionary
-        let trusted = AXIsProcessTrustedWithOptions(options)
-        Diagnostics.record("Permission", "Accessibility trusted: \(trusted)")
-
-        guard trusted else {
-            Diagnostics.record("Permission", "Accessibility permission missing", level: .error)
-            throw GateError.accessibilityDenied
-        }
+extension PermissionSetupController {
+    convenience init(locale: Locale) {
+        let gate = CapabilityGate()
+        self.init(
+            inspect: { await gate.inspect(locale: locale) },
+            requestPermission: { await gate.requestPermission($0) },
+            openSettings: { await gate.openSettings(for: $0) }
+        )
     }
 }

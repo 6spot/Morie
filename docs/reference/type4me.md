@@ -92,15 +92,23 @@ Primary reference:
 - `Type4MeTests/HotkeyStateMachineTests.swift`
 - relevant review/development reports
 
-Morie requirement is currently a focused push-to-talk interaction, not Type4Me's generalized hotkey subsystem.
+Morie requirement is a focused toggle-capture interaction, not Type4Me's generalized hotkey subsystem.
 
 Potentially reusable lessons:
 
 - repeat suppression;
-- explicit press/hold/release ownership;
+- explicit key-press ownership and repeat suppression;
 - stale state cleanup;
 - stop/abort/reset idempotency;
 - synthetic-event exclusion where Morie's own injected events can feed the same event path.
+- fail-open handling when Accessibility trust disappears: tear down the tap and return the event untouched;
+- keep file logging off the event/UI path on a dedicated serial queue.
+
+Current Morie-specific decision after the 2026-09-17 real-device timeout incident:
+
+- **ADAPT:** Type4Me's immediate Accessibility check, tap teardown, state reset, pass-through behavior, and background diagnostic-file queue.
+- **DROP:** media/mouse/generalized binding machinery and its broad 0.5-second hotkey watchdog.
+- **DO NOT COPY:** Type4Me automatically re-enables a disabled tap while Accessibility remains trusted. Morie observed six disable/re-enable events in one short run together with system-wide keyboard unresponsiveness, so Phase 0 uses the safer policy: release on timeout and require an explicit capability recheck.
 
 Do **not** automatically migrate:
 
@@ -142,6 +150,7 @@ Potentially reusable lessons:
 - avoid delivering into Morie itself;
 - preserve user text if the target disappears;
 - change-count-aware clipboard restore;
+- transient pasteboard markers so temporary injection/restoration traffic is not captured by clipboard-history apps such as Raycast;
 - synthetic Cmd+V event marking if required by Morie's chosen event mechanism;
 - bounded Accessibility access;
 - real compatibility testing across representative apps.
@@ -175,6 +184,27 @@ The implementation itself must be based on the **current macOS 27 Speech APIs** 
 Type4Me can provide evidence about practical macOS permission flows, but Morie must use current macOS 27 behavior and Apple system UI.
 
 Only current requirements for Microphone, Speech Recognition, Accessibility/event handling, and recovery after Settings changes should be retained.
+
+M-010 audit, 2026-09-18: inspected `PermissionManager.swift`, `PermissionGuideModel.swift` and `Type4MeTests/PermissionGuideModelTests.swift` at upstream `cc56207b46a30c4c6bf7af0c04b48cc44d06ffc4`. Reviewed permission history `092f71e` (denial/settings return and old signing identity), `5fce88f` (#281: setup bypass, overlay polling CPU and revocation handling) and `bfa487e` (guide/settings consistency).
+
+- **ADAPT:** separate read-only inspection from explicit requests; denied Microphone/Speech access goes to System Settings; refresh on app activation; give setup and recovery one clear native guide.
+- **ADAPT:** mandatory completion checks cannot be bypassed. Morie additionally requires Apple Intelligence, modern Chinese Speech availability and Speech authorization, regardless of another product's optional-provider rules. Tests inject all status/actions and never query real TCC.
+- **DROP:** custom permission-drag overlays, System Settings window polling, provider selection, optional Apple Speech, signature migration recovery and automatic relaunch/probe systems. These do not follow Morie's current native-only, no-legacy requirement.
+- **VERIFY:** any current macOS 27 event-tap/permission restart issue must be reproduced before adding recovery logic. Existing event-tap failure remains explicit and preserves ordinary keyboard input; this UI task does not add a platform workaround.
+
+The implementation is Morie-owned snapshot/controller logic plus native Apple permission APIs and SwiftUI Form/Window controls. No Type4Me implementation or external dependency was imported.
+
+M-010 Speech callback follow-up, 2026-09-18: rechecked the same upstream `PermissionManager.swift`, guide tests and `092f71e` history against the owner's paused-process stack and macOS 27 SDK header. Type4Me's permission manager is nonisolated; Morie's gate is `@MainActor`, so a same-shaped unannotated completion inherits an isolation requirement that the background TCC callback violates.
+
+- **ADAPT:** checked-continuation completion and status reinspection, with an explicit `@Sendable` handler at Morie's native Speech boundary. A regression retaining the Objective-C call boundary reproduces the dispatch assertion without touching TCC and passes with the annotation.
+- **DROP:** assuming the authorization callback runs on the main queue, changing global concurrency checks, or introducing signing/relaunch compatibility logic for this failure.
+- **VERIFY:** signed-app allow/deny and Settings-return behavior after rebuilding; injected callbacks do not establish actual consent-dialog acceptance.
+
+M-010 permission-window focus follow-up, 2026-09-19: the owner requires the originating Morie window to return after an explicit authorization, and requires Accessibility to open its Settings pane without a redundant system prompt. This narrows the earlier rejection of Type4Me's broad Settings-window polling.
+
+- **ADAPT:** remember and restore the originating native window; after an explicit Privacy-pane action only, use a bounded low-frequency permission-status wait that terminates on grant, return, cancellation or timeout.
+- **DROP:** permanent/background System Settings polling and opening the Accessibility pane in parallel with its registration prompt. A later device finding confirmed that `prompt: false` does not add a new app to the list, so Morie must retain `kAXTrustedCheckOptionPrompt: true` as the single public registration/navigation flow.
+- **VERIFY:** signed-app TCC registration, focus ordering, allow/deny and return-without-grant behavior on macOS 27. Logic tests do not control System Settings or establish device acceptance.
 
 ### 7. Later-phase reusable lessons
 
@@ -238,3 +268,92 @@ For each, record:
 ## Current assessment
 
 The first Morie Phase 0 skeleton is still provisional, but the goal is **not** to replace it with Type4Me's full mature machinery. The goal is to use Type4Me to identify which failure modes are worth protecting against, then implement only the macOS 27-native subset that Morie's design actually requires.
+
+M-003 source-audio evidence:
+
+- `ADAPT`: Type4Me's single authoritative `AVCaptureAudioDataOutput`, deterministic stop/drain/detach lifecycle, and streaming sample ownership.
+- `DROP`: full uncompressed PCM accumulation in memory and provider/runtime complexity.
+- `REJECTED`: adding `AVCaptureAudioFileOutput` beside Apple's `CaptureInputSequenceProvider` data output. Although `canAddOutput` returned true, macOS 27 threw an Objective-C exception from `startRecording` and aborted Morie on owner hardware.
+- Morie's replacement must preserve the approved 7-day compressed-audio policy while using one proven data-output path; it must not start a second microphone session.
+- `ADAPT` implemented for verification: Morie now owns one data output and drains its callback queue before finishing. Each buffer is forwarded to Apple Speech and streamed to Apple's AAC encoder; unlike Type4Me, the complete PCM recording is never accumulated in memory.
+
+## M-003 History recovery audit — 2026-09-18
+
+Morie requirement: play retained audio and explicitly re-recognize it without losing the original Capture, altering a previous delivery, or delaying a new live input session.
+
+Inspected `Type4Me/UI/Settings/HistoryTab.swift`, the finalization/retry portions of `Type4Me/Session/RecognitionSession.swift`, and `Type4MeTests/RecordingCancellationTests.swift` in fix [#311](https://github.com/joewongjc/type4me/pull/311) (`cc56207b`). The relevant history also includes [#303](https://github.com/joewongjc/type4me/pull/303), which records why recognized and delivered text must remain distinguishable.
+
+- **ADAPT:** preserve earlier nonempty transcript evidence even if a later result becomes empty; distinguish explicit cancellation from failed recognition; reject late results after cancellation; retain original delivered output separately from a new recognition.
+- **DROP:** automatic multi-provider/batch retry, network finalization grace periods, full PCM replay buffers, custom History styling, and provider/usage analytics.
+- **VERIFY:** quiet speech versus ambient noise and native file-recognition/playback behavior on macOS 27. No new audio threshold is accepted as a proven speech detector.
+
+Apple's current [`SpeechDetector`](https://developer.apple.com/documentation/speech/speechdetector) documentation says it gates transcription and may discard real speech. Morie therefore keeps the live `SpeechTranscriber` path and performs explicit History retry through `SpeechAnalyzer.analyzeSequence(from:)`. Uncertain empty recordings remain recoverable. No Type4Me source was copied.
+
+## M-003 capture-only entry audit — 2026-09-18
+
+The approved Morie baseline requires `captureOnly` as an intentional in-app entry. Inspected the session-start target reset and post-recognition delivery decision in `Type4Me/Session/RecognitionSession.swift`, together with the cancellation tests and #311 history already cited above.
+
+- **ADAPT:** establish a fresh destination for every capture, retain session identity through asynchronous finalization, and keep successful completion distinct from cancellation.
+- **DROP:** Type4Me's manual/automation target routing and configurable clipboard output after cancellation. Morie's saved `captureOnly` mode bypasses delivery entirely and uses the existing explicit-discard cancellation behavior.
+- **VERIFY:** switching apps before capture-only finish, alternating with normal shortcut input, and live microphone/History preemption on macOS 27.
+
+The implementation adds no provider, legacy format, old API or compatibility route, and copies no Type4Me source.
+
+## M-003 interruption preservation audit — 2026-09-18
+
+Morie requirement: operational interruption must retain intentional audio/text; explicit user cancellation must close native recording before discarding it. Source conversion/finalization failure must not delete earlier AAC frames.
+
+Inspected explicit cancellation and terminal-error handling in `Type4Me/Session/RecognitionSession.swift`, stop/drain/detach in `Type4Me/Audio/AudioCaptureEngine.swift`, synchronous paste dispatch in `Type4Me/Injection/TextInjectionEngine.swift`, and the recording-cancellation tests/history at #311 (`cc56207b`). `AudioCaptureEngineTests.swift` covers format/chunk assumptions and does not prove error-path AAC finalization.
+
+- **ADAPT:** authoritative session identity, deterministic teardown, preservation of prior text/audio after operational error, explicit discard semantics, and recording delivery outcome at paste dispatch.
+- **DROP:** provider/network recovery, automatic partial-text injection, broad device workarounds, and complete PCM replay storage. No Type4Me source was copied.
+- **VERIFY:** actual macOS 27 microphone interruptions, startup/finalization cancellation timing and immediate subsequent capture. Apple AAC encode/decode tests now prove readable files for controlled converter/flush errors and immediate stop; they do not replace those device checks.
+
+## M-004 explicit Memory foundation audit — 2026-09-18
+
+Morie requirement: selectively save user-confirmed vocabulary/project memory with source IDs and lifecycle, then retrieve active context. Inspected `Services/VocabularyCommands.swift`, `Services/HotwordStorage.swift`, `Type4MeTests/VocabularyCommandsTests.swift`, and the provenance distinction in `UI/Settings/CorrectionProvenance.swift` (#300).
+
+- **ADAPT:** case-insensitive duplicate detection, surfacing save failures, explicit user choice before vocabulary writes, and recording provenance when an action occurs rather than reconstructing it later.
+- **DROP:** UserDefaults/file migration, built-in dictionaries, snippet replacement rules, URL/automation commands, cloud hotword tables and external ASR restarts. Morie uses the current SwiftData schema directly and has no compatibility contract.
+- **VERIFY:** native editor/navigation/accessibility and the usefulness of real Chinese/English names/aliases. Native NaturalLanguage matching is tested on synthetic examples; no Type4Me source or dictionary is copied.
+
+## M-004 candidate provenance audit — 2026-09-18
+
+Morie requirement: use saved final text for selective candidate extraction, retain the actual input/evidence, and explicitly review before creating Memory. The owner requires future AI-polished output to be saved here while recognized text remains separate. Revisited `UI/Settings/CorrectionProvenance.swift` and `Type4MeTests/CorrectionProvenanceTests.swift` (#300).
+
+- **ADAPT:** record the actual text/provenance at the action boundary; distinguish recognized text from final output and avoid attributing an AI transformation to another operation. Keep explicit review and duplicate/save-error behavior from the vocabulary audit above.
+- **DROP:** legacy provenance reconstruction, snippet/provider routing, translation modes and old-build inference. Morie has no released data contract and calls the macOS 27 on-device Foundation Models APIs directly. No Type4Me source was copied.
+- **VERIFY:** model selectivity, Chinese/English evidence fidelity, review usability and optional-model cancellation latency on owner hardware. Deterministic tests prove source-state handling, not AI quality.
+
+## M-005 restrained input refinement audit — 2026-09-18
+
+Morie requirement: use confirmed relevant Vocabulary/Project context to improve the next input while preserving the user's own wording and reliable delivery. Inspected `Type4MeTests/IntelliSensePromptAndGuardTests.swift`, `Type4Me/LLM/PromptContext.swift`, and the provenance lessons in `UI/Settings/CorrectionProvenance.swift` / its tests (#300).
+
+- **ADAPT:** treat transcript/context as data rather than instructions; preserve technical tokens, negation, facts and tone; do not answer dictated requests; do not remove acknowledgments such as 嗯/OK/好的 through a filler-word list. Record the actual input and change provenance when refinement happens.
+- **DROP:** scene/provider routing, prompt-variable frameworks, clipboard/selection context reads, translation modes, generalized rewriting, old-build inference and Type4Me's lock/detached-AX timeout machinery. Morie uses one current native model session, a native structured result and a Swift-concurrency deadline owner; no source was copied.
+- **VERIFY:** real on-device terminology benefit, punctuation quality, mixed-language fidelity and latency versus unrefined input. A provisional 2-second model-wait deadline and deterministic cancellation tests establish a control-flow bound, not measured Foundation Models performance or a guarantee that punctuation always preserves meaning.
+
+## M-009 dictionary and automatic Memory amendment — 2026-09-18
+
+The earlier M-004/M-005 audits record the design at that time. The owner's current requirement separates user-maintained words from automatically learned personal information and removes required Memory candidate confirmation. [M-009](../tasks/M-009-macos-input-memory.md) and [the cleanup contract](../input-cleanup.md) supersede those earlier product rules.
+
+- **ADAPT:** existing prompt/data isolation, technical-content protection, provenance, save-error and duplicate-handling lessons; native Speech contextual strings supply bounded dictionary hints. Meaningful short replies and uncertainty remain content.
+- **DROP:** vocabulary stored as personal Memory, a required daily-input review inbox, narrow punctuation-only cleanup, provider-specific hotwords and any old-schema compatibility layer. Personal Memory analyzes committed final text in durable idle batches.
+- **ADAPT:** the owner-supplied [OpenLess behavior reference](openless.md) adds an independent opt-in confirmation after a user corrects a word. It creates a spelling hint, not an automatic global replacement or a personal fact. No OpenLess source is copied.
+- **VERIFY:** actual native Speech hint benefit, model fidelity and personal-evidence selection, input preemption, bounded AX reads/focus and native correction-prompt usability on macOS 27. Logic tests cannot establish those device results.
+
+## M-011 word-only dictionary amendment — 2026-09-18
+
+The owner clarified that a dictionary entry should save just one word. [M-011](../tasks/M-011-simple-dictionary.md) removes M-009's explicit-alias fields and configuration directly. The vocabulary/save-error and Speech-hint lessons above still apply; no new upstream implementation is needed for this simplification.
+
+- **ADAPT:** normalized duplicate handling, explicit save errors, bounded native Speech hints and immutable word/processing evidence.
+- **DROP:** alias editing, alias collision rules, full-/half-width normalization and unconditional substitutions. Same-word letter-case normalization remains, with native word boundaries and technical-content protection.
+- **VERIFY:** actual recognition benefit and the compact native editor's focus/keyboard/VoiceOver behavior. The OpenLess-inspired correction confirmation still saves only the corrected word.
+
+### M-011 Apple hotword and segmentation follow-up — 2026-09-19
+
+The owner's **文字 / 蚊子** and **常 蚊 子** results required checking whether Type4Me had a proven Apple-native correction path. Inspected `HotwordStorage.swift`, `SpeechRecognizer.swift`, `AppleASRClient.swift`, `RecognitionSession.swift`, provider protocol builders and relevant history at upstream `cc56207b46a30c4c6bf7af0c04b48cc44d06ffc4`.
+
+- **ADAPT:** Type4Me joins confirmed/partial recognition pieces directly and does not invent whitespace. Morie applies the same behavior to `SpeechTranscriber` results, fixing its own artificial separator that produced **常 蚊 子**. Morie retains macOS 27 `AnalysisContext.contextualStrings`, the current native equivalent of a recognition hint.
+- **DROP:** Type4Me's Apple client explicitly ignores shared `ASRRequestOptions.hotwords`; only external providers map them to native keyterm/prompt/boosting APIs. Do not copy provider hotword machinery, cloud tables, ASR restarts, alias tables, candidate heuristics, phonetic rewriting or unconditional **蚊子 → 文字** substitution. Full-/half-width normalization is also removed as unrelated to recognition quality.
+- **VERIFY:** signed-device dictation of **再来试一试长文字吧** with **文字** saved and **Codex** when Speech returns **Coldex** must confirm both useful contextual bias, model-assisted correction and absence of artificial inter-segment spaces. Apple `contextualStrings` remains a hint rather than a forced vocabulary. Morie therefore supplies the same bounded dictionary snapshot to cleanup without requiring an exact match in the erroneous transcript. Type4Me does not prove Apple-native hotword effectiveness, and logic tests cannot prove model output.

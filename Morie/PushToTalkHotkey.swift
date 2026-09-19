@@ -2,6 +2,45 @@ import AppKit
 import ApplicationServices
 import Foundation
 
+enum CaptureShortcut: String, CaseIterable, Identifiable {
+    case functionKey
+    case controlSpace
+    case optionSpace
+    case commandShiftSpace
+
+    static let defaultsKey = "captureShortcut"
+    static let defaultValue: CaptureShortcut = .functionKey
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .functionKey: "Fn / 地球仪"
+        case .controlSpace: "⌃ 空格"
+        case .optionSpace: "⌥ 空格"
+        case .commandShiftSpace: "⇧⌘ 空格"
+        }
+    }
+
+    var logName: String {
+        switch self {
+        case .functionKey: "Fn"
+        case .controlSpace: "Control+Space"
+        case .optionSpace: "Option+Space"
+        case .commandShiftSpace: "Command+Shift+Space"
+        }
+    }
+
+    fileprivate var requiredModifiers: CGEventFlags {
+        switch self {
+        case .functionKey: .maskSecondaryFn
+        case .controlSpace: .maskControl
+        case .optionSpace: .maskAlternate
+        case .commandShiftSpace: [.maskCommand, .maskShift]
+        }
+    }
+}
+
 /// Minimal macOS 27 voice-capture shortcut.
 ///
 /// Morie intentionally supports one focused keyboard interaction here. This is
@@ -11,20 +50,23 @@ final class PushToTalkHotkey {
     enum StartError: LocalizedError {
         case accessibilityUnavailable
         case eventTapCreationFailed
+        case eventTapTimedOut
 
         var errorDescription: String? {
             switch self {
             case .accessibilityUnavailable:
-                "Accessibility permission is required for the global voice-capture shortcut."
+                "使用全局录音快捷键需要辅助功能权限。"
             case .eventTapCreationFailed:
-                "Morie could not install the global voice-capture shortcut."
+                "无法启用全局录音快捷键，请在使用引导中检查权限后重试。"
+            case .eventTapTimedOut:
+                "键盘响应超时，Morie 已停用全局快捷键。请打开使用引导，重新检查并点击“开始使用”以恢复。"
             }
         }
     }
 
-    private static let shortcutKeyCode = CGKeyCode(49) // Space
+    private static let spaceKeyCode = CGKeyCode(49)
+    private static let functionKeyCode = CGKeyCode(63)
     private static let escapeKeyCode = CGKeyCode(53)
-    private static let requiredModifiers: CGEventFlags = [.maskControl]
     private static let relevantModifiers: CGEventFlags = [
         .maskCommand,
         .maskShift,
@@ -36,18 +78,23 @@ final class PushToTalkHotkey {
     private let onToggle: () -> Void
     private let onCancel: () -> Void
     private let onUnavailable: (Error) -> Void
+    private let shortcut: CaptureShortcut
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var shortcutPressOwned = false
     private var escapePressOwned = false
     private var cancellationEnabled = false
+    private var functionKeyDown = false
+    private var functionKeyUsedInChord = false
 
     init(
+        shortcut: CaptureShortcut,
         onToggle: @escaping () -> Void,
         onCancel: @escaping () -> Void,
         onUnavailable: @escaping (Error) -> Void
     ) {
+        self.shortcut = shortcut
         self.onToggle = onToggle
         self.onCancel = onCancel
         self.onUnavailable = onUnavailable
@@ -64,12 +111,14 @@ final class PushToTalkHotkey {
         }
 
         let trusted = AXIsProcessTrusted()
-        Diagnostics.record("Hotkey", "Installing Control+Space toggle event tap; accessibilityTrusted=\(trusted)")
+        Diagnostics.record("Hotkey", "Installing \(shortcut.logName) toggle event tap; accessibilityTrusted=\(trusted)")
         guard trusted else {
             throw StartError.accessibilityUnavailable
         }
 
-        let mask = Self.mask(for: .keyDown) | Self.mask(for: .keyUp)
+        let mask = Self.mask(for: .keyDown)
+            | Self.mask(for: .keyUp)
+            | Self.mask(for: .flagsChanged)
         let userInfo = Unmanaged.passUnretained(self).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
@@ -97,7 +146,7 @@ final class PushToTalkHotkey {
             throw StartError.eventTapCreationFailed
         }
 
-        Diagnostics.record("Hotkey", "Control+Space toggle event tap installed and enabled")
+        Diagnostics.record("Hotkey", "\(shortcut.logName) toggle event tap installed and enabled")
     }
 
     func setCancellationEnabled(_ enabled: Bool) {
@@ -111,6 +160,8 @@ final class PushToTalkHotkey {
         shortcutPressOwned = false
         escapePressOwned = false
         cancellationEnabled = false
+        functionKeyDown = false
+        functionKeyUsedInChord = false
 
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
@@ -134,9 +185,28 @@ final class PushToTalkHotkey {
     }
 
     fileprivate func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        // Fail open before interpreting or consuming any keyboard event. If
+        // TCC changes while Morie is running, the system must keep the event
+        // and Morie must release its tap immediately.
+        guard AXIsProcessTrusted() else {
+            Diagnostics.record(
+                "Hotkey",
+                "Accessibility trust lost during event handling; releasing event tap",
+                level: .error
+            )
+            invalidate()
+            onUnavailable(StartError.accessibilityUnavailable)
+            return Unmanaged.passUnretained(event)
+        }
+
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            Diagnostics.record("Hotkey", "Event tap disabled by system; attempting recovery", level: .warning)
-            recoverEventTapIfPossible()
+            Diagnostics.record(
+                "Hotkey",
+                "Event tap disabled by system; releasing tap instead of re-enabling it to protect system keyboard input",
+                level: .error
+            )
+            invalidate()
+            onUnavailable(StartError.eventTapTimedOut)
             return Unmanaged.passUnretained(event)
         }
 
@@ -145,7 +215,18 @@ final class PushToTalkHotkey {
         }
 
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-        if keyCode == Self.shortcutKeyCode {
+        if shortcut == .functionKey {
+            if type == .flagsChanged, keyCode == Self.functionKeyCode {
+                return handleFunctionKey(event: event)
+            }
+
+            if functionKeyDown, (type == .keyDown || type == .flagsChanged) {
+                functionKeyUsedInChord = true
+                Diagnostics.record("Hotkey", "Fn solo candidate cancelled by keyCode=\(keyCode)")
+            }
+        }
+
+        if shortcut != .functionKey, keyCode == Self.spaceKeyCode {
             return handleShortcut(type: type, event: event)
         }
 
@@ -156,14 +237,42 @@ final class PushToTalkHotkey {
         return Unmanaged.passUnretained(event)
     }
 
+    private func handleFunctionKey(event: CGEvent) -> Unmanaged<CGEvent>? {
+        let isDown = event.flags.contains(.maskSecondaryFn)
+
+        if isDown, !functionKeyDown {
+            functionKeyDown = true
+            functionKeyUsedInChord = false
+            Diagnostics.record("Hotkey", "Fn press began; waiting for solo release")
+            return Unmanaged.passUnretained(event)
+        }
+
+        if !isDown, functionKeyDown {
+            functionKeyDown = false
+            let shouldToggle = !functionKeyUsedInChord
+            functionKeyUsedInChord = false
+
+            guard shouldToggle else {
+                Diagnostics.record("Hotkey", "Fn release passed through because Fn was used in a chord")
+                return Unmanaged.passUnretained(event)
+            }
+
+            Diagnostics.record("Hotkey", "Fn solo release accepted; toggling capture")
+            onToggle()
+            return nil
+        }
+
+        return Unmanaged.passUnretained(event)
+    }
+
     private func handleShortcut(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         switch type {
         case .keyDown:
-            guard Self.hasExactShortcutModifiers(event.flags) else {
-                if event.flags.contains(.maskControl) {
+            guard hasExactShortcutModifiers(event.flags) else {
+                if !event.flags.intersection(Self.relevantModifiers).isEmpty {
                     Diagnostics.record(
                         "Hotkey",
-                        "Space keyDown ignored because modifiers were not exactly Control; flags=0x\(String(event.flags.rawValue, radix: 16))",
+                        "Space keyDown ignored because modifiers did not match \(shortcut.logName); flags=0x\(String(event.flags.rawValue, radix: 16))",
                         level: .warning
                     )
                 }
@@ -171,12 +280,12 @@ final class PushToTalkHotkey {
             }
 
             if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || shortcutPressOwned {
-                Diagnostics.record("Hotkey", "Control+Space repeat suppressed")
+                Diagnostics.record("Hotkey", "\(shortcut.logName) repeat suppressed")
                 return nil
             }
 
             shortcutPressOwned = true
-            Diagnostics.record("Hotkey", "Control+Space keyDown accepted; toggling capture")
+            Diagnostics.record("Hotkey", "\(shortcut.logName) keyDown accepted; toggling capture")
             onToggle()
             return nil
 
@@ -186,7 +295,7 @@ final class PushToTalkHotkey {
             }
 
             shortcutPressOwned = false
-            Diagnostics.record("Hotkey", "Control+Space keyUp accepted; capture state unchanged")
+            Diagnostics.record("Hotkey", "\(shortcut.logName) keyUp accepted; capture state unchanged")
             return nil
 
         default:
@@ -223,32 +332,8 @@ final class PushToTalkHotkey {
         }
     }
 
-    private func recoverEventTapIfPossible() {
-        guard let tap = eventTap else {
-            Diagnostics.record("Hotkey", "Cannot recover event tap because it no longer exists", level: .error)
-            return
-        }
-
-        guard AXIsProcessTrusted() else {
-            Diagnostics.record("Hotkey", "Event tap recovery failed: Accessibility trust lost", level: .error)
-            invalidate()
-            onUnavailable(StartError.accessibilityUnavailable)
-            return
-        }
-
-        CGEvent.tapEnable(tap: tap, enable: true)
-        guard CGEvent.tapIsEnabled(tap: tap) else {
-            Diagnostics.record("Hotkey", "Event tap recovery failed after re-enable", level: .error)
-            invalidate()
-            onUnavailable(StartError.eventTapCreationFailed)
-            return
-        }
-
-        Diagnostics.record("Hotkey", "Event tap recovered")
-    }
-
-    private static func hasExactShortcutModifiers(_ flags: CGEventFlags) -> Bool {
-        flags.intersection(relevantModifiers) == requiredModifiers
+    private func hasExactShortcutModifiers(_ flags: CGEventFlags) -> Bool {
+        flags.intersection(Self.relevantModifiers) == shortcut.requiredModifiers
     }
 
     private static func mask(for type: CGEventType) -> CGEventMask {

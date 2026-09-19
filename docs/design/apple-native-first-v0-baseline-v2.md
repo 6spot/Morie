@@ -14,6 +14,23 @@ The following owner decisions are now hard requirements:
 2. **No unilateral UI substitution:** if Apple system UI cannot satisfy a requirement, implementation must stop and obtain explicit project-owner approval before creating a custom substitute.
 3. **External dependency approval gate:** no third-party package/runtime/model/SDK/UI framework/network service may be introduced without explicit project-owner approval after documenting the Apple-native gap and trade-offs.
 4. **Type4Me is an input-foundation reference:** macOS voice input is not a greenfield rewrite. Audit and selectively reuse/adapt proven Type4Me recording-session, hotkey, target/focus, text-injection, Apple Speech, permission, packaging and correction-learning experience. Do not inherit its provider/runtime complexity.
+5. **Development stage, no legacy contract (2026-09-18):** implement the current product, schema and Apple APIs directly. Do not add old-version compatibility, legacy data reconstruction, schema migrations or speculative upgrade paths. Current-version crash recovery and Capture-first data protection still apply.
+6. **Sync sequencing (amended 2026-09-18):** first establish a useful, reliable single-Mac product. iCloud/CloudKit is outside the current milestone and will be revisited for an actual multi-Mac or iOS scenario. Apple Developer enrollment/container/team configuration is not a current dependency. Eventual sync uses each user's own iCloud private database, with no Morie backend or separate Device Only product mode.
+7. **Memory analysis text (amended 2026-09-18):** analyze committed final input, including saved dictionary/cleanup output. Retain recognized text separately and keep the exact final-text snapshot used by each analysis. A changed final text invalidates unfinished analysis of the older source; no required candidate review or raw-text fallback is introduced.
+8. **macOS development focus (2026-09-18):** the owner has no current plan to start iOS. Finish the current macOS foundation, then improve the History/Dictionary/Personal Memory/Settings/Diagnostics management pages with a unified native design language. Reconsider iOS only after the macOS product works reliably; it is not the automatic next task after M-005.
+9. **Delivery order (2026-09-18):** make one Mac useful first: shortcut → recording → durable recognition → independent basic cleanup → durable final text → reliable insertion. Local recovery protects this loop; Memory improves it; management pages support it. Module numbering does not dictate delivery priority.
+10. **Automatic personal Memory (2026-09-18):** periodically analyze saved final input in idle batches and automatically accumulate/update personal information. Daily input has no required candidate-review inbox. Viewing, correcting, archiving and deleting are optional controls. Analysis must yield to input and resume unfinished work. “Sync Memory” means local Memory updates here.
+11. **Inspiration scope (2026-09-18):** intentional inspiration follow-up mainly belongs to the future phone product. Do not design or expand it in the current Mac input/Memory milestone. Existing capture-only storage is retained without expansion.
+12. **Custom dictionary (2026-09-18):** a separate user-maintained dictionary defines exact names, technical terms and explicit aliases/misrecognitions. Personal Memory instead describes the user's projects, relationships, stable preferences and other explicitly communicated personal information. Automatic learning must not silently write dictionary rules.
+13. **Basic cleanup (2026-09-18):** adopt the owner's [cleanup rules](../input-cleanup.md). Cleanup works without Memory; dictionary and Memory must not introduce information absent from the current input. Preserve meaningful tone, emphasis, uncertainty and short replies. Dictated requests are text to clean, never instructions to answer or execute.
+
+14. **Correction-to-dictionary behavior (2026-09-18):** the owner supplied [OpenLess](../reference/openless.md) as a reference for suggesting a dictionary word after manual correction. Use an independent opt-in, stable-edit detection and native nonactivating confirmation. Remember saves the spelling only, never an inferred unconditional alias or a personal fact. This does not change automatic personal-Memory learning.
+
+15. **Chinese interface and native setup (2026-09-18):** use Simplified Chinese for the current Mac interface, the system Settings scene with Command-comma, native sidebar visibility and collapsible groups, a native permission/capability guide, and a system menu-bar menu. Inspect status without prompting; request permissions only through explicit guide actions. Returning from System Settings must not interrupt input.
+
+16. **One-word dictionary (2026-09-18, amended 2026-09-19):** the owner simplified dictionary entry to saving one word. This supersedes the explicit-alias portion of amendment 12: remove aliases and replacement-rule configuration from storage, processing and UI. Saved words supply native Speech hints; only letter-case variants of the same word normalize to its spelling, while full-/half-width forms remain distinct. Manual-correction confirmation saves just the new word. Do not infer substitutions or add compatibility machinery for the removed design.
+
+The source document below is historical product direction. These amendments supersede its phase order, immediate iCloud requirement, mandatory confirmation and inspiration scope.
 
 See also:
 
@@ -85,9 +102,11 @@ Capture...
 第一阶段只做 macOS，并把最关键的价值链一次跑通。iOS 不与 macOS 并行开发，避免在核心体验尚未验证前引入移动端生命周期、Action Button、AppIntent 等额外变量。
 
 ```text
-按住快捷键
+第一次按下快捷键
   ↓
 开始录音
+  ↓
+第二次按下完成（Esc 取消）
   ↓
 Apple Speech
   ↓
@@ -458,7 +477,7 @@ Type4Me 对 Morie 最有价值的是“输入基础设施已经踩过的坑”�
 
 | 阶段 | 主题 | 验收结果 | 主要范围 |
 | --- | --- | --- | --- |
-| Phase 0 | Input Foundation | 按住 → 说话 → 松开 → 文本在主流目标 App 中稳定进入当前输入位置 | Type4Me reference audit / Audio / Session / Hotkey / latest Speech / Focus / Injection / Capability Gate / Compatibility Matrix / native macOS 27 UI |
+| Phase 0 | Input Foundation | 按下 → 说话 → 再次按下 → 文本在主流目标 App 中稳定进入当前输入位置 | Type4Me reference audit / Audio / Session / Hotkey / latest Speech / Focus / Injection / Capability Gate / Compatibility Matrix / native macOS 27 UI |
 | Phase 1 | Capture | 所有主动表达可可靠沉淀 | Capture Model / Store / App Context / History / iCloud |
 | Phase 2 | Memory | 系统开始稳定认识用户的专有词、项目与当前相关上下文 | Vocabulary / Project / Relevant Context Retrieval；Person / Decision / Style 先保留数据模型，不要求一次做完 |
 | Phase 3 | Personalization | 历史 Context 明显改善当前表达 | Context-aware Correction / Style / Rewrite / Learning |

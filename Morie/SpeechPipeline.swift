@@ -9,25 +9,35 @@ actor SpeechPipeline {
         case noMicrophone
         case unsupportedLocale
         case notRunning
+        case recognitionFailed(String, Result)
 
         var errorDescription: String? {
             switch self {
-            case .alreadyRunning: "Speech capture is already running."
-            case .noMicrophone: "No audio capture device is available."
-            case .unsupportedLocale: "The current locale is not supported by SpeechTranscriber."
-            case .notRunning: "Speech capture is not running."
+            case .alreadyRunning: "录音正在进行中。"
+            case .noMicrophone: "没有可用的麦克风。"
+            case .unsupportedLocale: "Apple 语音转写暂不支持当前输入语言。"
+            case .notRunning: "当前没有正在进行的录音。"
+            case .recognitionFailed(let reason, _): reason
             }
         }
     }
 
+    struct Result: Sendable {
+        let transcript: String
+        let sourceAudio: CapturedSourceAudio
+    }
+
     private var activeSessionID: UUID?
     private var analyzer: SpeechAnalyzer?
-    private var provider: CaptureInputSequenceProvider?
+    private var audioSource: CaptureAudioSource?
+    private var finalizedSourceAudio: CapturedSourceAudio?
     private var resultTask: Task<Void, Error>?
     private var analysisTask: Task<CMTime?, Error>?
-    private var levelTask: Task<Void, Never>?
     private var finalizedText = ""
     private var volatileText = ""
+    private var hasTranscriptEvidence = false
+    private var isFinalizing = false
+    private var reportedFailure = false
 
     func prepare(locale requestedLocale: Locale) async throws {
         guard activeSessionID == nil else { throw PipelineError.alreadyRunning }
@@ -51,19 +61,20 @@ actor SpeechPipeline {
     func start(
         sessionID: UUID,
         locale requestedLocale: Locale,
+        sourceAudioURL: URL,
+        dictionaryWords: [String] = [],
         onTranscript: @escaping @Sendable (UUID, String) -> Void,
-        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
+        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void,
+        onFailure: @escaping @Sendable (UUID, String) -> Void
     ) async throws {
         guard activeSessionID == nil else { throw PipelineError.alreadyRunning }
         activeSessionID = sessionID
         finalizedText = ""
         volatileText = ""
+        hasTranscriptEvidence = false
 
         let session = label(sessionID)
         Diagnostics.record("Speech", "Pipeline start requested for \(session)")
-
-        var preparedProvider: CaptureInputSequenceProvider?
-        var preparedAnalyzer: SpeechAnalyzer?
 
         do {
             try requireActiveSession(sessionID)
@@ -78,88 +89,91 @@ actor SpeechPipeline {
             try requireActiveSession(sessionID)
             Diagnostics.record("Speech", "SpeechTranscriber created for \(session)")
 
-            let provider = try await CaptureInputSequenceProvider.providerWithSession(
-                from: microphone,
-                compatibleWith: [transcriber],
-                priority: .userInitiated
-            )
-            preparedProvider = provider
+            let inputConverter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
             try requireActiveSession(sessionID)
-            Diagnostics.record("Speech", "CaptureInputSequenceProvider created for \(session)")
+            let source = try CaptureAudioSource(
+                device: microphone,
+                converter: inputConverter,
+                destinationURL: sourceAudioURL,
+                onAudioLevel: { level in onAudioLevel(sessionID, level) }
+            )
+            Diagnostics.record("Speech", "Single-output audio source created for \(session)")
 
             let analyzer = SpeechAnalyzer(modules: [transcriber])
-            preparedAnalyzer = analyzer
-            let analyzerInputs = provider.analyzerInputs
+            let analyzerInputs = source.analyzerInputs
 
-            self.provider = provider
+            self.audioSource = source
             self.analyzer = analyzer
 
-            resultTask = Task {
-                for try await result in transcriber.results {
-                    try Task.checkCancellation()
-                    guard activeSessionID == sessionID else { return }
+            if !dictionaryWords.isEmpty {
+                let context = AnalysisContext()
+                context.contextualStrings = [.general: dictionaryWords]
+                do { try await analyzer.setContext(context) }
+                catch {
+                    // Dictionary hints are optional; a rejected hint must not prevent intentional input.
+                    Diagnostics.record("Speech", "Dictionary context was unavailable; continuing recognition", level: .warning)
+                }
+                try requireActiveSession(sessionID)
+            }
 
-                    let text = String(result.text.characters)
-                    if result.isFinal {
-                        finalizedText = join(finalizedText, text)
-                        volatileText = ""
+            resultTask = Task {
+                do {
+                    for try await result in transcriber.results {
+                        try Task.checkCancellation()
+                        guard activeSessionID == sessionID else { return }
+
+                        let text = String(result.text.characters)
+                        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            hasTranscriptEvidence = true
+                        }
+                        if result.isFinal {
+                            finalizedText = join(finalizedText, text)
+                            volatileText = ""
+                        } else {
+                            volatileText = text
+                        }
+
+                        let combined = join(finalizedText, volatileText)
                         Diagnostics.record(
-                            "Speech",
-                            "Final result for \(session); text=\"\(text)\"; accumulated=\"\(finalizedText)\""
+                            "SpeechText",
+                            "Session \(session) transcriptCharacters=\(combined.count); final=\(result.isFinal)"
                         )
-                    } else {
-                        volatileText = text
-                        Diagnostics.record(
-                            "Speech",
-                            "Volatile result for \(session); text=\"\(text)\""
-                        )
+                        onTranscript(sessionID, combined)
                     }
 
-                    let combined = join(finalizedText, volatileText)
-                    Diagnostics.record(
-                        "SpeechText",
-                        "Session \(session) transcript=\"\(combined)\""
-                    )
-                    onTranscript(sessionID, combined)
+                    Diagnostics.record("Speech", "Transcriber result stream ended for \(session)")
+                } catch {
+                    reportFailure(error, sessionID: sessionID, onFailure: onFailure)
+                    throw error
                 }
-
-                Diagnostics.record("Speech", "Transcriber result stream ended for \(session)")
             }
 
             analysisTask = Task {
-                Diagnostics.record("Speech", "Analyzer sequence started for \(session)")
-                let lastSampleTime = try await analyzer.analyzeSequence(analyzerInputs)
-                Diagnostics.record(
-                    "Speech",
-                    "Analyzer sequence ended for \(session); lastSampleTime=\(String(describing: lastSampleTime))"
-                )
-                return lastSampleTime
+                do {
+                    Diagnostics.record("Speech", "Analyzer sequence started for \(session)")
+                    let lastSampleTime = try await analyzer.analyzeSequence(analyzerInputs)
+                    Diagnostics.record("Speech", "Analyzer sequence ended for \(session)")
+                    return lastSampleTime
+                } catch {
+                    reportFailure(error, sessionID: sessionID, onFailure: onFailure)
+                    throw error
+                }
             }
 
-            provider.captureSession.startRunning()
-            Diagnostics.record("Speech", "AVCaptureSession startRunning called for \(session)")
-            startAudioLevelPolling(
-                provider: provider,
-                sessionID: sessionID,
-                onAudioLevel: onAudioLevel
-            )
+            try requireActiveSession(sessionID)
+            source.start()
+            Diagnostics.record("Speech", "Single-output AVCaptureSession started for \(session)")
             try requireActiveSession(sessionID)
         } catch {
             Diagnostics.record("Speech", "Pipeline start failed for \(session): \(error.localizedDescription)", level: .error)
-            preparedProvider?.captureSession.stopRunning()
-            levelTask?.cancel()
-            levelTask = nil
-
-            if let preparedAnalyzer {
-                await preparedAnalyzer.cancelAndFinishNow()
+            if let result = await stopImmediately(sessionID: sessionID) {
+                throw PipelineError.recognitionFailed(error.localizedDescription, result)
             }
-
-            reset(sessionID: sessionID)
             throw error
         }
     }
 
-    func stop(sessionID: UUID) async throws -> String {
+    func stop(sessionID: UUID) async throws -> Result {
         try requireActiveSession(sessionID)
         guard let analyzer, let analysisTask else {
             throw PipelineError.notRunning
@@ -168,13 +182,14 @@ actor SpeechPipeline {
         let session = label(sessionID)
         Diagnostics.record("Speech", "Normal stop started for \(session)")
 
-        levelTask?.cancel()
-        levelTask = nil
-        provider?.captureSession.stopRunning()
-        provider = nil
-        Diagnostics.record("Speech", "Capture session stopped and provider released for \(session)")
+        isFinalizing = true
+        guard let completion = audioSource?.finish() else { throw PipelineError.notRunning }
+        finalizedSourceAudio = completion.sourceAudio
+        self.audioSource = nil
+        Diagnostics.record("Speech", "Capture session stopped and source audio finalized for \(session)")
 
         do {
+            if let error = completion.error { throw error }
             let lastSampleTime = try await analysisTask.value
             try requireActiveSession(sessionID)
 
@@ -192,40 +207,65 @@ actor SpeechPipeline {
 
             try requireActiveSession(sessionID)
 
-            let final = join(finalizedText, volatileText)
-            Diagnostics.record("Speech", "Normal stop completed for \(session); finalText=\"\(final)\"")
+            let result = snapshot(sourceAudio: completion.sourceAudio)
+            Diagnostics.record("Speech", "Normal stop completed for \(session); finalCharacters=\(result.transcript.count)")
             reset(sessionID: sessionID)
-            return final
+            return result
         } catch {
             Diagnostics.record("Speech", "Normal stop failed for \(session): \(error.localizedDescription)", level: .error)
-            await analyzer.cancelAndFinishNow()
-            reset(sessionID: sessionID)
-            throw error
+            if let result = await stopImmediately(sessionID: sessionID) {
+                throw PipelineError.recognitionFailed(error.localizedDescription, result)
+            }
+            // An external interruption already took ownership of the snapshot.
+            throw CancellationError()
         }
     }
 
-    func cancel(sessionID: UUID) async {
-        guard activeSessionID == sessionID else {
-            Diagnostics.record("Speech", "Cancel ignored for stale session \(label(sessionID))", level: .warning)
-            return
-        }
+    func stopImmediately(sessionID: UUID) async -> Result? {
+        guard activeSessionID == sessionID else { return nil }
 
         let session = label(sessionID)
-        Diagnostics.record("Speech", "Cancelling pipeline for \(session)", level: .warning)
+        Diagnostics.record("Speech", "Stopping pipeline immediately for \(session)", level: .warning)
 
-        levelTask?.cancel()
-        levelTask = nil
-        provider?.captureSession.stopRunning()
-        provider = nil
-        analysisTask?.cancel()
-        resultTask?.cancel()
+        let sourceAudio = audioSource?.stopImmediately() ?? finalizedSourceAudio
+        let result = sourceAudio.map { snapshot(sourceAudio: $0) }
+        let analyzer = analyzer
+        let analysisTask = analysisTask
+        let resultTask = resultTask
+
+        // Detach ownership before awaiting native teardown. A concurrent finish
+        // cannot cancel the analyzer twice or overwrite the next session.
+        reset(sessionID: sessionID)
 
         if let analyzer {
             await analyzer.cancelAndFinishNow()
         }
+        _ = await analysisTask?.result
+        _ = await resultTask?.result
 
-        reset(sessionID: sessionID)
-        Diagnostics.record("Speech", "Pipeline cancelled/reset for \(session)", level: .warning)
+        Diagnostics.record("Speech", "Pipeline stopped; source audio kept for \(session)", level: .warning)
+        return result
+    }
+
+    private func snapshot(sourceAudio: CapturedSourceAudio) -> Result {
+        Result(
+            transcript: join(finalizedText, volatileText),
+            sourceAudio: CapturedSourceAudio(
+                url: sourceAudio.url,
+                duration: sourceAudio.duration,
+                hasMeaningfulAudio: hasTranscriptEvidence ? true : sourceAudio.hasMeaningfulAudio
+            )
+        )
+    }
+
+    private func reportFailure(
+        _ error: Error,
+        sessionID: UUID,
+        onFailure: @Sendable (UUID, String) -> Void
+    ) {
+        guard activeSessionID == sessionID, !isFinalizing, !reportedFailure, !Task.isCancelled else { return }
+        reportedFailure = true
+        onFailure(sessionID, error.localizedDescription)
     }
 
     private func makeTranscriber(locale requestedLocale: Locale) async throws -> SpeechTranscriber {
@@ -238,52 +278,6 @@ actor SpeechPipeline {
         return SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
     }
 
-    private func startAudioLevelPolling(
-        provider: CaptureInputSequenceProvider,
-        sessionID: UUID,
-        onAudioLevel: @escaping @Sendable (UUID, Double) -> Void
-    ) {
-        levelTask?.cancel()
-        let session = label(sessionID)
-
-        levelTask = Task {
-            Diagnostics.record("Speech", "Native microphone level polling started for \(session)")
-            var sampleCount = 0
-
-            while !Task.isCancelled {
-                guard activeSessionID == sessionID else { return }
-
-                let channels = provider.captureSession.connections.flatMap(\.audioChannels)
-                let averagePower = channels.map(\.averagePowerLevel).max() ?? -60
-                let peakPower = channels.map(\.peakHoldLevel).max() ?? -60
-                let normalized = Self.normalizedPower(averagePower)
-
-                // Keep the audio signal raw here. The HUD owns visual shaping/history;
-                // pre-smoothing at the capture layer makes normal speech look flat.
-                onAudioLevel(sessionID, normalized)
-
-                sampleCount += 1
-                if sampleCount.isMultiple(of: 20) {
-                    let averageText = String(format: "%.1f", averagePower)
-                    let peakText = String(format: "%.1f", peakPower)
-                    let normalizedText = String(format: "%.3f", normalized)
-                    Diagnostics.record(
-                        "Audio",
-                        "Meter \(session): channels=\(channels.count), average=\(averageText)dB, peak=\(peakText)dB, normalized=\(normalizedText), captureRunning=\(provider.captureSession.isRunning)"
-                    )
-                }
-
-                try? await Task.sleep(for: .milliseconds(50))
-            }
-        }
-    }
-
-    private static func normalizedPower(_ decibels: Float) -> Double {
-        let floor: Float = -60
-        let clamped = min(max(decibels, floor), 0)
-        return Double((clamped - floor) / -floor)
-    }
-
     private func requireActiveSession(_ sessionID: UUID) throws {
         try Task.checkCancellation()
         guard activeSessionID == sessionID else {
@@ -294,26 +288,23 @@ actor SpeechPipeline {
     private func reset(sessionID: UUID) {
         guard activeSessionID == sessionID else { return }
 
-        levelTask?.cancel()
         analysisTask?.cancel()
         resultTask?.cancel()
-        levelTask = nil
         analysisTask = nil
         resultTask = nil
-        provider = nil
+        audioSource = nil
+        finalizedSourceAudio = nil
         analyzer = nil
         activeSessionID = nil
         finalizedText = ""
         volatileText = ""
+        hasTranscriptEvidence = false
+        isFinalizing = false
+        reportedFailure = false
     }
 
     private func join(_ lhs: String, _ rhs: String) -> String {
-        let left = lhs.trimmingCharacters(in: .whitespacesAndNewlines)
-        let right = rhs.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if left.isEmpty { return right }
-        if right.isEmpty { return left }
-        return left + " " + right
+        SpeechTranscriptAssembler.join(lhs, rhs)
     }
 
     private func label(_ sessionID: UUID) -> String {
