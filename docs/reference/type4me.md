@@ -403,3 +403,20 @@ Rechecked Type4Me's current Voice Polish prompt in `Type4Me/UI/AppState.swift`. 
 - **DROP:** mandatory Arabic-number conversion, forced total-summary formatting, generated titles/subitems, transition insertion and count rewriting.
 - **ADAPT:** avoid defining cleanup as Chinese-only; Morie keeps the same restrained contract for Chinese, English and mixed-language dictation.
 - **VERIFY:** real Foundation Models behavior on natural false starts such as partial clause → restart, versus two independent clauses that merely share words.
+
+
+## M-018 Expression Profile audit — 2026-09-19
+
+Rechecked Type4Me current `ExpressionProfileStore.swift` and `UserEditObservation.swift` on `main`.
+
+Useful lessons for Morie:
+
+- **ADAPT:** Expression Profile is a separate aggregate from semantic Memory. Style features should never be stored as personal facts.
+- **ADAPT:** actual edits to recently inserted text are stronger evidence than inferring style from model output.
+- **ADAPT:** use explicit `insufficient → learning → stable` states and require repeated multi-day evidence before style changes future output.
+- **ADAPT:** sentence length, line breaks, list usage, terminal punctuation, exclamation and Chinese/English spacing are low-risk style dimensions.
+- **ADAPT:** offer an explicit reset control.
+- **DROP:** Type4Me's global/category/application scope hierarchy for the first Morie slice, accepted-unchanged weak evidence, JSON profile files, rebuild-from-history machinery, schema migration/decay compatibility code and broad runtime-specific sensitivity infrastructure.
+- **MORIE-SPECIFIC:** only style-only edits with unchanged lexical content are admitted. Raw edited text is not persisted as Expression Profile data. Stable directives are capped and cannot override the current utterance.
+
+The bounded post-insertion observer is shared with dictionary suggestions so Morie does not run two AX polling loops against the same insertion.
