@@ -80,13 +80,13 @@ final class PostInsertionLearningController {
                     }
                     let now = Date()
                     if expressionLearningEnabled, !expressionRecorded,
-                       let stableEdit = styleTracker.observe(sample, at: now) {
+                       let stableEdit = styleTracker.observe(sample, at: now),
+                       ExpressionStyleExtractor.extract(injected: text, edited: stableEdit) != nil,
+                       let self {
                         do {
-                            try self?.expressionProfile.record(injected: text, edited: stableEdit, at: now)
-                            if ExpressionStyleExtractor.extract(injected: text, edited: stableEdit) != nil {
-                                expressionRecorded = true
-                                Diagnostics.record("ExpressionProfile", "Recorded one bounded style-edit sample")
-                            }
+                            try self.expressionProfile.record(injected: text, edited: stableEdit, at: now)
+                            expressionRecorded = true
+                            Diagnostics.record("ExpressionProfile", "Recorded one bounded style-edit sample")
                         } catch {
                             Diagnostics.record("ExpressionProfile", "Could not save style sample", level: .warning)
                         }
