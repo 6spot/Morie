@@ -158,64 +158,232 @@
 		D10000000000000000000002 /* Morie */ = {
 			isa = PBXGroup;
 			children = (
-				B10000000000000000000034 /* PermissionSetupController.swift */,
-				B10000000000000000000035 /* MorieSetupView.swift */,
-				D10000000000000000000004 /* InfoPlist.strings */,
+				D30000000000000000000001 /* App */,
+				D30000000000000000000002 /* Features */,
+				D30000000000000000000009 /* Platform */,
+				D3000000000000000000000E /* Support */,
+				D3000000000000000000000F /* Resources */,
+				B10000000000000000000014 /* Morie.entitlements */,
+			);
+			path = Morie;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000001 /* App */ = {
+			isa = PBXGroup;
+			children = (
 				B10000000000000000000001 /* MorieApp.swift */,
 				B10000000000000000000002 /* AppController.swift */,
-				B10000000000000000000003 /* CapabilityGate.swift */,
-				B10000000000000000000004 /* SpeechPipeline.swift */,
-				B10000000000000000000005 /* PushToTalkHotkey.swift */,
-				B10000000000000000000006 /* TextInjector.swift */,
-				B10000000000000000000008 /* Diagnostics.swift */,
-				B10000000000000000000009 /* CaptureHUD.swift */,
+				B10000000000000000000013 /* MorieControlCenter.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000002 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				D30000000000000000000003 /* Capture */,
+				D30000000000000000000005 /* Memory */,
+				D30000000000000000000006 /* Dictionary */,
+				D30000000000000000000007 /* Personalization */,
+				D30000000000000000000008 /* Setup */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000003 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
 				B10000000000000000000010 /* CaptureRecord.swift */,
 				B10000000000000000000011 /* CaptureStore.swift */,
-				B10000000000000000000012 /* CaptureHistoryView.swift */,
-				B10000000000000000000013 /* MorieControlCenter.swift */,
-				B10000000000000000000014 /* Morie.entitlements */,
 				B10000000000000000000015 /* CaptureAudioSource.swift */,
-				B10000000000000000000016 /* CaptureFileTranscriber.swift */,
-				B10000000000000000000017 /* CaptureHistoryController.swift */,
 				B10000000000000000000018 /* CaptureAudioStream.swift */,
+				B10000000000000000000016 /* CaptureFileTranscriber.swift */,
+				B10000000000000000000004 /* SpeechPipeline.swift */,
+				B10000000000000000000027 /* CaptureRefinement.swift */,
+				B10000000000000000000028 /* InputRefiner.swift */,
+				B10000000000000000000009 /* CaptureHUD.swift */,
+				D30000000000000000000004 /* History */,
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000004 /* History */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000017 /* CaptureHistoryController.swift */,
+				B10000000000000000000012 /* CaptureHistoryView.swift */,
+			);
+			path = History;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000005 /* Memory */ = {
+			isa = PBXGroup;
+			children = (
 				B10000000000000000000019 /* MemoryRecord.swift */,
+				B10000000000000000000023 /* MemoryAnalysisRecord.swift */,
 				B10000000000000000000020 /* MemoryStore.swift */,
 				B10000000000000000000021 /* MemoryContextRetriever.swift */,
-				B10000000000000000000022 /* MemoryView.swift */,
-				B10000000000000000000023 /* MemoryAnalysisRecord.swift */,
 				B10000000000000000000024 /* MemoryLearner.swift */,
 				B10000000000000000000025 /* MemoryLearningController.swift */,
 				B10000000000000000000026 /* MemoryLearningView.swift */,
-				B10000000000000000000027 /* CaptureRefinement.swift */,
-				B10000000000000000000028 /* InputRefiner.swift */,
-				B10000000000000000000029 /* CapturePersonalizer.swift */,
-				B10000000000000000000037 /* ExpressionProfile.swift */,
-				B10000000000000000000038 /* ICloudSyncSettings.swift */,
-				B10000000000000000000033 /* PostInsertionLearningController.swift */,
+				B10000000000000000000022 /* MemoryView.swift */,
+			);
+			path = Memory;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000006 /* Dictionary */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000030 /* DictionaryStore.swift */,
 				B10000000000000000000032 /* DictionaryCorrection.swift */,
 				B10000000000000000000031 /* DictionaryView.swift */,
-				B10000000000000000000030 /* DictionaryStore.swift */,
 			);
-			path = Morie;
+			path = Dictionary;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000007 /* Personalization */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000029 /* CapturePersonalizer.swift */,
+				B10000000000000000000037 /* ExpressionProfile.swift */,
+				B10000000000000000000033 /* PostInsertionLearningController.swift */,
+			);
+			path = Personalization;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000008 /* Setup */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000034 /* PermissionSetupController.swift */,
+				B10000000000000000000035 /* MorieSetupView.swift */,
+			);
+			path = Setup;
+			sourceTree = "<group>";
+		};
+		D30000000000000000000009 /* Platform */ = {
+			isa = PBXGroup;
+			children = (
+				D3000000000000000000000A /* Capabilities */,
+				D3000000000000000000000B /* Input */,
+				D3000000000000000000000C /* TextDelivery */,
+				D3000000000000000000000D /* Cloud */,
+			);
+			path = Platform;
+			sourceTree = "<group>";
+		};
+		D3000000000000000000000A /* Capabilities */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000003 /* CapabilityGate.swift */,
+			);
+			path = Capabilities;
+			sourceTree = "<group>";
+		};
+		D3000000000000000000000B /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000005 /* PushToTalkHotkey.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
+		D3000000000000000000000C /* TextDelivery */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000006 /* TextInjector.swift */,
+			);
+			path = TextDelivery;
+			sourceTree = "<group>";
+		};
+		D3000000000000000000000D /* Cloud */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000038 /* ICloudSyncSettings.swift */,
+			);
+			path = Cloud;
+			sourceTree = "<group>";
+		};
+		D3000000000000000000000E /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000008 /* Diagnostics.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		D3000000000000000000000F /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000004 /* InfoPlist.strings */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		D20000000000000000000001 /* MorieTests */ = {
 			isa = PBXGroup;
 			children = (
-				B20000000000000000000012 /* CaptureHUDTests.swift */,
-				B20000000000000000000011 /* PermissionSetupTests.swift */,
-				B20000000000000000000001 /* CaptureStoreTests.swift */,
-				B20000000000000000000003 /* CaptureHistoryTests.swift */,
-				B20000000000000000000004 /* TestDiagnostics.swift */,
-				B20000000000000000000005 /* CaptureAudioStreamTests.swift */,
-				B20000000000000000000006 /* MemoryTests.swift */,
-				B20000000000000000000007 /* MemoryLearningTests.swift */,
-				B20000000000000000000008 /* PersonalizationTests.swift */,
-				B20000000000000000000013 /* ExpressionProfileTests.swift */,
-				B20000000000000000000010 /* DictionaryCorrectionTests.swift */,
-				B20000000000000000000009 /* DictionaryTests.swift */,
+				D40000000000000000000001 /* Capture */,
+				D40000000000000000000002 /* Memory */,
+				D40000000000000000000003 /* Dictionary */,
+				D40000000000000000000004 /* Personalization */,
+				D40000000000000000000005 /* Setup */,
+				D40000000000000000000006 /* Support */,
 			);
 			path = MorieTests;
+			sourceTree = "<group>";
+		};
+		D40000000000000000000001 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000001 /* CaptureStoreTests.swift */,
+				B20000000000000000000003 /* CaptureHistoryTests.swift */,
+				B20000000000000000000005 /* CaptureAudioStreamTests.swift */,
+				B20000000000000000000012 /* CaptureHUDTests.swift */,
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
+		D40000000000000000000002 /* Memory */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000006 /* MemoryTests.swift */,
+				B20000000000000000000007 /* MemoryLearningTests.swift */,
+			);
+			path = Memory;
+			sourceTree = "<group>";
+		};
+		D40000000000000000000003 /* Dictionary */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000009 /* DictionaryTests.swift */,
+				B20000000000000000000010 /* DictionaryCorrectionTests.swift */,
+			);
+			path = Dictionary;
+			sourceTree = "<group>";
+		};
+		D40000000000000000000004 /* Personalization */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000008 /* PersonalizationTests.swift */,
+				B20000000000000000000013 /* ExpressionProfileTests.swift */,
+			);
+			path = Personalization;
+			sourceTree = "<group>";
+		};
+		D40000000000000000000005 /* Setup */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000011 /* PermissionSetupTests.swift */,
+			);
+			path = Setup;
+			sourceTree = "<group>";
+		};
+		D40000000000000000000006 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000004 /* TestDiagnostics.swift */,
+			);
+			path = Support;
 			sourceTree = "<group>";
 		};
 		D10000000000000000000003 /* Products */ = {

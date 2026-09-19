@@ -32,6 +32,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-017 | Input quality | Clean abandoned fragments and sentence restarts without losing independent meaning | IN PROGRESS | — | [`M-017`](./tasks/M-017-cleanup-false-starts.md) |
 | M-018 | Personalization | Learn aggregate Expression Profile from bounded post-insertion style edits | IN PROGRESS | — | [`M-018`](./tasks/M-018-expression-profile.md) |
 | M-019 | Private sync | Add explicit opt-in iCloud/CloudKit sync and backup foundation | IN PROGRESS | — | [`M-019`](./tasks/M-019-icloud-opt-in.md) |
+| M-020 | Architecture | Organize source and tests by feature/platform ownership without behavior changes | IN PROGRESS | [#18](https://github.com/6spot/Morie/issues/18) | [`M-020`](./tasks/M-020-source-tree-organization.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
