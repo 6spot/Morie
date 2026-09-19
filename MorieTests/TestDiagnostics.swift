@@ -7,4 +7,5 @@ enum DiagnosticLevel: Sendable {
 
 enum Diagnostics {
     static func record(_ category: String, _ message: String, level: DiagnosticLevel = .info) {}
+    static func recordMemory(_ phase: String) {}
 }
