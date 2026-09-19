@@ -24,9 +24,8 @@ final class MemoryStore: ObservableObject {
     }
 
     @Published private(set) var entries: [MemoryRecord] = []
-    @Published private(set) var analyses: [MemoryAnalysisRecord] = []
     private let container: ModelContainer
-    private let context: ModelContext
+    private var context: ModelContext
     private let commit: (ModelContext) throws -> Void
 
     init(container: ModelContainer, commit: @escaping (ModelContext) throws -> Void = { try $0.save() }) {
@@ -37,8 +36,9 @@ final class MemoryStore: ObservableObject {
     }
 
     func load() throws {
-        entries = try context.fetch(FetchDescriptor<MemoryRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]))
-        analyses = try context.fetch(FetchDescriptor<MemoryAnalysisRecord>(sortBy: [SortDescriptor(\.sourceCapturedAt)]))
+        entries = try context.fetch(
+            FetchDescriptor<MemoryRecord>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        )
     }
 
     func analysisSource(for captureID: UUID) throws -> MemoryAnalysisSource {
@@ -52,47 +52,75 @@ final class MemoryStore: ObservableObject {
         return source
     }
 
-    func analysis(for source: MemoryAnalysisSource) -> MemoryAnalysisRecord? { analyses.first { $0.source == source } }
+    func analysis(for source: MemoryAnalysisSource) -> MemoryAnalysisRecord? {
+        let reader = makeContext()
+        return try? analysis(in: reader, for: source)
+    }
+
+    func analyses(for captureID: UUID, linkedTo memoryID: UUID? = nil) -> [MemoryAnalysisRecord] {
+        let reader = makeContext()
+        var descriptor = FetchDescriptor<MemoryAnalysisRecord>(
+            predicate: #Predicate { $0.sourceCaptureID == captureID },
+            sortBy: [SortDescriptor(\.sourceCapturedAt)]
+        )
+        descriptor.fetchLimit = 8
+        guard let records = try? reader.fetch(descriptor) else { return [] }
+        guard let memoryID else { return records }
+        return records.filter { analysis in
+            analysis.observations.contains { $0.memoryID == memoryID }
+        }
+    }
+
+    func analysisCount() throws -> Int {
+        let reader = makeContext()
+        return try reader.fetchCount(FetchDescriptor<MemoryAnalysisRecord>())
+    }
 
     /// One startup reconciliation recovers completed inputs that may have been saved just before a crash.
     /// Normal operation enqueues only the Capture that just reached a terminal delivery state.
     func reconcileCompletedInputs() throws {
-        try load()
-        let knownCaptureIDs = Set(analyses.map(\.sourceCaptureID))
-        let captures = try container.mainContext.fetch(
+        let reader = makeContext()
+        let knownCaptureIDs = Set(
+            try reader.fetch(FetchDescriptor<MemoryAnalysisRecord>()).map(\.sourceCaptureID)
+        )
+        let captures = try reader.fetch(
             FetchDescriptor<CaptureRecord>(sortBy: [SortDescriptor(\.createdAt)])
         )
         var inserted = false
         for capture in captures where eligibleForLearning(capture) {
-            let source = MemoryAnalysisSource(capture: capture)
             guard !knownCaptureIDs.contains(capture.id) else { continue }
-            context.insert(MemoryAnalysisRecord(source: source))
+            context.insert(MemoryAnalysisRecord(source: MemoryAnalysisSource(capture: capture)))
             inserted = true
         }
         if inserted { try save() }
     }
 
     func enqueueCompletedInput(captureID: UUID) throws {
-        try load()
-        guard let source = try? analysisSource(for: captureID),
-              analysis(for: source) == nil else { return }
+        guard let source = try? analysisSource(for: captureID) else { return }
+        let reader = makeContext()
+        guard try analysis(in: reader, captureID: captureID) == nil else { return }
         context.insert(MemoryAnalysisRecord(source: source))
         try save()
     }
 
     func pendingSources(now: Date = Date(), limit: Int = 3) throws -> [MemoryAnalysisSource] {
-        try load()
-        return analyses.filter { $0.state == .pending && $0.nextAttemptAt <= now }
-            .prefix(max(0, limit))
-            .map(\.source)
+        let pending = MemoryAnalysisState.pending.rawValue
+        var descriptor = FetchDescriptor<MemoryAnalysisRecord>(
+            predicate: #Predicate { $0.stateRawValue == pending && $0.nextAttemptAt <= now },
+            sortBy: [SortDescriptor(\.nextAttemptAt), SortDescriptor(\.sourceCapturedAt)]
+        )
+        descriptor.fetchLimit = max(0, limit)
+        return try makeContext().fetch(descriptor).map(\.source)
     }
 
     func nextPendingAttemptDate() throws -> Date? {
-        try load()
-        return analyses.lazy
-            .filter { $0.state == .pending }
-            .map(\.nextAttemptAt)
-            .min()
+        let pending = MemoryAnalysisState.pending.rawValue
+        var descriptor = FetchDescriptor<MemoryAnalysisRecord>(
+            predicate: #Predicate { $0.stateRawValue == pending },
+            sortBy: [SortDescriptor(\.nextAttemptAt)]
+        )
+        descriptor.fetchLimit = 1
+        return try makeContext().fetch(descriptor).first?.nextAttemptAt
     }
 
     func learningInput(for source: MemoryAnalysisSource) throws -> MemoryLearningInput {
@@ -107,8 +135,7 @@ final class MemoryStore: ObservableObject {
     }
 
     func recordFailure(_ failure: MemoryAnalysisFailure, for source: MemoryAnalysisSource, now: Date = Date()) throws {
-        try load()
-        guard let analysis = analysis(for: source), analysis.state == .pending else { return }
+        guard let analysis = try analysis(in: context, for: source), analysis.state == .pending else { return }
         analysis.attempts += 1
         analysis.failureRawValue = failure.rawValue
         analysis.stateRawValue = (failure.retryable ? MemoryAnalysisState.pending : .skipped).rawValue
@@ -118,8 +145,7 @@ final class MemoryStore: ObservableObject {
 
     func retry(_ source: MemoryAnalysisSource) throws {
         guard try analysisSource(for: source.captureID) == source else { throw StoreError.sourceChanged }
-        try load()
-        guard let analysis = analysis(for: source), analysis.state != .completed else { return }
+        guard let analysis = try analysis(in: context, for: source), analysis.state != .completed else { return }
         analysis.stateRawValue = MemoryAnalysisState.pending.rawValue
         analysis.nextAttemptAt = Date()
         analysis.failureRawValue = nil
@@ -131,7 +157,7 @@ final class MemoryStore: ObservableObject {
         guard try analysisSource(for: input.source.captureID) == input.source else { throw StoreError.sourceChanged }
         guard suggestions.count <= 3 else { throw StoreError.invalidAnalysis }
         try load()
-        guard let analysis = analysis(for: input.source) else { throw StoreError.sourceUnavailable }
+        guard let analysis = try analysis(in: context, for: input.source) else { throw StoreError.sourceUnavailable }
         guard analysis.state != .completed else { return }
         do {
             var seen = Set<String>()
@@ -210,12 +236,18 @@ final class MemoryStore: ObservableObject {
 
         guard suggestion.action == .remember else { observation.disposition = .conflict; return }
         var sources = [input.source]
-        let supports = analyses.filter { analysis in
-            analysis.state == .completed && analysis.sourceCaptureID != input.source.captureID
-                && analysis.observations.contains { prior in
-                    prior.disposition == .accumulating && prior.suggestion.draft == draft
-                }
-        }.filter { (try? analysisSource(for: $0.sourceCaptureID)) == $0.source }
+        let completed = MemoryAnalysisState.completed.rawValue
+        let currentCaptureID = input.source.captureID
+        let candidates = try context.fetch(FetchDescriptor<MemoryAnalysisRecord>(
+            predicate: #Predicate {
+                $0.stateRawValue == completed && $0.sourceCaptureID != currentCaptureID
+            }
+        ))
+        let supports = candidates.filter { analysis in
+            analysis.observations.contains { prior in
+                prior.disposition == .accumulating && prior.suggestion.draft == draft
+            }
+        }.filter { durableSourceMatches($0.source) }
         sources += supports.map(\.source)
         let sourceIDs = Set(sources.map(\.captureID))
         guard (suggestion.evidenceKind == .explicitPersonal && suggestion.confidence >= 0.9) || sourceIDs.count >= 2 else { return }
@@ -351,12 +383,13 @@ final class MemoryStore: ObservableObject {
 
     func delete(_ id: UUID) throws {
         let record = try memory(id)
-        let analyses = try context.fetch(FetchDescriptor<MemoryAnalysisRecord>())
         if let draft = record.draft {
             context.insert(MemoryLearningBlock(draft: draft))
             let key = MemoryLearningBlock.key(for: draft)
-            for analysis in analyses {
-                analysis.observations.removeAll { $0.memoryID == id || MemoryLearningBlock.key(for: $0.suggestion.draft) == key }
+            for analysis in try context.fetch(FetchDescriptor<MemoryAnalysisRecord>()) {
+                analysis.observations.removeAll {
+                    $0.memoryID == id || MemoryLearningBlock.key(for: $0.suggestion.draft) == key
+                }
             }
         }
         context.delete(record)
@@ -412,8 +445,49 @@ final class MemoryStore: ObservableObject {
     }
 
     private func save() throws {
-        do { try commit(context) }
-        catch { context.rollback(); throw error }
+        do {
+            try commit(context)
+        } catch {
+            context.rollback()
+            resetContext()
+            try? load()
+            throw error
+        }
+        resetContext()
         try load()
+    }
+
+    private func analysis(in context: ModelContext, captureID: UUID) throws -> MemoryAnalysisRecord? {
+        var descriptor = FetchDescriptor<MemoryAnalysisRecord>(
+            predicate: #Predicate { $0.sourceCaptureID == captureID }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func analysis(in context: ModelContext, for source: MemoryAnalysisSource) throws -> MemoryAnalysisRecord? {
+        guard let record = try analysis(in: context, captureID: source.captureID),
+              record.source == source else { return nil }
+        return record
+    }
+
+    private func durableSourceMatches(_ source: MemoryAnalysisSource) -> Bool {
+        let reader = makeContext()
+        let id = source.captureID
+        var descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let capture = try? reader.fetch(descriptor).first,
+              let capture, eligibleForLearning(capture) else { return false }
+        return MemoryAnalysisSource(capture: capture) == source
+    }
+
+    private func makeContext() -> ModelContext {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        return context
+    }
+
+    private func resetContext() {
+        context = makeContext()
     }
 }
