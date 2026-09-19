@@ -723,7 +723,14 @@ final class AppController: ObservableObject {
         lastPresentedFailure = nil
         state = .ready
         hud.showSuccess(deliveryMode: deliveryMode)
-        Diagnostics.recordMemory("capture-complete \(label(sessionID))")
+        let completedLabel = label(sessionID)
+        Diagnostics.recordMemory("capture-complete \(completedLabel)")
+        Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(2)) }
+            catch { return }
+            guard self?.activeCaptureID == nil else { return }
+            Diagnostics.recordMemory("capture-settled \(completedLabel)")
+        }
     }
 
     private func failSession(_ sessionID: UUID, error: Error) {
