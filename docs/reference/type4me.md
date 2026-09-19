@@ -368,3 +368,15 @@ The owner's **文字 / 蚊子** and **常 蚊 子** results required checking wh
 - **ADAPT:** Type4Me joins confirmed/partial recognition pieces directly and does not invent whitespace. Morie applies the same behavior to `SpeechTranscriber` results, fixing its own artificial separator that produced **常 蚊 子**. Morie retains macOS 27 `AnalysisContext.contextualStrings`, the current native equivalent of a recognition hint.
 - **DROP:** Type4Me's Apple client explicitly ignores shared `ASRRequestOptions.hotwords`; only external providers map them to native keyterm/prompt/boosting APIs. Do not copy provider hotword machinery, cloud tables, ASR restarts, alias tables, candidate heuristics, phonetic rewriting or unconditional **蚊子 → 文字** substitution. Full-/half-width normalization is also removed as unrelated to recognition quality.
 - **VERIFY:** signed-device dictation of **再来试一试长文字吧** with **文字** saved and **Codex** when Speech returns **Coldex** must confirm both useful contextual bias, model-assisted correction and absence of artificial inter-segment spaces. Apple `contextualStrings` remains a hint rather than a forced vocabulary. Morie therefore supplies the same bounded dictionary snapshot to cleanup without requiring an exact match in the erroneous transcript. Type4Me does not prove Apple-native hotword effectiveness, and logic tests cannot prove model output.
+
+
+### M-011 small built-in vocabulary follow-up — 2026-09-19
+
+The owner asked whether Morie should keep a small baseline after reviewing Type4Me's vocabulary history. Rechecked upstream `HotwordStorage.swift` and changelog at revision `55e8779354cb38a959138ac8fd53a1ce7a75cc4e`. Type4Me historically carried 139 code-defined AI/dev hotwords and separate built-in/user files, but later changed `loadEffective()` to return only user-managed words.
+
+- **ADAPT:** the lesson that a small product-owned vocabulary can improve first-run recognition for a few high-value names, and that user words should take precedence over a matching built-in spelling.
+- **DROP:** Type4Me's 139-word baseline, dual JSON files, provider-specific hotword/cloud synchronization and built-in snippet replacement machinery. Morie keeps only a tiny code-owned baseline and no replacement rules.
+- **ADAPT:** persist provenance for user words created manually versus words accepted from the correction prompt. They remain the same semantic object and therefore share one SwiftData entity rather than separate duplicate tables; provenance keeps the backend distinction explicit.
+- **VERIFY:** actual Apple Speech benefit and any unintended bias from the small baseline on signed macOS 27 hardware. The baseline must stay small enough that user-specific words retain priority.
+
+This narrows the earlier M-004 decision that dropped built-in dictionaries entirely; that older decision rejected Type4Me's large file/provider machinery, not a later owner-approved tiny Morie-native baseline.
