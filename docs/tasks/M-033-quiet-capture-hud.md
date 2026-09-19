@@ -14,7 +14,8 @@ Make the compact Capture capsule visually quieter and more internally consistent
 
 - Cancel and Finish controls use one neutral low-contrast color treatment.
 - The capsule glass is less black/heavy.
-- The existing soft blue/accent processing ring is retained.
+- The existing soft blue/accent processing ring is retained unchanged.
+- The `Thinking` label uses secondary text contrast so the black text does not dominate the capsule.
 - Current-app completion changes from **已输入** to plain `SUCCESS`.
 - `SUCCESS` uses the same softened accent-color family as the processing ring; bright green is removed.
 - Text feedback inside the capsule does not carry decorative leading icons.
@@ -32,7 +33,8 @@ recording
 
 processing
           Thinking
-   soft accent-color ring
+   secondary text +
+   existing accent ring
 
 current-app success
           SUCCESS
@@ -48,6 +50,7 @@ The native `NSGlassEffectView` remains the surface; only its tint intensity is r
 - [x] Cancel/Finish buttons have the same low-contrast bordered treatment.
 - [x] Capsule tint is visibly softer than the previous black-heavy value.
 - [x] Thinking ring is unchanged.
+- [x] Thinking text uses secondary contrast instead of primary black.
 - [x] Current-app success is plain `SUCCESS`, no icon, no green.
 - [x] Saved/clipboard/recognition status messages have no leading decorative icon.
 - [ ] macOS 27 Release compile passes.
