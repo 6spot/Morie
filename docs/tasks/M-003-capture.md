@@ -3,7 +3,7 @@
 ## Status
 
 - **State:** IN PROGRESS
-- **Last updated:** 2026-09-18
+- **Last updated:** 2026-09-19
 - **Phase:** Phase 1
 - **Starts after:** M-002 macOS Input Foundation reaches an acceptable stable baseline
 - **Owner sequencing decision (2026-09-18):** finish the single-Mac input/dictionary/Memory loop before cross-device work. CloudKit is outside this task and the current milestone, not a local-persistence blocker. No Team ID or container is requested.
@@ -14,7 +14,7 @@
 
 ## Why
 
-Morie must make every intentional user expression durable before optional AI processing. Phase 1 establishes the persistence boundary that later Memory and personalization depend on.
+Morie must give every intentional user expression a durable recovery anchor before optional processing. The minimal Capture shell and audio destination are that boundary. Derived recognition/refinement/delivery state should become durable without forcing ordinary current-app input to wait for History I/O.
 
 ## Scope
 
@@ -39,7 +39,7 @@ Excluded:
 
 ## Acceptance criteria
 
-1. Intentional Capture is durably written before optional enrichment.
+1. The minimal intentional Capture shell and audio destination are durably written before Speech/enrichment starts; later derived History state may persist asynchronously.
 2. AI/enrichment failure cannot lose the raw Capture.
 3. History can inspect saved captures.
 4. Retained source audio can be played and explicitly re-recognized from History using native Apple APIs/UI.
@@ -50,17 +50,18 @@ Excluded:
 9. Both entry points share finish/cancel, empty-result recovery and History preemption. An in-app capture reports “已保存”; a later global-shortcut capture still uses `currentApp` delivery.
 10. Capability recheck, shortcut loss, microphone interruption and Speech failure stop native recording and preserve available source audio/text as a failed Capture. Late results must not inject or override capability status.
 11. Explicit user cancellation closes native recording and awaits outstanding work before deleting the Capture and its file. New recording cannot begin during teardown.
-12. Speech conversion/flush failure still finalizes already-written AAC. Repeated teardown is idempotent, and an already-dispatched delivery keeps its actual durable outcome.
+12. Speech conversion/flush failure still finalizes already-written AAC. Repeated teardown is idempotent, and an already-dispatched delivery keeps its actual outcome.
+13. After the initial recovery shell, normal `currentApp` input does not await SwiftData History writes before cleanup, paste dispatch, or success feedback. `captureOnly` waits for its latest final snapshot before reporting “已保存”.
 
 ## Progress
 
 | Subtask | Status | Notes |
 | --- | --- | --- |
 | SwiftData Capture schema | IMPLEMENTED / VERIFY | `CaptureRecord` stores stable identity, timestamps, lifecycle, recognized/final text, delivery mode, source app/bundle, original window identity and delivery error. No uniqueness constraint or non-Apple dependency. |
-| Capture-first local store | IMPLEMENTED / VERIFY | A voice Capture and audio filename are saved before Speech starts; progressive text is checkpointed at most every 500 ms. Explicit cancellation discards the record. Empty results preserve uncertain audio, and interrupted audio/text can be recovered on restart. Ambient-noise classification remains open. |
+| Capture-first local store | IMPLEMENTED / VERIFY | A minimal voice Capture shell and audio filename are synchronously saved before Speech starts. Later progressive/final/refinement/delivery snapshots are queued to a separate revisioned persistence writer; progressive checkpoints remain bounded to at most every 500 ms. Explicit cancellation uses a tombstone revision. Empty results preserve uncertain audio, and interrupted audio/text can be recovered on restart. Ambient-noise classification remains open. |
 | Input-loop integration | IMPLEMENTED / VERIFY | Capture UUID is shared with the Phase 0 session UUID. Storage initialization failure blocks capture rather than silently running without durability. |
 | Interruption versus discard | IMPLEMENTED / VERIFY | One shutdown task closes native recording and joins startup/finalization before disposition. Operational failures preserve text/audio; only explicit cancellation discards. Live Speech/capture-session errors trigger cleanup, and late results cannot deliver. AAC error-path tests pass; real microphone, timing and notification validation remains open. |
-| Capture-only voice entry | IMPLEMENTED / VERIFY | History's native **Record Capture** toolbar action starts the shared audio pipeline with a durably stored `captureOnly` destination. Completion saves a terminal `recognized` record, releases active ownership and reports “已保存”, without entering text delivery. Finish/cancel use the existing HUD or shortcut. Interaction validation remains open. |
+| Capture-only voice entry | IMPLEMENTED / VERIFY | History's native **Record Capture** toolbar action starts the shared audio pipeline with a durably stored `captureOnly` destination. Unlike current-app delivery, completion explicitly flushes the newest final snapshot before releasing active ownership and reporting “已保存”. It never enters text delivery. Finish/cancel use the existing HUD or shortcut. Interaction validation remains open. |
 | Native management window / History | IMPLEMENTED / VERIFY | Native management window with selectable `List` and a simultaneous reading detail, reorganized by [M-008](./M-008-macos-management-ui.md). Details show recognition/original output, native AVKit playback, Copy actions, explicit failures, and deletion with system confirmation. Device interaction validation remains open. |
 | App Context | IN PROGRESS | Source app name, bundle identifier and original window number are stored. Window title collection remains excluded until a minimal privacy-safe requirement is approved. |
 | Source audio / retry | IMPLEMENTED / VERIFY | Single-output AAC capture remains in place. File retry uses `SpeechAnalyzer.analyzeSequence(from:)`; results save only on success and original delivered output stays intact. Generated Chinese AAC, silent-file and missing-file native checks passed. Interactive retry/cancel and live-capture preemption still require device validation. |
@@ -74,13 +75,13 @@ Isolated macOS 27 Debug compilation passed using temporary DerivedData, without 
 
 - The persistent entity is `CaptureRecord`; voice is represented as a source of Capture rather than the domain root.
 - M-009's current schema adds `DictionaryEntry`, `MemoryRecord`, `MemoryAnalysisRecord` and `MemoryLearningBlock` to the Capture container. Dictionary and personal Memory write through separate contexts and cannot roll back Capture checkpoints. Current implementation is direct, with no migrations from the superseded candidate schema.
-- Final text and exact dictionary/context/cleanup provenance are saved before delivery and later idle analysis. `recognizedText` stays separate. Deleting a Capture removes its analysis source snapshots; separate Memory remains. History retries preserve completed final output and its actual earlier provenance. See [M-009](M-009-macos-input-memory.md) for current evidence and remaining model/device acceptance.
+- `recognizedText`, final text and exact dictionary/context/cleanup provenance remain separate in the Capture model, but current-app delivery no longer waits for those derived fields to commit. Live state is snapshotted to the ordered background writer; Memory learning waits for a post-delivery flush. `captureOnly` remains save-first. Deleting a Capture removes its analysis source snapshots; separate Memory remains. History retries preserve completed final output and its actual earlier provenance. See [M-009](M-009-macos-input-memory.md) for current evidence and remaining model/device acceptance.
 - The authoritative session UUID is also the Capture UUID, avoiding a second identity mapping during the input loop.
 - Capture creation requires an explicit delivery mode. The shortcut supplies `currentApp`; History's **Record Capture** supplies `captureOnly` and records Morie as the source without reading another app's window identity. Recognition completion returns the persisted mode, so the controller's delivery decision does not depend on whichever app is frontmost at finish time.
 - Capture-only success is terminal at the recognition save. The same record becomes available to History playback/retry without a delivery step, and a late cancellation cannot discard it. The HUD reports saved versus inserted using the corresponding mode.
 - Local persistence uses SwiftData with an explicit non-CloudKit configuration throughout this single-Mac milestone.
-- The first durable write occurs before `SpeechPipeline.start`. Progressive recognized text is checkpointed with a bounded 500 ms cadence to avoid a disk save for every character callback.
-- Delivery success/failure and operational failure are durable terminal states. User cancellation is an explicit discard and removes the active record.
+- The first durable shell write occurs before `SpeechPipeline.start`. After that point `CaptureStore` keeps main-context autosave disabled. Progressive recognized text is snapshotted with a bounded 500 ms cadence and written by `CapturePersistenceWriter`, so Speech callbacks do not perform disk saves.
+- Delivery success/failure and operational failure remain terminal History states, but current-app terminal commits are asynchronous after the delivery decision. User cancellation is an explicit discard; its tombstone revision prevents older queued snapshots from restoring the record.
 - Capability recheck and hotkey loss previously reused destructive cancellation. They now retain a failed Capture. The controller claims shutdown ownership before awaiting native work, cancels outstanding startup/finalization, closes the writer, accepts any final snapshot, and only then persists failure or explicit discard. Checking/blocked states cannot be replaced by a cancelled task's Ready transition.
 - `CaptureAudioStream` owns AAC writing and analyzer inputs behind the source's serial output queue. Conversion and flush errors end analysis but always close the file; repeated completion and immediate stop cannot remove or append to the artifact. Speech teardown returns text/audio without deleting files.
 - `SpeechPipeline` observes live analyzer/result failures. AVFoundation runtime-error/interruption notifications fail the input stream and trigger controller cleanup. An ownership check after async converter creation prevents cancelled startup from opening a later source.
