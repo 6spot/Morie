@@ -5,16 +5,35 @@ import Foundation
 final class CaptureSoundFeedback {
     static let enabledDefaultsKey = "capture.soundFeedback.enabled"
 
+    private struct Tone {
+        let startFrequency: Double
+        let endFrequency: Double
+        let duration: Double
+        let gain: Double
+    }
+
     private enum Cue {
         case start
         case stop
 
-        var tones: [(frequency: Double, duration: Double)] {
+        var tones: [Tone] {
             switch self {
             case .start:
-                [(880, 0.040), (1_320, 0.070)]
+                [
+                    Tone(startFrequency: 1_520, endFrequency: 1_760, duration: 0.030, gain: 0.82),
+                    Tone(startFrequency: 2_060, endFrequency: 2_320, duration: 0.042, gain: 1.0),
+                ]
             case .stop:
-                [(1_175, 0.040), (784, 0.070)]
+                [
+                    Tone(startFrequency: 1_180, endFrequency: 920, duration: 0.048, gain: 0.72),
+                ]
+            }
+        }
+
+        var volume: Float {
+            switch self {
+            case .start: 0.18
+            case .stop: 0.10
             }
         }
     }
@@ -31,14 +50,14 @@ final class CaptureSoundFeedback {
     }
 
     func playStart() {
-        play(startPlayer, label: "start")
+        play(startPlayer, cue: .start, label: "start")
     }
 
     func playStop() {
-        play(stopPlayer, label: "stop")
+        play(stopPlayer, cue: .stop, label: "stop")
     }
 
-    private func play(_ player: AVAudioPlayer?, label: String) {
+    private func play(_ player: AVAudioPlayer?, cue: Cue, label: String) {
         guard let player else {
             Diagnostics.record("CaptureSound", "Cue unavailable: \(label)", level: .warning)
             return
@@ -46,7 +65,7 @@ final class CaptureSoundFeedback {
         startPlayer?.stop()
         stopPlayer?.stop()
         player.currentTime = 0
-        player.volume = 0.36
+        player.volume = cue.volume
         player.play()
         Diagnostics.record("CaptureSound", "Played \(label) cue")
     }
@@ -57,30 +76,48 @@ final class CaptureSoundFeedback {
     }
 
     private func wavData(
-        for tones: [(frequency: Double, duration: Double)]
+        for tones: [Tone]
     ) -> Data? {
-        let attack = 0.0018
-        let release = 0.010
-        let interToneGapFrames = Int(0.004 * sampleRate)
+        let attack = 0.0012
+        let release = 0.008
+        let interToneGapFrames = Int(0.003 * sampleRate)
         var samples: [Int16] = []
 
         for (toneIndex, tone) in tones.enumerated() {
             if toneIndex > 0 {
                 samples.append(contentsOf: repeatElement(0, count: interToneGapFrames))
             }
+
             let frameCount = max(1, Int(tone.duration * sampleRate))
+            var phase = 0.0
+
             for index in 0..<frameCount {
                 let t = Double(index) / sampleRate
+                let progress = Double(index) / Double(max(frameCount - 1, 1))
+                let frequency = tone.startFrequency
+                    + (tone.endFrequency - tone.startFrequency) * progress
+                phase += 2 * .pi * frequency / sampleRate
+
                 let remaining = tone.duration - t
                 let attackEnvelope = min(1, t / attack)
                 let releaseEnvelope = min(1, max(0, remaining / release))
-                let decay = exp(-3.8 * t / tone.duration)
-                let fundamental = sin(2 * .pi * tone.frequency * t)
-                let second = sin(2 * .pi * tone.frequency * 2 * t) * 0.24
-                let third = sin(2 * .pi * tone.frequency * 3 * t) * 0.07
-                let timbre = (fundamental + second + third) / 1.31
-                let value = timbre * attackEnvelope * releaseEnvelope * decay * 0.72
-                samples.append(Int16(max(-1, min(1, value)) * Double(Int16.max)))
+                let decay = exp(-5.4 * progress)
+
+                let fundamental = sin(phase)
+                let second = sin(phase * 2.0) * 0.16
+                let third = sin(phase * 3.0) * 0.035
+                let transient = sin(phase * 4.0) * 0.018 * (1 - progress)
+                let timbre = (fundamental + second + third + transient) / 1.213
+
+                let value = timbre
+                    * attackEnvelope
+                    * releaseEnvelope
+                    * decay
+                    * tone.gain
+
+                samples.append(
+                    Int16(max(-1, min(1, value)) * Double(Int16.max))
+                )
             }
         }
 

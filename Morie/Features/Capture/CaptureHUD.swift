@@ -461,7 +461,7 @@ private struct CaptureHUDView: View {
 
         case .processing:
             Text("Thinking")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
@@ -510,28 +510,41 @@ private struct ProcessingBorder: View {
             let cycle = reduceMotion
                 ? 0.0
                 : timeline.date.timeIntervalSinceReferenceDate
-                    .truncatingRemainder(dividingBy: 1.6) / 1.6
-            Capsule()
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            .clear,
-                            .white.opacity(0.10),
-                            .white.opacity(0.72),
-                            .white.opacity(0.16),
-                            .clear,
-                        ]),
-                        center: .center,
-                        startAngle: .degrees(cycle * 360),
-                        endAngle: .degrees(cycle * 360 + 360)
-                    ),
-                    lineWidth: 1.15
-                )
-                .padding(0.75)
-                .opacity(reduceMotion ? 0.38 : 1)
+                    .truncatingRemainder(dividingBy: 1.35) / 1.35
+            let start = Angle.degrees(cycle * 360)
+
+            ZStack {
+                Capsule()
+                    .stroke(Color.primary.opacity(0.16), lineWidth: 1)
+
+                Capsule()
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [
+                                Color.accentColor.opacity(0.18),
+                                Color.accentColor.opacity(0.42),
+                                Color.white.opacity(0.98),
+                                Color.accentColor.opacity(0.96),
+                                Color.accentColor.opacity(0.24),
+                                Color.accentColor.opacity(0.18),
+                            ]),
+                            center: .center,
+                            startAngle: start,
+                            endAngle: start + .degrees(360)
+                        ),
+                        lineWidth: reduceMotion ? 1.35 : 1.85
+                    )
+                    .shadow(
+                        color: Color.accentColor.opacity(reduceMotion ? 0.12 : 0.34),
+                        radius: reduceMotion ? 0.5 : 2.2
+                    )
+                    .opacity(reduceMotion ? 0.58 : 1)
+            }
+            .padding(0.5)
         }
     }
 }
+
 @MainActor
 private final class CompactWaveDynamics {
     private var displayedLevel: CGFloat = 0
