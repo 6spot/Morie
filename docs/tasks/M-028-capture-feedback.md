@@ -128,3 +128,49 @@ Owner-device validation remains open for the final subjective loudness/tone and 
 GitHub Actions `macOS 27 CI` run #113 passed the Release product compile on Xcode 27/macOS 27.
 
 The code slice is mergeable. M-028 remains IN PROGRESS only for owner-device subjective validation of the final cue character/volume and Thinking-border visibility.
+
+## 2026-09-19 third owner-device tuning — cues are action feedback
+
+Owner clarified the desired semantics after using the previous completion-timed version:
+
+- The sounds are not state-completion notifications.
+- They are **immediate accepted-action feedback** for the two global capture presses.
+- Start cue should play as soon as a new capture has been accepted and its HUD/session state is established; it must not wait for Speech asset/session readiness.
+- Finish cue should play as soon as a valid finish press is accepted, immediately before the HUD enters `Thinking`; it must not wait for recognition, cleanup, paste, or success.
+- Duplicate/ignored finish presses do not play another cue.
+- Cancel remains distinct and does not reuse the normal finish cue.
+
+### Reference sound analysis
+
+The owner supplied a recording of another app's preferred sound character. The audible pair is approximately:
+
+```text
+start: ~392 Hz → ~523 Hz   (gentle rising two-note chime)
+finish: ~392 Hz → ~294 Hz  (softer falling two-note chime)
+```
+
+The recording is a capture of playback rather than the original asset, so these frequencies are treated as tonal guidance rather than source samples.
+
+macOS exposes named Application Kit system sounds through `NSSound`, but the stock Tink/Pop/Ping/Glass family are single system alerts and do not reproduce this exact rising/falling two-note contour. Morie therefore keeps its dependency-free in-memory synthesis and retunes it to the reference character rather than copying/bundling another app's audio asset.
+
+Current generated cues:
+
+- start: 392 Hz then 523.25 Hz, ~144 ms including gap, volume 0.14;
+- finish: 392 Hz then 293.66 Hz, ~116 ms including gap, volume 0.085;
+- restrained second/third harmonics add laptop-speaker clarity without the previous high-frequency chirp.
+
+### Final interaction timing
+
+```text
+accepted Start press
+  ↓ cue immediately
+  ↓ HUD / Speech startup continues
+
+accepted Finish press
+  ↓ cue immediately
+  ↓ Thinking
+  ↓ Speech final / cleanup / paste
+  ↓ success / capsule close
+```
+
+Owner-device validation remains open for the new tonal match.
