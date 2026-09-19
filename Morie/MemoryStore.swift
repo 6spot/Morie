@@ -71,6 +71,10 @@ final class MemoryStore: ObservableObject {
         }
     }
 
+    var analyses: [MemoryAnalysisRecord] {
+        (try? analysisRecords()) ?? []
+    }
+
     func analysisCount() throws -> Int {
         let reader = makeContext()
         return try reader.fetchCount(FetchDescriptor<MemoryAnalysisRecord>())
@@ -185,6 +189,7 @@ final class MemoryStore: ObservableObject {
         } catch {
             // A fetch can fail after an earlier suggestion mutated this transaction too.
             context.rollback()
+            resetContext()
             try? load()
             throw error
         }
@@ -483,8 +488,9 @@ final class MemoryStore: ObservableObject {
         let id = source.captureID
         var descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
-        guard let capture = try? reader.fetch(descriptor).first,
-              let capture, eligibleForLearning(capture) else { return false }
+        guard let records = try? reader.fetch(descriptor),
+              let capture = records.first,
+              eligibleForLearning(capture) else { return false }
         return MemoryAnalysisSource(capture: capture) == source
     }
 
