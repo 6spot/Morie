@@ -57,8 +57,14 @@ enum ExpressionStyleExtractor {
               lexicalProjection(injected) == lexicalProjection(edited)
         else { return nil }
 
-        let before = measurements(injected)
-        let after = measurements(edited)
+        var before = measurements(injected)
+        var after = measurements(edited)
+        for feature in [ExpressionFeature.listUsage, .chineseEnglishSpacing] {
+            if before[feature] != nil || after[feature] != nil {
+                before[feature] = before[feature] ?? 0
+                after[feature] = after[feature] ?? 0
+            }
+        }
         let directions = Dictionary(uniqueKeysWithValues: ExpressionFeature.allCases.map { feature in
             let delta = (after[feature] ?? 0) - (before[feature] ?? 0)
             let epsilon = feature == .averageSentenceLength ? 1.0 : 0.025
@@ -82,14 +88,19 @@ enum ExpressionStyleExtractor {
         let transitions = matches(#"(?:\p{Han}\s*[A-Za-z]|[A-Za-z]\s*\p{Han})"#, in: text)
         let spacedTransitions = matches(#"(?:\p{Han}\s+[A-Za-z]|[A-Za-z]\s+\p{Han})"#, in: text)
 
-        return [
+        var result: [ExpressionFeature: Double] = [
             .averageSentenceLength: Double(scalarCount) / Double(sentenceCount),
             .lineBreakDensity: Double(text.filter { $0 == "\n" }.count) / Double(scalarCount),
-            .listUsage: Double(listLines.count) / Double(max(1, nonemptyLines.count)),
             .terminalPunctuationUsage: Double(terminalPunctuation) / Double(max(1, nonemptyLines.count)),
             .exclamationUsage: Double(exclamations) / Double(scalarCount),
-            .chineseEnglishSpacing: Double(spacedTransitions) / Double(max(1, transitions)),
         ]
+        if listLines.count >= 2 {
+            result[.listUsage] = Double(listLines.count) / Double(max(1, nonemptyLines.count))
+        }
+        if transitions > 0 {
+            result[.chineseEnglishSpacing] = Double(spacedTransitions) / Double(transitions)
+        }
+        return result
     }
 
     private static func lexicalProjection(_ text: String) -> String {
