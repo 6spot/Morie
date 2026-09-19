@@ -1,11 +1,68 @@
 import Foundation
 import FoundationModels
+import FoundationModelsUtilities
+
+enum RefinementModelMode: String, CaseIterable, Identifiable, Sendable {
+    case automatic
+    case local
+    case cloud
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .automatic: "自动"
+        case .local: "Apple 本机"
+        case .cloud: "外部 API"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .automatic: "优先使用已配置的外部模型，失败时回退 Apple 本机模型。"
+        case .local: "始终使用这台 Mac 上的 Apple Foundation Models。"
+        case .cloud: "始终使用已配置的 OpenAI-compatible Chat Completions API。"
+        }
+    }
+}
+
+struct RefinementModelConfiguration: Equatable, Sendable {
+    let mode: RefinementModelMode
+    let cloudBaseURL: String
+    let cloudModelName: String
+    let cloudAPIKey: String
+
+    static let local = RefinementModelConfiguration(
+        mode: .local,
+        cloudBaseURL: "",
+        cloudModelName: "",
+        cloudAPIKey: ""
+    )
+
+    var cloudURL: URL? {
+        let value = cloudBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              url.host != nil
+        else { return nil }
+        return url
+    }
+
+    var trimmedCloudModelName: String {
+        cloudModelName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var hasUsableCloudConfiguration: Bool {
+        cloudURL != nil && !trimmedCloudModelName.isEmpty
+    }
+}
 
 enum InputRefiner {
     // The product contract lives in docs/input-cleanup.md. Context cannot override these rules.
     static let instructionsText = """
         # 角色
-        你是 Morie 的本地语音输入整理器。输入是一次 ASR 转写。目标只是把这一次口述整理成用户自己会输入的自然文字：忠实、简洁、可直接粘贴。
+        你是 Morie 的语音输入整理器。输入是一次 ASR 转写。目标只是把这一次口述整理成用户自己会输入的自然文字：忠实、简洁、可直接粘贴。
 
         # 最高优先级：只整理原文
         1. 最终文字中的每个事实、请求、判断、问题、态度和话题都必须来自 transcript。
@@ -116,8 +173,35 @@ enum InputRefiner {
         }
         return count
     }
-    static func generate(_ input: RefinementInput) async throws -> String {
+    static func generate(
+        _ input: RefinementInput,
+        configuration: RefinementModelConfiguration = .local
+    ) async throws -> String {
         try Task.checkCancellation()
+        switch configuration.mode {
+        case .local:
+            return try await generateLocally(input)
+        case .cloud:
+            return try await generateWithCloud(input, configuration: configuration)
+        case .automatic:
+            guard configuration.hasUsableCloudConfiguration else {
+                return try await generateLocally(input)
+            }
+            do {
+                return try await generateWithCloud(input, configuration: configuration)
+            } catch {
+                if Task.isCancelled || error is CancellationError { throw CancellationError() }
+                Diagnostics.record(
+                    "Refinement",
+                    "External refinement failed in Auto mode; falling back to Apple on-device model",
+                    level: .warning
+                )
+                return try await generateLocally(input)
+            }
+        }
+    }
+
+    private static func generateLocally(_ input: RefinementInput) async throws -> String {
         let model = SystemLanguageModel.default
         guard model.availability == .available else { throw RefinementReason.unavailable }
         let instructions = Instructions { instructionsText }
@@ -151,6 +235,43 @@ enum InputRefiner {
             }
         }
     }
+
+    private static func generateWithCloud(
+        _ input: RefinementInput,
+        configuration: RefinementModelConfiguration
+    ) async throws -> String {
+        guard let url = configuration.cloudURL,
+              !configuration.trimmedCloudModelName.isEmpty
+        else { throw RefinementReason.unavailable }
+
+        let key = configuration.cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let headers = key.isEmpty ? [:] : ["Authorization": "Bearer \(key)"]
+        let model = ChatCompletionsLanguageModel(
+            name: configuration.trimmedCloudModelName,
+            url: url,
+            additionalHeaders: headers,
+            supportsGuidedGeneration: false
+        )
+        let instructions = Instructions { instructionsText }
+        let promptText = try promptText(for: input)
+        let prompt = Prompt { promptText }
+        let responseBudget = min(1_536, max(256, input.prepared.text.count * 2))
+
+        do {
+            try Task.checkCancellation()
+            let session = LanguageModelSession(model: model, instructions: instructions)
+            let response = try await session.respond(
+                to: prompt,
+                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: responseBudget)
+            )
+            try Task.checkCancellation()
+            return response.content
+        } catch {
+            if Task.isCancelled || error is CancellationError { throw CancellationError() }
+            // Remote errors may include response bodies. Never persist them into Capture history.
+            throw RefinementReason.generationFailed
+        }
+    }
 }
 
 @Generable
@@ -168,7 +289,8 @@ enum RefinementGeneration: Sendable {
 /// still releases the input path without waiting for model cancellation to drain.
 @MainActor
 final class InputRefinementRunner {
-    typealias Generate = @Sendable (RefinementInput) async throws -> String
+    typealias Generate = @Sendable (RefinementInput, RefinementModelConfiguration) async throws -> String
+    typealias LegacyGenerate = @Sendable (RefinementInput) async throws -> String
 
     private let generate: Generate
     private var generationTask: Task<Void, Never>?
@@ -181,11 +303,22 @@ final class InputRefinementRunner {
     // Observation for shutdown/validation only. The live input path never awaits model teardown.
     func waitForModelToFinish() async { await generationTask?.value }
 
-    init(generate: @escaping Generate = InputRefiner.generate) {
+    init() {
+        generate = InputRefiner.generate
+    }
+
+    init(generate: @escaping Generate) {
         self.generate = generate
     }
 
-    func run(_ input: RefinementInput) async throws -> RefinementGeneration {
+    init(generate: @escaping LegacyGenerate) {
+        self.generate = { input, _ in try await generate(input) }
+    }
+
+    func run(
+        _ input: RefinementInput,
+        configuration: RefinementModelConfiguration = .local
+    ) async throws -> RefinementGeneration {
         try Task.checkCancellation()
         guard !isBusy else { return .keptOriginal(.modelBusy) }
         let id = UUID()
@@ -201,7 +334,7 @@ final class InputRefinementRunner {
                 generationTask = Task { [weak self, generate] in
                     let outcome: RefinementGeneration
                     do {
-                        outcome = .text(try await generate(input))
+                        outcome = .text(try await generate(input, configuration))
                     } catch {
                         outcome = .keptOriginal((error as? RefinementReason) ?? .generationFailed)
                     }
