@@ -3,7 +3,7 @@
 ## Status
 
 - **State:** IN PROGRESS
-- **Last updated:** 2026-09-18
+- **Last updated:** 2026-09-19
 - **Phase:** Phase 3 (task area, not execution order)
 - **Active integration:** [M-009](M-009-macos-input-memory.md), branch `feature/m-009-input-dictionary-memory`.
 - **Dependency:** durable Capture. Basic cleanup does not require personal Memory.
@@ -41,6 +41,7 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 - [x] Recheck source/dictionary/Memory after generation; preserve Capture through errors/restart/retry.
 - [x] Connect native Settings/History and automatic analysis of saved final input through M-009.
 - [x] Verify with isolated model stubs, persistence tests and actual SDK compilation.
+- [x] Simplify the Foundation Models cleanup prompt and send only dictionary word strings plus useful Memory name/notes text; omit UUIDs, timestamps, status/origin and matching metadata from the model payload. Native Speech already receives only `[String]` dictionary hints, so no Speech metadata path required a code change.
 - [ ] Measure fidelity, unintended changes, hint benefit, timeout rate, final-to-delivery latency and native interactions.
 
 ## Implementation notes
