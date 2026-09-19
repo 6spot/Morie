@@ -2,9 +2,9 @@
 
 ## Status
 
-**IN PROGRESS** — 2026-09-19
+**DONE** — 2026-09-19
 
-Implementation is in [PR #21](https://github.com/6spot/Morie/pull/21) on `m-021/capture-session-controller`. Code and architecture ownership changes are implemented; macOS 27 compile validation remains pending.
+Implementation is complete in [PR #21](https://github.com/6spot/Morie/pull/21) on `m-021/capture-session-controller`. The macOS 27 Release compile gate passed on the refactored code and documentation head.
 
 ## Why
 
@@ -38,7 +38,7 @@ Explicitly excluded:
 - [x] App-level setup/hotkey/iCloud/Settings ownership stays in `AppController`.
 - [x] Existing visible `AppController.State` cases and UI-facing surface remain unchanged.
 - [x] No external dependency, package split, schema change or UI redesign is introduced.
-- [ ] macOS 27 compile gate passes.
+- [x] macOS 27 compile gate passes.
 
 ## Subtasks / progress
 
@@ -48,7 +48,7 @@ Explicitly excluded:
 - [x] Add phase/transcript/failure callbacks back to `AppController`.
 - [x] Update architecture/task docs.
 - [x] Open PR #21.
-- [ ] Run and record CI.
+- [x] Run and record CI.
 
 ## Implementation notes
 
@@ -64,20 +64,20 @@ The extraction deliberately migrates the existing behavior instead of redesignin
 
 ## Validation
 
-Pending GitHub macOS 27 compile validation.
+Completed:
 
-Structural checks before CI:
-
+- GitHub Actions `macOS 27 CI` run #48 compiled the extracted code successfully;
+- run #49 compiled the code plus architecture/task documentation head successfully;
 - the new controller is included only in the existing Morie app target;
 - `AppController` no longer contains the previous Speech/HUD/delivery service fields or capture UUID/task fields;
 - no Capture/Memory/Dictionary persistence types or schemas changed;
 - no third-party dependency or target was added.
 
-Runtime-sensitive behavior remains governed by the existing validation matrix; this ownership refactor does not waive finish-during-startup, cancellation, interruption, clipboard fallback or microphone-release checks.
+The repository CI currently performs the Release product compile rather than real-device interaction tests. Runtime-sensitive behavior remains governed by the existing validation matrix; this ownership refactor does not waive finish-during-startup, cancellation, interruption, clipboard fallback or microphone-release checks.
 
 ## Known issues / blockers
 
-No known product blocker. Compile validation is pending.
+No known blocker remains for this architecture task.
 
 ## Follow-up
 
