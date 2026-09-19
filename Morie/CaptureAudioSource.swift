@@ -122,6 +122,7 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
 
     deinit {
         stopCaptureSession()
+        Diagnostics.record("AudioLifetime", "CaptureAudioSource released")
     }
 
     private func reportFailure(_ error: Error) {
