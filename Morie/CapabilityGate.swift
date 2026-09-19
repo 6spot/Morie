@@ -177,13 +177,9 @@ struct CapabilityGate {
     }
 
     private func inspectSpeech(locale: Locale) async -> CapabilityCheck {
-        guard SpeechTranscriber.isAvailable else {
+        guard await DictationTranscriber.supportedLocale(equivalentTo: locale) != nil else {
             return .init(requirement: .speechTranscription, state: .unavailable,
-                         detail: "这台 Mac 暂时无法使用 Apple 本机语音转写。")
-        }
-        guard await SpeechTranscriber.supportedLocale(equivalentTo: locale) != nil else {
-            return .init(requirement: .speechTranscription, state: .unavailable,
-                         detail: "Apple 语音转写暂不支持当前输入语言（\(locale.identifier)）。")
+                         detail: "Apple 听写暂不支持当前输入语言（\(locale.identifier)）。")
         }
         return .init(requirement: .speechTranscription, state: .ready)
     }

@@ -27,12 +27,13 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-012 | Performance | Stop hidden HUD rendering and establish idle CPU/RSS baseline | IN PROGRESS | — | [`M-012`](./tasks/M-012-idle-performance.md) |
 | M-013 | macOS UX | Simplify menu, setup, filters, Settings and Dictionary navigation | IN PROGRESS | — | [`M-013`](./tasks/M-013-control-center.md) |
 | M-014 | Input routing | Deliver final text to current keyboard focus like a system input method | IN PROGRESS | — | [`M-014`](./tasks/M-014-current-focus-input.md) |
+| M-015 | Speech quality | Use Apple dictation punctuation for live and saved-audio transcription | IN PROGRESS | — | [`M-015`](./tasks/M-015-native-dictation-punctuation.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
 ## Current milestone
 
-The owner's amended priority is **one Mac's input → dictionary/cleanup → automatic personal Memory loop**, tracked in M-009. M-002/M-003 preserve input and recovery; M-004/M-005 now supply personal Memory and independent cleanup; M-008 supplies native management; M-010 supplies Chinese/native setup usability, M-011 simplifies dictionary entry to a single word, and M-014 replaces original-app restoration with current-keyboard-focus delivery. Required real-device checks remain open. iCloud/CloudKit is outside this milestone, and iOS/inspiration follow-up are not scheduled. The historical phase numbers below are reference IDs, not the execution order.
+The owner's amended priority is **one Mac's input → dictionary/cleanup → automatic personal Memory loop**, tracked in M-009. M-002/M-003 preserve input and recovery; M-004/M-005 now supply personal Memory and independent cleanup; M-008 supplies native management; M-010 supplies Chinese/native setup usability, M-011 simplifies dictionary entry to a single word, M-014 replaces original-app restoration with current-keyboard-focus delivery, and M-015 moves the Speech layer to Apple's punctuated dictation preset. Required real-device checks remain open. iCloud/CloudKit is outside this milestone, and iOS/inspiration follow-up are not scheduled. The historical phase numbers below are reference IDs, not the execution order.
 
 ### Implementation and remaining acceptance
 
@@ -42,7 +43,7 @@ Current management follows the native M-008 structure with separate History, Dic
 
 M-010 also fixes the owner-observed Speech authorization callback crash and simplifies the setup window's title, permission state and footer actions. Signed-app permission and interaction retesting remains open; regression/build/layout evidence is in its task record.
 
-The owner deferred interactive validation until the evening of 2026-09-18. Actual model fidelity/latency, correction prompts across supported fields, keyboard/VoiceOver, microphone/recovery and the delivery matrix must be tested before completion. CloudKit is deferred to a later cross-device milestone; no enrollment/container IDs are required for current work.
+The owner deferred interactive validation until the evening of 2026-09-18. Actual model fidelity/latency, correction prompts across supported fields, keyboard/VoiceOver, microphone/recovery and the delivery matrix must be tested before completion. The current execution order is input routing → native dictation punctuation → Dictionary/Cleanup/Memory quality → Expression Profile → optional iCloud/CloudKit sync/backup. No local automatic-backup subsystem is planned; development schema changes may discard old local development data.
 
 ## Maintenance rules
 

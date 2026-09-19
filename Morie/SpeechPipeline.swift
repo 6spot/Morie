@@ -42,7 +42,7 @@ actor SpeechPipeline {
     func prepare(locale requestedLocale: Locale) async throws {
         guard activeSessionID == nil else { throw PipelineError.alreadyRunning }
 
-        Diagnostics.record("Speech", "Preparing SpeechTranscriber for locale \(requestedLocale.identifier)")
+        Diagnostics.record("Speech", "Preparing DictationTranscriber for locale \(requestedLocale.identifier)")
         let transcriber = try await makeTranscriber(locale: requestedLocale)
         try Task.checkCancellation()
 
@@ -87,7 +87,7 @@ actor SpeechPipeline {
 
             let transcriber = try await makeTranscriber(locale: requestedLocale)
             try requireActiveSession(sessionID)
-            Diagnostics.record("Speech", "SpeechTranscriber created for \(session)")
+            Diagnostics.record("Speech", "DictationTranscriber created for \(session)")
 
             let inputConverter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
             try requireActiveSession(sessionID)
@@ -268,14 +268,17 @@ actor SpeechPipeline {
         onFailure(sessionID, error.localizedDescription)
     }
 
-    private func makeTranscriber(locale requestedLocale: Locale) async throws -> SpeechTranscriber {
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
+    private func makeTranscriber(locale requestedLocale: Locale) async throws -> DictationTranscriber {
+        guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
             Diagnostics.record("Speech", "Unsupported requested locale: \(requestedLocale.identifier)", level: .error)
             throw PipelineError.unsupportedLocale
         }
 
-        Diagnostics.record("Speech", "Resolved Speech locale: \(locale.identifier)")
-        return SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+        Diagnostics.record("Speech", "Resolved Dictation locale: \(locale.identifier)")
+        // Morie is an input method, so use Apple's dictation-oriented module.
+        // progressiveLongDictation keeps live volatile results while asking the
+        // native recognizer to supply punctuation for long-form speech.
+        return DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
     }
 
     private func requireActiveSession(_ sessionID: UUID) throws {

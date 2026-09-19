@@ -96,13 +96,13 @@ Explicitly excluded:
 | Menu Bar shell | IN PROGRESS | Native `MenuBarExtra` with a stable waveform entry icon; runtime state remains in the HUD and textual menu content instead of changing the persistent system-bar icon. Real macOS 27 visual/interaction validation still required. |
 | Native Diagnostics surface | DONE / VERIFY | Native `Table` within the Morie management window (M-008); Copy All Events/confirmed Clear Diagnostics/Show Log File; traces capability/hotkey/session/Speech/delivery paths and mirrors the current launch to `~/Library/Logs/Morie/morie-debug.log` without transcript content. Real-device log usefulness is being validated. |
 | Foundation Models capability check | DONE | `SystemLanguageModel` availability + locale. |
-| Speech capability/locale check | DONE | `SpeechTranscriber` availability + locale. |
+| Speech capability/locale check | DONE | `DictationTranscriber` locale support for the same native module Morie actually uses. |
 | Microphone/Speech authorization | DONE / VERIFY | Native first-request prompts plus modal/menu System Settings recovery when macOS returns denial without presenting consent. Only Accessibility suppresses Morie's modal to avoid stacking it over Device Control and Data Access; microphone revoke/re-enable/recheck needs another real-device pass. |
 | Accessibility trust check | DONE | Native trust prompt/check plus direct System Settings recovery; user manually enables Morie, then rechecks. |
 | iCloud/CloudKit capability check | DEFERRED | Outside the single-Mac milestone per the owner’s 2026-09-18 correction. A later cross-device task will own provisioning/account/sync acceptance; M-003 local persistence has no CloudKit dependency. |
 | Global toggle-capture hotkey | IMPLEMENTED / VERIFY | Owner-approved default is solo `Fn / Globe` release: first release starts, second finishes, Fn chords do not trigger, and `Escape` cancels. A timed-out event tap now fails open and is released instead of entering an automatic re-enable loop that can block keyboard input. Native Settings provides alternate combinations; real-device timeout recovery and Fn/system-conflict validation remain. |
 | Reliable recording/session layer | IMPLEMENTED / VERIFY | Unique session IDs, setup cancellation, stale-result rejection, deterministic terminal cleanup. |
-| Modern Apple Speech pipeline | IMPLEMENTED / VERIFY | `SpeechAnalyzer` + `SpeechTranscriber` + one `AVCaptureAudioDataOutput`/`AnalyzerInputConverter`; M-003 shares its buffers with streamed source-audio encoding. Remaining runtime finalization cases still need device proof. |
+| Modern Apple Speech pipeline | IMPLEMENTED / VERIFY | M-015 uses `SpeechAnalyzer` + `DictationTranscriber(.progressiveLongDictation)` + one `AVCaptureAudioDataOutput`/`AnalyzerInputConverter`; Apple dictation owns first-pass punctuation while preserving live volatile results. M-003 shares the same buffers with streamed source-audio encoding. Remaining punctuation/finalization cases still need device proof. |
 | Current-keyboard-focus delivery | IMPLEMENTED / VERIFY | M-014 removes start-time app/window pinning. When final text is ready, Morie resolves the current external frontmost app and dispatches one standard Cmd+V without activating or switching applications. Current-focus timing and cross-app switching require signed-device validation. |
 | Text injection / clipboard fallback | IMPLEMENTED / VERIFY | Universal synthetic Cmd+V delivery, change-count-aware restore (including an originally empty clipboard), and transient markers for Raycast/clipboard-history exclusion; no app-specific compatibility branch. |
 | Cancellation/stale-result hardening | IMPLEMENTED / VERIFY | Finish/cancel during in-flight setup stays bound to its session; per-session identity protects new sessions. |
@@ -168,7 +168,7 @@ A model-asset download must not begin after the user has already started an inte
 
 The current Speech path uses:
 
-- `SpeechTranscriber(locale:preset:.progressiveTranscription)`;
+- `DictationTranscriber(locale:preset:.progressiveLongDictation)` for live input, with native punctuation and volatile results;
 - `AssetInventory`;
 - one `AVCaptureAudioDataOutput` feeding `AnalyzerInputConverter` and M-003's streamed source-audio encoder;
 - `SpeechAnalyzer`.
@@ -347,7 +347,7 @@ Verified:
 - current Phase 0 files are connected to the Xcode target;
 - no external Swift/package product dependency is present;
 - the project compiles with Xcode 27 / macOS 27 SDK and Swift 6;
-- current `SpeechAnalyzer`/`SpeechTranscriber`/capture-input API usage compiles against that SDK;
+- current `SpeechAnalyzer`/`DictationTranscriber`/capture-input API usage compiles against that SDK;
 - current `CGEventTap` implementation compiles against that SDK;
 - native debug window/instrumentation compiles and packages against that SDK;
 - Morie-first Type4Me extraction boundaries are documented.
@@ -370,7 +370,7 @@ Still required on a supported real Mac:
 - additional interruption/failure recovery beyond the verified rapid/short/repeated toggle and Escape paths;
 - microphone/session cleanup after failure/cancel;
 - volatile/final transcript edge cases such as immediate finish and end-of-short-utterance retention;
-- remaining focus restoration and universal clipboard/paste delivery matrix applications/fields;
+- remaining current-focus and universal clipboard/paste delivery matrix applications/fields;
 - clipboard replacement race where another app/user changes it during Morie's restore window;
 - native Liquid Glass appearance/interaction;
 - Reduce Motion, Reduce Transparency, Increase Contrast, VoiceOver, and keyboard-control behavior for the capture HUD;
@@ -391,15 +391,9 @@ These items keep M-002 **IN PROGRESS** even though the initial Phase 0 implement
 
 ## Follow-up
 
-After M-002 runtime validation is stable, M-003 introduces the Capture-first reliability boundary:
+M-003 already provides the Capture-first local reliability boundary. The current execution order is input quality first, then Expression Profile, then optional iCloud/CloudKit sync/backup after the single-Mac data model settles.
 
-- durable local Capture storage;
-- History;
-- App Context persistence;
-- CloudKit/iCloud container and sync;
-- iCloud capability gate.
-
-Memory extraction/personalization remains later work.
+Morie does not add a local automatic-backup subsystem during development or as an interim product feature. Development schema changes may discard old local development data instead of carrying compatibility or backup machinery.
 
 ## References
 
