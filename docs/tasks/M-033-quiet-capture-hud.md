@@ -53,10 +53,10 @@ The native `NSGlassEffectView` remains the surface; only its tint intensity is r
 - [x] Thinking text uses secondary contrast instead of primary black.
 - [x] Current-app success is plain `SUCCESS`, no icon, no green.
 - [x] Saved/clipboard/recognition status messages have no leading decorative icon.
-- [ ] macOS 27 Release compile passes.
-- [ ] MorieTests pass.
+- [x] macOS 27 Release compile passes (CI #143).
+- [x] MorieTests pass (CI #143).
 - [ ] Owner-device visual check confirms contrast feels appropriately quiet.
 
 ## Validation boundary
 
-Hosted CI can prove compilation and regression safety, but it cannot establish the final perceived contrast of Liquid Glass on the owner's display. The owner-device visual check remains the final UI acceptance item.
+Hosted CI #143 passed both the macOS 27 Release compile and the full MorieTests gate. It cannot establish the final perceived contrast of Liquid Glass on the owner's display, so the owner-device visual check remains the final UI acceptance item before M-033 is closed.
