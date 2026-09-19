@@ -58,14 +58,14 @@ final class MemoryStore: ObservableObject {
     /// Normal operation enqueues only the Capture that just reached a terminal delivery state.
     func reconcileCompletedInputs() throws {
         try load()
-        let knownSources = Set(analyses.map(\.source))
+        let knownCaptureIDs = Set(analyses.map(\.sourceCaptureID))
         let captures = try container.mainContext.fetch(
             FetchDescriptor<CaptureRecord>(sortBy: [SortDescriptor(\.createdAt)])
         )
         var inserted = false
         for capture in captures where eligibleForLearning(capture) {
             let source = MemoryAnalysisSource(capture: capture)
-            guard !knownSources.contains(source) else { continue }
+            guard !knownCaptureIDs.contains(capture.id) else { continue }
             context.insert(MemoryAnalysisRecord(source: source))
             inserted = true
         }
