@@ -35,6 +35,7 @@ final class AppController: ObservableObject {
     @Published private(set) var inputRefinementEnabled: Bool
     @Published private(set) var correctionSuggestionsEnabled: Bool
     @Published private(set) var expressionLearningEnabled: Bool
+    @Published private(set) var soundFeedbackEnabled: Bool
     @Published private(set) var iCloudSyncEnabled: Bool
     @Published private(set) var iCloudSyncState: ICloudSyncState
     @Published private(set) var needsSetup = false
@@ -73,7 +74,8 @@ final class AppController: ObservableObject {
             memoryLearning: memoryLearning,
             inputRefinementEnabled: inputRefinementEnabled,
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
-            expressionLearningEnabled: expressionLearningEnabled
+            expressionLearningEnabled: expressionLearningEnabled,
+            soundFeedbackEnabled: soundFeedbackEnabled
         )
         session.onPhaseChange = { [weak self] phase in
             self?.applyCapturePhase(phase)
@@ -134,6 +136,9 @@ final class AppController: ObservableObject {
             forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
         )
         expressionLearningEnabled = UserDefaults.standard.bool(forKey: ExpressionProfileStore.enabledDefaultsKey)
+        soundFeedbackEnabled = UserDefaults.standard.object(
+            forKey: CaptureSoundFeedback.enabledDefaultsKey
+        ) as? Bool ?? true
         let savedICloudSyncEnabled = ICloudSyncSettings.isEnabled
         iCloudSyncEnabled = savedICloudSyncEnabled
         if let cloudSyncStartupError {
@@ -232,6 +237,13 @@ final class AppController: ObservableObject {
         UserDefaults.standard.set(enabled, forKey: ExpressionProfileStore.enabledDefaultsKey)
         captureSession.expressionLearningEnabled = enabled
         if !enabled && !correctionSuggestionsEnabled { postInsertionLearning?.stop() }
+    }
+
+
+    func setSoundFeedbackEnabled(_ enabled: Bool) {
+        soundFeedbackEnabled = enabled
+        captureSession.soundFeedbackEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: CaptureSoundFeedback.enabledDefaultsKey)
     }
 
     func clearExpressionProfile() {
