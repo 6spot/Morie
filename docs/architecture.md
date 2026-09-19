@@ -389,7 +389,7 @@ An actor owns the Apple-native speech session state:
 - stale-session rejection;
 - resource cleanup.
 
-Speech assets are prepared before Ready so a model download is not started inside an active capture. `SpeechPipeline.start` receives up to 100 dictionary spellings / 2,000 characters and applies `AnalysisContext.contextualStrings[.general]` through `SpeechAnalyzer.setContext`. Hint failure does not prevent capture; session ownership is rechecked after that await.
+Speech assets for both the live progressive preset and the final accurate preset are prepared before Ready so a model download is not started inside an active capture or finish path. `SpeechPipeline.start` receives up to 100 dictionary spellings / 2,000 characters and applies `AnalysisContext.contextualStrings[.general]` through `SpeechAnalyzer.setContext`. Hint failure does not prevent capture; session ownership is rechecked after that await.
 
 Result passages are concatenated exactly as Apple emits them; Morie does not insert spaces or guessed punctuation between native segments. A finish action stops capture and lets already-captured analyzer input finish before finalization. Cancellation instead terminates analysis immediately. The most recent volatile segment is preserved because the current Speech result contract does not guarantee that each volatile result will later be emitted again as final.
 
