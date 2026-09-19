@@ -9,6 +9,7 @@ final class CaptureSoundFeedback {
         let frequency: Double
         let duration: Double
         let gain: Double
+        let brightness: Double
     }
 
     private enum Cue {
@@ -21,21 +22,21 @@ final class CaptureSoundFeedback {
             switch self {
             case .start:
                 [
-                    Tone(frequency: 392.0, duration: 0.055, gain: 0.82),
-                    Tone(frequency: 523.25, duration: 0.082, gain: 1.0),
+                    Tone(frequency: 392.0, duration: 0.050, gain: 0.78, brightness: 0.22),
+                    Tone(frequency: 523.25, duration: 0.090, gain: 1.0, brightness: 0.24),
                 ]
             case .stop:
                 [
-                    Tone(frequency: 392.0, duration: 0.045, gain: 0.66),
-                    Tone(frequency: 293.66, duration: 0.064, gain: 0.72),
+                    Tone(frequency: 392.0, duration: 0.058, gain: 0.56, brightness: 0.26),
+                    Tone(frequency: 293.66, duration: 0.100, gain: 0.62, brightness: 0.34),
                 ]
             }
         }
 
         var volume: Float {
             switch self {
-            case .start: 0.14
-            case .stop: 0.085
+            case .start: 0.125
+            case .stop: 0.075
             }
         }
     }
@@ -80,8 +81,8 @@ final class CaptureSoundFeedback {
     private func wavData(
         for tones: [Tone]
     ) -> Data? {
-        let attack = 0.0015
-        let release = 0.010
+        let attack = 0.0009
+        let release = 0.014
         let interToneGapFrames = Int(0.007 * sampleRate)
         var samples: [Int16] = []
 
@@ -98,15 +99,17 @@ final class CaptureSoundFeedback {
 
                 let attackEnvelope = min(1, t / attack)
                 let releaseEnvelope = min(1, max(0, remaining / release))
-                let decay = exp(-3.2 * progress)
+                let decay = exp(-2.65 * progress)
                 let phase = 2 * .pi * tone.frequency * t
 
                 // Mostly a clean musical tone with just enough upper harmonic
                 // energy to feel crisp on laptop speakers at low volume.
                 let fundamental = sin(phase)
-                let second = sin(phase * 2.0) * 0.12
-                let third = sin(phase * 3.0) * 0.025
-                let timbre = (fundamental + second + third) / 1.145
+                let second = sin(phase * 2.0) * tone.brightness
+                let third = sin(phase * 3.0) * tone.brightness * 0.24
+                let fourth = sin(phase * 4.0) * tone.brightness * 0.08 * (1 - progress)
+                let normalization = 1 + tone.brightness * 1.32
+                let timbre = (fundamental + second + third + fourth) / normalization
 
                 let value = timbre
                     * attackEnvelope

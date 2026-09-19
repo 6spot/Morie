@@ -174,3 +174,17 @@ accepted Finish press
 ```
 
 Owner-device validation remains open for the new tonal match.
+
+## 2026-09-19 fourth owner-device tuning — crispness
+
+Owner confirmed the reference-like contour is close but the current synthesized tone still lacks a crisp attack; the finish tone also feels too short and dull.
+
+The architecture is already correct for memory/runtime cost: `CaptureSoundFeedback.init()` synthesizes both tiny WAV buffers once, creates two retained `AVAudioPlayer` instances and calls `prepareToPlay()`. Capture presses only rewind/play those players; they do not resynthesize audio.
+
+This tuning keeps the same two-note contour but:
+
+- shortens the attack to ~0.9 ms;
+- increases restrained upper harmonics for more laptop-speaker definition;
+- lowers overall volume slightly;
+- lengthens the finish pair, especially its second note;
+- keeps finish quieter than start.
