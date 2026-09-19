@@ -94,7 +94,6 @@ final class CaptureStore {
         bundleIdentifier: String?,
         windowNumber: CGWindowID?
     ) throws -> URL {
-        try pruneExpiredAudio()
         let record = CaptureRecord(
             id: id,
             deliveryMode: deliveryMode,
@@ -373,11 +372,15 @@ final class CaptureStore {
     }
 
     func pruneExpiredAudio(now: Date = Date()) throws {
-        let descriptor = FetchDescriptor<CaptureRecord>()
+        let noExpiry = Date.distantFuture
+        let descriptor = FetchDescriptor<CaptureRecord>(
+            predicate: #Predicate {
+                $0.sourceAudioRelativePath != nil
+                    && ($0.sourceAudioExpiresAt ?? noExpiry) <= now
+            }
+        )
         let expired = try container.mainContext.fetch(descriptor).filter {
-            $0.sourceAudioRelativePath != nil && records[$0.id] == nil
-                && $0.refinement?.status != .running
-                && ($0.sourceAudioExpiresAt.map { $0 <= now } ?? false)
+            records[$0.id] == nil && $0.refinement?.status != .running
         }
         guard !expired.isEmpty else { return }
 
