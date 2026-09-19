@@ -129,12 +129,12 @@ The compact capture capsule is deliberately low-contrast. Recording controls use
 Status color is reserved for state, not button identity:
 
 - **Thinking** keeps the existing soft system accent-color border animation.
-- successful current-app delivery shows plain `SUCCESS` text using the same softened accent color, with no leading checkmark and no bright green;
-- capture-only success keeps plain **已保存** text using the same softened accent color;
-- clipboard fallback, no-speech and recognition-failure messages are text-only and visually secondary;
+- normal successful completion has no separate success state: once processing completes, the `Thinking` capsule immediately runs its normal collapse/fade-out animation;
+- this applies to both current-app delivery and capture-only completion; no `SUCCESS`, **已输入**, **已保存**, checkmark, green flash or other success badge is shown in the HUD;
+- clipboard fallback, no-speech and recognition-failure messages remain visible because they communicate an outcome the user may need to act on; they stay text-only and visually secondary;
 - accessibility labels remain descriptive Simplified Chinese even when the visible success word is English.
 
-Do not add decorative leading status icons back to these text messages. Strong red/green treatment is reserved for situations where a future interaction genuinely requires semantic emphasis; normal successful input should remain visually quiet.
+Do not add decorative leading status icons back to these text messages. Normal success is communicated by the disappearance of the processing capsule itself; do not add another success dwell state unless new usability evidence requires one. Strong semantic color is reserved for outcomes that genuinely require attention.
 
 ## History recovery
 
