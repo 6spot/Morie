@@ -64,6 +64,7 @@ final class AppController: ObservableObject {
     private var captureStartTask: Task<Void, Never>?
     private var captureFinishTask: Task<Void, Never>?
     private var captureShutdownTask: Task<Void, Never>?
+    private var audioMaintenanceTask: Task<Void, Never>?
     private var stoppingCaptureID: UUID?
     private var activeSourceAudioURL: URL?
     private var lastPresentedFailure: String?
@@ -245,6 +246,7 @@ final class AppController: ObservableObject {
             state = .ready
             memoryLearning?.setInputActive(false)
             memoryLearning?.start()
+            startAudioMaintenanceLoopIfNeeded()
             Diagnostics.record("App", "Bootstrap complete; Morie is Ready")
         } catch is CancellationError {
             state = .blocked("准备已取消，可以在使用引导中重试。")
@@ -580,6 +582,7 @@ final class AppController: ObservableObject {
             // Delivery may already have dispatched before cancellation arrived.
             // Record that outcome even when interruption now owns the UI.
             try captureStore.markDelivered(sessionID)
+            memoryLearning?.captureDidComplete(sessionID)
             completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
         } catch {
             Diagnostics.record("Session", "Capture \(label(sessionID)) failed: \(error.localizedDescription)", level: .error)
@@ -726,6 +729,7 @@ final class AppController: ObservableObject {
         do {
             if preservedOnClipboard {
                 try captureStore?.markDeliveryFailed(sessionID, error: message)
+                memoryLearning?.captureDidComplete(sessionID)
             } else if stoppingCaptureID != sessionID {
                 try captureStore?.markFailed(sessionID, error: message)
             }
@@ -762,6 +766,31 @@ final class AppController: ObservableObject {
         targetWindowNumber = nil
         history?.setInputActive(false)
         memoryLearning?.setInputActive(false)
+    }
+
+    private func startAudioMaintenanceLoopIfNeeded() {
+        guard audioMaintenanceTask == nil else { return }
+        audioMaintenanceTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(24 * 60 * 60))
+                    try Task.checkCancellation()
+                } catch {
+                    return
+                }
+
+                guard let store = self?.captureStore else { return }
+                do {
+                    try store.pruneExpiredAudio()
+                } catch {
+                    Diagnostics.record(
+                        "CaptureStore",
+                        "Scheduled audio maintenance failed: \(error.localizedDescription)",
+                        level: .warning
+                    )
+                }
+            }
+        }
     }
 
     private func presentFailure(title: String, message: String) {
