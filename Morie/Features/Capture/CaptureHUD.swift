@@ -9,9 +9,11 @@ final class CaptureHUDController {
     private weak var animatedCapsuleView: NSView?
     private var hideTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
+    private var processingTransitionTask: Task<Void, Never>?
 
     private enum Layout {
         static let contentWidth: CGFloat = 142
+        static let processingWidth: CGFloat = 94
         static let contentHeight: CGFloat = 34
         static let effectInset: CGFloat = 6
         static let bottomOffset: CGFloat = 48
@@ -36,8 +38,11 @@ final class CaptureHUDController {
         hideTask?.cancel()
         hideTask = nil
 
+        processingTransitionTask?.cancel()
+        processingTransitionTask = nil
         model.beginRecording()
         showPanel()
+        setCapsuleWidth(Layout.contentWidth, animated: false)
         Diagnostics.record("HUD", "Compact capture HUD shown in recording state")
     }
 
@@ -50,9 +55,37 @@ final class CaptureHUDController {
         hideTask?.cancel()
         hideTask = nil
 
-        model.phase = .processing
+        if model.phase == .processing || processingTransitionTask != nil {
+            return
+        }
+
         showPanel()
-        Diagnostics.record("HUD", "Compact capture HUD entered processing state")
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            setCapsuleWidth(Layout.processingWidth, animated: false)
+            model.phase = .processing
+            Diagnostics.record("HUD", "Compact capture HUD entered processing state")
+            return
+        }
+
+        // Match the reference rhythm: first let the wide recording capsule
+        // close in around the waveform, then replace the waveform with text.
+        // Keeping the recording content during the width animation naturally
+        // clips the side controls inward instead of hard-cutting them away.
+        setCapsuleWidth(Layout.processingWidth, animated: true, duration: 0.16)
+        processingTransitionTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(130))
+            } catch {
+                return
+            }
+            guard let self, !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.09)) {
+                self.model.phase = .processing
+            }
+            self.processingTransitionTask = nil
+            Diagnostics.record("HUD", "Compact capture HUD entered processing state")
+        }
     }
 
     func showSuccess(deliveryMode: CaptureDeliveryMode) {
@@ -60,13 +93,15 @@ final class CaptureHUDController {
             "HUD",
             "Capture completed successfully; closing processing HUD; mode=\(deliveryMode.rawValue)"
         )
-        hide()
+        hideSuccessfulProcessing()
     }
 
     func showClipboardFallback() {
         hideTask?.cancel()
+        cancelProcessingTransition()
         model.showFeedback(.clipboardFallback)
         showPanel()
+        setCapsuleWidth(Layout.contentWidth, animated: true)
         Diagnostics.record("HUD", "Compact capture HUD showing clipboard fallback", level: .warning)
 
         hideTask = Task { @MainActor [weak self] in
@@ -78,8 +113,10 @@ final class CaptureHUDController {
 
     func showNoSpeech() {
         hideTask?.cancel()
+        cancelProcessingTransition()
         model.phase = .noSpeech
         showPanel()
+        setCapsuleWidth(Layout.contentWidth, animated: true)
         hideTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(900))
             guard !Task.isCancelled else { return }
@@ -89,8 +126,10 @@ final class CaptureHUDController {
 
     func showRecognitionFailure() {
         hideTask?.cancel()
+        cancelProcessingTransition()
         model.phase = .recognitionFailure
         showPanel()
+        setCapsuleWidth(Layout.contentWidth, animated: true)
         hideTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
@@ -100,8 +139,10 @@ final class CaptureHUDController {
 
     func showFailure() {
         hideTask?.cancel()
+        cancelProcessingTransition()
         model.phase = .failure
         showPanel()
+        setCapsuleWidth(Layout.contentWidth, animated: true)
         Diagnostics.record("HUD", "Compact capture HUD showing failure", level: .warning)
 
         hideTask = Task { @MainActor [weak self] in
@@ -111,10 +152,47 @@ final class CaptureHUDController {
         }
     }
 
+    private func hideSuccessfulProcessing() {
+        hideTask?.cancel()
+        hideTask = nil
+        collapseTask?.cancel()
+        cancelProcessingTransition()
+
+        guard panel != nil, let rootView = animatedCapsuleView else {
+            releasePanel()
+            return
+        }
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            releasePanel()
+            return
+        }
+
+        // Successful completion is intentionally quieter than cancellation:
+        // keep the compact Thinking shape and let it mostly fade in place.
+        let duration = 0.20
+        animate(
+            rootView,
+            fromScale: currentScale(of: rootView),
+            toScale: 0.94,
+            fromOpacity: rootView.layer?.presentation()?.opacity ?? 1,
+            toOpacity: 0,
+            duration: duration,
+            timing: .easeOut
+        )
+
+        collapseTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            self?.releasePanel()
+        }
+    }
+
     func hide() {
         hideTask?.cancel()
         hideTask = nil
         collapseTask?.cancel()
+        cancelProcessingTransition()
 
         guard panel != nil, let rootView = animatedCapsuleView else {
             releasePanel()
@@ -232,9 +310,40 @@ final class CaptureHUDController {
         return panel
     }
 
+    private func setCapsuleWidth(
+        _ width: CGFloat,
+        animated: Bool,
+        duration: TimeInterval = 0.16
+    ) {
+        guard let panel, let view = animatedCapsuleView else { return }
+        let target = NSRect(
+            x: ((panel.contentView?.bounds.width ?? Layout.panelSize.width) - width) / 2,
+            y: Layout.effectInset,
+            width: width,
+            height: Layout.contentHeight
+        )
+
+        guard animated, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            view.frame = target
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            view.animator().frame = target
+        }
+    }
+
+    private func cancelProcessingTransition() {
+        processingTransitionTask?.cancel()
+        processingTransitionTask = nil
+    }
+
     private func releasePanel() {
         collapseTask?.cancel()
         collapseTask = nil
+        cancelProcessingTransition()
         panel?.orderOut(nil)
         // Releasing the NSHostingView stops the hidden waveform TimelineView.
         panel?.contentView = nil
@@ -399,7 +508,8 @@ private struct CaptureHUDView: View {
 
     var body: some View {
         phaseContent
-            .frame(width: Layout.contentWidth, height: Layout.contentHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(height: Layout.contentHeight)
     }
 
     @ViewBuilder
@@ -460,6 +570,7 @@ private struct CaptureHUDView: View {
                 height: Layout.innerHeight
             )
             .padding(Layout.contentInset)
+            .transition(.opacity)
 
         case .processing:
             Text("Thinking")
@@ -471,6 +582,7 @@ private struct CaptureHUDView: View {
                         .allowsHitTesting(false)
                 }
                 .accessibilityLabel("正在整理输入")
+                .transition(.opacity)
 
         case .clipboardFallback:
             Text("已复制到剪贴板")
