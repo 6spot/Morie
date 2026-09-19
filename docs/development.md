@@ -90,20 +90,26 @@ Permission setup tests inject read-only snapshots and authorization/settings act
 
 The actual Foundation Models and native Speech-hint paths compile. Logic tests never invoke a real model, microphone, clipboard or product app, and cannot establish semantic quality or cross-app acceptance.
 
-## CI compile gate
+## CI compile and logic-test gate
 
-`.github/workflows/macos-27-ci.yml` compiles product changes on GitHub's `xcode-27` hosted environment. `.github/workflows/macos-27-package.yml` creates the test artifact.
+`.github/workflows/macos-27-ci.yml` runs two independent checks on GitHub's `xcode-27` hosted environment:
+
+- **Xcode 27 compile** — Release build of the Morie product target;
+- **MorieTests** — Debug execution of the standalone shared `MorieTests` scheme.
+
+`.github/workflows/macos-27-package.yml` remains responsible for creating the test artifact.
 
 The CI gate exists to catch:
 
 - current macOS 27 SDK signature drift;
 - Swift 6 strict-concurrency errors;
 - Xcode project/build-setting breakage;
-- accidental product-source compile failures.
+- accidental product-source compile failures;
+- deterministic regressions already covered by Capture, History, Dictionary, Memory, Personalization, setup and synthetic-audio tests.
 
-It is intentionally scoped to changes under `Morie/**`, `Morie.xcodeproj/**`, and the workflow itself. Documentation-only changes do not need another expensive macOS compile run.
+It is scoped to changes under `Morie/**`, `MorieTests/**`, `Morie.xcodeproj/**`, and the workflow files. Documentation-only changes do not need another expensive macOS run.
 
-CI is **not** runtime acceptance. A hosted build cannot prove real microphone/TCC behavior, physical hotkeys, current-keyboard-focus routing, cross-app paste delivery, Liquid Glass rendering, or latency/energy characteristics.
+CI is **not** runtime acceptance. Hosted tests intentionally do not request real microphone/TCC access, invoke the user's Apple Intelligence model, exercise physical hotkeys/current-focus paste in third-party apps, judge native rendering/audio feel, or establish latency/energy characteristics.
 
 ## Required permissions
 
