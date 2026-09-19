@@ -33,6 +33,7 @@ final class CaptureSessionController {
         let locale: Locale
         let dictionaryWords: [String]
         let inputRefinementEnabled: Bool
+        let refinementModelConfiguration: RefinementModelConfiguration
         let correctionSuggestionsEnabled: Bool
         let expressionLearningEnabled: Bool
         let soundFeedbackEnabled: Bool
@@ -45,6 +46,7 @@ final class CaptureSessionController {
     var onPresentFailure: ((String, String) -> Void)?
 
     var inputRefinementEnabled: Bool
+    var refinementModelConfiguration: RefinementModelConfiguration
     var correctionSuggestionsEnabled: Bool
     var expressionLearningEnabled: Bool
     var soundFeedbackEnabled: Bool
@@ -81,6 +83,7 @@ final class CaptureSessionController {
         postInsertionLearning: PostInsertionLearningController?,
         memoryLearning: MemoryLearningController?,
         inputRefinementEnabled: Bool,
+        refinementModelConfiguration: RefinementModelConfiguration = .local,
         correctionSuggestionsEnabled: Bool,
         expressionLearningEnabled: Bool,
         soundFeedbackEnabled: Bool
@@ -92,6 +95,7 @@ final class CaptureSessionController {
         self.postInsertionLearning = postInsertionLearning
         self.memoryLearning = memoryLearning
         self.inputRefinementEnabled = inputRefinementEnabled
+        self.refinementModelConfiguration = refinementModelConfiguration
         self.correctionSuggestionsEnabled = correctionSuggestionsEnabled
         self.expressionLearningEnabled = expressionLearningEnabled
         self.soundFeedbackEnabled = soundFeedbackEnabled
@@ -146,6 +150,7 @@ final class CaptureSessionController {
             locale: speechLocale,
             dictionaryWords: (try? dictionary?.speechHints()) ?? [],
             inputRefinementEnabled: inputRefinementEnabled,
+            refinementModelConfiguration: refinementModelConfiguration,
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
             expressionLearningEnabled: expressionLearningEnabled,
             soundFeedbackEnabled: soundFeedbackEnabled,
@@ -452,7 +457,8 @@ final class CaptureSessionController {
                     sessionID,
                     enabled: sessionContext.inputRefinementEnabled,
                     expressionStyleEnabled: sessionContext.expressionLearningEnabled,
-                    otherModelWorkActive: memoryLearning?.isModelBusy == true
+                    otherModelWorkActive: memoryLearning?.isModelBusy == true,
+                    modelConfiguration: sessionContext.refinementModelConfiguration
                 )
                 recordLatency("refinement-final", sessionID: sessionID)
                 Diagnostics.recordMemory("refinement-finish \(label(sessionID))")
