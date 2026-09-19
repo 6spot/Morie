@@ -267,15 +267,11 @@ private struct CaptureHistoryDetailPane: View {
         NavigationStack {
             if let id = selectedCaptureID,
                let capture = captures.first,
-               let history = controller.history,
-               let memory = controller.memory,
-               let learning = controller.memoryLearning {
+               let history = controller.history {
                 CaptureDetailView(
                     capture: capture,
                     captureID: id,
                     history: history,
-                    memory: memory,
-                    learning: learning,
                     canRecognize: controller.canStartCapture,
                     onRecognize: controller.recognizeHistoryCapture
                 )
@@ -283,7 +279,7 @@ private struct CaptureHistoryDetailPane: View {
                 ContentUnavailableView(
                     "选择一条记录",
                     systemImage: "waveform",
-                    description: Text("在这里查看保存的文字、录音和相关个人记忆。")
+                    description: Text("在这里查看保存的文字、识别结果和原始录音。")
                 )
             }
         }
