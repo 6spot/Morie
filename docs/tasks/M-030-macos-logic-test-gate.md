@@ -2,7 +2,7 @@
 
 ## Status
 
-**IN PROGRESS** — 2026-09-19
+**DONE** — 2026-09-19
 
 Issue: [#48](https://github.com/6spot/Morie/issues/48)
 
@@ -70,8 +70,12 @@ Still owner-device/runtime only:
 - [x] Test-only changes under `MorieTests/**` trigger the workflow.
 - [x] Existing Release product compile remains a separate job.
 - [x] No external testing dependency is introduced.
-- [ ] GitHub Actions executes the new test job successfully on the PR head.
+- [x] GitHub Actions executes the new test job successfully on the PR head (macOS 27 CI #136: Release compile + 136 logic tests passed).
 
 ## Validation
 
-The final hosted result is intentionally left open until the PR workflow executes. A passing compile job alone is not sufficient to close M-030.
+GitHub Actions macOS 27 CI run #136 passed both jobs on the PR head:
+- Xcode 27 Release product compile: passed;
+- MorieTests: 136 tests executed, 0 failures.
+
+Enabling the gate also exposed and fixed previously hidden test-target drift: Swift 6 async assertions, the History query's test visibility/import boundary, stale restart tests that did not wait for asynchronous Capture persistence, and outdated Memory/cleanup expectations. No test was disabled to obtain the green result.
