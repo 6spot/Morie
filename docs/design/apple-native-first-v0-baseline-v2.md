@@ -30,9 +30,15 @@ The following owner decisions are now hard requirements:
 
 16. **One-word dictionary (2026-09-18, amended 2026-09-19):** the owner simplified dictionary entry to saving one word. This supersedes the explicit-alias portion of amendment 12: remove aliases and replacement-rule configuration from storage, processing and UI. Saved words supply native Speech hints; only letter-case variants of the same word normalize to its spelling, while full-/half-width forms remain distinct. Manual-correction confirmation saves just the new word. Do not infer substitutions or add compatibility machinery for the removed design.
 
-17. **iCloud sequencing and backup boundary (2026-09-19):** after current-focus input, native dictation punctuation, Dictionary/Cleanup/Memory quality and Expression Profile, begin optional iCloud/CloudKit sync/backup. Do not build a local automatic-backup subsystem. The iCloud control defaults off, uses the user's private CloudKit database through Apple-native persistence, and keeps original recording files local in the first slice. Development schema changes may discard obsolete development data instead of creating upgrade backups or compatibility migrations.
+17. **iCloud sequencing and backup boundary (2026-09-19):** optional iCloud/CloudKit sync/backup may follow the useful single-Mac loop, but it is never a startup gate for local input. Do not build a local automatic-backup subsystem. The iCloud control defaults off, uses the user's private CloudKit database through Apple-native persistence, and keeps original recording files local in the first slice. Development schema changes may discard obsolete development data instead of creating upgrade backups or compatibility migrations.
 
-The source document below is historical product direction. These amendments supersede its phase order, immediate iCloud requirement, mandatory confirmation and inspiration scope.
+18. **Current-keyboard-focus delivery (2026-09-19):** M-014 supersedes every source-body reference to Frontmost App capture / Focus Restore as the ordinary input contract. Do not pin a delivery app/window at recording start. When final text is ready, resolve the external current keyboard focus/frontmost application, stage the final text on the clipboard, dispatch one synthetic `Cmd+V`, and restore prior safe clipboard content only when `changeCount` proves no newer clipboard write occurred. Never reactivate the record-start app for ordinary current-app input.
+
+19. **Confirmed correction mappings (2026-09-19):** M-027 supersedes the “spelling only / never any alias” wording in amendments 14 and 16. The visible Dictionary remains canonical-word only and has no alias/replacement-rule configuration. After a bounded verified post-insertion edit and explicit user confirmation, Morie may additionally persist an internal observed-ASR → canonical-word mapping and apply that exact mapping deterministically before optional cleanup. No unconfirmed/broad replacement rule is learned.
+
+20. **Native Speech backend selection (2026-09-19):** prefer Apple's `SpeechTranscriber` when the requested locale/device supports it; keep `DictationTranscriber` only as the Apple-native runtime fallback implemented by Morie when newer backend preparation is unavailable. Do not add cloud/third-party ASR speculatively.
+
+The source document below is historical product direction. These amendments supersede its phase order, immediate iCloud requirement, record-start Focus Restore, spelling-only correction wording, mandatory confirmation and inspiration scope.
 
 See also:
 
