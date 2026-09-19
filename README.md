@@ -18,7 +18,7 @@ Morie is an Apple-native voice-input product that learns useful personal context
 
 `record → durable recognition → dictionary + optional AI cleanup → durable final text → insertion → idle personal-Memory learning`
 
-The app includes native toggle capture, Apple Speech, focus restoration, clipboard/paste delivery, source-audio recovery and a system management window for **历史记录 / 字典 / 个人记忆 / 诊断**, plus a shared native **设置** window. Each dictionary entry saves one word, supplying native Speech hints and consistent case/width spelling independently of AI cleanup. Basic cleanup works with an empty Memory store.
+The app includes native toggle capture, Apple Speech, current-keyboard-focus clipboard/paste delivery, source-audio recovery and a system management window for **历史记录 / 字典 / 个人记忆 / 诊断**, plus a shared native **设置** window. Each dictionary entry saves one word, supplying native Speech hints and consistent case/width spelling independently of AI cleanup. Basic cleanup works with an empty Memory store.
 
 Personal Memory analyzes saved final input during idle time, retains exact source snapshots and retries unfinished work. New voice input takes priority. Memories appear automatically; users can inspect, correct, archive or delete them without processing a confirmation inbox.
 
