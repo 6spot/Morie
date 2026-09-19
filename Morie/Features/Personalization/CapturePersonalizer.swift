@@ -40,7 +40,9 @@ final class CapturePersonalizer {
         if enabled && (otherModelWorkActive || runner.isBusy) { skip = .modelBusy }
         let source = try store.capture(captureID).finalText
         let dictionaryEntries = (try? dictionary.relevantEntries(for: source)) ?? []
-        let prepared = DictionarySpelling.normalize(source, using: dictionaryEntries).text
+        let correctionEntries = (try? dictionary.confirmedCorrections()) ?? []
+        let corrected = DictionaryCorrections.apply(source, using: correctionEntries)
+        let prepared = DictionarySpelling.normalize(corrected.text, using: dictionaryEntries).text
         // Neither a missing personal profile nor retrieval failure disables day-one cleanup.
         let context = skip == nil
             ? ((try? memory.relevantContext(for: prepared, limit: Self.cleanupMemoryContextLimit)) ?? [])
@@ -52,6 +54,7 @@ final class CapturePersonalizer {
             for: captureID,
             context: context,
             dictionary: dictionaryEntries,
+            corrections: correctionEntries,
             expressionStyle: expressionStyle
         )
 
@@ -71,7 +74,8 @@ final class CapturePersonalizer {
             try Task.checkCancellation()
             try store.requireRefinementSource(input)
 
-            guard (try? dictionary.relevantEntries(for: input.text)) == input.dictionary else {
+            guard (try? dictionary.relevantEntries(for: input.text)) == input.dictionary,
+                  (try? dictionary.confirmedCorrections()) == input.confirmedCorrections else {
                 return try keepOriginal(input, reason: .dictionaryChanged, started: started)
             }
             switch generation {
@@ -120,6 +124,7 @@ final class CapturePersonalizer {
         do {
             let mayApplyDictionary = reason != .dictionaryChanged && reason != .saveFailed
                 && (try? dictionary.relevantEntries(for: input.text)) == input.dictionary
+                && (try? dictionary.confirmedCorrections()) == input.confirmedCorrections
             let result = mayApplyDictionary ? input.prepared : ValidatedRefinement(text: input.text, edits: [])
             return try store.saveRefinement(input, result: result, reason: reason, durationSeconds: elapsed(since: started))
         } catch {
