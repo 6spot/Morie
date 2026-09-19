@@ -244,7 +244,7 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertNil(try fetch(id, from: store))
     }
 
-    func testCaptureSurvivesStoreRecreation() throws {
+    func testCaptureSurvivesStoreRecreation() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieCaptureStoreTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -262,6 +262,7 @@ final class CaptureStoreTests: XCTestCase {
                 applicationName: "Xcode",
                 bundleIdentifier: "com.apple.dt.Xcode"
             )
+            try await store.flushPersistence(for: id)
         }
 
         let reopenedStore = try CaptureStore(storageURL: storeURL)
@@ -348,7 +349,7 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: expiredURL.path))
     }
 
-    func testMeaningfulAudioPreservesEmptyFailedCaptureAcrossRecreation() throws {
+    func testMeaningfulAudioPreservesEmptyFailedCaptureAcrossRecreation() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MorieMeaningfulAudioTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -366,6 +367,7 @@ final class CaptureStoreTests: XCTestCase {
                 for: id
             )
             try store.markFailed(id, error: "Recognition returned no text")
+            try await store.flushPersistence(for: id)
         }
 
         let reopened = try CaptureStore(storageURL: storeURL, audioDirectory: audioDirectory)
