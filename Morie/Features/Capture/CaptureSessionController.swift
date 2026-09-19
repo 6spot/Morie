@@ -15,13 +15,28 @@ final class CaptureSessionController {
 
     enum SessionError: LocalizedError {
         case persistenceUnavailable(String)
+        case sessionContextUnavailable
 
         var errorDescription: String? {
             switch self {
             case .persistenceUnavailable(let reason):
                 "记录存储不可用：\(reason)"
+            case .sessionContextUnavailable:
+                "本次录音上下文已失效。"
             }
         }
+    }
+
+    private struct CaptureSessionContext: Sendable {
+        let id: UUID
+        let deliveryMode: CaptureDeliveryMode
+        let locale: Locale
+        let dictionaryWords: [String]
+        let inputRefinementEnabled: Bool
+        let correctionSuggestionsEnabled: Bool
+        let expressionLearningEnabled: Bool
+        let soundFeedbackEnabled: Bool
+        let acceptedAt: Date
     }
 
     var onPhaseChange: ((Phase) -> Void)?
@@ -48,6 +63,7 @@ final class CaptureSessionController {
 
     private(set) var phase: Phase = .idle
     private var activeCaptureID: UUID?
+    private var activeSessionContext: CaptureSessionContext?
     private var speechReadyCaptureID: UUID?
     private var finishRequestedCaptureID: UUID?
     private var captureStartTask: Task<Void, Never>?
@@ -124,12 +140,23 @@ final class CaptureSessionController {
         guard !isActive, let captureStore else { return }
 
         let sessionID = UUID()
-        let sourceApplication: NSRunningApplication? = deliveryMode == .captureOnly ? .current : nil
+        let sessionContext = CaptureSessionContext(
+            id: sessionID,
+            deliveryMode: deliveryMode,
+            locale: speechLocale,
+            dictionaryWords: (try? dictionary?.speechHints()) ?? [],
+            inputRefinementEnabled: inputRefinementEnabled,
+            correctionSuggestionsEnabled: correctionSuggestionsEnabled,
+            expressionLearningEnabled: expressionLearningEnabled,
+            soundFeedbackEnabled: soundFeedbackEnabled,
+            acceptedAt: Date()
+        )
+        let sourceApplication: NSRunningApplication? = sessionContext.deliveryMode == .captureOnly ? .current : nil
 
         do {
             activeSourceAudioURL = try captureStore.beginVoiceCapture(
                 id: sessionID,
-                deliveryMode: deliveryMode,
+                deliveryMode: sessionContext.deliveryMode,
                 applicationName: sourceApplication?.localizedName,
                 bundleIdentifier: sourceApplication?.bundleIdentifier
             )
@@ -146,6 +173,7 @@ final class CaptureSessionController {
         }
 
         activeCaptureID = sessionID
+        activeSessionContext = sessionContext
         speechReadyCaptureID = nil
         finishRequestedCaptureID = nil
         onTranscriptChange?("")
@@ -156,13 +184,13 @@ final class CaptureSessionController {
 
         onCancellationEnabledChange?(true)
         hud.showRecording()
-        if soundFeedbackEnabled {
+        if sessionContext.soundFeedbackEnabled {
             soundFeedback.playStart()
         }
 
         Diagnostics.record(
             "Session",
-            "Capture \(label(sessionID)) started; mode=\(deliveryMode.rawValue); deliveryTarget=currentKeyboardFocus; locale=\(speechLocale.identifier)"
+            "Capture \(label(sessionID)) started; mode=\(sessionContext.deliveryMode.rawValue); deliveryTarget=currentKeyboardFocus; locale=\(sessionContext.locale.identifier); dictionaryHints=\(sessionContext.dictionaryWords.count); acceptedAt=\(sessionContext.acceptedAt.timeIntervalSince1970)"
         )
         Diagnostics.recordMemory("capture-start \(label(sessionID))")
 
@@ -181,6 +209,15 @@ final class CaptureSessionController {
             return
         }
 
+        guard let sessionContext = activeSessionContext, sessionContext.id == sessionID else {
+            Diagnostics.record(
+                "Session",
+                "Finish requested for \(label(sessionID)) without its pinned session context",
+                level: .error
+            )
+            return
+        }
+
         guard phase == .recording, stoppingCaptureID == nil,
               finishRequestedCaptureID != sessionID, captureFinishTask == nil else {
             Diagnostics.record(
@@ -193,7 +230,7 @@ final class CaptureSessionController {
 
         finishRequestedCaptureID = sessionID
         finishRequestedAt = ContinuousClock.now
-        if soundFeedbackEnabled {
+        if sessionContext.soundFeedbackEnabled {
             soundFeedback.playStop()
         }
         setPhase(.finalizing)
@@ -267,15 +304,18 @@ final class CaptureSessionController {
             await history?.cancelRecognitionAndWait()
             try Task.checkCancellation()
             guard activeCaptureID == sessionID else { throw CancellationError() }
+            guard let sessionContext = activeSessionContext, sessionContext.id == sessionID else {
+                throw SessionError.sessionContextUnavailable
+            }
             guard let sourceAudioURL = activeSourceAudioURL else {
                 throw SessionError.persistenceUnavailable("原始录音存储尚未初始化。")
             }
 
             try await speech.start(
                 sessionID: sessionID,
-                locale: speechLocale,
+                locale: sessionContext.locale,
                 sourceAudioURL: sourceAudioURL,
-                dictionaryWords: (try? dictionary?.speechHints()) ?? [],
+                dictionaryWords: sessionContext.dictionaryWords,
                 onTranscript: { [weak self] resultSessionID, text in
                     Task { @MainActor in
                         guard let self,
@@ -356,7 +396,9 @@ final class CaptureSessionController {
     private func finishCapture(sessionID: UUID) async {
         guard activeCaptureID == sessionID,
               stoppingCaptureID == nil,
-              speechReadyCaptureID == sessionID
+              speechReadyCaptureID == sessionID,
+              let sessionContext = activeSessionContext,
+              sessionContext.id == sessionID
         else {
             Diagnostics.record(
                 "Session",
@@ -408,8 +450,8 @@ final class CaptureSessionController {
                 setPhase(.refining)
                 finalText = try await personalizer.refine(
                     sessionID,
-                    enabled: inputRefinementEnabled,
-                    expressionStyleEnabled: expressionLearningEnabled,
+                    enabled: sessionContext.inputRefinementEnabled,
+                    expressionStyleEnabled: sessionContext.expressionLearningEnabled,
                     otherModelWorkActive: memoryLearning?.isModelBusy == true
                 )
                 recordLatency("refinement-final", sessionID: sessionID)
@@ -450,8 +492,8 @@ final class CaptureSessionController {
                 postInsertionLearning?.observeInsertion(
                     finalText,
                     in: deliveryApplication,
-                    dictionarySuggestionsEnabled: correctionSuggestionsEnabled,
-                    expressionLearningEnabled: expressionLearningEnabled
+                    dictionarySuggestionsEnabled: sessionContext.correctionSuggestionsEnabled,
+                    expressionLearningEnabled: sessionContext.expressionLearningEnabled
                 )
             }
 
@@ -675,6 +717,7 @@ final class CaptureSessionController {
 
     private func resetSessionIdentity() {
         activeCaptureID = nil
+        activeSessionContext = nil
         activeSourceAudioURL = nil
         speechReadyCaptureID = nil
         finishRequestedCaptureID = nil
