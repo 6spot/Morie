@@ -248,6 +248,7 @@ final class AppController: ObservableObject {
             memoryLearning?.start()
             startAudioMaintenanceLoopIfNeeded()
             Diagnostics.record("App", "Bootstrap complete; Morie is Ready")
+            Diagnostics.recordMemory("bootstrap-ready")
         } catch is CancellationError {
             state = .blocked("准备已取消，可以在使用引导中重试。")
             needsSetup = true
@@ -383,6 +384,7 @@ final class AppController: ObservableObject {
             "Session",
             "Capture \(label(sessionID)) started; mode=\(deliveryMode.rawValue); target=\(targetName) (\(targetBundle)); window=\(targetWindowNumber.map(String.init) ?? "unknown"); locale=\(speechLocale.identifier)"
         )
+        Diagnostics.recordMemory("capture-start \(label(sessionID))")
 
         captureStartTask = Task { @MainActor [weak self] in
             await self?.startCapture(sessionID: sessionID)
@@ -519,6 +521,7 @@ final class AppController: ObservableObject {
 
         do {
             let result = try await speech.stop(sessionID: sessionID)
+            Diagnostics.recordMemory("speech-stop \(label(sessionID))")
             var finalText = result.transcript
             guard let captureStore else {
                 throw ControllerError.persistenceUnavailable("记录存储尚未初始化。")
@@ -553,6 +556,7 @@ final class AppController: ObservableObject {
                     sessionID, enabled: inputRefinementEnabled,
                     otherModelWorkActive: memoryLearning?.isModelBusy == true
                 )
+                Diagnostics.recordMemory("refinement-finish \(label(sessionID))")
                 // Cancellation/recheck may have taken over while the optional model was running.
                 try Task.checkCancellation()
                 guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
@@ -719,6 +723,7 @@ final class AppController: ObservableObject {
         lastPresentedFailure = nil
         state = .ready
         hud.showSuccess(deliveryMode: deliveryMode)
+        Diagnostics.recordMemory("capture-complete \(label(sessionID))")
     }
 
     private func failSession(_ sessionID: UUID, error: Error) {
