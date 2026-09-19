@@ -71,6 +71,7 @@
 		A2000000000000000000001E /* CaptureHUDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000012 /* CaptureHUDTests.swift */; };
 		A10000000000000000000023 /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
 		A10000000000000000000024 /* ICloudSyncSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000038 /* ICloudSyncSettings.swift */; };
+		A10000000000000000000025 /* CaptureSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000039 /* CaptureSessionController.swift */; };
 		A2000000000000000000001F /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
 		A20000000000000000000020 /* ExpressionProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000013 /* ExpressionProfileTests.swift */; };
 		A10000000000000000000022 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* InfoPlist.strings */; };
@@ -126,6 +127,7 @@
 		B20000000000000000000012 /* CaptureHUDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureHUDTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000037 /* ExpressionProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpressionProfile.swift; sourceTree = "<group>"; };
 		B10000000000000000000038 /* ICloudSyncSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSyncSettings.swift; sourceTree = "<group>"; };
+		B10000000000000000000039 /* CaptureSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSessionController.swift; sourceTree = "<group>"; };
 		B20000000000000000000013 /* ExpressionProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpressionProfileTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000036 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -202,6 +204,7 @@
 				B10000000000000000000027 /* CaptureRefinement.swift */,
 				B10000000000000000000028 /* InputRefiner.swift */,
 				B10000000000000000000009 /* CaptureHUD.swift */,
+				B10000000000000000000039 /* CaptureSessionController.swift */,
 				D30000000000000000000004 /* History */,
 			);
 			path = Capture;
@@ -501,6 +504,7 @@
 				A10000000000000000000006 /* TextInjector.swift in Sources */,
 				A10000000000000000000007 /* Diagnostics.swift in Sources */,
 				A10000000000000000000008 /* CaptureHUD.swift in Sources */,
+				A10000000000000000000025 /* CaptureSessionController.swift in Sources */,
 				A10000000000000000000009 /* CaptureRecord.swift in Sources */,
 				A1000000000000000000000A /* CaptureStore.swift in Sources */,
 				A1000000000000000000000B /* CaptureHistoryView.swift in Sources */,
