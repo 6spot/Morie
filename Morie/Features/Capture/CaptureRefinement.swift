@@ -6,7 +6,7 @@ struct RefinementInput: Codable, Equatable, Sendable {
     let text: String
     var context: [MemoryContextMatch] = []
     var dictionary: [DictionarySnapshot] = []
-    var corrections: [DictionaryCorrectionSnapshot]?
+    var corrections: [DictionaryCorrectionSnapshot]? = nil
     var expressionStyle: [String] = []
 
     var confirmedCorrections: [DictionaryCorrectionSnapshot] { corrections ?? [] }
