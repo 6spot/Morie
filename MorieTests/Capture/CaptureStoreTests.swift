@@ -41,8 +41,8 @@ final class CaptureStoreTests: XCTestCase {
 
         reader = ModelContext(store.container)
         descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
-        persisted = try reader.fetch(descriptor).first
-        XCTAssertNil(persisted)
+        let deleted = try reader.fetch(descriptor).first
+        XCTAssertNil(deleted)
     }
 
     func testFlushPersistenceMakesLatestTerminalStateDurable() async throws {
