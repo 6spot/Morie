@@ -153,6 +153,9 @@ solo configured shortcut activation (Fn / Globe release by default)
   ↓
 create authoritative capture UUID; cancel optional learning/word observation
   ↓
+snapshot immutable per-Capture runtime context
+(locale + Speech dictionary hints + cleanup/correction/expression/sound preferences)
+  ↓
 durably save the minimal Capture shell + audio destination
 (the only required synchronous History write on the live-input path)
   ↓
@@ -286,6 +289,7 @@ Cleanup context is narrower than Speech hints. `speechHints()` still returns the
 Owns the authoritative live Capture lifecycle:
 
 - capture UUID and source-audio destination;
+- one immutable per-Capture runtime context containing delivery mode, locale, Speech dictionary hints and the cleanup/correction/expression/sound preferences accepted at Start;
 - Speech asset preparation, start/finalization and live transcript state;
 - enqueueing bounded persistence snapshots without awaiting them on the current-app delivery path;
 - finish-during-Speech-startup coordination;
@@ -298,6 +302,8 @@ Owns the authoritative live Capture lifecycle:
 One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; shortcut failure, microphone interruption and Speech errors retain a failed Capture. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
 
 `AppController` receives phase/transcript/failure callbacks and keeps the app/setup state machine authoritative. Returning a Capture session to idle only returns the visible app state to Ready when the current state is capture-owned; a concurrent blocked/checking state is not overwritten.
+
+Settings remain mutable application preferences, but they are sampled only when a new Capture is accepted. The active Capture never rereads those preference properties during asynchronous Speech startup, finalization, cleanup or post-insertion observation. Dictionary Speech hints are likewise resolved once for that Capture. This keeps one interaction deterministic without introducing a generalized provider/session abstraction.
 
 ### \`CapturePersistenceWriter\`
 
