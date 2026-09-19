@@ -22,6 +22,29 @@ struct CapturePersistenceSnapshot: Sendable {
     let lastRecognitionAttemptAt: Date?
     let lastRecognitionErrorDescription: String?
     let refinement: CaptureRefinement?
+
+    init(record: CaptureRecord, revision: Int, enqueuedAt: Date = Date()) {
+        id = record.id
+        self.revision = revision
+        self.enqueuedAt = enqueuedAt
+        createdAt = record.createdAt
+        updatedAt = record.updatedAt
+        lifecycleRawValue = record.lifecycleRawValue
+        deliveryModeRawValue = record.deliveryModeRawValue
+        recognizedText = record.recognizedText
+        finalText = record.finalText
+        sourceApplicationName = record.sourceApplicationName
+        sourceBundleIdentifier = record.sourceBundleIdentifier
+        deliveryErrorDescription = record.deliveryErrorDescription
+        sourceAudioRelativePath = record.sourceAudioRelativePath
+        sourceAudioDurationSeconds = record.sourceAudioDurationSeconds
+        sourceAudioByteCount = record.sourceAudioByteCount
+        sourceAudioExpiresAt = record.sourceAudioExpiresAt
+        sourceAudioHasMeaningfulContent = record.sourceAudioHasMeaningfulContent
+        lastRecognitionAttemptAt = record.lastRecognitionAttemptAt
+        lastRecognitionErrorDescription = record.lastRecognitionErrorDescription
+        refinement = record.refinement
+    }
 }
 
 actor CapturePersistenceWriter {
