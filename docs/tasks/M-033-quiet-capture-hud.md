@@ -89,3 +89,23 @@ macOS 27 CI #149 passed both the Release product compile and the full MorieTests
 ## Validation boundary
 
 The earlier visual refinement passed CI #143. The follow-up that removes the success dwell passed macOS 27 CI #146: Release compile and the full MorieTests gate both succeeded. Final owner-device acceptance should confirm that `Thinking → collapse` feels faster and clearer than a separate success message.
+
+
+## 2026-09-20 first-cue / shimmer correctness follow-up
+
+Owner-device validation found two implementation defects in the previous looping-shimmer build:
+
+1. The first audible cue after app launch could still crackle. The earlier 18 ms leading silence lived inside the same cue WAV, so it did not guarantee that Core Audio had opened the output path before that player's first real playback.
+2. The Thinking highlight appeared dark and traversed only part of the visible capsule. The shimmer peak used `Color.primary` (black in light appearance), and the moving band owned its own clipping/layout instead of being positioned inside a full-width capsule container.
+
+The corrected implementation now:
+
+- creates a dedicated 120 ms all-zero PCM `AVAudioPlayer`;
+- starts that silent player during `CaptureSoundFeedback` initialization;
+- delays any pending first audible cue until the output path has been active for ~70 ms;
+- keeps the cue's existing small leading silence as a secondary edge guard;
+- renders the Thinking band inside a container exactly matching the processing capsule width;
+- clips at the outer capsule boundary, not at the band itself;
+- moves from fully outside the left edge to fully outside the right edge with a linear 2.4 s traversal;
+- uses a bright-neutral white highlight (peak ~0.26 opacity), never `Color.primary`, so light appearance cannot turn the shimmer black;
+- preserves the 0.6 s clear pause and indefinite activity loop until real completion interrupts it.
