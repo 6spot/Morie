@@ -144,7 +144,7 @@ final class CaptureAudioStreamTests: XCTestCase {
             let id = UUID()
             let url = try store.beginVoiceCapture(
                 id: id, deliveryMode: mode,
-                applicationName: "Test", bundleIdentifier: nil, windowNumber: nil
+                applicationName: "Test", bundleIdentifier: nil
             )
             let stream = try makeStream(at: url)
             stream.append(try makeAudio())
@@ -172,7 +172,7 @@ final class CaptureAudioStreamTests: XCTestCase {
         let id = UUID()
         let url = try store.beginVoiceCapture(
             id: id, deliveryMode: .captureOnly,
-            applicationName: "Test", bundleIdentifier: nil, windowNumber: nil
+            applicationName: "Test", bundleIdentifier: nil
         )
         let stream = try makeStream(at: url)
         stream.append(try makeAudio())
