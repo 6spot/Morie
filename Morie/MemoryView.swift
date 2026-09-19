@@ -103,7 +103,7 @@ struct MemoryDetailView: View {
                                 NavigationLink("来源输入 \(index + 1)") {
                                     ManagementDetailContent {
                                         CaptureMemorySource(captureID: id)
-                                        ForEach(store.analyses.filter { $0.sourceCaptureID == id && $0.observations.contains(where: { $0.memoryID == memoryID }) }) { analysis in
+                                        ForEach(store.analyses(for: id, linkedTo: memoryID)) { analysis in
                                             MemoryAnalysisSourceView(analysis: analysis)
                                         }
                                     }
