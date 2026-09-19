@@ -267,10 +267,9 @@ final class PersonalizationTests: XCTestCase {
         ).refine(id, enabled: true, expressionStyleEnabled: true)
 
         XCTAssertEqual(result, "今天继续测试 Morie。")
-        XCTAssertTrue(
-            try XCTUnwrap((try await fixture.saved(id)).refinement)
-                .input.expressionStyle.contains("倾向保留句末标点。")
-        )
+        let saved = try await fixture.saved(id)
+        let refinement = try XCTUnwrap(saved.refinement)
+        XCTAssertTrue(refinement.input.expressionStyle.contains("倾向保留句末标点。"))
     }
 
     func testDisabledOrBusyCleanupStillAppliesDictionaryWithoutInvokingModel() async throws {
