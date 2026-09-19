@@ -131,9 +131,7 @@ Ready
 
 solo configured shortcut activation (Fn / Globe release by default)
   ↓
-create authoritative capture UUID
-  ↓
-capture original target application; cancel optional learning/word observation
+create authoritative capture UUID; cancel optional learning/word observation
   ↓
 save Capture identity and audio destination
   ↓
@@ -153,9 +151,9 @@ dictionary corrections + bounded optional AI cleanup
   ↓
 durable final text and processing provenance
   ↓
-restore original target
+resolve the external app that currently owns keyboard focus
   ↓
-safe synthetic Cmd+V using temporary clipboard value
+safe synthetic Cmd+V using temporary clipboard value; macOS first-responder routing chooses the field
   ↓
 restore clipboard only if user did not change it
   ↓
@@ -207,7 +205,7 @@ Owns Phase 0 orchestration:
 - Speech asset preparation before Ready;
 - hotkey installation;
 - authoritative capture UUID;
-- original target-app capture;
+- current-keyboard-focus delivery at final paste time;
 - start/finish/cancel coordination;
 - dictionary hints, independent cleanup and durable final text;
 - delivery transition and opt-in correction observation;
@@ -501,7 +499,7 @@ CI compilation does **not** validate:
 - microphone routing;
 - physical keyboard event behavior;
 - Apple Intelligence/Speech asset runtime availability;
-- real focus restoration;
+- real current-focus routing;
 - target-app injection;
 - Liquid Glass visual behavior;
 - latency/energy use.
