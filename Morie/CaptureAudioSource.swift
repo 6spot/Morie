@@ -24,9 +24,14 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
     let analyzerInputs: AsyncThrowingStream<AnalyzerInput, Error>
 
     private let output = AVCaptureAudioDataOutput()
-    private let outputQueue = DispatchQueue(label: "me.morie.capture-audio", qos: .userInitiated)
+    private let outputQueue = DispatchQueue(
+        label: "me.morie.capture-audio",
+        qos: .userInitiated,
+        autoreleaseFrequency: .workItem
+    )
     private let stream: CaptureAudioStream
     private var notificationObservers: [NSObjectProtocol] = []
+    private var stopped = false
 
     init(
         device: AVCaptureDevice,
@@ -89,12 +94,34 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
     }
 
     private func stopCaptureSession() {
+        guard !stopped else { return }
+        stopped = true
+
         for observer in notificationObservers {
             NotificationCenter.default.removeObserver(observer)
         }
         notificationObservers.removeAll()
-        session.stopRunning()
+
         output.setSampleBufferDelegate(nil, queue: nil)
+        if session.isRunning {
+            session.stopRunning()
+        }
+
+        // stopRunning() leaves the capture graph configured. Explicitly detach
+        // native inputs/outputs so CoreMedia/AudioToolbox resources can be
+        // released even if AVFoundation retains the session briefly.
+        session.beginConfiguration()
+        if session.outputs.contains(where: { $0 === output }) {
+            session.removeOutput(output)
+        }
+        for input in session.inputs {
+            session.removeInput(input)
+        }
+        session.commitConfiguration()
+    }
+
+    deinit {
+        stopCaptureSession()
     }
 
     private func reportFailure(_ error: Error) {
@@ -106,11 +133,13 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        guard let pcmBuffer = sampleBuffer.moriePCMBuffer else {
-            stream.fail(SourceError.invalidAudioBuffer)
-            return
+        autoreleasepool {
+            guard let pcmBuffer = sampleBuffer.moriePCMBuffer else {
+                stream.fail(SourceError.invalidAudioBuffer)
+                return
+            }
+            stream.append(pcmBuffer)
         }
-        stream.append(pcmBuffer)
     }
 }
 
