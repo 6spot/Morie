@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 private enum ControlCenterSection: String, CaseIterable, Identifiable {
+    case overview
     case history
     case memory
     case dictionary
@@ -13,6 +14,7 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .overview: "总览"
         case .history: "历史记录"
         case .memory: "个人记忆"
         case .dictionary: "字典"
@@ -24,6 +26,7 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .overview: "square.grid.2x2"
         case .history: "clock.arrow.circlepath"
         case .memory: "person.text.rectangle"
         case .dictionary: "character.book.closed"
@@ -39,7 +42,7 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
 @MainActor
 struct MorieControlCenter: View {
     @ObservedObject var controller: AppController
-    @State private var selection: ControlCenterSection? = .history
+    @State private var selection: ControlCenterSection? = .overview
     @State private var selectedCaptureID: UUID?
     @State private var selectedMemory: UUID?
     @State private var selectedDictionaryEntry: UUID?
@@ -57,7 +60,7 @@ struct MorieControlCenter: View {
                         DictionaryView(store: dictionary, selection: $selectedDictionaryEntry)
                     }
                 }
-            } else if (selection ?? .history).isLibrary {
+            } else if (selection ?? .overview).isLibrary {
                 NavigationSplitView(columnVisibility: columnVisibility(isLibrary: true)) {
                     sidebar
                 } content: {
@@ -72,6 +75,8 @@ struct MorieControlCenter: View {
                     sidebar
                 } detail: {
                     switch selection {
+                    case .overview, nil:
+                        OverviewView(controller: controller)
                     case .settings:
                         MorieSettingsView(controller: controller)
                     case .permissions:
@@ -105,6 +110,8 @@ struct MorieControlCenter: View {
 
     private var sidebar: some View {
         List(selection: $selection) {
+            sidebarItem(.overview)
+
             Section("资料库", isExpanded: $libraryExpanded) {
                 sidebarItem(.history)
                 sidebarItem(.dictionary)

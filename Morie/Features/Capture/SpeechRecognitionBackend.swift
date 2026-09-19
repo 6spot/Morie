@@ -21,6 +21,17 @@ enum SpeechRecognitionBackend: Sendable, Equatable {
         }
     }
 
+    var displayName: String { logName }
+
+    var isFallback: Bool {
+        if case .dictationTranscriber = self { return true }
+        return false
+    }
+
+    var localeIdentifier: String {
+        locale.identifier.replacingOccurrences(of: "_", with: "-")
+    }
+
     static func preferred(for requestedLocale: Locale) async -> SpeechRecognitionBackend? {
         if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) {
             return .speechTranscriber(locale)

@@ -38,6 +38,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-023 | Dictionary UX | Split user terms from built-in read-only terms | IN PROGRESS | [#23](https://github.com/6spot/Morie/issues/23) | [`M-023`](./tasks/M-023-dictionary-readonly-sections.md) |
 | M-024 | Speech quality | Improve transcription readability and diagnose native recognition quality | IN PROGRESS | [#24](https://github.com/6spot/Morie/issues/24) | [`M-024`](./tasks/M-024-transcription-quality.md) |
 | M-025 | Input latency | Move History persistence off the normal input hot path | IN PROGRESS | [#26](https://github.com/6spot/Morie/issues/26) / [PR #27](https://github.com/6spot/Morie/pull/27) | [`M-025`](./tasks/M-025-async-capture-persistence.md) |
+| M-026 | Control Center | Add Overview with local usage metrics and actual runtime model status | IN PROGRESS | [#31](https://github.com/6spot/Morie/issues/31) | [`M-026`](./tasks/M-026-control-center-overview.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 

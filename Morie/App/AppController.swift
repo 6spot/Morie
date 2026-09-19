@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import FoundationModels
 
 @MainActor
 final class AppController: ObservableObject {
@@ -39,6 +40,7 @@ final class AppController: ObservableObject {
     @Published private(set) var needsSetup = false
     @Published private(set) var setupError: String?
     @Published private(set) var isBootstrapping = false
+    @Published private(set) var speechBackend: SpeechRecognitionBackend?
 
     let history: CaptureHistoryController?
     let memory: MemoryStore?
@@ -159,6 +161,30 @@ final class AppController: ObservableObject {
             await self?.bootstrap()
         }
         refreshICloudSyncState()
+    }
+
+    var refinementModelName: String {
+        "Apple Foundation Models"
+    }
+
+    var refinementModelDetail: String {
+        "SystemLanguageModel.default · 本机"
+    }
+
+    var refinementModelStatusTitle: String {
+        guard inputRefinementEnabled else { return "已关闭" }
+        switch SystemLanguageModel.default.availability {
+        case .available:
+            return "可用"
+        case .unavailable(.modelNotReady):
+            return "模型准备中"
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return "Apple 智能未开启"
+        case .unavailable(.deviceNotEligible):
+            return "设备不支持"
+        case .unavailable:
+            return "暂不可用"
+        }
     }
 
     var statusTitle: String {
@@ -342,6 +368,7 @@ final class AppController: ObservableObject {
 
         Diagnostics.record("App", "Bootstrap started")
         state = .checking
+        speechBackend = nil
         setupError = nil
         memoryLearning?.stop()
         memoryLearning?.setInputActive(true)
@@ -376,6 +403,7 @@ final class AppController: ObservableObject {
             }
 
             try await captureSession.prepareSpeech()
+            speechBackend = await captureSession.preparedSpeechBackend()
             try Task.checkCancellation()
             guard state == .checking else { return }
 
