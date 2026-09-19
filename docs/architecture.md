@@ -393,6 +393,18 @@ There is no third-party/provider abstraction or legacy `SFSpeechRecognizer` path
 
 `CaptureAudioSource` owns the microphone session, native notifications and serial sample queue. `CaptureAudioStream` writes AAC before Speech conversion, owns the analyzer input stream, and finalizes the file even if conversion or flushing fails. Immediate stop skips converter flushing. Repeated stop/finish returns the same closed artifact; late buffers cannot append to it. Only the store applies explicit discard, empty no-input removal, expiry or History deletion. The stream boundary allows real Apple AAC encoding/error-path tests with synthetic PCM and no microphone/model access.
 
+No-speech retention policy is evidence-based rather than `any non-zero microphone sample == meaningful`. `CaptureAudioStream` tracks the longest continuous run above a speech-like RMS threshold. SpeechPipeline independently upgrades `hasMeaningfulAudio` to true whenever Apple Speech emitted transcript evidence.
+
+Terminal empty-transcript policy:
+
+```text
+no final transcript
+  ├─ no Speech evidence + no sustained speech-like audio → discard Capture + audio
+  └─ Speech evidence or sustained speech-like audio       → retain failed Capture for History retry
+```
+
+This combines Type4Me's no-speech fast exit with OpenLess's recoverable empty-transcript history behavior: normal room noise does not pollute History, but recordings likely containing actual speech are not destroyed merely because ASR returned no final text.
+
 ### `ExpressionProfileStore` / `PostInsertionLearningController`
 
 Expression Profile is separate from personal Memory. Memory stores semantic facts/preferences/projects; Expression Profile stores only aggregate formatting/style tendencies learned from the user's edits to text Morie just inserted.

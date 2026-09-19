@@ -81,6 +81,17 @@ final class CaptureHUDController {
         }
     }
 
+    func showNoSpeech() {
+        hideTask?.cancel()
+        model.phase = .noSpeech
+        showPanel()
+        hideTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(900))
+            guard !Task.isCancelled else { return }
+            self?.hide()
+        }
+    }
+
     func showRecognitionFailure() {
         hideTask?.cancel()
         model.phase = .recognitionFailure
@@ -329,6 +340,7 @@ final class CaptureHUDModel: ObservableObject {
         case success
         case saved
         case clipboardFallback
+        case noSpeech
         case recognitionFailure
         case failure
     }
@@ -486,11 +498,18 @@ private struct CaptureHUDView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel("输入位置不可用，文字已复制到剪贴板")
 
+        case .noSpeech:
+            Text("未检测到语音")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityLabel("未检测到语音，本次录音未保存")
+
         case .recognitionFailure:
-            Label("未识别，录音已保存", systemImage: "waveform.badge.exclamationmark")
+            Label("未识别，录音已保留", systemImage: "waveform.badge.exclamationmark")
                 .font(.system(size: 10, weight: .medium))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityLabel("未识别出文字，录音已保存，可在历史记录中重新识别")
+                .accessibilityLabel("检测到语音但未识别出文字，录音已保留，可在历史记录中重新识别")
 
         case .failure:
             Image(systemName: "exclamationmark")

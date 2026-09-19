@@ -19,7 +19,9 @@ final class CaptureAudioStream {
     private var audioFile: AVAudioFile?
     private var writtenFrames: AVAudioFramePosition = 0
     private var callbackCount = 0
-    private var hasAudioSignal = false
+    private var speechLikeRunDuration: Double = 0
+    private var longestSpeechLikeRunDuration: Double = 0
+    private var peakDecibels: Float = -.infinity
     private var ended = false
     private var failure: Error?
     private var completion: Completion?
@@ -54,8 +56,7 @@ final class CaptureAudioStream {
             try audioFile.write(from: buffer)
             writtenFrames += AVAudioFramePosition(buffer.frameLength)
             let decibels = Self.signalDecibels(buffer)
-            // Record signal evidence before Speech conversion, which can fail.
-            if decibels != -.infinity { hasAudioSignal = true }
+            recordSpeechEvidence(buffer: buffer, decibels: decibels)
             guard let convert else { return }
             for input in try convert(buffer) {
                 continuation.yield(input)
@@ -108,11 +109,16 @@ final class CaptureAudioStream {
         convert = nil
         flush = nil
         onAudioLevel = nil
+        let hasMeaningfulAudio = longestSpeechLikeRunDuration >= Self.minimumSpeechLikeRunDuration
+        Diagnostics.record(
+            "AudioEvidence",
+            "Capture audio closed; meaningful=\(hasMeaningfulAudio); longestSpeechLikeMs=\(Int(longestSpeechLikeRunDuration * 1_000)); peakDb=\(peakDecibels.isFinite ? String(format: "%.1f", peakDecibels) : "-inf")"
+        )
         let result = Completion(
             sourceAudio: CapturedSourceAudio(
                 url: destinationURL,
                 duration: Double(writtenFrames) / 16_000,
-                hasMeaningfulAudio: hasAudioSignal ? nil : false
+                hasMeaningfulAudio: hasMeaningfulAudio
             ),
             error: failure
         )
@@ -122,6 +128,31 @@ final class CaptureAudioStream {
 
     deinit {
         Diagnostics.record("AudioLifetime", "CaptureAudioStream released")
+    }
+
+    private static let speechLikeThresholdDecibels: Float = -36
+    private static let minimumSpeechLikeRunDuration: Double = 0.16
+
+    private func recordSpeechEvidence(
+        buffer: AVAudioPCMBuffer,
+        decibels: Float
+    ) {
+        guard decibels.isFinite, buffer.format.sampleRate > 0 else {
+            speechLikeRunDuration = 0
+            return
+        }
+
+        peakDecibels = max(peakDecibels, decibels)
+        let duration = Double(buffer.frameLength) / buffer.format.sampleRate
+        if decibels >= Self.speechLikeThresholdDecibels {
+            speechLikeRunDuration += duration
+            longestSpeechLikeRunDuration = max(
+                longestSpeechLikeRunDuration,
+                speechLikeRunDuration
+            )
+        } else {
+            speechLikeRunDuration = 0
+        }
     }
 
     private static func signalDecibels(_ buffer: AVAudioPCMBuffer) -> Float {
