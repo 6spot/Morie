@@ -206,6 +206,17 @@ M-010 permission-window focus follow-up, 2026-09-19: the owner requires the orig
 - **DROP:** permanent/background System Settings polling and opening the Accessibility pane in parallel with its registration prompt. A later device finding confirmed that `prompt: false` does not add a new app to the list, so Morie must retain `kAXTrustedCheckOptionPrompt: true` as the single public registration/navigation flow.
 - **VERIFY:** signed-app TCC registration, focus ordering, allow/deny and return-without-grant behavior on macOS 27. Logic tests do not control System Settings or establish device acceptance.
 
+### M-005 input-cleanup prompt audit, 2026-09-19
+
+Inspected upstream `ProcessingMode.formalWritingPromptTemplate` and the archived voice-polish prompt iteration notes at Type4Me revision `55e8779354cb38a959138ac8fd53a1ce7a75cc4e`.
+
+- **ADAPT:** organize the model instruction by role, task goal, hard boundaries, spoken-language cleanup, formatting, structure/register, context and a small set of generic examples. Retain Type4Me's proven distinction between formal and informal speech so cleanup can improve readability without erasing meaningful conversational tone.
+- **DROP:** mandatory Arabic-number conversion for conversational time, forced “总起句 + 编号分点”, generated item titles/subitems, inserted transition phrases, and any rule that changes user-stated counts. Those behaviors belong to Type4Me's stronger Voice Polish mode and exceed Morie's current light-edit contract.
+- **ADAPT:** examples should teach behavior classes rather than copy owner-specific UI wording. The prompt explicitly states that example wording, stance and opinions may not leak into unrelated input.
+- **VERIFY:** real Apple Foundation Models fidelity for punctuation, repetition, colloquial time and formal/informal register remains a supported-device acceptance item. Prompt shape and unit assertions alone do not prove semantic preservation.
+
+No Type4Me code or external dependency is copied; this is a concept-level prompt-organization adaptation under Morie's existing M-005 contract.
+
 ### 7. Later-phase reusable lessons
 
 When later phases start, inspect Type4Me only after reading that phase's Morie design/task document. Potential reference areas include:
