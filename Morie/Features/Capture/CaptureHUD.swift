@@ -471,7 +471,7 @@ private struct CaptureHUDView: View {
         case .processing:
             Text("Thinking")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
                     ProcessingBorder(reduceMotion: reduceMotion)
@@ -530,30 +530,30 @@ private struct ProcessingBorder: View {
 
             ZStack {
                 Capsule()
-                    .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.16), lineWidth: 1)
 
                 Capsule()
                     .stroke(
                         AngularGradient(
                             gradient: Gradient(colors: [
-                                Color.accentColor.opacity(0.08),
                                 Color.accentColor.opacity(0.18),
-                                Color.accentColor.opacity(0.34),
-                                Color.accentColor.opacity(0.46),
-                                Color.accentColor.opacity(0.20),
-                                Color.accentColor.opacity(0.08),
+                                Color.accentColor.opacity(0.42),
+                                Color.white.opacity(0.98),
+                                Color.accentColor.opacity(0.96),
+                                Color.accentColor.opacity(0.24),
+                                Color.accentColor.opacity(0.18),
                             ]),
                             center: .center,
                             startAngle: start,
                             endAngle: start + .degrees(360)
                         ),
-                        lineWidth: reduceMotion ? 1.15 : 1.45
+                        lineWidth: reduceMotion ? 1.35 : 1.85
                     )
                     .shadow(
-                        color: Color.accentColor.opacity(reduceMotion ? 0.05 : 0.12),
-                        radius: reduceMotion ? 0.3 : 1.1
+                        color: Color.accentColor.opacity(reduceMotion ? 0.12 : 0.34),
+                        radius: reduceMotion ? 0.5 : 2.2
                     )
-                    .opacity(reduceMotion ? 0.46 : 0.78)
+                    .opacity(reduceMotion ? 0.58 : 1)
             }
             .padding(0.5)
         }
