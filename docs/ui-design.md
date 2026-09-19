@@ -128,7 +128,7 @@ The compact capture capsule is deliberately low-contrast. The surface uses `NSGl
 
 Status color is reserved for state, not button identity:
 
-- **Thinking** uses a restrained repeating left-to-right shimmer band inside the compact capsule. It is not a progress fill and must not imply 0–100% completion. One cycle is about 3 seconds: ~2.4 seconds of travel followed by ~0.6 seconds fully clear before restarting. Real completion interrupts the cycle immediately.
+- **Thinking** uses a restrained repeating left-to-right shimmer band inside the compact capsule. The band travels across the **entire visible processing capsule**, from fully outside the left edge to fully outside the right edge. It is bright-neutral (white highlight on glass), never `Color.primary`, so light appearance must not produce a black sweep. It is not a progress fill and must not imply 0–100% completion. One cycle is about 3 seconds: ~2.4 seconds linear travel followed by ~0.6 seconds fully clear before restarting. Real completion interrupts the cycle immediately.
 - normal successful completion has no separate success state: once processing completes, the `Thinking` capsule immediately runs its normal collapse/fade-out animation;
 - this applies to both current-app delivery and capture-only completion; no `SUCCESS`, **已输入**, **已保存**, checkmark, green flash or other success badge is shown in the HUD;
 - clipboard fallback, no-speech and recognition-failure messages remain visible because they communicate an outcome the user may need to act on; they stay text-only and visually secondary;
