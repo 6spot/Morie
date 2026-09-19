@@ -3,10 +3,12 @@ import XCTest
 
 @MainActor
 final class DictionaryTests: XCTestCase {
-    func testSpeechSegmentsPreserveNativeSpacingWithoutInventingSeparators() {
+    func testSpeechSegmentsPreserveNativeSpacingAndPunctuationWithoutInventingSeparators() {
         XCTAssertEqual(SpeechTranscriptAssembler.join("常", "蚊"), "常蚊")
         XCTAssertEqual(SpeechTranscriptAssembler.join("常蚊", "子"), "常蚊子")
         XCTAssertEqual(SpeechTranscriptAssembler.join("hello ", "world"), "hello world")
+        XCTAssertEqual(SpeechTranscriptAssembler.join("第一句。", "第二句？"), "第一句。第二句？")
+        XCTAssertEqual(SpeechTranscriptAssembler.join("先处理这个，", "然后处理那个。"), "先处理这个，然后处理那个。")
     }
 
     func testWordsSurviveRestartSeparatelyFromMemory() throws {
