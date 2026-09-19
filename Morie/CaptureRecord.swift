@@ -1,5 +1,4 @@
 import Foundation
-import CoreGraphics
 import SwiftData
 
 struct CapturedSourceAudio: Sendable {
@@ -40,7 +39,6 @@ final class CaptureRecord {
     var finalText: String = ""
     var sourceApplicationName: String?
     var sourceBundleIdentifier: String?
-    var originalWindowNumber: Int64?
     var deliveryErrorDescription: String?
     var sourceAudioRelativePath: String?
     var sourceAudioDurationSeconds: Double?
@@ -55,14 +53,12 @@ final class CaptureRecord {
         id: UUID,
         deliveryMode: CaptureDeliveryMode,
         sourceApplicationName: String?,
-        sourceBundleIdentifier: String?,
-        originalWindowNumber: CGWindowID?
+        sourceBundleIdentifier: String?
     ) {
         self.id = id
         self.deliveryModeRawValue = deliveryMode.rawValue
         self.sourceApplicationName = sourceApplicationName
         self.sourceBundleIdentifier = sourceBundleIdentifier
-        self.originalWindowNumber = originalWindowNumber.map(Int64.init)
     }
 
     var lifecycle: CaptureLifecycle {
