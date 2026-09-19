@@ -33,6 +33,7 @@ final class AppController: ObservableObject {
     @Published private(set) var audioRetentionDays: Int
     @Published private(set) var inputRefinementEnabled: Bool
     @Published private(set) var correctionSuggestionsEnabled: Bool
+    @Published private(set) var expressionLearningEnabled: Bool
     @Published private(set) var needsSetup = false
     @Published private(set) var setupError: String?
     @Published private(set) var isBootstrapping = false
@@ -40,6 +41,7 @@ final class AppController: ObservableObject {
     let history: CaptureHistoryController?
     let memory: MemoryStore?
     let dictionary: DictionaryStore?
+    let expressionProfile: ExpressionProfileStore?
     let memoryLearning: MemoryLearningController?
 
     let setup = PermissionSetupController(locale: Locale(identifier: "zh-CN"))
@@ -51,7 +53,7 @@ final class AppController: ObservableObject {
     private let hud = CaptureHUDController()
     private let captureStore: CaptureStore?
     private let personalizer: CapturePersonalizer?
-    private let dictionaryCorrections: DictionaryCorrectionController?
+    private let postInsertionLearning: PostInsertionLearningController?
     private let persistenceError: Error?
     private let speechLocale = Locale(identifier: "zh-CN")
 
@@ -73,10 +75,23 @@ final class AppController: ObservableObject {
         history = captureStore.map { CaptureHistoryController(store: $0, locale: Locale(identifier: "zh-CN")) }
         memory = captureStore.map { MemoryStore(container: $0.container) }
         dictionary = captureStore.map { DictionaryStore(container: $0.container) }
-        dictionaryCorrections = dictionary.map { DictionaryCorrectionController(dictionary: $0) }
+        expressionProfile = captureStore.map { ExpressionProfileStore(container: $0.container) }
+        if let dictionary, let expressionProfile {
+            postInsertionLearning = PostInsertionLearningController(
+                dictionary: dictionary,
+                expressionProfile: expressionProfile
+            )
+        } else {
+            postInsertionLearning = nil
+        }
         let personalizer: CapturePersonalizer?
-        if let captureStore, let memory, let dictionary {
-            personalizer = CapturePersonalizer(store: captureStore, memory: memory, dictionary: dictionary)
+        if let captureStore, let memory, let dictionary, let expressionProfile {
+            personalizer = CapturePersonalizer(
+                store: captureStore,
+                memory: memory,
+                dictionary: dictionary,
+                expressionProfile: expressionProfile
+            )
         } else {
             personalizer = nil
         }
@@ -89,7 +104,10 @@ final class AppController: ObservableObject {
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
         audioRetentionDays = CaptureStore.audioRetentionDays
         inputRefinementEnabled = UserDefaults.standard.object(forKey: CapturePersonalizer.enabledDefaultsKey) as? Bool ?? true
-        correctionSuggestionsEnabled = UserDefaults.standard.bool(forKey: DictionaryCorrectionController.enabledDefaultsKey)
+        correctionSuggestionsEnabled = UserDefaults.standard.bool(
+            forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
+        )
+        expressionLearningEnabled = UserDefaults.standard.bool(forKey: ExpressionProfileStore.enabledDefaultsKey)
 
         hud.onCancel = { [weak self] in
             Task { @MainActor in
@@ -142,8 +160,26 @@ final class AppController: ObservableObject {
 
     func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
         correctionSuggestionsEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: DictionaryCorrectionController.enabledDefaultsKey)
-        if !enabled { dictionaryCorrections?.stop() }
+        UserDefaults.standard.set(
+            enabled,
+            forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
+        )
+        if !enabled && !expressionLearningEnabled { postInsertionLearning?.stop() }
+    }
+
+    func setExpressionLearningEnabled(_ enabled: Bool) {
+        expressionLearningEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: ExpressionProfileStore.enabledDefaultsKey)
+        if !enabled && !correctionSuggestionsEnabled { postInsertionLearning?.stop() }
+    }
+
+    func clearExpressionProfile() {
+        do {
+            try expressionProfile?.clear()
+            Diagnostics.record("ExpressionProfile", "Cleared learned expression profile")
+        } catch {
+            Diagnostics.record("ExpressionProfile", "Could not clear learned expression profile", level: .error)
+        }
     }
 
     var statusDetail: String? {
@@ -191,7 +227,7 @@ final class AppController: ObservableObject {
         setupError = nil
         memoryLearning?.stop()
         memoryLearning?.setInputActive(true)
-        dictionaryCorrections?.stop()
+        postInsertionLearning?.stop()
         hotkey?.invalidate()
         hotkey = nil
         hud.hide()
@@ -361,7 +397,7 @@ final class AppController: ObservableObject {
         transcript = ""
         state = .recording
         history?.setInputActive(true)
-        dictionaryCorrections?.stop()
+        postInsertionLearning?.stop()
         memoryLearning?.setInputActive(true)
 
         hotkey?.setCancellationEnabled(true)
@@ -540,7 +576,9 @@ final class AppController: ObservableObject {
             if let personalizer {
                 state = .refining
                 finalText = try await personalizer.refine(
-                    sessionID, enabled: inputRefinementEnabled,
+                    sessionID,
+                    enabled: inputRefinementEnabled,
+                    expressionStyleEnabled: expressionLearningEnabled,
                     otherModelWorkActive: memoryLearning?.isModelBusy == true
                 )
                 Diagnostics.recordMemory("refinement-finish \(label(sessionID))")
@@ -568,8 +606,13 @@ final class AppController: ObservableObject {
                 "Delivery",
                 "Injection completed for \(label(sessionID)); app=\(deliveredName ?? "unknown") (\(deliveredBundle ?? "unknown"))"
             )
-            if correctionSuggestionsEnabled, !Task.isCancelled, stoppingCaptureID == nil {
-                dictionaryCorrections?.observeInsertion(finalText, in: deliveryApplication)
+            if !Task.isCancelled, stoppingCaptureID == nil {
+                postInsertionLearning?.observeInsertion(
+                    finalText,
+                    in: deliveryApplication,
+                    dictionarySuggestionsEnabled: correctionSuggestionsEnabled,
+                    expressionLearningEnabled: expressionLearningEnabled
+                )
             }
             // Delivery may already have dispatched before cancellation arrived.
             // Record that outcome even when interruption now owns the UI.
