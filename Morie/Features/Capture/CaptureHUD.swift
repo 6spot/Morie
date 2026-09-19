@@ -120,11 +120,11 @@ final class CaptureHUDController {
             return
         }
 
-        let duration = 0.14
+        let duration = 0.16
         animate(
             rootView,
             fromScale: currentScale(of: rootView),
-            toScale: 0.06,
+            toScale: 0.10,
             fromOpacity: rootView.layer?.presentation()?.opacity ?? 1,
             toOpacity: 0,
             duration: duration,
@@ -154,11 +154,11 @@ final class CaptureHUDController {
                 } else {
                     animate(
                         rootView,
-                        fromScale: 0.06,
+                        fromScale: 0.10,
                         toScale: 1,
                         fromOpacity: 0,
                         toOpacity: 1,
-                        duration: 0.18,
+                        duration: 0.22,
                         timing: .easeOut
                     )
                 }
@@ -295,7 +295,7 @@ final class CaptureHUDController {
 
     private func currentScale(of view: NSView) -> CGFloat {
         guard let transform = view.layer?.presentation()?.affineTransform() else { return 1 }
-        return max(0.06, sqrt(transform.a * transform.a + transform.c * transform.c))
+        return max(0.10, sqrt(transform.a * transform.a + transform.c * transform.c))
     }
     private func position(_ panel: NSPanel) {
         let mouseLocation = NSEvent.mouseLocation
