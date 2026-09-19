@@ -4,7 +4,7 @@
 
 **IN PROGRESS** — 2026-09-19
 
-Implementation is on `m-020/source-tree-organization`. Source/test relocation and Xcode project updates are implemented; the macOS 27 compile gate and pull-request validation remain pending.
+Implementation is on `m-020/source-tree-organization` in [PR #19](https://github.com/6spot/Morie/pull/19). Source/test relocation and Xcode project updates are implemented; the macOS 27 compile gate remains pending.
 
 ## Why
 
@@ -53,7 +53,8 @@ Explicitly excluded:
 - [x] Rebuild Xcode group hierarchy without changing target membership.
 - [x] Update `docs/architecture.md`.
 - [x] Update `docs/tasks.md`.
-- [ ] Open pull request and run CI.
+- [x] Open pull request #19.
+- [ ] Run and record CI.
 - [ ] Record final validation evidence and close the task when checks pass.
 
 ## Implementation notes
@@ -103,7 +104,7 @@ Do not extract `MorieCore` or another shared Swift package until iOS or another 
 ## References
 
 - GitHub Issue: [#18](https://github.com/6spot/Morie/issues/18)
-- Pull request: pending
+- Pull request: [#19](https://github.com/6spot/Morie/pull/19)
 - [Architecture](../architecture.md)
 - [Product and architecture baseline](../product-architecture-baseline.md)
 - [Development guide](../development.md)
