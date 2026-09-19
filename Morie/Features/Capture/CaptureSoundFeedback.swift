@@ -49,27 +49,98 @@ final class CaptureSoundFeedback {
     private let sampleRate: Double = 48_000
     private var startPlayer: AVAudioPlayer?
     private var stopPlayer: AVAudioPlayer?
+    private var warmupPlayer: AVAudioPlayer?
+    private var warmupTask: Task<Void, Never>?
+    private var pendingCue: Cue?
+    private var outputPrimed = false
 
     init() {
         startPlayer = makePlayer(for: .start)
         stopPlayer = makePlayer(for: .stop)
+        warmupPlayer = makeSilentWarmupPlayer()
         startPlayer?.prepareToPlay()
         stopPlayer?.prepareToPlay()
+        warmupPlayer?.prepareToPlay()
+        beginOutputWarmupIfNeeded()
     }
 
     func playStart() {
-        play(startPlayer, cue: .start, label: "start")
+        request(.start)
     }
 
     func playStop() {
-        play(stopPlayer, cue: .stop, label: "stop")
+        request(.stop)
     }
 
-    private func play(_ player: AVAudioPlayer?, cue: Cue, label: String) {
+    private func request(_ cue: Cue) {
+        pendingCue = cue
+
+        guard outputPrimed else {
+            beginOutputWarmupIfNeeded()
+            return
+        }
+
+        pendingCue = nil
+        playPrepared(cue)
+    }
+
+    private func beginOutputWarmupIfNeeded() {
+        guard !outputPrimed, warmupTask == nil else { return }
+
+        guard let warmupPlayer else {
+            outputPrimed = true
+            if let cue = pendingCue {
+                pendingCue = nil
+                playPrepared(cue)
+            }
+            return
+        }
+
+        warmupPlayer.stop()
+        warmupPlayer.currentTime = 0
+        warmupPlayer.volume = 1
+        warmupPlayer.play()
+
+        // AVAudioPlayer.prepareToPlay() prepares decoding/buffers, but the first
+        // real playback can still be the moment Core Audio opens the output path.
+        // Run actual silent PCM first, then allow audible cues only after the
+        // device has been active for a short period.
+        warmupTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(70))
+            } catch {
+                return
+            }
+            guard let self, !Task.isCancelled else { return }
+
+            self.outputPrimed = true
+            self.warmupTask = nil
+            Diagnostics.record("CaptureSound", "Audio output path primed")
+
+            if let cue = self.pendingCue {
+                self.pendingCue = nil
+                self.playPrepared(cue)
+            }
+        }
+    }
+
+    private func playPrepared(_ cue: Cue) {
+        let player: AVAudioPlayer?
+        let label: String
+        switch cue {
+        case .start:
+            player = startPlayer
+            label = "start"
+        case .stop:
+            player = stopPlayer
+            label = "stop"
+        }
+
         guard let player else {
             Diagnostics.record("CaptureSound", "Cue unavailable: \(label)", level: .warning)
             return
         }
+
         startPlayer?.stop()
         stopPlayer?.stop()
         player.currentTime = 0
@@ -80,6 +151,13 @@ final class CaptureSoundFeedback {
 
     private func makePlayer(for cue: Cue) -> AVAudioPlayer? {
         guard let data = wavData(for: cue.tones) else { return nil }
+        return try? AVAudioPlayer(data: data)
+    }
+
+    private func makeSilentWarmupPlayer() -> AVAudioPlayer? {
+        let frameCount = Int(0.12 * sampleRate)
+        let samples = Array(repeating: Int16.zero, count: frameCount)
+        guard let data = wavData(forRawSamples: samples) else { return nil }
         return try? AVAudioPlayer(data: data)
     }
 
@@ -136,6 +214,10 @@ final class CaptureSoundFeedback {
             }
         }
 
+        return wavData(forRawSamples: samples)
+    }
+
+    private func wavData(forRawSamples samples: [Int16]) -> Data? {
         guard !samples.isEmpty else { return nil }
 
         let channels: UInt16 = 1
