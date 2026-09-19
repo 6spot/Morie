@@ -6,15 +6,26 @@ struct RefinementInput: Codable, Equatable, Sendable {
     let text: String
     var context: [MemoryContextMatch] = []
     var dictionary: [DictionarySnapshot] = []
+    var corrections: [DictionaryCorrectionSnapshot]?
     var expressionStyle: [String] = []
 
-    var prepared: ValidatedRefinement { DictionarySpelling.normalize(text, using: dictionary) }
+    var confirmedCorrections: [DictionaryCorrectionSnapshot] { corrections ?? [] }
+
+    var prepared: ValidatedRefinement {
+        let corrected = DictionaryCorrections.apply(text, using: confirmedCorrections)
+        let normalized = DictionarySpelling.normalize(corrected.text, using: dictionary)
+        return ValidatedRefinement(
+            text: normalized.text,
+            edits: corrected.edits + normalized.edits
+        )
+    }
 }
 
 struct RefinementEdit: Codable, Equatable, Sendable {
     let original: String
     let replacement: String
     var dictionaryEntryID: UUID?
+    var correctionRuleID: UUID?
 }
 
 enum RefinementStatus: String, Codable, Sendable {
