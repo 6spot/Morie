@@ -71,6 +71,10 @@ actor CapturePersistenceWriter {
         let latest = latestRevision[id] ?? -1
         guard revision > latest else { return }
 
+        // Claim the tombstone revision before disk I/O. Even if deletion fails,
+        // an older queued snapshot must never resurrect an explicitly cancelled Capture.
+        latestRevision[id] = revision
+
         var descriptor = FetchDescriptor<CaptureRecord>(
             predicate: #Predicate { $0.id == id }
         )
@@ -84,7 +88,6 @@ actor CapturePersistenceWriter {
                 throw error
             }
         }
-        latestRevision[id] = revision
         Diagnostics.record(
             "CapturePersistence",
             "Persisted cancellation tombstone for \(label(id)) revision=\(revision)"
