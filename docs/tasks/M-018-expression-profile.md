@@ -30,7 +30,7 @@ Type4Me's current Expression Profile implementation validates this direction: ag
   - terminal punctuation usage;
   - exclamation usage;
   - Chinese/English spacing.
-- Require at least 5 samples before a feature leaves insufficient state and at least 10 samples spanning 3 days before stable style can affect cleanup.
+- Require at least 5 directional edits for a specific feature before it leaves insufficient state and at least 10 directional edits for that feature spanning 3 days before stable style can affect cleanup.
 - Send at most four stable directives to Foundation Models.
 - Persist the actual directives used in each `RefinementInput` so History provenance remains exact.
 - Add a default-off native Settings toggle and explicit profile reset.
@@ -50,7 +50,7 @@ Type4Me's current Expression Profile implementation validates this direction: ag
 
 1. A punctuation/line-break/list/spacing-only user edit can become aggregate style evidence.
 2. A lexical, factual, numeric or word-correction edit cannot become Expression Profile evidence.
-3. Fewer than 10 samples or evidence spanning fewer than 3 days produces no stable cleanup directive.
+3. Fewer than 10 directional edits for a feature or evidence spanning fewer than 3 days produces no stable cleanup directive; unrelated style edits do not advance that feature.
 4. Stable profile directives are limited to four and appear in the cleanup payload/provenance only when Expression Profile is enabled.
 5. Disabling Expression Profile stops both observation and use of existing directives.
 6. Clearing Expression Profile removes aggregate style learning without deleting History, Dictionary or Personal Memory.
