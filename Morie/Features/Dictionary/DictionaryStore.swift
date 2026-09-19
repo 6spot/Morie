@@ -240,8 +240,25 @@ final class DictionaryStore: ObservableObject {
 
 
     func relevantEntries(for text: String) throws -> [DictionarySnapshot] {
-        _ = text
-        return try contextualEntries()
+        let candidates = try contextualEntries()
+        let tokens = InputText.words(in: text).map { String(text[$0]) }
+        return Array(
+            candidates
+                .filter { Self.cleanupTermIsRelevant($0.name, in: text, tokens: tokens) }
+                .prefix(16)
+        )
+    }
+
+    func relevantConfirmedCorrections(for text: String) throws -> [DictionaryCorrectionSnapshot] {
+        try confirmedCorrections().filter { rule in
+            if Self.containsCJK(rule.original) {
+                return text.range(
+                    of: rule.original,
+                    options: [.caseInsensitive, .diacriticInsensitive]
+                ) != nil
+            }
+            return !InputText.literalRanges(of: rule.original, in: text).isEmpty
+        }
     }
 
     func speechHints() throws -> [String] {
@@ -314,6 +331,88 @@ final class DictionaryStore: ObservableObject {
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+    }
+
+
+    private static func cleanupTermIsRelevant(
+        _ term: String,
+        in text: String,
+        tokens: [String]
+    ) -> Bool {
+        let termKey = cleanupKey(term)
+        guard !termKey.isEmpty else { return false }
+
+        if containsCJK(term) {
+            return text.range(
+                of: term,
+                options: [.caseInsensitive, .diacriticInsensitive]
+            ) != nil
+        }
+
+        if term.contains(where: \.isWhitespace) {
+            return text.range(
+                of: term,
+                options: [.caseInsensitive, .diacriticInsensitive]
+            ) != nil
+        }
+
+        let tokenKeys = tokens.map(cleanupKey)
+        if tokenKeys.contains(termKey) { return true }
+
+        guard termKey.count >= 4,
+              termKey.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) })
+        else { return false }
+
+        let maxDistance = termKey.count <= 5 ? 1 : 2
+        return tokenKeys.contains { tokenKey in
+            guard tokenKey.count >= 4,
+                  abs(tokenKey.count - termKey.count) <= maxDistance,
+                  tokenKey.first == termKey.first,
+                  tokenKey.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) })
+            else { return false }
+            return editDistance(tokenKey, termKey) <= maxDistance
+        }
+    }
+
+    private static func cleanupKey(_ text: String) -> String {
+        text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+    }
+
+    private static func containsCJK(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
+                true
+            default:
+                false
+            }
+        }
+    }
+
+    private static func editDistance(_ lhs: String, _ rhs: String) -> Int {
+        let left = Array(lhs)
+        let right = Array(rhs)
+        if left.isEmpty { return right.count }
+        if right.isEmpty { return left.count }
+
+        var previous = Array(0...right.count)
+        for (leftIndex, leftCharacter) in left.enumerated() {
+            var current = Array(repeating: 0, count: right.count + 1)
+            current[0] = leftIndex + 1
+            for (rightIndex, rightCharacter) in right.enumerated() {
+                let substitution = previous[rightIndex] + (leftCharacter == rightCharacter ? 0 : 1)
+                let insertion = current[rightIndex] + 1
+                let deletion = previous[rightIndex + 1] + 1
+                current[rightIndex + 1] = min(substitution, insertion, deletion)
+            }
+            previous = current
+        }
+        return previous[right.count]
     }
 
     private func save() throws {
