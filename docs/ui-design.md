@@ -165,3 +165,13 @@ After a stable eligible correction, show a native nonactivating utility `NSPanel
 Remember saves the spelling only; saving can display an inline error. Not Now, expiry, changing the text again, leaving the observed field, starting input or disabling the setting dismisses it. Unsupported or secure fields do not show a suggestion. Keep the same word from repeatedly interrupting a session. Validate focus, keyboard/VoiceOver, long words, failure layout and fullscreen/multiple-screen behavior in the signed app; an offscreen image cannot establish those interactions.
 
 Morie's differentiation remains useful input and personal context built on Apple system UI.
+
+
+## Expression Profile settings
+
+Expression Profile is controlled from the native **设置** page rather than adding another library/sidebar destination in its first slice.
+
+- **学习我的表达习惯** is a native Toggle and defaults off while post-insertion observation is still being validated.
+- Supporting copy states that Morie observes only the text it just inserted, learns aggregate punctuation/paragraph/list/spacing preferences, and does not persist the edited source text as profile data.
+- **清除已学习的表达习惯…** uses a destructive native confirmation dialog and clears only aggregate style learning, not History, Dictionary or Personal Memory.
+- Do not expose raw accumulator values or developer-style confidence controls in the ordinary settings UI.
