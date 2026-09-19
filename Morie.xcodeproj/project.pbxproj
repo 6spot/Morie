@@ -75,6 +75,7 @@
 		A10000000000000000000026 /* CapturePersistenceWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* CapturePersistenceWriter.swift */; };
 		A2000000000000000000001F /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
 		A20000000000000000000020 /* ExpressionProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000013 /* ExpressionProfileTests.swift */; };
+		A20000000000000000000021 /* CapturePersistenceWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* CapturePersistenceWriter.swift */; };
 		A10000000000000000000022 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
@@ -549,6 +550,7 @@
 				A20000000000000000000001 /* CaptureStoreTests.swift in Sources */,
 				A20000000000000000000002 /* CaptureRecord.swift in Sources */,
 				A20000000000000000000003 /* CaptureStore.swift in Sources */,
+				A20000000000000000000021 /* CapturePersistenceWriter.swift in Sources */,
 				A20000000000000000000004 /* TestDiagnostics.swift in Sources */,
 				A20000000000000000000005 /* CaptureFileTranscriber.swift in Sources */,
 				A20000000000000000000006 /* CaptureHistoryController.swift in Sources */,
