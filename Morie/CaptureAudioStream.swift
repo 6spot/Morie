@@ -120,6 +120,10 @@ final class CaptureAudioStream {
         return result
     }
 
+    deinit {
+        Diagnostics.record("AudioLifetime", "CaptureAudioStream released")
+    }
+
     private static func signalDecibels(_ buffer: AVAudioPCMBuffer) -> Float {
         guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return .nan }
         var sum: Float = 0
