@@ -25,7 +25,7 @@ The two existing destinations are `currentApp` (save and insert) and `captureOnl
 
 Operational failure must preserve available intentional audio/text. Explicit cancellation is a separate discard operation after native teardown. Current-version crash recovery remains required. Never silently delete user data to work around a development schema mismatch.
 
-Default recording uses a solo **Fn / Globe release** as one activation: the first starts, the next finishes; Escape cancels. Fn chords pass through. Focus restoration and generic clipboard/synthetic-paste delivery follow [ADR 0001](decisions/0001-universal-text-delivery.md); the nonactivating native HUD follows [ADR 0002](decisions/0002-toggle-capture-hud.md).
+Default recording uses a solo **Fn / Globe release** as one activation: the first starts, the next finishes; Escape cancels. Fn chords pass through. Ordinary current-app delivery resolves the external keyboard focus only when final text is ready, never restores the record-start app, and uses one generic clipboard/synthetic-paste path per [ADR 0001](decisions/0001-universal-text-delivery.md). The nonactivating native HUD follows [ADR 0002](decisions/0002-toggle-capture-hud.md).
 
 Cleanup follows the [owner's contract](input-cleanup.md). It works with empty Memory, preserves meaning, terminology, tone, emphasis and uncertainty, and never answers, summarizes, translates or executes the dictated content. Unavailable, slow or uncertain enrichment keeps usable saved input. New voice input takes priority over optional model work.
 
@@ -33,8 +33,8 @@ Cleanup follows the [owner's contract](input-cleanup.md). It works with empty Me
 
 | Area | Required behavior |
 | --- | --- |
-| Dictionary | Each user-maintained entry saves one word/name/term. No aliases, replacement pairs, inferred substitutions or compatibility adapter for the removed design. Words supply native Speech hints; only letter-case variants of the same whole word normalize to its spelling. Full-/half-width forms remain distinct. |
-| Correction suggestion | Independent, default-off observation of a verified recent insertion. A native nonactivating prompt saves only the corrected spelling after explicit confirmation. It creates neither a global replacement nor a personal fact. |
+| Dictionary | Each visible user-maintained entry saves one canonical word/name/term. There is no user-configured alias/replacement-rule UI. Canonical words supply native Speech hints; only letter-case variants of the same whole word normalize to their spelling. Full-/half-width forms remain distinct. |
+| Correction suggestion | Independent, default-off observation of a verified recent insertion. Explicit confirmation saves the canonical word when needed and may persist an internal observed-ASR → canonical-word correction mapping. That mapping is bounded, deterministic, hidden from the normal Dictionary UI and never becomes a personal fact. |
 | Personal Memory | Automatically learn selective projects, relationships, stable preferences, facts and decisions from committed final daily input during idle time. No required candidate-review inbox. |
 | Evidence and user control | Retain the exact final-text analysis snapshot, source IDs, origin, confidence, evidence date and lifecycle. Merge repeated evidence; supersede explicit later changes. Quotes, temporary/hypothetical/uncertain statements and unsupported inferences must not become personal facts. User edits/archive/delete take precedence. |
 | Future input | Relevant Memory helps interpret what was said; it cannot insert unspoken background or override the current viewpoint/style. Dictionary and cleanup remain useful independently. |

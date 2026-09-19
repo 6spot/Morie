@@ -158,7 +158,7 @@ durably save the minimal Capture shell + audio destination
   ↓
 start Apple capture + Speech with bounded dictionary hints
   ↓
-play optional native start cue after capture is actually ready
+play optional native start cue immediately when the start action is accepted
   ↓
 progressive / volatile transcript
   ├─ update live Capture state immediately
@@ -166,8 +166,10 @@ progressive / volatile transcript
   ↓
 second configured shortcut activation (or HUD confirm)
   ↓
-stop capture input
-  ├─ play optional stop cue only after microphone capture has closed
+accepted finish action
+  ├─ play optional finish cue immediately
+  ↓
+stop capture input and enter Thinking
   ↓
 finish Speech analysis for consumed audio
   ↓
@@ -336,7 +338,7 @@ The setup Window uses the system `.hiddenTitleBar` style. Permission rows show a
 
 ApplicationServices is imported through a Swift `@preconcurrency` boundary because its native C accessibility option-key global is not annotated for Swift 6 concurrency. This is an Apple-framework interop boundary, not a replacement dependency.
 
-CloudKit/iCloud gating belongs to a later scheduled cross-device milestone. The current capability gate has no account/container dependency and does not claim that sync is configured.
+Optional CloudKit/iCloud sync/backup is separate from the local-input capability gate. The current capability gate has no iCloud account/container dependency; local capture remains usable with sync disabled or unavailable.
 
 ### `PushToTalkHotkey`
 
@@ -476,7 +478,7 @@ The visible capsule now morphs from a tiny center point into the full pill on fi
 
 The processing state intentionally uses a larger plain `Thinking` label plus a visible accent-color border flow rather than an indeterminate spinner, avoiding network-loading semantics for local Speech/foundation-model work.
 
-`CaptureSoundFeedback` owns short synthesized in-memory start/finish tones through pre-prepared `AVAudioPlayer` instances. No bundled sound file or third-party dependency is required. Start feedback is emitted only after Speech capture starts successfully. The much quieter finish cue is emitted only after the whole input transaction succeeds—after capture-only persistence or successful current-app delivery—when the HUD leaves `Thinking` for its success/close state. Microphone shutdown itself is intentionally silent. Cancellation/failure do not play the finish cue.
+`CaptureSoundFeedback` owns short synthesized in-memory start/finish tones through pre-prepared `AVAudioPlayer` instances. No bundled sound file or third-party dependency is required. The cues acknowledge accepted global actions rather than backend completion: start plays immediately after a new Capture/session/HUD is established; finish plays immediately when a valid finish action is accepted, before `Thinking`. Duplicate/ignored finish requests and cancellation do not replay the normal finish cue.
 
 The microphone waveform is the only custom-drawn control because macOS does not provide a system live-audio waveform component. It renders a complete center-weighted envelope from the first frame—low at both edges and tallest in the middle—then smoothly changes the middle bars with actual microphone level. Its silence threshold and restrained gain curve retain the relevant proven behavior from Type4Me without importing Type4Me's scrolling-history presentation or UI system.
 
@@ -604,7 +606,7 @@ The independent **修改输入后建议加入字典** setting defaults off. Afte
 
 Accessibility IPC stays off the main actor with 50 ms native message timeouts. `AXStringForRange` reads a bounded insertion (at most 1,200 UTF-16 units, at most 64 units of length change); it never requests the whole document. PID, field identity, secure-input state and selection bounds are checked. Observation ends on departure, new capture, disabling the setting or 30 seconds. Character-count delta infers range length, so concurrent edits elsewhere and host range implementations remain device-validation risks.
 
-The pure detector aligns native word boundaries across both texts and waits two seconds for a stable small correction. The per-process suggested-word suppression cache is bounded to 256 normalized words instead of growing without limit. It handles shared letters, added/deleted letters and word joins, while rejecting appended/deleted phrases, punctuation/numbers/technical edits and broad rewrites. A native nonactivating `NSPanel` offers **加入字典 / 暂不添加** for the spelling. Remember does not create an alias; the prompt expires after 20 seconds, dismisses on further edits/departure, and offers each normalized word at most once per process. External text is never sent to AI, logged or saved into Capture. See the [OpenLess audit](reference/openless.md).
+The pure detector aligns native word boundaries across both texts and waits two seconds for a stable small correction. The per-process suggested-word suppression cache is bounded to 256 normalized words instead of growing without limit. It handles shared letters, added/deleted letters and word joins, while rejecting appended/deleted phrases, punctuation/numbers/technical edits and broad rewrites. A native nonactivating `NSPanel` offers **加入字典 / 暂不添加** for the correction. Explicit confirmation keeps/adds the canonical spelling and may persist the detected observed-ASR → canonical-word mapping in the internal `DictionaryCorrectionRule` store; the wrong form never becomes a normal Dictionary row. Not Now/expiry saves nothing. The prompt expires after 20 seconds, dismisses on further edits/departure, and offers each normalized word at most once per process. External text is never sent to AI, logged or saved into Capture. See the [OpenLess audit](reference/openless.md).
 
 ### `MorieTests`
 

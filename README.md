@@ -22,7 +22,7 @@ The app includes native toggle capture, Apple Speech, current-keyboard-focus cli
 
 Personal Memory analyzes saved final input during idle time, retains exact source snapshots and retries unfinished work. New voice input takes priority. Memories appear automatically; users can inspect, correct, archive or delete them without processing a confirmation inbox.
 
-An independent, default-off setting offers to remember a word after the user corrects recently inserted Morie text. A native nonactivating prompt saves the correct spelling only after **加入字典**; an automatic global replacement alias is never created. See the [OpenLess behavior reference](docs/reference/openless.md).
+An independent, default-off setting can learn from a word the user corrects inside a verified recent Morie insertion. A native nonactivating prompt requires explicit confirmation; Morie keeps the canonical spelling in the visible Dictionary and may also retain the confirmed observed-ASR → canonical-word mapping internally so the same recognition mistake can be repaired later. No broad/unconfirmed replacement rule is learned. See [M-027](docs/tasks/M-027-confirmed-dictionary-corrections.md) and the [OpenLess behavior reference](docs/reference/openless.md).
 
 Isolated logic tests and compilation cover the implementation. Real-model quality/latency, cross-app correction prompts, microphone/recovery interactions, keyboard/VoiceOver and system-material acceptance remain open. The owner deferred interactive validation until the evening of 2026-09-18; it has not been waived. M-002/M-003/M-004/M-005/M-008/M-009/M-010/M-011 remain `IN PROGRESS` for their outstanding acceptance items.
 
@@ -34,7 +34,7 @@ Isolated logic tests and compilation cover the implementation. Real-model qualit
 
 1. Use macOS 27+ on an Apple Intelligence-capable Mac and open `Morie.xcodeproj` in the current Xcode.
 2. Configure signing if Xcode requests it and run Morie. In **使用引导与权限**, review device capabilities and authorize **麦克风 / 语音识别 / 辅助功能**. Click **开始使用** after every requirement passes; Morie then prepares Speech assets and enables recording.
-3. Place the caret in another app, press and release **Fn / 地球仪**, speak, then release Fn again to finish. **Esc** cancels. **⌘,** opens native **设置**, where alternate recording shortcuts are available.
+3. Place the caret in another app, press and release **Fn / 地球仪** once to start, speak, then press and release it again to finish. You may move to another app/field while Morie is processing; ordinary input follows the keyboard focus that exists when paste is dispatched. **Esc** cancels while recording. **⌘,** opens native **设置**, where alternate recording shortcuts are available.
 4. Open **字典 → 添加词语**, enter a name or term in **词语**, then click **添加**. Use **编辑词语** to change it later.
 5. **设置 → 自动润色语音输入** defaults to on. The [cleanup contract](docs/input-cleanup.md) preserves intent, meaningful emphasis and uncertainty while removing speech redundancy and organizing clear structure.
 6. Inspect **历史记录 → 最终文字 / 识别与润色** for saved output, original input and processing context. **原始录音** offers native playback and explicit re-recognition.

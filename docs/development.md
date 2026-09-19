@@ -57,7 +57,7 @@ If existing development data needs a reset, make the data change explicit to the
 
 The current default database is `~/Library/Application Support/MorieCaptures.store`; recordings are under `~/Library/Application Support/Morie/CaptureAudio`. A complete backup is required even when the data was created during development. This is an explicit local development operation, not a compatibility path in Morie.
 
-iCloud/CloudKit is outside the current single-Mac milestone. Complete input, dictionary, cleanup and automatic personal Memory before scheduling cross-device work. The local store explicitly disables sync; no enrollment/container configuration is requested now. Eventual sync uses each user's own private database, without a Morie backend. See [deployment.md](deployment.md#cloudkit-deployment--later-cross-device-milestone).
+Optional iCloud/CloudKit sync/backup is separate from the local-input capability gate. Local capture, Speech, cleanup, History and Memory must remain usable without iCloud. When enabled and correctly provisioned, sync uses the user's own private CloudKit database without a Morie backend; original source audio remains local in the current slice. See [deployment.md](deployment.md#cloudkit-deployment--later-cross-device-milestone).
 
 ## Unit tests
 
@@ -103,7 +103,7 @@ The CI gate exists to catch:
 
 It is intentionally scoped to changes under `Morie/**`, `Morie.xcodeproj/**`, and the workflow itself. Documentation-only changes do not need another expensive macOS compile run.
 
-CI is **not** runtime acceptance. A hosted build cannot prove real microphone/TCC behavior, physical hotkeys, focus restoration, app injection, Liquid Glass rendering, or latency/energy characteristics.
+CI is **not** runtime acceptance. A hosted build cannot prove real microphone/TCC behavior, physical hotkeys, current-keyboard-focus routing, cross-app paste delivery, Liquid Glass rendering, or latency/energy characteristics.
 
 ## Required permissions
 
@@ -134,10 +134,10 @@ It currently traces:
 - launch/bootstrap start and Ready/blocked state;
 - Apple Intelligence, Speech, microphone, Speech authorization, and Accessibility checks;
 - configured global-shortcut event-tap installation, solo Fn candidate/release/chord rejection, accepted key events, repeats, and tap recovery;
-- capture session identity and original target app/bundle identifier;
+- capture session identity plus the actual delivery app/bundle resolved at paste time;
 - Speech asset preparation, microphone/provider/analyzer lifecycle, partial/final result lengths, stop/cancel/failure;
 - microphone meter channel count, average/peak power, normalized HUD level, and warnings when channels are missing or remain pinned at the floor;
-- target activation and Accessibility insertion result;
+- current-focus delivery target resolution and synthetic paste dispatch result;
 - clipboard fallback, synthetic Cmd+V dispatch, and clipboard restoration result;
 - native alerts and terminal session state.
 
@@ -172,7 +172,7 @@ If no accepted Hotkey entry appears after the configured shortcut, diagnose the 
 5. Press and release `Fn / Globe` once (or use the configured alternate binding).
 6. Speak a short phrase.
 7. Activate the same shortcut again to finish.
-8. Verify the original app regains focus and receives the final text.
+8. Verify the app/field that owns keyboard focus when paste is dispatched receives the final text. Switching apps or fields after recording starts must route to the new current focus without Morie activating the record-start app.
 9. Verify the debug log contains the corresponding Hotkey → Session → Speech → Delivery path.
 10. Repeat several times, including rapid toggles, `Escape` cancellation, HUD cancel/finish, and Chinese/English mixed content where relevant.
 11. Verify the previous clipboard content is restored after clipboard fallback unless another app/user changed the clipboard meanwhile.
@@ -199,7 +199,7 @@ Use generated fixture audio and temporary stores for automated API checks. Never
 1. From **打开 Morie → 历史记录**, choose **开始录音** and speak an idea. Complete it with the HUD; verify “已保存”, **保存位置：历史记录**, saved text and playable audio.
 2. Repeat with shortcut finish and Escape cancellation. Cancellation removes the unfinished Capture and audio.
 3. Start in History, switch to another app and finish there. The saved idea must not be pasted, focus must not be restored elsewhere, and the clipboard must remain unchanged.
-4. Alternate this entry with normal shortcut input into a disposable document. Each new shortcut capture must still deliver to its original app and report “已输入”.
+4. Alternate this entry with normal shortcut input into a disposable document. Each new shortcut capture must deliver to the field that owns keyboard focus at paste time and report “已输入”.
 5. Start while a History recording is playing or being re-recognized. The existing live-capture preemption must apply, and no second microphone session may start.
 
 Mode persistence, terminal capture-only storage, cancellation and retry are covered by isolated logic tests. These checks do not replace the interactive clipboard/focus/microphone checks above.
@@ -229,7 +229,7 @@ See [the Memory device checklist](validation.md#m-004-memory-foundation). Model 
 ## Word-correction suggestion smoke test
 
 1. Verify **修改输入后建议加入字典** defaults off. Enable it explicitly, dictate into a supported disposable text field, correct a word, and pause for two seconds.
-2. The native **加入字典 / 暂不添加** prompt should appear without activating Morie or stealing typing focus. Remember saves only the corrected spelling; verify that no old-word alias was created.
+2. The native **加入字典 / 暂不添加** prompt should appear without activating Morie or stealing typing focus. Confirmation keeps the canonical spelling in the visible Dictionary and may save the bounded observed-ASR → canonical-word mapping internally; verify that no broad/unconfirmed replacement rule is created.
 3. Repeat with Chinese, mixed words, added/deleted letters and joined terms. Appended sentences, numbers, punctuation, URLs/code and broad rewrites should not create word suggestions.
 4. Continue editing, undo, move outside the inserted text, change apps/fields, start new input or disable the setting. Observation/pending suggestions should stop. Not Now/expiry saves nothing; the same word should not repeatedly prompt in one process.
 5. Verify unsupported/secure fields, capture-only completion and clipboard fallback do not start observation. Check long words, save errors, fullscreen/multiple screens, keyboard/VoiceOver and panel dismissal.
@@ -334,7 +334,7 @@ Phase 0 diagnostics must make the following distinguishable without logging priv
 - recording/session transition;
 - Speech asset availability/download failure;
 - transcription finalization failure;
-- focus restore failure;
+- current-focus target resolution / paste dispatch failure;
 - clipboard staging, synthetic paste, and safe restoration;
 - delivery success/failure;
 - latency checkpoints as they are added.
