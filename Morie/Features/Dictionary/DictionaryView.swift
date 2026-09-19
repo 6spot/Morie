@@ -23,59 +23,93 @@ struct DictionaryView: View {
         return selectedEntry?.id
     }
 
-    private var visibleEntries: [DictionaryDisplayEntry] {
+    private var filteredEntries: [DictionaryDisplayEntry] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return store.displayEntries.filter { entry in
             query.isEmpty || entry.name.localizedStandardContains(query)
         }
     }
 
+    private var visibleUserEntries: [DictionaryDisplayEntry] {
+        filteredEntries.filter(\.isEditable)
+    }
+
+    private var visibleBuiltInEntries: [DictionaryDisplayEntry] {
+        filteredEntries.filter { !$0.isEditable }
+    }
+
+    private var visibleCount: Int {
+        visibleUserEntries.count + visibleBuiltInEntries.count
+    }
+
     var body: some View {
         ScrollView {
-            if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-            }
+            VStack(alignment: .leading, spacing: 28) {
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-                ForEach(visibleEntries) { entry in
-                    let item = DictionaryWordItem(
-                        entry: entry,
-                        isSelected: selection == entry.id,
-                        select: { selection = entry.id }
-                    )
-                    .help(entry.source.helpText)
-
-                    if entry.isEditable {
-                        item.contextMenu {
-                            Button("编辑") { edit(entry.id) }
-                            Button("删除…", role: .destructive) {
-                                selection = entry.id
-                                confirmsDeletion = true
+                if search.isEmpty || !visibleUserEntries.isEmpty {
+                    dictionarySection(
+                        title: "用户添加",
+                        description: "你添加或确认过的词语，可以编辑和删除。"
+                    ) {
+                        if visibleUserEntries.isEmpty {
+                            HStack(spacing: 10) {
+                                Text("还没有添加词语。")
+                                    .foregroundStyle(.secondary)
+                                Button("添加词语", systemImage: "plus", action: add)
+                            }
+                        } else {
+                            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                                ForEach(visibleUserEntries) { entry in
+                                    DictionaryUserWordItem(
+                                        entry: entry,
+                                        isSelected: selection == entry.id,
+                                        select: { selection = entry.id }
+                                    )
+                                    .help(entry.source.helpText)
+                                    .contextMenu {
+                                        Button("编辑") { edit(entry.id) }
+                                        Button("删除…", role: .destructive) {
+                                            selection = entry.id
+                                            confirmsDeletion = true
+                                        }
+                                    }
+                                }
                             }
                         }
-                    } else {
-                        item
+                    }
+                }
+
+                if !visibleBuiltInEntries.isEmpty {
+                    dictionarySection(
+                        title: "系统内置",
+                        description: "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
+                    ) {
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                            ForEach(visibleBuiltInEntries) { entry in
+                                DictionaryBuiltInWordItem(entry: entry)
+                                    .help("系统内置词语，不支持修改或删除。")
+                            }
+                        }
                     }
                 }
             }
             .padding(20)
         }
         .overlay {
-            if visibleEntries.isEmpty && errorMessage == nil {
+            if visibleCount == 0 && errorMessage == nil {
                 ContentUnavailableView {
-                    Label(search.isEmpty ? "你的字典" : "没有匹配的词语", systemImage: "character.book.closed")
+                    Label("没有匹配的词语", systemImage: "character.book.closed")
                 } description: {
-                    Text(search.isEmpty ? "添加人名、产品名和专业术语，帮助 Morie 正确识别。" : "试试其他搜索词。")
-                } actions: {
-                    if search.isEmpty { Button("添加词语", systemImage: "plus", action: add) }
+                    Text("试试其他搜索词。")
                 }
             }
         }
         .navigationTitle("字典")
-        .navigationSubtitle("\(visibleEntries.count) 个词语")
+        .navigationSubtitle("\(visibleCount) 个词语")
         .searchable(text: $search, prompt: "搜索词语")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -83,10 +117,12 @@ struct DictionaryView: View {
                     if let selectedUserEntryID { edit(selectedUserEntryID) }
                 }
                 .disabled(selectedUserEntryID == nil)
+
                 Button("删除词语…", systemImage: "trash", role: .destructive) {
                     confirmsDeletion = true
                 }
                 .disabled(selectedUserEntryID == nil)
+
                 Button("添加词语", systemImage: "plus", action: add)
             }
         }
@@ -107,12 +143,40 @@ struct DictionaryView: View {
             Text("已保存的输入和个人记忆会保留。")
         }
         .onAppear {
-            do { try store.load(); errorMessage = nil }
-            catch { errorMessage = "无法加载字典。" }
+            do {
+                try store.load()
+                errorMessage = nil
+                if selectedEntry?.isEditable != true {
+                    selection = nil
+                }
+            } catch {
+                errorMessage = "无法加载字典。"
+            }
         }
-        .onChange(of: visibleEntries.map(\.id), initial: true) { _, ids in
-            if let selection, !ids.contains(selection) { self.selection = nil }
+        .onChange(of: visibleUserEntries.map(\.id), initial: true) { _, ids in
+            if let selection, !ids.contains(selection) {
+                self.selection = nil
+            }
         }
+    }
+
+    @ViewBuilder
+    private func dictionarySection<Content: View>(
+        title: String,
+        description: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(description)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func add() {
@@ -126,7 +190,7 @@ struct DictionaryView: View {
     }
 }
 
-private struct DictionaryWordItem: View {
+private struct DictionaryUserWordItem: View {
     let entry: DictionaryDisplayEntry
     let isSelected: Bool
     let select: () -> Void
@@ -147,6 +211,21 @@ private struct DictionaryWordItem: View {
             }
             .buttonStyle(.bordered)
         }
+    }
+}
+
+private struct DictionaryBuiltInWordItem: View {
+    let entry: DictionaryDisplayEntry
+
+    var body: some View {
+        Text(entry.name)
+            .lineLimit(1)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
+            .accessibilityLabel("\(entry.name)，系统内置，只读")
     }
 }
 
