@@ -5,7 +5,7 @@ struct CaptureMemorySection: View {
     @ObservedObject var controller: MemoryLearningController
     let capture: CaptureRecord
 
-    private var analysis: MemoryAnalysisRecord? { store.analysis(for: MemoryAnalysisSource(capture: capture)) }
+    private var analysis: MemoryAnalysisSnapshot? { store.analysis(for: MemoryAnalysisSource(capture: capture)) }
     private var linked: [MemoryRecord] { store.entries.filter { $0.sourceCaptureIDs.contains(capture.id) } }
 
     var body: some View {
@@ -27,7 +27,7 @@ struct CaptureMemorySection: View {
                     } else {
                         Text("个人记忆已自动更新。").foregroundStyle(.secondary)
                     }
-                    MemoryAnalysisSourceView(analysis: analysis)
+                    MemoryAnalysisSourceView(sourceText: analysis.sourceText)
                 } else if capture.lifecycle == .delivered || capture.lifecycle == .deliveryFailed {
                     Text("已保存的输入将在空闲时自动分析。").foregroundStyle(.secondary)
                 }
@@ -48,13 +48,13 @@ struct CaptureMemorySection: View {
 }
 
 struct MemoryAnalysisSourceView: View {
-    let analysis: MemoryAnalysisRecord
+    let sourceText: String
 
     var body: some View {
         DisclosureGroup("用于学习的文字") {
             VStack(alignment: .leading, spacing: 8) {
                 Text("已保存的最终文字").font(.caption).foregroundStyle(.secondary)
-                Text(analysis.sourceText).textSelection(.enabled)
+                Text(sourceText).textSelection(.enabled)
             }
             .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
         }

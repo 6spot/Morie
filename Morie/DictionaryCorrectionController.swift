@@ -13,6 +13,8 @@ final class DictionaryCorrectionController {
     private var observationID: UUID?
     private var panel: NSPanel?
     private var suggestedWords = Set<String>()
+    private var suggestedWordOrder: [String] = []
+    private let maximumSuggestedWords = 256
 
     init(dictionary: DictionaryStore) { self.dictionary = dictionary }
 
@@ -81,6 +83,11 @@ final class DictionaryCorrectionController {
             MemoryText.normalized($0.name) == key
         }) else { return }
         suggestedWords.insert(key)
+        suggestedWordOrder.append(key)
+        if suggestedWordOrder.count > maximumSuggestedWords {
+            let removed = suggestedWordOrder.removeFirst()
+            suggestedWords.remove(removed)
+        }
         let content = DictionaryCorrectionPrompt(correction: correction, save: { [weak self] in
             guard let self else { return }
             // Save the same single word as the dictionary editor.

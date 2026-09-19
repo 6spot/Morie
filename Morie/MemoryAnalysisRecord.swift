@@ -69,6 +69,25 @@ enum MemoryAnalysisFailure: String, Codable, Error, Sendable {
     }
 }
 
+struct MemoryAnalysisSnapshot: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let source: MemoryAnalysisSource
+    let state: MemoryAnalysisState?
+    let failure: MemoryAnalysisFailure?
+    let observations: [MemoryObservation]
+
+    var sourceCaptureID: UUID { source.captureID }
+    var sourceText: String { source.text }
+
+    init(_ record: MemoryAnalysisRecord) {
+        id = record.id
+        source = record.source
+        state = record.state
+        failure = record.failure
+        observations = record.observations
+    }
+}
+
 @Model
 final class MemoryAnalysisRecord {
     var id: UUID = UUID()

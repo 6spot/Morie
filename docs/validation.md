@@ -359,6 +359,8 @@ Record observations for the same tested build:
 | Cold launch time | TBD | |
 | Idle RSS | TBD | |
 | Recording RSS | TBD | |
+| RSS after 10 / 25 / 50 captures | TBD | Verify growth reaches a plateau rather than increasing roughly per capture |
+| Memory Graph / Allocations | TBD | Check retained MemoryAnalysisRecord / CaptureRecord / LanguageModelSession counts after repeated use |
 | ASR final latency | TBD | finish action → final transcript |
 | Final → delivery latency | TBD | final transcript → inserted text |
 | CPU / Energy Impact | TBD | Activity Monitor / Instruments as appropriate |
