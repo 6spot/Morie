@@ -205,10 +205,13 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertEqual(result.text, "嗯，今天不要发布 Morie 2.0。")
     }
 
-    func testPersonalMemoryIsPromptContextRatherThanALocalOutputFilter() throws {
+    func testPersonalMemoryIsPromptContextAndCannotInjectUnspokenContent() throws {
         let memory = MemorySnapshot(id: UUID(), kind: .fact, status: .active, name: "职业", notes: "我是开发者。", origin: .automatic, updatedAt: Date())
         let input = RefinementInput(captureID: UUID(), text: "开始吧", context: [MemoryContextMatch(memory: memory, matchedTerm: "职业")])
-        XCTAssertEqual(try ValidatedRefinement.accepting("我是开发者，开始吧。", for: input).text, "我是开发者，开始吧。")
+
+        XCTAssertThrowsError(try ValidatedRefinement.accepting("我是开发者，开始吧。", for: input)) { error in
+            XCTAssertEqual(error as? RefinementReason, .invalidEdits)
+        }
         XCTAssertTrue(InputRefiner.instructionsText.contains("personalContext"))
         XCTAssertTrue(InputRefiner.instructionsText.contains("不能把记忆里的事实"))
     }
@@ -327,14 +330,17 @@ final class PersonalizationTests: XCTestCase {
         }
     }
 
-    func testGeneratedContentIsSavedWithoutLocalSemanticRejection() async throws {
+    func testUngroundedGeneratedContentIsRejectedAndOriginalIsKept() async throws {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("原始文字")
         let generated = "Foundation Models 给出的结构化结果。"
         let result = try await fixture.personalizer(InputRefinementRunner { _ in generated }).refine(id, enabled: true)
-        XCTAssertEqual(result, generated)
+
+        XCTAssertEqual(result, "原始文字")
         let saved = try await fixture.saved(id)
-        XCTAssertEqual(saved.refinement?.status, .applied)
+        XCTAssertEqual(saved.finalText, "原始文字")
+        XCTAssertEqual(saved.refinement?.status, .failed)
+        XCTAssertEqual(saved.refinement?.reason, .invalidEdits)
     }
 
     func testSavedFinalAndInputSnapshotsSurviveSpeechRetryAndRestart() async throws {
