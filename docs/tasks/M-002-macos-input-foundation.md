@@ -41,7 +41,7 @@ Included:
 - focused global toggle-capture shortcut;
 - authoritative recording-session lifecycle;
 - latest Apple Speech stack;
-- original target-app capture and focus restoration;
+- system-input-style delivery to the app that owns keyboard focus when final text is ready;
 - Accessibility text delivery;
 - safe clipboard + paste fallback;
 - cancellation/error/stale-result cleanup;
@@ -70,7 +70,7 @@ Explicitly excluded:
 3. Finishing or cancelling while Speech setup is still in flight cannot create a late/orphaned microphone session.
 4. The modern Apple Speech stack produces live/partial and final output without a legacy recognition fallback.
 5. Stale results from an earlier session cannot mutate a newer session.
-6. Morie remembers the app active before capture, restores it, and delivers final text where supported.
+6. Morie behaves like a system input method: it never restores the app active at recording start; final text is dispatched to the external app that owns keyboard focus when delivery begins.
 7. Delivery fallback preserves the user's transcript and does not overwrite newer clipboard content.
 8. Cancel/error/interruption paths release capture resources and leave Morie recoverable.
 9. Relevant Type4Me behavior is classified `ADAPT`, `DROP`, or `VERIFY` only after the Morie/macOS 27 requirement is defined.
@@ -103,7 +103,7 @@ Explicitly excluded:
 | Global toggle-capture hotkey | IMPLEMENTED / VERIFY | Owner-approved default is solo `Fn / Globe` release: first release starts, second finishes, Fn chords do not trigger, and `Escape` cancels. A timed-out event tap now fails open and is released instead of entering an automatic re-enable loop that can block keyboard input. Native Settings provides alternate combinations; real-device timeout recovery and Fn/system-conflict validation remain. |
 | Reliable recording/session layer | IMPLEMENTED / VERIFY | Unique session IDs, setup cancellation, stale-result rejection, deterministic terminal cleanup. |
 | Modern Apple Speech pipeline | IMPLEMENTED / VERIFY | `SpeechAnalyzer` + `SpeechTranscriber` + one `AVCaptureAudioDataOutput`/`AnalyzerInputConverter`; M-003 shares its buffers with streamed source-audio encoding. Remaining runtime finalization cases still need device proof. |
-| Original-app capture/focus restore | IMPLEMENTED / VERIFY | App and original on-screen window identity are captured before recording; a closed original window now blocks false-success paste and preserves the transcript on the ordinary clipboard. Remaining timing/alternate-window behavior requires validation. |
+| Current-keyboard-focus delivery | IMPLEMENTED / VERIFY | M-014 removes start-time app/window pinning. When final text is ready, Morie resolves the current external frontmost app and dispatches one standard Cmd+V without activating or switching applications. Current-focus timing and cross-app switching require signed-device validation. |
 | Text injection / clipboard fallback | IMPLEMENTED / VERIFY | Universal synthetic Cmd+V delivery, change-count-aware restore (including an originally empty clipboard), and transient markers for Raycast/clipboard-history exclusion; no app-specific compatibility branch. |
 | Cancellation/stale-result hardening | IMPLEMENTED / VERIFY | Finish/cancel during in-flight setup stays bound to its session; per-session identity protects new sessions. |
 | Liquid Glass capture HUD | IMPLEMENTED / VERIFY | One native `NSGlassEffectView` capsule in the non-activating panel, system buttons, and a Type4Me-informed live waveform. The HUD uses quiet-speech-sensitive mapping, real-signal transient emphasis, 60 Hz metering/rendering, and asymmetric per-bar history. Edge bars remain active while the center keeps the largest travel. Successful delivery now uses animated, labelled feedback; recoverable delivery failure reports “已复制到剪贴板” in the HUD instead of opening a modal alert. Visual response/accessibility validation remains. |
@@ -203,20 +203,25 @@ The latest volatile segment is retained when producing Morie's final string beca
 
 M-003's History follow-up keeps earlier nonempty transcript evidence when classifying an empty final result. The single capture output distinguishes no input/zero signal from unclassified nonzero audio; the latter remains retryable in History. An empty retained result shows “未识别，录音已保存”, while a discarded no-input capture hides the HUD. Neither reports successful text insertion. Live capture also stops History playback and cancels file re-recognition before Speech startup. These additions require the corresponding runtime checks in `validation.md`; they do not close M-002.
 
-The 2026-09-18 interruption follow-up passed isolated Xcode 27 Debug compilation and all 31 tests, including real AAC encode/decode under controlled failures. See [M-003's validation evidence](./M-003-capture.md#validation-evidence). Real microphone interruption, capture timing and cancellation around focus handoff remain open.
+The 2026-09-18 interruption follow-up passed isolated Xcode 27 Debug compilation and all 31 tests, including real AAC encode/decode under controlled failures. See [M-003's validation evidence](./M-003-capture.md#validation-evidence). Real microphone interruption, capture timing and cancellation around final delivery remain open.
 
 ### 5. Text delivery
 
+M-014 deliberately models Morie as a system input method rather than an asynchronous task sender.
+
 Delivery remains generic and evidence-driven:
 
-1. reject missing/terminated/self target and preserve transcript on clipboard;
-2. restore the original app;
-3. snapshot safe text-like clipboard representations;
-4. write the transcript and send synthetic Cmd+V;
-5. tag Morie's generated events so the hotkey layer ignores them;
-6. restore the old clipboard only if `changeCount` proves nobody changed it after Morie's temporary write.
+1. do not capture or restore a destination app/window at recording start;
+2. when final text is ready, resolve `NSWorkspace.shared.frontmostApplication`;
+3. reject Morie itself, a missing app or a terminated app and preserve the transcript on the ordinary clipboard;
+4. snapshot safe text-like clipboard representations;
+5. write the transcript and send one synthetic Cmd+V without activating or switching applications;
+6. let macOS and the receiving app's first-responder chain choose the actual field;
+7. tag Morie's generated events so the hotkey layer ignores them;
+8. restore the old clipboard only if `changeCount` proves nobody changed it after Morie's temporary write;
+9. save the actual delivery app/bundle on the Capture after dispatch.
 
-There is currently **no Electron/app-family branch**. Any app-specific delay or workaround requires a reproduced macOS 27 validation case first.
+The obsolete original-window persistence and focus-handoff delay are removed directly; there is no development compatibility adapter. There is currently **no Electron/app-family branch** and no AX editability gate. Any app-specific workaround requires a reproduced macOS 27 validation case first.
 
 ### 6. Capability gate
 
