@@ -107,9 +107,12 @@ The repository's standard CI still builds the product target rather than executi
 
 \`InputLatency\` records:
 
-- finish → Speech final;
+- finish → progressive/live Speech final;
+- finish → authoritative Speech final after M-024's accurate saved-audio pass;
 - finish → refinement final;
 - finish → paste dispatched.
+
+M-024 intentionally adds the accurate saved-audio Speech pass to the finish path for recognition quality. This does not relax M-025's persistence invariant: History/SwiftData writes still must not gate recognition, cleanup or current-app paste.
 
 \`CapturePersistence\` records per snapshot:
 

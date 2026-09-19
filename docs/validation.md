@@ -257,7 +257,9 @@ Test at least:
 - project/product names with and without dictionary Speech hints;
 - quiet and normal office acoustic conditions.
 
-Morie now prefers Apple's newer `SpeechTranscriber` for both live and saved-audio transcription when the requested locale/device supports it, and uses `DictationTranscriber` only as the Apple-native runtime fallback when preparation/support requires it. Result segments are concatenated exactly as Apple emits them; Morie does not invent spaces or guessed punctuation between segments. Record the actual backend shown in Overview/diagnostics, whether partial/volatile punctuation is sensible, whether finalization changes it materially, whether punctuation survives segment boundaries, and whether the end of a short utterance is ever lost after the finish action.
+Morie now prefers Apple's newer `SpeechTranscriber` when the requested locale/device supports it and uses `DictationTranscriber` only as the Apple-native runtime fallback when preparation/support requires it. Live recording uses the progressive preset for immediate feedback; after finish closes the source audio, normal Capture completion re-runs that file with `SpeechTranscriber(.transcription)` (or `DictationTranscriber(.longDictation)`) and the Capture's frozen Dictionary hints before cleanup. A failed/empty accurate pass must fall back to the usable progressive transcript rather than failing the Capture. Result segments are concatenated exactly as Apple emits them; Morie does not invent spaces or guessed punctuation between segments.
+
+For each representative sample, record the actual backend shown in Overview/diagnostics, the progressive text visible before finish, the final accurate raw recognition saved in History, whether punctuation/terminology/end-of-utterance handling improves or regresses, and `InputLatency` for both `speech-live-final` and `speech-final`. Include at least one short utterance, one long utterance, one Chinese/English mixed sample and one Dictionary-term sample.
 
 ## Capture HUD and Liquid Glass
 

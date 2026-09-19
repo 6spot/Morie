@@ -16,6 +16,14 @@ enum CaptureFileTranscriber {
     }
 
     static func recognize(_ url: URL, locale requestedLocale: Locale) async throws -> String {
+        try await recognize(url, locale: requestedLocale, dictionaryWords: [])
+    }
+
+    static func recognize(
+        _ url: URL,
+        locale requestedLocale: Locale,
+        dictionaryWords: [String]
+    ) async throws -> String {
         try Task.checkCancellation()
         let probe = try AVAudioFile(forReading: url)
         guard probe.length > 0 else { throw TranscriptionError.emptyRecognition }
@@ -26,7 +34,7 @@ enum CaptureFileTranscriber {
 
         Diagnostics.record(
             "Speech",
-            "Saved-audio recognition selected \(backend.logName) for \(backend.locale.identifier)"
+            "Saved-audio recognition selected \(backend.logName) for \(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count)"
         )
 
         switch backend {
@@ -42,23 +50,37 @@ enum CaptureFileTranscriber {
                         "SpeechTranscriber asset preparation failed for saved audio; falling back to DictationTranscriber: \(error.localizedDescription)",
                         level: .warning
                     )
-                    return try await recognizeWithDictation(url, locale: fallbackLocale)
+                    return try await recognizeWithDictation(
+                        url,
+                        locale: fallbackLocale,
+                        dictionaryWords: dictionaryWords
+                    )
                 }
                 throw error
             }
-            return try await recognizeWithSpeech(url, transcriber: transcriber)
+            return try await recognizeWithSpeech(
+                url,
+                transcriber: transcriber,
+                dictionaryWords: dictionaryWords
+            )
 
         case .dictationTranscriber(let locale):
-            return try await recognizeWithDictation(url, locale: locale)
+            return try await recognizeWithDictation(
+                url,
+                locale: locale,
+                dictionaryWords: dictionaryWords
+            )
         }
     }
 
     private static func recognizeWithSpeech(
         _ url: URL,
-        transcriber: SpeechTranscriber
+        transcriber: SpeechTranscriber,
+        dictionaryWords: [String]
     ) async throws -> String {
         let audioFile = try AVAudioFile(forReading: url)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
+        await applyDictionaryContext(dictionaryWords, analyzer: analyzer)
 
         return try await withTaskCancellationHandler {
             let results = Task {
@@ -98,11 +120,13 @@ enum CaptureFileTranscriber {
 
     private static func recognizeWithDictation(
         _ url: URL,
-        locale: Locale
+        locale: Locale,
+        dictionaryWords: [String]
     ) async throws -> String {
         let audioFile = try AVAudioFile(forReading: url)
         let transcriber = DictationTranscriber(locale: locale, preset: .longDictation)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
+        await applyDictionaryContext(dictionaryWords, analyzer: analyzer)
 
         return try await withTaskCancellationHandler {
             let results = Task {
@@ -137,6 +161,38 @@ enum CaptureFileTranscriber {
             }
         } onCancel: {
             Task { await analyzer.cancelAndFinishNow() }
+        }
+    }
+
+    static func preferredTranscript(live: String, accurate: String?) -> String {
+        guard let accurate,
+              !accurate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return live
+        }
+        return accurate
+    }
+
+    private static func applyDictionaryContext(
+        _ dictionaryWords: [String],
+        analyzer: SpeechAnalyzer
+    ) async {
+        guard !dictionaryWords.isEmpty else { return }
+
+        let context = AnalysisContext()
+        context.contextualStrings = [.general: dictionaryWords]
+        do {
+            try await analyzer.setContext(context)
+            Diagnostics.record(
+                "SpeechQuality",
+                "Applied \(dictionaryWords.count) contextual dictionary strings to saved-audio recognition"
+            )
+        } catch {
+            Diagnostics.record(
+                "Speech",
+                "Saved-audio dictionary context was unavailable; continuing recognition: \(error.localizedDescription)",
+                level: .warning
+            )
         }
     }
 
