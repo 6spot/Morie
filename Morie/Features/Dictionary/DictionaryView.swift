@@ -196,12 +196,21 @@ private struct DictionaryUserWordItem: View {
     let select: () -> Void
 
     var body: some View {
-        Button(action: select) {
-            Text(entry.name)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        if isSelected {
+            Button(action: select) {
+                Text(entry.name)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.borderedProminent)
+        } else {
+            Button(action: select) {
+                Text(entry.name)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
         }
-        .buttonStyle(isSelected ? .borderedProminent : .bordered)
     }
 }
 
