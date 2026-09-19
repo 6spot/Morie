@@ -7,16 +7,16 @@ This file defines the working rules for humans and coding agents contributing to
 Read these before changing code, in this order:
 
 1. `README.md` — project direction and current status.
-2. `docs/design/apple-native-first-v0-baseline-v2.md` — repository copy of the approved design baseline and owner-approved amendments.
-3. `docs/product-architecture-baseline.md` — approved product/architecture constraints.
-4. `docs/architecture.md` — current code/module architecture.
-5. `docs/ui-design.md` — macOS 27 native UI / Liquid Glass rules.
-6. `docs/tasks.md` — master task plan and overall progress.
-7. `docs/tasks/M-xxx-*.md` — detailed execution record for the active task.
-8. `docs/reference/type4me.md` — Type4Me reference/migration boundary, consulted only after the Morie requirement is understood.
-9. `docs/development.md` — local development workflow.
-10. `docs/deployment.md` — build, signing, packaging, and release workflow.
-11. `docs/validation.md` — Phase 0 real-device validation matrix.
+2. `docs/product-architecture-baseline.md` — current approved product/architecture constraints.
+3. `docs/architecture.md` — current code/module architecture and runtime flow.
+4. `docs/tasks.md` — master task plan and overall progress.
+5. `docs/tasks/M-xxx-*.md` — detailed execution record for the active task.
+6. `docs/ui-design.md` — macOS 27 native UI / Liquid Glass rules.
+7. `docs/development.md` — local development workflow.
+8. `docs/deployment.md` — build, signing, packaging, and release workflow.
+9. `docs/validation.md` — Phase 0 real-device validation matrix.
+10. `docs/design/apple-native-first-v0-baseline-v2.md` — historical approved-design provenance plus amendments; never let a superseded body section override the current baseline/architecture/task.
+11. `docs/reference/type4me.md` and `docs/reference/openless.md` — external-reference lessons consulted only after the Morie requirement is understood.
 
 When implementation changes behavior, update the relevant documentation in the same pull request.
 
@@ -28,8 +28,8 @@ When implementation changes behavior, update the relevant documentation in the s
 - **Apple Native First**: the Apple system implementation is the default and required implementation path.
 - **Native UI Only**: product UI must use Apple system UI components and the native macOS 27 Liquid Glass design language. Do not replace a system component with a custom imitation.
 - **Private Mode first**: V0 has no Morie cloud backend.
-- **Single Mac first**: Private Mode currently uses Apple-native local intelligence and storage. iCloud/CloudKit belongs to a later, actual cross-device milestone; it is not a dependency of local persistence or this milestone. No separate Device Only product mode is introduced.
-- **Dictionary and Memory are different**: each user-maintained dictionary entry saves one word, with no alias or replacement-rule configuration; automatic personal Memory records durable information from daily communication. Ordinary input never requires candidate approval.
+- **Single Mac first**: Private Mode uses Apple-native local intelligence and storage. Optional iCloud/CloudKit sync/backup is default-off and is never a startup dependency for local input. No separate Device Only product mode is introduced.
+- **Dictionary and Memory are different**: the visible Dictionary stores canonical words only, with no user-configured alias/replacement-rule UI. An explicitly confirmed post-insertion correction may additionally persist an internal observed-ASR → canonical-word mapping; automatic personal Memory remains separate. Ordinary input never requires candidate approval.
 - **Current scope**: finish Mac input, independent basic cleanup, custom dictionary and automatic local Memory. Inspiration capture/follow-up primarily belongs to the future mobile product and is not active work.
 - **Capture First**: intentional user input must be durably saved before AI enrichment once Phase 1 persistence exists.
 - **Expression First**: personalization must not make ordinary voice input slow or unreliable.
@@ -126,9 +126,9 @@ Current Phase 0 responsibilities:
 - focused global toggle-capture interaction;
 - audio capture/session lifecycle;
 - latest Apple Speech transcription;
-- frontmost-app/target capture;
-- focus restore;
-- text injection and clipboard fallback;
+- delivery-time current-keyboard-focus resolution;
+- one generic clipboard + synthetic `Cmd+V` delivery path with safe restoration/fallback;
+- no record-start target pinning, app activation or focus restoration for ordinary current-app input;
 - Type4Me reference audit only for currently relevant failure modes.
 
 Do not pull Phase 1+ persistence, Memory, iOS, provider abstractions, MCP, Morie Cloud, or generalized backward-compatibility systems into a Phase 0 change unless the task explicitly requires it.
