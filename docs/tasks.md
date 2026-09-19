@@ -30,6 +30,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-015 | Speech quality | Use Apple dictation punctuation for live and saved-audio transcription | IN PROGRESS | — | [`M-015`](./tasks/M-015-native-dictation-punctuation.md) |
 | M-016 | Input quality | Keep cleanup Memory context small and directly relevant | IN PROGRESS | — | [`M-016`](./tasks/M-016-conservative-cleanup-context.md) |
 | M-017 | Input quality | Clean abandoned fragments and sentence restarts without losing independent meaning | IN PROGRESS | — | [`M-017`](./tasks/M-017-cleanup-false-starts.md) |
+| M-018 | Personalization | Learn aggregate Expression Profile from bounded post-insertion style edits | IN PROGRESS | — | [`M-018`](./tasks/M-018-expression-profile.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
@@ -45,7 +46,7 @@ Current management follows the native M-008 structure with separate History, Dic
 
 M-010 also fixes the owner-observed Speech authorization callback crash and simplifies the setup window's title, permission state and footer actions. Signed-app permission and interaction retesting remains open; regression/build/layout evidence is in its task record.
 
-The owner deferred interactive validation until the evening of 2026-09-18. Actual model fidelity/latency, correction prompts across supported fields, keyboard/VoiceOver, microphone/recovery and the delivery matrix must be tested before completion. The current execution order is input routing → native dictation punctuation → Dictionary/Cleanup/Memory quality → Expression Profile → optional iCloud/CloudKit sync/backup. No local automatic-backup subsystem is planned; development schema changes may discard old local development data.
+The owner deferred interactive validation until the evening of 2026-09-18. Actual model fidelity/latency, correction prompts across supported fields, keyboard/VoiceOver, microphone/recovery and the delivery matrix must be tested before completion. The current execution order is input routing → native dictation punctuation → Dictionary/Cleanup/Memory quality → Expression Profile → optional iCloud/CloudKit sync/backup. M-018 starts the Expression Profile stage with bounded local style learning. No local automatic-backup subsystem is planned; development schema changes may discard old local development data.
 
 ## Maintenance rules
 
