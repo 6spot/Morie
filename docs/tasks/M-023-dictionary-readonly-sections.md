@@ -2,7 +2,7 @@
 
 ## Status
 
-**TODO** — 2026-09-19
+**IN PROGRESS** — 2026-09-19
 
 Issue: [#23](https://github.com/6spot/Morie/issues/23)
 
@@ -30,3 +30,25 @@ The backend already distinguishes `builtIn`, `manual` and `correction`. Built-in
 - VoiceOver communicates built-in terms as read-only text rather than actions.
 - No schema migration or new dependency.
 - macOS 27 compile and Dictionary tests pass.
+
+
+## 2026-09-19 implementation
+
+The Dictionary presentation is now explicitly split by ownership:
+
+\`\`\`text
+用户添加
+  manual + correction
+  selectable / editable / deletable
+
+系统内置
+  builtIn
+  static read-only text
+  no selection / button / context menu / edit / delete
+\`\`\`
+
+Built-ins use semantic secondary foreground and quaternary background treatment so their read-only ownership is visible without inventing a custom design language. They are rendered as static SwiftUI text rather than disabled buttons, so pointer, keyboard and VoiceOver semantics no longer imply an action.
+
+Search still applies to both sections. Empty section headers are hidden during filtered search; in the normal unfiltered state the user section remains visible even when empty so the Add action and ownership model are obvious.
+
+No source/provenance, persistence schema, Speech hint, cleanup or dictionary matching behavior changed.
