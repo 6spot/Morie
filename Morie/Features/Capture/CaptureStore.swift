@@ -82,6 +82,7 @@ final class CaptureStore {
             )
         }
         container = try ModelContainer(for: schema, configurations: [configuration])
+        container.mainContext.autosaveEnabled = false
         persistenceWriter = CapturePersistenceWriter(container: container)
         if let audioDirectory {
             self.audioDirectory = audioDirectory
