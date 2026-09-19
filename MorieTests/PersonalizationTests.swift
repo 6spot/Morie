@@ -46,8 +46,47 @@ final class PersonalizationTests: XCTestCase {
             ).text,
             "我们明天去公园。"
         )
-        XCTAssertTrue(InputRefiner.instructionsText.contains("Coldex"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("不是无条件替换规则"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("Gethab"))
+        XCTAssertTrue(InputRefiner.instructionsText.contains("GitHub"))
+    }
+
+    func testModelPromptSendsOnlyDictionaryWordsAndUsefulMemoryText() throws {
+        let dictionaryID = UUID()
+        let memoryID = UUID()
+        let updatedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "Gethab is where Morie lives",
+            context: [
+                MemoryContextMatch(
+                    memory: MemorySnapshot(
+                        id: memoryID,
+                        kind: .project,
+                        status: .active,
+                        name: "Morie",
+                        notes: "Morie is a voice input project.",
+                        origin: .automatic,
+                        updatedAt: updatedAt
+                    ),
+                    matchedTerm: "Morie"
+                )
+            ],
+            dictionary: [
+                DictionarySnapshot(id: dictionaryID, name: "GitHub", updatedAt: updatedAt)
+            ]
+        )
+
+        let prompt = try InputRefiner.promptText(for: input)
+        XCTAssertTrue(prompt.contains(#""dictionary":["GitHub"]"#))
+        XCTAssertTrue(prompt.contains(#""name":"Morie""#))
+        XCTAssertTrue(prompt.contains(#""notes":"Morie is a voice input project.""#))
+        XCTAssertFalse(prompt.contains(dictionaryID.uuidString))
+        XCTAssertFalse(prompt.contains(memoryID.uuidString))
+        XCTAssertFalse(prompt.contains("updatedAt"))
+        XCTAssertFalse(prompt.contains("matchedTerm"))
+        XCTAssertFalse(prompt.contains("origin"))
+        XCTAssertFalse(prompt.contains("status"))
+        XCTAssertFalse(prompt.contains("kind"))
     }
 
     func testDictionaryNormalizesSavedSpellingBeforeCleanupWithoutMemory() throws {
