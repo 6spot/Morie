@@ -9,7 +9,7 @@ final class CapturePersonalizer {
     private let store: CaptureStore
     private let memory: MemoryStore
     private let dictionary: DictionaryStore
-    private let expressionProfile: ExpressionProfileStore
+    private let expressionProfile: ExpressionProfileStore?
     private let runner: InputRefinementRunner
 
     var isModelBusy: Bool { runner.isBusy }
@@ -18,7 +18,7 @@ final class CapturePersonalizer {
         store: CaptureStore,
         memory: MemoryStore,
         dictionary: DictionaryStore,
-        expressionProfile: ExpressionProfileStore,
+        expressionProfile: ExpressionProfileStore? = nil,
         runner: InputRefinementRunner = InputRefinementRunner()
     ) {
         self.store = store
@@ -31,7 +31,7 @@ final class CapturePersonalizer {
     func refine(
         _ captureID: UUID,
         enabled: Bool,
-        expressionStyleEnabled: Bool,
+        expressionStyleEnabled: Bool = false,
         otherModelWorkActive: Bool = false
     ) async throws -> String {
         try Task.checkCancellation()
@@ -46,7 +46,7 @@ final class CapturePersonalizer {
             ? ((try? memory.relevantContext(for: prepared, limit: Self.cleanupMemoryContextLimit)) ?? [])
             : []
         let expressionStyle = skip == nil && expressionStyleEnabled
-            ? ((try? expressionProfile.directives()) ?? [])
+            ? ((try? expressionProfile?.directives()) ?? [])
             : []
         let input = try store.refinementInput(
             for: captureID,
@@ -81,7 +81,7 @@ final class CapturePersonalizer {
                     return try keepOriginal(input, reason: .memoryChanged, started: started)
                 }
                 let currentStyle = expressionStyleEnabled
-                    ? ((try? expressionProfile.directives()) ?? [])
+                    ? ((try? expressionProfile?.directives()) ?? [])
                     : []
                 guard currentStyle == input.expressionStyle else {
                     return try keepOriginal(input, reason: .expressionStyleChanged, started: started)
