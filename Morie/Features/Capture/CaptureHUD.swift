@@ -290,7 +290,6 @@ final class CaptureHUDController {
         glassView.autoresizingMask = []
         glassView.style = .regular
         glassView.cornerRadius = Layout.contentHeight / 2
-        glassView.tintColor = NSColor.black.withAlphaComponent(0.24)
         glassView.effectIsInteractive = true
         glassView.wantsLayer = true
 
@@ -618,62 +617,60 @@ private struct CaptureHUDView: View {
 private struct ProcessingSweep: View {
     let reduceMotion: Bool
 
+    @State private var progress: CGFloat = 0
+    @State private var overlayOpacity: Double = 0.10
+    @State private var didRun = false
+
     private let sweepDuration: TimeInterval = 1.05
-    private let settleDuration: TimeInterval = 0.22
-    private let pauseDuration: TimeInterval = 0.14
+    private let settleDuration: TimeInterval = 0.18
 
     var body: some View {
         GeometryReader { geometry in
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                let state = sweepState(at: timeline.date)
+            ZStack {
+                Capsule()
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
 
-                ZStack {
-                    Capsule()
-                        .stroke(Color.primary.opacity(0.10), lineWidth: 1)
-
-                    Capsule()
-                        .fill(
-                            Color.primary.opacity(
-                                reduceMotion ? 0.055 : 0.105 * state.opacity
+                Capsule()
+                    .fill(Color.primary.opacity(overlayOpacity))
+                    .mask(alignment: .leading) {
+                        Rectangle()
+                            .frame(
+                                width: reduceMotion
+                                    ? geometry.size.width
+                                    : geometry.size.width * progress
                             )
-                        )
-                        .mask(alignment: .leading) {
-                            Rectangle()
-                                .frame(
-                                    width: reduceMotion
-                                        ? geometry.size.width
-                                        : geometry.size.width * state.progress
-                                )
-                        }
+                    }
+            }
+            .padding(0.5)
+            .onAppear {
+                guard !didRun else { return }
+                didRun = true
+
+                if reduceMotion {
+                    progress = 1
+                    overlayOpacity = 0.045
+                    return
                 }
-                .padding(0.5)
+
+                progress = 0
+                overlayOpacity = 0.10
+
+                withAnimation(.easeInOut(duration: sweepDuration)) {
+                    progress = 1
+                }
+
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(sweepDuration))
+                    guard didRun else { return }
+                    withAnimation(.easeOut(duration: settleDuration)) {
+                        overlayOpacity = 0.045
+                    }
+                }
+            }
+            .onDisappear {
+                didRun = false
             }
         }
-    }
-
-    private func sweepState(at date: Date) -> (progress: CGFloat, opacity: Double) {
-        guard !reduceMotion else {
-            return (1, 1)
-        }
-
-        let cycleDuration = sweepDuration + settleDuration + pauseDuration
-        let elapsed = date.timeIntervalSinceReferenceDate
-            .truncatingRemainder(dividingBy: cycleDuration)
-
-        if elapsed < sweepDuration {
-            let linear = elapsed / sweepDuration
-            // Keep the reference's directional wipe, but soften the start/end
-            // so the vertical boundary never feels like a progress bar.
-            let eased = linear * linear * (3 - 2 * linear)
-            return (CGFloat(eased), 1)
-        }
-
-        if elapsed < sweepDuration + settleDuration {
-            let fade = (elapsed - sweepDuration) / settleDuration
-            return (1, max(0, 1 - fade))
-        }
-
-        return (0, 0)
     }
 }
 
