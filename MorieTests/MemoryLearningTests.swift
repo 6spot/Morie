@@ -28,7 +28,7 @@ final class MemoryLearningTests: XCTestCase {
         let fixture = try LearningFixture()
         _ = try fixture.capture("I work on Morie.", mode: .captureOnly)
         let pending = UUID()
-        _ = try fixture.captures.beginVoiceCapture(id: pending, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil, windowNumber: nil)
+        _ = try fixture.captures.beginVoiceCapture(id: pending, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil)
         try fixture.captures.completeRecognition("I work on Morie.", for: pending)
         try fixture.memory.reconcileCompletedInputs()
         XCTAssertTrue(fixture.memory.analyses.isEmpty)
@@ -282,12 +282,18 @@ private final class LearningFixture {
 
     func capture(_ text: String, recognition: String? = nil, mode: CaptureDeliveryMode = .currentApp, date: Date = Date()) throws -> UUID {
         let id = UUID()
-        _ = try captures.beginVoiceCapture(id: id, deliveryMode: mode, applicationName: "Test", bundleIdentifier: nil, windowNumber: nil)
+        _ = try captures.beginVoiceCapture(id: id, deliveryMode: mode, applicationName: "Test", bundleIdentifier: nil)
         try captures.capture(id).createdAt = date
         try captures.completeRecognition(recognition ?? text, for: id)
         try captures.capture(id).finalText = text
         try captures.container.mainContext.save()
-        if mode == .currentApp { try captures.markDelivered(id) }
+        if mode == .currentApp {
+            try captures.markDelivered(
+                id,
+                applicationName: "Test",
+                bundleIdentifier: "me.morie.tests"
+            )
+        }
         return id
     }
 
