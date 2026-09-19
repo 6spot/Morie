@@ -128,7 +128,7 @@ The compact capture capsule is deliberately low-contrast. The surface uses `NSGl
 
 Status color is reserved for state, not button identity:
 
-- **Thinking** uses one restrained left-to-right shimmer band inside the compact capsule. It is not a progress fill and must not imply 0–100% completion. The shimmer runs once over about 2.2 seconds, then disappears while the native clear glass and Thinking text remain until processing finishes.
+- **Thinking** uses a restrained repeating left-to-right shimmer band inside the compact capsule. It is not a progress fill and must not imply 0–100% completion. One cycle is about 3 seconds: ~2.4 seconds of travel followed by ~0.6 seconds fully clear before restarting. Real completion interrupts the cycle immediately.
 - normal successful completion has no separate success state: once processing completes, the `Thinking` capsule immediately runs its normal collapse/fade-out animation;
 - this applies to both current-app delivery and capture-only completion; no `SUCCESS`, **已输入**, **已保存**, checkmark, green flash or other success badge is shown in the HUD;
 - clipboard fallback, no-speech and recognition-failure messages remain visible because they communicate an outcome the user may need to act on; they stay text-only and visually secondary;
@@ -136,7 +136,7 @@ Status color is reserved for state, not button identity:
 
 Do not add decorative leading status icons back to these text messages. Normal success is communicated by the disappearance of the processing capsule itself; do not add another success dwell state unless new usability evidence requires one. Strong semantic color is reserved for outcomes that genuinely require attention.
 
-The recording-to-processing morph uses motion rather than another status color: the wide recording capsule contracts around the waveform before `Thinking` replaces it. The processing capsule is narrower (94 pt versus 142 pt recording width). When Thinking first appears, a narrow low-contrast highlight traverses the glass once from left to right over about 2.2 seconds; because it leaves no filled track behind, it reads as activity rather than progress. Successful completion keeps that compact shape and fades almost in place instead of collapsing to a tiny dot. Reduced Motion skips the moving shimmer and uses only the compact static glass treatment.
+The recording-to-processing morph uses motion rather than another status color: the wide recording capsule contracts around the waveform before `Thinking` replaces it. The processing capsule is narrower (94 pt versus 142 pt recording width). While Thinking is active, a narrow low-contrast highlight repeatedly traverses the glass from left to right. The band fully exits before a short pause and reset, so it reads as ongoing activity rather than accumulated progress. Successful completion keeps that compact shape and fades almost in place instead of collapsing to a tiny dot. Reduced Motion skips the moving shimmer and uses only the compact static glass treatment.
 
 ## History recovery
 
