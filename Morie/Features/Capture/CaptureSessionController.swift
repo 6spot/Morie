@@ -398,7 +398,7 @@ final class CaptureSessionController {
                 if disposition == .retainedForRetry {
                     hud.showRecognitionFailure()
                 } else {
-                    hud.hide()
+                    hud.showNoSpeech()
                 }
                 return
             }
