@@ -276,7 +276,7 @@ The owner-approved default is solo `Fn / Globe` release. Its interaction with th
 An actor owns the Apple-native speech session state:
 
 - unique active capture UUID;
-- `SpeechTranscriber` with progressive transcription;
+- `DictationTranscriber` with `.progressiveLongDictation`, preserving live volatile results while Apple supplies dictation punctuation;
 - `AssetInventory` preparation;
 - one `CaptureAudioSource` owning an AVFoundation data output and `AnalyzerInputConverter`;
 - `SpeechAnalyzer`;
@@ -287,7 +287,7 @@ An actor owns the Apple-native speech session state:
 
 Speech assets are prepared before Ready so a model download is not started inside an active capture. `SpeechPipeline.start` receives up to 100 dictionary spellings / 2,000 characters and applies `AnalysisContext.contextualStrings[.general]` through `SpeechAnalyzer.setContext`. Hint failure does not prevent capture; session ownership is rechecked after that await.
 
-A finish action stops capture and lets already-captured analyzer input finish before finalization. Cancellation instead terminates analysis immediately. The most recent volatile segment is preserved because the current Speech result contract does not guarantee that each volatile result will later be emitted again as final.
+Result passages are concatenated exactly as Apple emits them; Morie does not insert spaces or guessed punctuation between native segments. A finish action stops capture and lets already-captured analyzer input finish before finalization. Cancellation instead terminates analysis immediately. The most recent volatile segment is preserved because the current Speech result contract does not guarantee that each volatile result will later be emitted again as final.
 
 Native teardown always preserves the audio file and returns the best available text/audio snapshot. The snapshot remains available while normal finalization awaits Speech. Analyzer/result errors report to the controller during recording, so the microphone can stop without waiting for another user finish action. Capture-session runtime-error/interruption notifications end the input stream with an error. Session ownership is checked again after asynchronous converter creation, before constructing a microphone source.
 
