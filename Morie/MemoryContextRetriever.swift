@@ -10,9 +10,10 @@ enum MemoryContextRetriever {
     static func retrieve(for text: String, from memories: [MemorySnapshot], limit: Int = 8) -> [MemoryContextMatch] {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, limit > 0 else { return [] }
         let queryTerms = Set(terms(text))
+        let queryWordRanges = InputText.words(in: text)
         let matches: [(MemoryContextMatch, Int)] = memories.compactMap { memory in
             guard memory.status == .active else { return nil }
-            if !InputText.literalRanges(of: memory.name, in: text).isEmpty {
+            if !InputText.literalRanges(of: memory.name, in: text, wordRanges: queryWordRanges).isEmpty {
                 return (MemoryContextMatch(memory: memory, matchedTerm: memory.name), 100 + memory.name.count)
             }
             let shared = Set(terms(memory.name + " " + memory.notes)).intersection(queryTerms)
