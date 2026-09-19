@@ -26,12 +26,13 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-011 | Dictionary usability | Add a single word without alias configuration | IN PROGRESS | — | [`M-011`](./tasks/M-011-simple-dictionary.md) |
 | M-012 | Performance | Stop hidden HUD rendering and establish idle CPU/RSS baseline | IN PROGRESS | — | [`M-012`](./tasks/M-012-idle-performance.md) |
 | M-013 | macOS UX | Simplify menu, setup, filters, Settings and Dictionary navigation | IN PROGRESS | — | [`M-013`](./tasks/M-013-control-center.md) |
+| M-014 | Input routing | Deliver final text to current keyboard focus like a system input method | IN PROGRESS | — | [`M-014`](./tasks/M-014-current-focus-input.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
 ## Current milestone
 
-The owner's amended priority is **one Mac's input → dictionary/cleanup → automatic personal Memory loop**, tracked in M-009. M-002/M-003 preserve input and recovery; M-004/M-005 now supply personal Memory and independent cleanup; M-008 supplies native management; M-010 supplies Chinese/native setup usability and M-011 simplifies dictionary entry to a single word. Required real-device checks remain open. iCloud/CloudKit is outside this milestone, and iOS/inspiration follow-up are not scheduled. The historical phase numbers below are reference IDs, not the execution order.
+The owner's amended priority is **one Mac's input → dictionary/cleanup → automatic personal Memory loop**, tracked in M-009. M-002/M-003 preserve input and recovery; M-004/M-005 now supply personal Memory and independent cleanup; M-008 supplies native management; M-010 supplies Chinese/native setup usability, M-011 simplifies dictionary entry to a single word, and M-014 replaces original-app restoration with current-keyboard-focus delivery. Required real-device checks remain open. iCloud/CloudKit is outside this milestone, and iOS/inspiration follow-up are not scheduled. The historical phase numbers below are reference IDs, not the execution order.
 
 ### Implementation and remaining acceptance
 
