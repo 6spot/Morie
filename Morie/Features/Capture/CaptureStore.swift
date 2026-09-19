@@ -380,7 +380,7 @@ final class CaptureStore {
     private func finish(_ id: UUID, lifecycle: CaptureLifecycle, error: String?) throws {
         guard let record = records[id] else { return }
         if var refinement = record.refinement, refinement.status == .running {
-            // A refinement metadata save may have failed even though the durable original was usable.
+            // A refinement metadata snapshot may still be running when the session reaches a terminal state.
             let reason: RefinementReason = lifecycle == .delivered || lifecycle == .deliveryFailed ? .saveFailed : .interrupted
             refinement.status = reason.status
             refinement.reason = reason
