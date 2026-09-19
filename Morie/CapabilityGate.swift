@@ -52,7 +52,7 @@ struct CapabilityGate {
     }
 
     func requestPermission(_ requirement: SetupRequirement) async {
-        let permissionWindow = NSApplication.shared.keyWindow
+        let permissionWindow = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow
         switch requirement {
         case .microphone:
             guard AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined else { return }
@@ -65,7 +65,7 @@ struct CapabilityGate {
         default:
             break
         }
-        restore(window: permissionWindow)
+        await restore(window: permissionWindow)
     }
 
     static func requestSpeechAuthorization(
@@ -80,7 +80,7 @@ struct CapabilityGate {
 
     func openSettings(for requirement: SetupRequirement) async {
         guard let url = requirement.settingsURL else { return }
-        let permissionWindow = NSApplication.shared.keyWindow
+        let permissionWindow = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow
         Diagnostics.record("Permission", "Opening permission flow for \(requirement)")
         if requirement == .accessibility, !AXIsProcessTrusted() {
             // This is the only public API that registers the current signed
@@ -105,7 +105,7 @@ struct CapabilityGate {
         for _ in 0..<600 {
             if permissionIsGranted(requirement) {
                 Diagnostics.record("Permission", "Permission granted in System Settings for \(requirement)")
-                restore(window: permissionWindow)
+                await restore(window: permissionWindow)
                 return
             }
             do { try await Task.sleep(for: .milliseconds(500)) }
@@ -130,9 +130,26 @@ struct CapabilityGate {
         }
     }
 
-    private func restore(window: NSWindow?) {
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+    private func restore(window: NSWindow?) async {
+        func bringForward() {
+            NSApplication.shared.unhide(nil)
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            guard let window else { return }
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.makeKeyAndOrderFront(nil)
+            // Permission dialogs/System Settings can finish their own activation
+            // transition after our first activation. Reordering the originating
+            // native window keeps the explicit setup flow in front.
+            window.orderFrontRegardless()
+        }
+
+        bringForward()
+        await Task.yield()
+        do { try await Task.sleep(for: .milliseconds(180)) }
+        catch { return }
+        bringForward()
     }
 
     private func inspectAppleIntelligence(locale: Locale) -> CapabilityCheck {

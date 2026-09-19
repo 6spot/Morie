@@ -43,6 +43,8 @@ Excluded: answering/executing dictated content, generic rewrites, unexpressed ba
 - [x] Verify with isolated model stubs, persistence tests and actual SDK compilation.
 - [x] Simplify the Foundation Models cleanup prompt and send only dictionary word strings plus useful Memory name/notes text; omit UUIDs, timestamps, status/origin and matching metadata from the model payload. Native Speech already receives only `[String]` dictionary hints, so no Speech metadata path required a code change.
 - [x] Tighten cleanup fidelity for words being discussed as UI labels/terms: apparent repetition must not remove or rename labels such as `已输入`.
+- [x] Make punctuation completion an explicit model requirement and schema guide.
+- [x] Remove over-specific examples that could leak wording into unrelated input; explicitly forbid introducing unspoken stance words, generalize semantic-vs-stutter repetition handling, and normalize ordinary Chinese clock times such as `9:00 → 9点` without inventing AM/PM.
 - [ ] Measure fidelity, unintended changes, hint benefit, timeout rate, final-to-delivery latency and native interactions.
 
 ## Implementation notes
