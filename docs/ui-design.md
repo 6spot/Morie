@@ -136,7 +136,7 @@ Explicit cancellation shows the existing status surface as “正在停止…”
 
 ## Dictionary
 
-The **字典** library uses one native searchable content page, **添加词语 / 编辑词语** sheets and system deletion confirmation. Each entry is just one word: no aliases, replacement pairs, source/time explanation or additional configuration. Search rows show words; selection-scoped toolbar and context-menu actions edit or delete them.
+The **字典** library uses one native searchable content page, **添加词语 / 编辑词语** sheets and system deletion confirmation. Each entry is just one word: no aliases, replacement pairs or additional configuration. The page presents words in a compact adaptive grid of native bordered buttons rather than spending a full list row on each short term. Built-in baseline words, manually added words and correction-confirmed words may appear together; built-in words are read-only, while user-owned words retain edit/delete actions. Source is backend provenance rather than a required visible label.
 
 The sheet is 420 points wide and fits its content, with one **词语** TextField, a brief purpose description and **取消 / 添加** (or **保存**) buttons. The word field receives initial focus. Return invokes the default action and Escape cancels; empty input disables saving. Duplicate/invalid/save errors remain inline without closing the editor, and editing clears stale error feedback. Cancel leaves saved data intact. Use the native columns Form and ordinary system controls.
 

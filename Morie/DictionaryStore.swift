@@ -13,6 +13,52 @@ struct DictionaryDraft: Equatable, Sendable {
     var name = ""
 }
 
+enum DictionaryEntrySource: String, Codable, Equatable, Sendable {
+    case builtIn
+    case manual
+    case correction
+
+    var helpText: String {
+        switch self {
+        case .builtIn: "Morie 内置词语"
+        case .manual: "手动添加"
+        case .correction: "纠错确认添加"
+        }
+    }
+}
+
+struct DictionaryDisplayEntry: Equatable, Identifiable, Sendable {
+    let id: UUID
+    let name: String
+    let source: DictionaryEntrySource
+
+    var isEditable: Bool { source != .builtIn }
+}
+
+private enum BuiltinDictionary {
+    private static let updatedAt = Date(timeIntervalSince1970: 0)
+
+    static let entries: [DictionaryDisplayEntry] = [
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000001")!, name: "Morie", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000002")!, name: "GitHub", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000003")!, name: "ChatGPT", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000004")!, name: "Claude", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000005")!, name: "Claude Code", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000006")!, name: "Codex", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000007")!, name: "Gemini", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000008")!, name: "OpenAI", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-000000000009")!, name: "DeepSeek", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-00000000000A")!, name: "Qwen", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-00000000000B")!, name: "MCP", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-00000000000C")!, name: "Xcode", source: .builtIn),
+        .init(id: UUID(uuidString: "B17D0000-0000-0000-0000-00000000000D")!, name: "SwiftUI", source: .builtIn),
+    ]
+
+    static var snapshots: [DictionarySnapshot] {
+        entries.map { DictionarySnapshot(id: $0.id, name: $0.name, updatedAt: updatedAt) }
+    }
+}
+
 struct DictionarySnapshot: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let name: String
@@ -25,8 +71,17 @@ final class DictionaryEntry {
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var name: String = ""
+    // Optional so current development data written before source tracking remains readable.
+    var sourceRawValue: String?
 
-    init(_ draft: DictionaryDraft) { name = draft.name }
+    init(_ draft: DictionaryDraft, source: DictionaryEntrySource = .manual) {
+        name = draft.name
+        sourceRawValue = source == .correction ? DictionaryEntrySource.correction.rawValue : DictionaryEntrySource.manual.rawValue
+    }
+
+    var source: DictionaryEntrySource {
+        DictionaryEntrySource(rawValue: sourceRawValue ?? "") ?? .manual
+    }
 
     var snapshot: DictionarySnapshot { DictionarySnapshot(id: id, name: name, updatedAt: updatedAt) }
 }
@@ -46,6 +101,16 @@ final class DictionaryStore: ObservableObject {
     }
 
     @Published private(set) var entries: [DictionaryEntry] = []
+
+    var displayEntries: [DictionaryDisplayEntry] {
+        let user = entries.map { DictionaryDisplayEntry(id: $0.id, name: $0.name, source: $0.source) }
+        let userKeys = Set(user.map { Self.wordKey($0.name) })
+        let builtIns = BuiltinDictionary.entries.filter { !userKeys.contains(Self.wordKey($0.name)) }
+        return (user + builtIns).sorted {
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+    }
+
     private let context: ModelContext
 
     init(container: ModelContainer) {
@@ -58,10 +123,10 @@ final class DictionaryStore: ObservableObject {
     }
 
     @discardableResult
-    func create(_ draft: DictionaryDraft) throws -> UUID {
+    func create(_ draft: DictionaryDraft, source: DictionaryEntrySource = .manual) throws -> UUID {
         let draft = try validate(draft)
         try requireNewWord(draft.name)
-        let entry = DictionaryEntry(draft)
+        let entry = DictionaryEntry(draft, source: source)
         context.insert(entry)
         try save()
         return entry.id
@@ -87,16 +152,26 @@ final class DictionaryStore: ObservableObject {
         try contextualEntries().map(\.name)
     }
 
+    func containsEffectiveWord(_ name: String) throws -> Bool {
+        try load()
+        let key = Self.wordKey(name)
+        return entries.contains { Self.wordKey($0.name) == key }
+            || BuiltinDictionary.entries.contains { Self.wordKey($0.name) == key }
+    }
+
     /// Speech and cleanup receive the same bounded dictionary. Requiring an
     /// exact transcript match here would hide the correct spelling precisely
     /// when recognition produced a near-homophone such as Coldex for Codex.
     private func contextualEntries() throws -> [DictionarySnapshot] {
         try load()
+        let userKeys = Set(entries.map { Self.wordKey($0.name) })
+        let candidates = entries.sorted { $0.updatedAt > $1.updatedAt }.map(\.snapshot)
+            + BuiltinDictionary.snapshots.filter { !userKeys.contains(Self.wordKey($0.name)) }
         var characters = 0
-        return entries.sorted { $0.updatedAt > $1.updatedAt }.prefix(100).compactMap { entry in
+        return candidates.prefix(100).compactMap { entry in
             guard characters + entry.name.count <= 2_000 else { return nil }
             characters += entry.name.count
-            return entry.snapshot
+            return entry
         }
     }
 

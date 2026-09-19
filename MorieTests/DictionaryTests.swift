@@ -16,14 +16,14 @@ final class DictionaryTests: XCTestCase {
         let url = directory.appending(path: "store")
         let captures = try CaptureStore(storageURL: url)
         let dictionary = DictionaryStore(container: captures.container)
-        let id = try dictionary.create(DictionaryDraft(name: " Morie "))
+        let id = try dictionary.create(DictionaryDraft(name: " ProjectMorie "))
         let snapshot = try XCTUnwrap(dictionary.entries.first?.snapshot)
         let reopened = try CaptureStore(storageURL: url)
         let loaded = DictionaryStore(container: reopened.container)
         try loaded.load()
         let entry = try XCTUnwrap(loaded.entries.first)
         XCTAssertEqual(entry.id, id)
-        XCTAssertEqual(entry.name, "Morie")
+        XCTAssertEqual(entry.name, "ProjectMorie")
         XCTAssertEqual(entry.snapshot, snapshot)
         let memory = MemoryStore(container: reopened.container)
         try memory.load()
@@ -81,13 +81,50 @@ final class DictionaryTests: XCTestCase {
         let captures = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
         let store = DictionaryStore(container: captures.container)
-        let id = try store.create(DictionaryDraft(name: "Morie"))
-        XCTAssertEqual(try store.speechHints(), ["Morie"])
-        XCTAssertEqual(try store.relevantEntries(for: "use morie").map(\.id), [id])
-        XCTAssertEqual(try store.relevantEntries(for: "use More E").map(\.id), [id])
+        let id = try store.create(DictionaryDraft(name: "UserSpecificTerm"))
+        XCTAssertTrue(try store.speechHints().contains("UserSpecificTerm"))
+        XCTAssertTrue(try store.relevantEntries(for: "use user specific term").map(\.id).contains(id))
         try store.delete(id)
-        XCTAssertTrue(try store.speechHints().isEmpty)
-        XCTAssertTrue(try store.relevantEntries(for: "Morie").isEmpty)
+        XCTAssertFalse(try store.speechHints().contains("UserSpecificTerm"))
+        XCTAssertFalse(try store.relevantEntries(for: "UserSpecificTerm").map(\.id).contains(id))
+        XCTAssertTrue(try store.speechHints().contains("GitHub"))
+    }
+
+    func testBuiltInWordsAreReadOnlyAndUserEntriesOverrideTheirDisplaySource() throws {
+        let captures = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
+        let store = DictionaryStore(container: captures.container)
+        try store.load()
+        let builtIn = try XCTUnwrap(store.displayEntries.first(where: { $0.name == "GitHub" }))
+        XCTAssertEqual(builtIn.source, .builtIn)
+        XCTAssertFalse(builtIn.isEditable)
+
+        let id = try store.create(DictionaryDraft(name: "github"))
+        let overridden = try XCTUnwrap(store.displayEntries.first(where: {
+            $0.name.caseInsensitiveCompare("github") == .orderedSame
+        }))
+        XCTAssertEqual(overridden.id, id)
+        XCTAssertEqual(overridden.source, .manual)
+        XCTAssertEqual(store.displayEntries.filter {
+            $0.name.caseInsensitiveCompare("github") == .orderedSame
+        }.count, 1)
+    }
+
+    func testManualAndCorrectionSourcesPersistSeparately() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "MorieDictionarySource-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: "store")
+        let captures = try CaptureStore(storageURL: url)
+        let dictionary = DictionaryStore(container: captures.container)
+        let manualID = try dictionary.create(DictionaryDraft(name: "ManualTerm"))
+        let correctionID = try dictionary.create(DictionaryDraft(name: "CorrectedTerm"), source: .correction)
+
+        let reopened = try CaptureStore(storageURL: url)
+        let loaded = DictionaryStore(container: reopened.container)
+        try loaded.load()
+        XCTAssertEqual(loaded.entries.first(where: { $0.id == manualID })?.source, .manual)
+        XCTAssertEqual(loaded.entries.first(where: { $0.id == correctionID })?.source, .correction)
     }
 
     func testSpeechHintsRespectWordAndCharacterBudgets() throws {
