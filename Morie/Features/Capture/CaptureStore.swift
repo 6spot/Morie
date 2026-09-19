@@ -169,10 +169,7 @@ final class CaptureStore {
         record.updatedAt = Date()
         schedulePersistence(for: record)
         lastProgressiveSave[id] = nil
-        if deliveryMode == .captureOnly {
-            records[id] = nil
-        }
-        Diagnostics.record("CaptureStore", "Capture \(label(id)) recognition saved; characters=\(text.count)")
+        Diagnostics.record("CaptureStore", "Capture \(label(id)) recognition queued; characters=\(text.count)")
         return deliveryMode
     }
 
@@ -286,12 +283,21 @@ final class CaptureStore {
     }
 
     func capture(_ id: UUID) throws -> CaptureRecord {
+        if let record = records[id] {
+            return record
+        }
         var descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         guard let record = try container.mainContext.fetch(descriptor).first else {
             throw StoreError.captureNotFound
         }
         return record
+    }
+
+    func releaseCaptureOwnership(_ id: UUID) {
+        guard records[id]?.lifecycle != .capturing else { return }
+        records[id] = nil
+        lastProgressiveSave[id] = nil
     }
 
     func sourceAudioURL(for id: UUID, now: Date = Date()) throws -> URL {
