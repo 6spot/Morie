@@ -217,7 +217,7 @@ final class CaptureHUDController {
         glassView.autoresizingMask = []
         glassView.style = .regular
         glassView.cornerRadius = Layout.contentHeight / 2
-        glassView.tintColor = NSColor.black.withAlphaComponent(0.38)
+        glassView.tintColor = NSColor.black.withAlphaComponent(0.24)
         glassView.effectIsInteractive = true
         glassView.wantsLayer = true
 
@@ -347,8 +347,6 @@ final class CaptureHUDModel: ObservableObject {
 
     @Published var phase: Phase = .hidden
     @Published private(set) var recordingGeneration = UUID()
-    @Published private(set) var feedbackGeneration = 0
-
     let audioLevel = CaptureAudioLevelMeter()
 
     var onCancel: (() -> Void)?
@@ -370,7 +368,6 @@ final class CaptureHUDModel: ObservableObject {
     }
 
     func showFeedback(_ feedback: Phase) {
-        feedbackGeneration += 1
         phase = feedback
     }
 
@@ -423,13 +420,13 @@ private struct CaptureHUDView: View {
                 Button(action: model.cancel) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.white.opacity(0.72))
                         .frame(width: Layout.controlVisualSize, height: Layout.controlVisualSize)
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.circle)
                 .controlSize(.small)
-                .tint(.black.opacity(0.58))
+                .tint(.white.opacity(0.16))
                 .frame(width: Layout.controlLaneWidth, height: Layout.innerHeight)
                 .accessibilityLabel("取消录音")
                 .help("取消录音")
@@ -454,13 +451,13 @@ private struct CaptureHUDView: View {
                 Button(action: model.confirm) {
                     Image(systemName: "checkmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.white.opacity(0.72))
                         .frame(width: Layout.controlVisualSize, height: Layout.controlVisualSize)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .buttonBorderShape(.circle)
                 .controlSize(.small)
-                .tint(.white.opacity(0.94))
+                .tint(.white.opacity(0.16))
                 .frame(width: Layout.controlLaneWidth, height: Layout.innerHeight)
                 .accessibilityLabel("完成录音")
                 .help("完成录音")
@@ -474,7 +471,7 @@ private struct CaptureHUDView: View {
         case .processing:
             Text("Thinking")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
                     ProcessingBorder(reduceMotion: reduceMotion)
@@ -483,18 +480,16 @@ private struct CaptureHUDView: View {
                 .accessibilityLabel("正在整理输入")
 
         case .success, .saved:
-            Label(model.phase == .saved ? "已保存" : "已输入", systemImage: "checkmark.circle.fill")
+            Text(model.phase == .saved ? "已保存" : "SUCCESS")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.green)
-                .symbolEffect(.bounce, value: model.feedbackGeneration)
+                .foregroundStyle(Color.accentColor.opacity(0.52))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel(model.phase == .saved ? "录音和文字已保存到历史记录" : "文字已输入")
 
         case .clipboardFallback:
-            Label("已复制到剪贴板", systemImage: "doc.on.clipboard.fill")
+            Text("已复制到剪贴板")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: model.feedbackGeneration)
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel("输入位置不可用，文字已复制到剪贴板")
 
@@ -506,8 +501,9 @@ private struct CaptureHUDView: View {
                 .accessibilityLabel("未检测到语音，本次录音未保存")
 
         case .recognitionFailure:
-            Label("未识别，录音已保留", systemImage: "waveform.badge.exclamationmark")
+            Text("未识别，录音已保留")
                 .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel("检测到语音但未识别出文字，录音已保留，可在历史记录中重新识别")
 
