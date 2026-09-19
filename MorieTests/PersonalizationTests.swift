@@ -140,7 +140,11 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertEqual(saved.finalText, result)
         XCTAssertEqual(saved.recognizedText, "morie is my project")
         XCTAssertEqual(saved.refinement?.input.dictionary.map(\.id), [dictionaryID])
-        try fixture.store.markDelivered(id)
+        try fixture.store.markDelivered(
+            id,
+            applicationName: "Test",
+            bundleIdentifier: "me.morie.tests"
+        )
         try fixture.memory.enqueueCompletedInput(captureID: id)
         XCTAssertEqual(try fixture.memory.analysisSource(for: id).text, result)
     }
@@ -353,7 +357,7 @@ private final class RefinementFixture {
 
     func capture(_ text: String, mode: CaptureDeliveryMode = .captureOnly) throws -> UUID {
         let id = UUID()
-        _ = try store.beginVoiceCapture(id: id, deliveryMode: mode, applicationName: "Test", bundleIdentifier: nil, windowNumber: nil)
+        _ = try store.beginVoiceCapture(id: id, deliveryMode: mode, applicationName: "Test", bundleIdentifier: nil)
         try store.completeRecognition(text, for: id)
         return id
     }
