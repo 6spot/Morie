@@ -619,7 +619,6 @@ private struct ProcessingSweep: View {
 
     @State private var progress: CGFloat = 0
     @State private var overlayOpacity: Double = 0.10
-    @State private var didRun = false
 
     private let sweepDuration: TimeInterval = 1.05
     private let settleDuration: TimeInterval = 0.18
@@ -642,10 +641,7 @@ private struct ProcessingSweep: View {
                     }
             }
             .padding(0.5)
-            .onAppear {
-                guard !didRun else { return }
-                didRun = true
-
+            .task {
                 if reduceMotion {
                     progress = 1
                     overlayOpacity = 0.045
@@ -659,16 +655,16 @@ private struct ProcessingSweep: View {
                     progress = 1
                 }
 
-                Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(sweepDuration))
-                    guard didRun else { return }
-                    withAnimation(.easeOut(duration: settleDuration)) {
-                        overlayOpacity = 0.045
-                    }
+                do {
+                    try await Task.sleep(for: .seconds(sweepDuration))
+                } catch {
+                    return
                 }
-            }
-            .onDisappear {
-                didRun = false
+                guard !Task.isCancelled else { return }
+
+                withAnimation(.easeOut(duration: settleDuration)) {
+                    overlayOpacity = 0.045
+                }
             }
         }
     }
