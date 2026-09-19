@@ -419,9 +419,45 @@ final class CaptureSessionController {
 
         do {
             let result = try await speech.stop(sessionID: sessionID)
-            recordLatency("speech-final", sessionID: sessionID)
+            recordLatency("speech-live-final", sessionID: sessionID)
             Diagnostics.recordMemory("speech-stop \(label(sessionID))")
-            var finalText = result.transcript
+
+            var accurateTranscript: String?
+            if result.sourceAudio.hasMeaningfulAudio != false
+                || !result.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                do {
+                    accurateTranscript = try await CaptureFileTranscriber.recognize(
+                        result.sourceAudio.url,
+                        locale: sessionContext.locale,
+                        dictionaryWords: sessionContext.dictionaryWords
+                    )
+                    Diagnostics.record(
+                        "SpeechQuality",
+                        "Accurate final re-recognition completed for \(label(sessionID)); liveCharacters=\(result.transcript.count); accurateCharacters=\(accurateTranscript?.count ?? 0)"
+                    )
+                } catch {
+                    if Task.isCancelled || error is CancellationError {
+                        throw CancellationError()
+                    }
+                    Diagnostics.record(
+                        "Speech",
+                        "Accurate final re-recognition failed for \(label(sessionID)); using progressive transcript: \(error.localizedDescription)",
+                        level: .warning
+                    )
+                }
+            } else {
+                Diagnostics.record(
+                    "SpeechQuality",
+                    "Skipped accurate final re-recognition for \(label(sessionID)); source audio was confirmed as no speech"
+                )
+            }
+
+            var finalText = CaptureFileTranscriber.preferredTranscript(
+                live: result.transcript,
+                accurate: accurateTranscript
+            )
+            recordLatency("speech-final", sessionID: sessionID)
+
             guard let captureStore else {
                 throw SessionError.persistenceUnavailable("记录存储尚未初始化。")
             }
