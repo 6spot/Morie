@@ -106,14 +106,14 @@ private enum RefinementCredentialStore {
     }
 
     static func writeAPIKey(_ apiKey: String) throws {
-        let query = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-        ] as CFDictionary
+        ]
 
         guard !apiKey.isEmpty else {
-            let status = SecItemDelete(query)
+            let status = SecItemDelete(query as CFDictionary)
             guard status == errSecSuccess || status == errSecItemNotFound else {
                 throw RefinementModelSettingsError.keychain(status)
             }
@@ -122,12 +122,12 @@ private enum RefinementCredentialStore {
 
         let data = Data(apiKey.utf8)
         let updateStatus = SecItemUpdate(
-            query,
+            query as CFDictionary,
             [kSecValueData as String: data] as CFDictionary
         )
 
         if updateStatus == errSecItemNotFound {
-            var item = query as! [String: Any]
+            var item = query
             item[kSecValueData as String] = data
             let addStatus = SecItemAdd(item as CFDictionary, nil)
             guard addStatus == errSecSuccess else {
