@@ -2,7 +2,7 @@
 
 ## Status
 
-**IN PROGRESS** — 2026-09-19
+**DONE** — 2026-09-19
 
 Issue: [#23](https://github.com/6spot/Morie/issues/23)
 
@@ -59,3 +59,9 @@ No source/provenance, persistence schema, Speech hint, cleanup or dictionary mat
 GitHub Actions \`macOS 27 CI\` run #78 passed the Release product compile on Xcode 27/macOS 27.
 
 The repository CI does not currently execute \`MorieTests\`, so the existing Dictionary logic tests remain unexecuted in hosted CI. Owner visual/keyboard/VoiceOver validation remains open; the task stays IN PROGRESS until that interaction check is complete.
+
+## Completion
+
+Owner-device visual validation on 2026-09-19 confirmed the intended split between **用户添加** and **系统内置**. Built-in terms are visibly read-only and no longer presented as actionable controls.
+
+Issue #23 was closed as **completed** after the implementation had already passed the macOS 27 Release compile gate.
