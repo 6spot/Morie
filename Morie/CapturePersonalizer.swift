@@ -83,7 +83,7 @@ final class CapturePersonalizer {
                 let currentStyle = expressionStyleEnabled
                     ? ((try? expressionProfile?.directives()) ?? [])
                     : []
-                guard currentStyle == input.expressionStyle else {
+                guard currentStyle == input.effectiveExpressionStyle else {
                     return try keepOriginal(input, reason: .expressionStyleChanged, started: started)
                 }
                 let result: ValidatedRefinement
