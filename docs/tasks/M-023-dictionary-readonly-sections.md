@@ -52,3 +52,10 @@ Built-ins use semantic secondary foreground and quaternary background treatment 
 Search still applies to both sections. Empty section headers are hidden during filtered search; in the normal unfiltered state the user section remains visible even when empty so the Add action and ownership model are obvious.
 
 No source/provenance, persistence schema, Speech hint, cleanup or dictionary matching behavior changed.
+
+
+## Validation
+
+GitHub Actions \`macOS 27 CI\` run #78 passed the Release product compile on Xcode 27/macOS 27.
+
+The repository CI does not currently execute \`MorieTests\`, so the existing Dictionary logic tests remain unexecuted in hosted CI. Owner visual/keyboard/VoiceOver validation remains open; the task stays IN PROGRESS until that interaction check is complete.
