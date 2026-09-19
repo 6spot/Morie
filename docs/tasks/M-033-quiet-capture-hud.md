@@ -61,4 +61,4 @@ The native `NSGlassEffectView` remains the surface; only its tint intensity is r
 
 ## Validation boundary
 
-The earlier visual refinement passed CI #143. This follow-up removes the success dwell entirely and must pass the same Release compile + MorieTests gate. Final owner-device acceptance should confirm that `Thinking → collapse` feels faster and clearer than a separate success message.
+The earlier visual refinement passed CI #143. The follow-up that removes the success dwell passed macOS 27 CI #146: Release compile and the full MorieTests gate both succeeded. Final owner-device acceptance should confirm that `Thinking → collapse` feels faster and clearer than a separate success message.
