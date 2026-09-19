@@ -54,6 +54,8 @@ Morie/
 │   │   ├── AppController.swift
 │   │   └── MorieControlCenter.swift
 │   ├── Features/
+│   │   ├── Overview/
+│   │   │   └── OverviewView.swift
 │   │   ├── Capture/
 │   │   │   ├── CaptureRecord.swift
 │   │   │   ├── CaptureStore.swift
@@ -466,11 +468,25 @@ Re-recognition updates `recognizedText` only after successful file analysis. Del
 
 Audio playback uses AVKit's standard `AVPlayerView` controls. Open/close, expiry and refinement-state hooks preserve the controller's existing cancellation/player ownership. No replacement media controls are drawn, and recordings do not populate Now Playing metadata.
 
+
+### `OverviewView`
+
+The Control Center landing page is a local-only summary, not an analytics subsystem. It queries completed Capture records only while the page is visible and derives a small first-slice set of metrics:
+
+- cumulative recognized characters;
+- successful current-app deliveries;
+- operational input failure rate over terminal current-app attempts;
+- average cleanup duration where a refinement duration exists.
+
+The operational failure rate is deliberately not labelled as ASR accuracy/WER. Morie does not yet have enough ground-truth user corrections to distinguish recognition errors from spoken restarts, cleanup changes or later user edits reliably.
+
+The same page exposes actual runtime model state. `AppController` publishes the backend that `SpeechPipeline.prepare` really prepared, so a `DictationTranscriber` fallback is shown as fallback rather than pretending the preferred `SpeechTranscriber` is active. Cleanup identifies Apple's public `SystemLanguageModel.default` / Foundation Models surface and its current availability; Morie does not invent an Apple model/version string that the API does not expose.
+
 ### `MorieControlCenter`
 
-The primary management surface is one native SwiftUI `Window`, defaulting to 1120 × 720 with a 960 × 600 minimum. The sidebar groups **历史记录 / 字典 / 个人记忆** under **资料库**, and **设置 / 权限 / 诊断** under **应用**. History and Personal Memory use three-column `NavigationSplitView` layouts; Dictionary and application pages use two columns. Both map a shared sidebar-visibility choice to their native column states (`doubleColumn` versus `detailOnly` when hidden). Native expandable Section controls persist group expansion. Settings and routine permission management are embedded pages. The separate welcome guide has no permanent navigation entry. A one-time read-only launch inspection opens it automatically when setup is incomplete; the explicit **打开 Morie** action applies the same gate.
+The primary management surface is one native SwiftUI `Window`, defaulting to 1120 × 720 with a 960 × 600 minimum. The sidebar opens on **总览**, then groups **历史记录 / 字典 / 个人记忆** under **资料库**, and **设置 / 权限 / 诊断** under **应用**. History and Personal Memory use three-column `NavigationSplitView` layouts; Dictionary and application pages use two columns. Both map a shared sidebar-visibility choice to their native column states (`doubleColumn` versus `detailOnly` when hidden). Native expandable Section controls persist group expansion. Settings and routine permission management are embedded pages. The separate welcome guide has no permanent navigation entry. A one-time read-only launch inspection opens it automatically when setup is incomplete; the explicit **打开 Morie** action applies the same gate.
 
-The root owns independent Capture, Dictionary and Personal Memory UUID selections. Capture and Personal Memory details get a `NavigationStack` whose identity changes with that selection, so source/related links cannot leak navigation from another record. Dictionary selection drives edit/delete actions directly on its single content page. The SwiftData container is attached at the window root, while Capture `@Query` instances are created only by the visible History panes. The native menu retains one icon-free **打开 Morie** action, status/shortcut guidance and **退出 Morie**; it does not duplicate Settings or setup destinations.
+The root owns independent Capture, Dictionary and Personal Memory UUID selections. Capture and Personal Memory details get a `NavigationStack` whose identity changes with that selection, so source/related links cannot leak navigation from another record. Dictionary selection drives edit/delete actions directly on its single content page. The SwiftData container is attached at the window root. Capture `@Query` instances are created only by the visible History panes or the visible Overview page; neither keeps the full Capture history subscribed while the user is elsewhere. The native menu retains one icon-free **打开 Morie** action, status/shortcut guidance and **退出 Morie**; it does not duplicate Settings or setup destinations.
 
 `ManagementDetailContent` is a small composition of native ScrollView/VStack with 28-point padding and a readable maximum width of 760 points. It is shared by Capture and Personal Memory reading surfaces. Settings and Permissions use grouped Forms; the single-word dictionary sheet uses a compact native columns Form. There is no custom navigation, control library, material or persistence layer.
 
