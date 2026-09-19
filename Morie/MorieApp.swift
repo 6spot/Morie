@@ -8,10 +8,32 @@ struct MorieApp: App {
     private let captureStore: CaptureStore?
 
     init() {
+        let wantsICloud = ICloudSyncSettings.isEnabled
         do {
-            let store = try CaptureStore()
+            let store = try CaptureStore(cloudSyncEnabled: wantsICloud)
             captureStore = store
-            _controller = StateObject(wrappedValue: AppController(captureStore: store))
+            _controller = StateObject(
+                wrappedValue: AppController(captureStore: store)
+            )
+        } catch where wantsICloud {
+            // Optional iCloud must never make local input unusable. If the
+            // CloudKit-backed SwiftData configuration cannot open, retry the
+            // same current schema locally and surface the cloud failure.
+            do {
+                let store = try CaptureStore(cloudSyncEnabled: false)
+                captureStore = store
+                _controller = StateObject(
+                    wrappedValue: AppController(
+                        captureStore: store,
+                        cloudSyncStartupError: error
+                    )
+                )
+            } catch {
+                captureStore = nil
+                _controller = StateObject(
+                    wrappedValue: AppController(captureStore: nil, persistenceError: error)
+                )
+            }
         } catch {
             captureStore = nil
             _controller = StateObject(
