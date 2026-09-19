@@ -122,6 +122,20 @@ Capture and Personal Memory details use the same native ScrollView composition, 
 
 Settings and Permissions are flexible grouped Forms inside Control Center rather than separate management windows. Command-comma opens Control Center and selects Settings. On launch, one read-only inspection automatically presents the welcome guide when required setup is incomplete; **打开 Morie** applies the same gate. Routine permission repair stays on the Permissions page. Diagnostics uses the native Table with Time, Level, Category and Message columns, search and a direct level filter. Selecting an event reveals its full selectable message below a native split divider. Severity has a word/icon as well as semantic color. Copy All Events copies the whole current log; the action menu reveals the file or clears it after system confirmation.
 
+## Capture HUD visual language
+
+The compact capture capsule is deliberately low-contrast. Recording controls use the same neutral gray-white treatment on both sides; Cancel and Finish are distinguished by their symbols and accessibility labels, not by opposite black/white fills or semantic success/error colors. The glass tint stays restrained so the HUD reads as a lightweight system affordance instead of a dark floating badge.
+
+Status color is reserved for state, not button identity:
+
+- **Thinking** keeps the existing soft system accent-color border animation.
+- successful current-app delivery shows plain `SUCCESS` text using the same softened accent color, with no leading checkmark and no bright green;
+- capture-only success keeps plain **已保存** text using the same softened accent color;
+- clipboard fallback, no-speech and recognition-failure messages are text-only and visually secondary;
+- accessibility labels remain descriptive Simplified Chinese even when the visible success word is English.
+
+Do not add decorative leading status icons back to these text messages. Strong red/green treatment is reserved for situations where a future interaction genuinely requires semantic emphasis; normal successful input should remain visually quiet.
+
 ## History recovery
 
 History uses a system selectable `List` and a simultaneous reading detail. Search covers final/recognized text and the source app; filters provide All Captures, History Only and Needs Attention. History rows reserve a fixed two-line preview so progressive recognition does not continuously change native List row geometry or overlap neighboring rows. The secondary metadata stays on one line: source app followed by month/day/time, with status text only for active/error states; normal `已保存 / 已输入` badges are omitted as redundant. The audio player is AVKit's native `AVPlayerView` with inline controls; Morie does not draw a replacement playback bar. Recording playback is user-initiated, stops when leaving the detail or starting a capture, and does not publish private recordings to Now Playing.
