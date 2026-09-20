@@ -339,7 +339,7 @@ final class CaptureSessionController {
             )
             Diagnostics.record(
                 "ApplicationContext",
-                "Capture \(self.label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); focusedCharacters=\(context.focusedCharacterCount); nearbyCharacters=\(context.nearbyCharacterCount); extractedHints=\(applicationContextWords.count); collectionMilliseconds=\(elapsedMilliseconds); rawContextPersisted=false; rawTermsLogged=false"
+                "Capture \(self.label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); focusedCharacters=\(context.focusedCharacterCount); nearbyCharacters=\(context.nearbyCharacterCount); extractedHints=\(applicationContextWords.count); collectionMilliseconds=\(elapsedMilliseconds); capturePersistence=false; standardLogRawText=false; devTraceRawText=\(DevelopmentDiagnostics.isEnabled)"
             )
             await self.speech.updateApplicationContextWords(
                 applicationContextWords,
