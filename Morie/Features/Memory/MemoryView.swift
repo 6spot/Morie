@@ -41,7 +41,7 @@ struct MemoryView: View {
     }
 
     var body: some View {
-        ControlCenterContentPage(spacing: 32) {
+        VStack(alignment: .leading, spacing: 32) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Morie 会在这里维护对你有用的长期信息和近期上下文，并随着新的输入持续更新。")
                         .font(.body)
