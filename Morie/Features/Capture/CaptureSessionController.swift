@@ -579,7 +579,7 @@ final class CaptureSessionController {
             DevelopmentDiagnostics.record(
                 "Audio",
                 captureID: sessionID,
-                "meaningful=\(String(describing: result.sourceAudio.hasMeaningfulAudio)); sourceBytes=\((try? Data(contentsOf: result.sourceAudio.url).count) ?? -1)"
+                "meaningful=\(String(describing: result.sourceAudio.hasMeaningfulAudio)); durationSeconds=\(result.sourceAudio.duration); sourceFile=\(result.sourceAudio.url.lastPathComponent)"
             )
 
             var accurateTranscript: String?
