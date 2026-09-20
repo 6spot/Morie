@@ -34,7 +34,7 @@ The implementation follows:
 1. Apple's current sidebar/split-view/Form/List/Table conventions;
 2. Morie's native-UI policy in `AGENTS.md`;
 3. the rewritten **Control Center shell** rules in `docs/ui-design.md`;
-4. owner-provided screenshots as the visual target for hierarchy, density and page-specific presentation; implementation is rewritten rather than copied.
+4. owner-provided screenshots only as functional/content references. They are not a visual-style target.
 
 ## Layout contract
 
@@ -86,7 +86,7 @@ The shell is uniform; the content presentation is not forced into one control ty
 - [x] Align Diagnostics selected-message margins with the shared dense-workspace metric.
 - [x] Rewrite `docs/ui-design.md` Control Center rules.
 - [x] Remove the NavigationSplitView-generated sidebar toggle and provide one persistent shell-owned toolbar toggle so page toolbar/search changes cannot replace it.
-- [x] Apply the same 28 pt scroll-content grid to Overview, Dictionary, Personal Memory, Settings and Permissions.
+- [x] Apply one shared 24 pt scroll-content grid to Overview, Dictionary, Personal Memory, Settings and Permissions so page content starts on the same leading axis as the navigation title.
 - [x] Run Xcode 27 compile/tests.
 - [ ] Owner signed-app visual/interaction check.
 
@@ -131,6 +131,6 @@ Apple explicitly supports removing the default `.sidebarToggle` and placing an a
 
 Owner video review after PR #87 also exposed a design error: the rewrite correctly stabilized the shell, but incorrectly interpreted “Apple-native” as “convert every content page into Form/List.” That flattened the Overview, turned the Dictionary into a long database-like list, and regressed Personal Memory into the exact list presentation the owner had already rejected.
 
-The corrective rule is: **standardize shell, navigation, spacing and system controls; preserve the page-specific information architecture that fits the content.** Native does not mean visually identical page bodies.
+The corrective rule is: **standardize shell, navigation, spacing, section styling and system controls. Preserve each page's functions/content, not its old visual styling.** The screenshots were provided to show what each page must do, not how it should look.
 
 Do not mark this task DONE until those interactions are checked in the signed app.
