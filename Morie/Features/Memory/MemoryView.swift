@@ -64,18 +64,16 @@ struct MemoryView: View {
                 }
 
                 if !activeLongTerm.isEmpty {
-                    MemoryNarrativeGroup(
-                        entries: activeLongTerm,
-                        store: store
-                    )
+                    ControlCenterSectionGroup("长期记忆") {
+                        MemoryNarrativeGroup(
+                            entries: activeLongTerm,
+                            store: store
+                        )
+                    }
                 }
 
                 if !recentContext.isEmpty {
-                    VStack(alignment: .leading, spacing: 18) {
-                        Text("最近")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-
+                    ControlCenterSectionGroup("最近") {
                         MemoryNarrativeGroup(
                             entries: recentContext,
                             store: store,
@@ -85,15 +83,16 @@ struct MemoryView: View {
                 }
 
                 if !history.isEmpty {
-                    DisclosureGroup("已归档与历史") {
-                        MemoryNarrativeGroup(
-                            entries: history,
-                            store: store,
-                            showsStatus: true
-                        )
-                        .padding(.top, 16)
+                    ControlCenterSectionGroup("已归档与历史") {
+                        DisclosureGroup("查看历史内容") {
+                            MemoryNarrativeGroup(
+                                entries: history,
+                                store: store,
+                                showsStatus: true
+                            )
+                            .padding(.top, 12)
+                        }
                     }
-                    .font(.headline)
                 }
 
                 if !hasVisibleMemory && errorMessage == nil {
