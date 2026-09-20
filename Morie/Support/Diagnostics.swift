@@ -23,7 +23,7 @@ final class DiagnosticLogStore: ObservableObject {
 
     @Published private(set) var entries: [Entry] = []
 
-    private let maximumEntries = 1_000
+    private let maximumEntries = DevelopmentDiagnostics.isEnabled ? 5_000 : 1_000
     private let fileFlushDelay: Duration = .milliseconds(400)
     private var pendingFileText = ""
     private var fileFlushTask: Task<Void, Never>?
@@ -116,7 +116,8 @@ final class DiagnosticLogStore: ObservableObject {
 
 private enum DiagnosticFileWriter {
     private static let queue = DispatchQueue(label: "com.sixspot.morie.diagnostics-file")
-    private static let maximumFileSize: UInt64 = 5 * 1_024 * 1_024
+    private static let maximumFileSize: UInt64 =
+        (DevelopmentDiagnostics.isEnabled ? 20 : 5) * 1_024 * 1_024
 
     static func append(_ text: String, to url: URL) {
         queue.async {
@@ -250,6 +251,117 @@ struct AppBuildIdentity: Equatable {
             return [:]
         }
         return dictionary
+    }
+}
+
+/// Verbose local diagnostics for development builds.
+///
+/// The runtime debug-assert configuration follows the actual optimization mode
+/// and avoids requiring a project-level DEBUG define. Release builds therefore
+/// keep only the existing privacy-preserving summary logs.
+///
+/// Development diagnostics may contain user-authored text and current-app text.
+/// They must never contain credentials, API keys, authorization headers, or
+/// unrelated clipboard contents.
+enum DevelopmentDiagnostics {
+    static var isEnabled: Bool {
+        _isDebugAssertConfiguration()
+    }
+
+    static func record(
+        _ category: String,
+        captureID: UUID? = nil,
+        level: DiagnosticLevel = .info,
+        _ message: @autoclosure () -> String
+    ) {
+        guard isEnabled else { return }
+        Diagnostics.record(
+            "Dev/\(category)",
+            prefix(captureID) + sanitizeSingleLine(message()),
+            level: level
+        )
+    }
+
+    static func text(
+        _ category: String,
+        captureID: UUID? = nil,
+        label: String,
+        _ value: String?,
+        limit: Int = 8_000
+    ) {
+        guard isEnabled else { return }
+        let rendered: String
+        if let value {
+            let normalized = value
+                .replacingOccurrences(of: "\u{0000}", with: "")
+                .replacingOccurrences(of: "\r\n", with: "\n")
+                .replacingOccurrences(of: "\r", with: "\n")
+            if normalized.count > limit {
+                rendered = String(normalized.prefix(limit))
+                    + "…<truncated \(normalized.count - limit) chars>"
+            } else {
+                rendered = normalized
+            }
+        } else {
+            rendered = "<nil>"
+        }
+
+        Diagnostics.record(
+            "Dev/\(category)",
+            prefix(captureID)
+                + "\(label)=\(rendered.replacingOccurrences(of: "\n", with: "\\n"))"
+        )
+    }
+
+    static func list(
+        _ category: String,
+        captureID: UUID? = nil,
+        label: String,
+        _ values: [String],
+        limit: Int = 128
+    ) {
+        guard isEnabled else { return }
+        let bounded = Array(values.prefix(limit))
+        let suffix = values.count > bounded.count
+            ? " …(+\(values.count - bounded.count))"
+            : ""
+        record(
+            category,
+            captureID: captureID,
+            "\(label)=[\(bounded.joined(separator: " | "))]\(suffix)"
+        )
+    }
+
+    static func recordEnvironment() {
+        guard isEnabled else { return }
+        let process = ProcessInfo.processInfo
+        record(
+            "Environment",
+            "\(AppBuildIdentity.current.logValue); "
+                + "pid=\(process.processIdentifier); "
+                + "os=\(process.operatingSystemVersionString); "
+                + "locale=\(Locale.current.identifier); "
+                + "bundle=\(Bundle.main.bundleIdentifier ?? "unknown"); "
+                + "executable=\(Bundle.main.executableURL?.lastPathComponent ?? "unknown"); "
+                + "rawDevelopmentTextLogging=true"
+        )
+    }
+
+    static func errorType(_ error: Error) -> String {
+        String(reflecting: type(of: error))
+    }
+
+    private static func prefix(_ captureID: UUID?) -> String {
+        guard let captureID else { return "" }
+        return "Capture \(String(captureID.uuidString.prefix(8))); "
+    }
+
+    private static func sanitizeSingleLine(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\u{0000}", with: "")
+            .replacingOccurrences(of: "\r\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\n")
+            .replacingOccurrences(of: "\n", with: "\\n")
     }
 }
 
