@@ -63,7 +63,7 @@ Morie ships `Morie/Resources/DefaultRefinementInstructions.txt` as the recoverab
 
 - task/content boundary;
 - allowed light edits and protected content;
-- natural formatting, including preservation of spoken lead-ins/notes/questions/closings around lists.
+- semantic paragraphing and logical organization, including preservation of spoken lead-ins/notes/questions/closings around lists.
 
 The instruction deliberately has no product-specific few-shot vocabulary.
 
@@ -116,6 +116,8 @@ Prompt simplification does not remove deterministic boundaries:
 - [x] `formattingHint` and its layout heuristics are removed from the model request.
 - [x] `@Guide` no longer duplicates the behavior contract.
 - [x] The baseline prompt explicitly preserves a spoken lead-in around an enumerated list.
+- [x] The baseline prompt asks for semantic paragraphing at topic/intent/stance/stage boundaries instead of length-based splitting.
+- [x] The baseline prompt asks the model to expose logical relations already present in the transcript (parallel, sequence, cause/effect, contrast, condition, whole-to-parts) without inventing new reasoning.
 - [ ] macOS 27 product compile passes in CI.
 - [ ] deterministic MorieTests pass in CI.
 - [ ] Owner-device Apple Foundation Models smoke test confirms the reported three-item example retains its lead-in.
