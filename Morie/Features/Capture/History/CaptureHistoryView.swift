@@ -50,6 +50,11 @@ struct CaptureHistoryWorkspace: View {
         _selection = selection
     }
 
+    private var canStartCapture: Bool {
+        _ = runtime.state
+        return controller.canStartCapture
+    }
+
     var body: some View {
         Group {
             if let history = controller.history {
@@ -59,7 +64,7 @@ struct CaptureHistoryWorkspace: View {
                         selection: $selection,
                         search: $search,
                         filter: $filter,
-                        canStartCapture: controller.canStartCapture,
+                        canStartCapture: canStartCapture,
                         onRecord: controller.startCaptureOnly
                     )
                     .frame(
@@ -105,7 +110,7 @@ struct CaptureHistoryWorkspace: View {
                     systemImage: "mic",
                     action: controller.startCaptureOnly
                 )
-                .disabled(!controller.canStartCapture)
+                .disabled(!canStartCapture)
             }
         }
     }
@@ -236,6 +241,11 @@ private struct CaptureHistoryDetailPane: View {
         return history.captures.first { $0.id == selectedCaptureID }
     }
 
+    private var canStartCapture: Bool {
+        _ = runtime.state
+        return controller.canStartCapture
+    }
+
     var body: some View {
         if let selectedCaptureID,
            let capture {
@@ -243,7 +253,7 @@ private struct CaptureHistoryDetailPane: View {
                 capture: capture,
                 captureID: selectedCaptureID,
                 history: history,
-                canRecognize: controller.canStartCapture,
+                canRecognize: canStartCapture,
                 onRecognize: controller.recognizeHistoryCapture
             )
         } else {
