@@ -3,6 +3,31 @@ import CoreMedia
 import Foundation
 import Speech
 
+enum SpeechContextHints {
+    static let maximumCount = 48
+
+    static func merged(
+        dictionaryWords: [String],
+        applicationContextWords: [String]
+    ) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+
+        for raw in dictionaryWords + applicationContextWords {
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty, value.count <= 80 else { continue }
+            let key = value.folding(
+                options: [.caseInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+            guard seen.insert(key).inserted else { continue }
+            result.append(value)
+            if result.count == maximumCount { break }
+        }
+        return result
+    }
+}
+
 actor SpeechPipeline {
     enum PipelineError: LocalizedError {
         case alreadyRunning
@@ -95,6 +120,7 @@ actor SpeechPipeline {
         locale requestedLocale: Locale,
         sourceAudioURL: URL,
         dictionaryWords: [String] = [],
+        applicationContextWords: [String] = [],
         onTranscript: @escaping @Sendable (UUID, String) -> Void,
         onAudioLevel: @escaping @Sendable (UUID, Double) -> Void,
         onFailure: @escaping @Sendable (UUID, String) -> Void
@@ -129,9 +155,13 @@ actor SpeechPipeline {
             }
 
             try requireActiveSession(sessionID)
+            let contextualWords = SpeechContextHints.merged(
+                dictionaryWords: dictionaryWords,
+                applicationContextWords: applicationContextWords
+            )
             Diagnostics.record(
                 "SpeechQuality",
-                "Session \(session) backend=\(backend.logName); locale=\(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count)"
+                "Session \(session) backend=\(backend.logName); locale=\(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count); applicationHints=\(applicationContextWords.count); contextualHints=\(contextualWords.count)"
             )
 
             let setup = try await configureLiveBackend(
@@ -140,7 +170,9 @@ actor SpeechPipeline {
                 sessionLabel: session,
                 microphone: microphone,
                 sourceAudioURL: sourceAudioURL,
-                dictionaryWords: dictionaryWords,
+                contextualWords: contextualWords,
+                dictionaryHintCount: dictionaryWords.count,
+                applicationHintCount: applicationContextWords.count,
                 onTranscript: onTranscript,
                 onAudioLevel: onAudioLevel,
                 onFailure: onFailure
@@ -312,7 +344,9 @@ actor SpeechPipeline {
         sessionLabel: String,
         microphone: AVCaptureDevice,
         sourceAudioURL: URL,
-        dictionaryWords: [String],
+        contextualWords: [String],
+        dictionaryHintCount: Int,
+        applicationHintCount: Int,
         onTranscript: @escaping @Sendable (UUID, String) -> Void,
         onAudioLevel: @escaping @Sendable (UUID, Double) -> Void,
         onFailure: @escaping @Sendable (UUID, String) -> Void
@@ -332,7 +366,13 @@ actor SpeechPipeline {
                 onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
             let analyzer = SpeechAnalyzer(modules: modules)
-            try await applyDictionaryContext(dictionaryWords, analyzer: analyzer, sessionID: sessionID)
+            try await applyRecognitionContext(
+                contextualWords,
+                dictionaryHintCount: dictionaryHintCount,
+                applicationHintCount: applicationHintCount,
+                analyzer: analyzer,
+                sessionID: sessionID
+            )
 
             let task = Task {
                 do {
@@ -371,7 +411,13 @@ actor SpeechPipeline {
                 onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
             let analyzer = SpeechAnalyzer(modules: modules)
-            try await applyDictionaryContext(dictionaryWords, analyzer: analyzer, sessionID: sessionID)
+            try await applyRecognitionContext(
+                contextualWords,
+                dictionaryHintCount: dictionaryHintCount,
+                applicationHintCount: applicationHintCount,
+                analyzer: analyzer,
+                sessionID: sessionID
+            )
 
             let task = Task {
                 do {
@@ -424,24 +470,26 @@ actor SpeechPipeline {
         onTranscript(sessionID, combined)
     }
 
-    private func applyDictionaryContext(
-        _ dictionaryWords: [String],
+    private func applyRecognitionContext(
+        _ contextualWords: [String],
+        dictionaryHintCount: Int,
+        applicationHintCount: Int,
         analyzer: SpeechAnalyzer,
         sessionID: UUID
     ) async throws {
-        guard !dictionaryWords.isEmpty else { return }
+        guard !contextualWords.isEmpty else { return }
         let context = AnalysisContext()
-        context.contextualStrings = [.general: dictionaryWords]
+        context.contextualStrings = [.general: contextualWords]
         do {
             try await analyzer.setContext(context)
             Diagnostics.record(
                 "SpeechQuality",
-                "Applied \(dictionaryWords.count) contextual dictionary strings for \(label(sessionID))"
+                "Applied \(contextualWords.count) contextual strings for \(label(sessionID)); dictionaryHints=\(dictionaryHintCount); applicationHints=\(applicationHintCount)"
             )
         } catch {
             Diagnostics.record(
                 "Speech",
-                "Dictionary context was unavailable; continuing recognition: \(error.localizedDescription)",
+                "Recognition context was unavailable; continuing recognition: \(error.localizedDescription)",
                 level: .warning
             )
         }
