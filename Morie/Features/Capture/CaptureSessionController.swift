@@ -237,6 +237,7 @@ final class CaptureSessionController {
 
         applicationContextTask?.cancel()
         activeApplicationContext = nil
+        activeApplicationContextWords = []
         let sessionID = sessionContext.id
         applicationContextTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -249,6 +250,10 @@ final class CaptureSessionController {
             }
 
             self.activeApplicationContext = context
+            let applicationContextWords = ApplicationContextVocabulary.extract(
+                from: context
+            )
+            self.activeApplicationContextWords = applicationContextWords
             self.applicationContextTask = nil
             let elapsedMilliseconds = max(
                 0,
@@ -256,7 +261,11 @@ final class CaptureSessionController {
             )
             Diagnostics.record(
                 "ApplicationContext",
-                "Capture \(self.label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); focusedCharacters=\(context.focusedCharacterCount); nearbyCharacters=\(context.nearbyCharacterCount); collectionMilliseconds=\(elapsedMilliseconds); rawContextPersisted=false"
+                "Capture \(self.label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); focusedCharacters=\(context.focusedCharacterCount); nearbyCharacters=\(context.nearbyCharacterCount); extractedHints=\(applicationContextWords.count); collectionMilliseconds=\(elapsedMilliseconds); rawContextPersisted=false; rawTermsLogged=false"
+            )
+            await self.speech.updateApplicationContextWords(
+                applicationContextWords,
+                sessionID: sessionID
             )
         }
     }
@@ -373,31 +382,12 @@ final class CaptureSessionController {
                 throw SessionError.persistenceUnavailable("原始录音存储尚未初始化。")
             }
 
-            if let contextTask = applicationContextTask {
-                await contextTask.value
-            }
-            try Task.checkCancellation()
-            guard activeCaptureID == sessionID,
-                  activeSessionContext?.id == sessionID
-            else {
-                throw CancellationError()
-            }
-
-            let applicationContextWords = activeApplicationContext.map {
-                ApplicationContextVocabulary.extract(from: $0)
-            } ?? []
-            activeApplicationContextWords = applicationContextWords
-            Diagnostics.record(
-                "ApplicationContextVocabulary",
-                "Capture \(label(sessionID)); extractedHints=\(applicationContextWords.count); rawTermsLogged=false"
-            )
-
             try await speech.start(
                 sessionID: sessionID,
                 locale: sessionContext.locale,
                 sourceAudioURL: sourceAudioURL,
                 dictionaryWords: sessionContext.dictionaryWords,
-                applicationContextWords: applicationContextWords,
+                applicationContextWords: activeApplicationContextWords,
                 onTranscript: { [weak self] resultSessionID, text in
                     Task { @MainActor in
                         guard let self,
