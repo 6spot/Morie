@@ -34,7 +34,7 @@ The implementation follows:
 1. Apple's current sidebar/split-view/Form/List/Table conventions;
 2. Morie's native-UI policy in `AGENTS.md`;
 3. the rewritten **Control Center shell** rules in `docs/ui-design.md`;
-4. owner-provided screenshots only as evidence of current inconsistencies, not as layout code to preserve.
+4. owner-provided screenshots as the visual target for hierarchy, density and page-specific presentation; implementation is rewritten rather than copied.
 
 ## Layout contract
 
@@ -49,21 +49,24 @@ The implementation follows:
 
 ### Page families
 
-- Overview / Settings / Permissions → grouped native `Form`;
-- Dictionary / Personal Memory → searchable native `List`;
-- History → `HSplitView` with one native list and one reading detail inside the persistent right-side navigation host;
-- Diagnostics → native `Table` plus selected-message split detail;
+The shell is uniform; the content presentation is not forced into one control type.
+
+- Overview → dashboard composition using system `GroupBox`, adaptive grid and shared page margins.
+- Dictionary → compact adaptive grid of system buttons/read-only terms, matching the owner-approved density.
+- Personal Memory → natural document-style topic overview with optional recent/history sections, not a database list.
+- Settings / Permissions → grouped native `Form`.
+- History → `HSplitView` with one native list and one reading detail inside the persistent right-side navigation host.
+- Diagnostics → native `Table` plus selected-message split detail.
 - Capture/Memory reading details → shared ScrollView with 28-point scroll-content margins and 760-point readable max width.
 
 ### Prohibited layout patterns
 
-- page-specific top/left outer padding;
-- fixed-width outer ScrollViews;
-- custom metric cards for Overview;
-- custom grid/card navigation for Dictionary/Memory;
+- page-specific top/left outer padding that breaks the shared content grid;
+- fixed-width outer ScrollViews that move the scrollbar away from the workspace edge;
+- forcing every page into `Form` or `List` merely because those controls are native;
 - nested page-level `NavigationSplitView` / `NavigationStack` roots;
 - custom toolbar/title backgrounds;
-- custom selection fills where List/Table selection exists.
+- decorative custom glass or replacement system controls.
 
 ## Implementation progress
 
@@ -71,9 +74,12 @@ The implementation follows:
 - [x] Replace the conditional Control Center detail root with one persistent `NavigationStack`.
 - [x] Replace shared ad-hoc page padding constants with one reading-detail-only layout contract.
 - [x] Move History search/filter/record controls to the History workspace and remove its list/detail NavigationStack roots.
-- [x] Rebuild Overview as grouped Form rows.
-- [x] Rebuild Dictionary as a native searchable List.
-- [x] Rebuild Personal Memory as a native searchable List.
+- [x] Rebuild Overview inside the persistent shell.
+- [x] Correct Overview back to the dashboard hierarchy shown in the owner reference.
+- [x] Rebuild Dictionary inside the persistent shell.
+- [x] Correct Dictionary back to the compact adaptive word grid shown in the owner reference.
+- [x] Rebuild Personal Memory inside the persistent shell.
+- [x] Correct Personal Memory back to the narrative topic presentation; do not regress it to a database list.
 - [x] Remove extra outer margins from grouped Settings.
 - [x] Rebuild Permissions into native capability/permission Form sections.
 - [x] Stop Permissions from unconditional refresh on every page revisit.
@@ -86,8 +92,8 @@ The implementation follows:
 
 - [ ] Sidebar remains mounted when switching every section.
 - [ ] Section switching changes only routed content, not the outer split/navigation shell.
-- [ ] Overview, Settings and Permissions share the same system-owned Form spacing.
-- [ ] Dictionary and Memory share native List behavior rather than custom cards/grids.
+- [ ] Overview, Dictionary, Memory, Settings and Permissions align to one shared page content grid.
+- [ ] Dictionary remains compact and Memory remains narrative while both use the same shell/margins.
 - [ ] History stays within the available right workspace and no longer shows separate page-level navigation roots.
 - [ ] Scroll indicators remain at the workspace edge.
 - [ ] The 960 × 600 minimum window does not overflow.
@@ -112,5 +118,9 @@ GitHub Actions `macOS 27 CI` run #251 passed on 2026-09-20:
 - **MorieTests**: **147 tests passed, 0 failures**.
 
 The test log still contains temporary SQLite cleanup warnings about WAL/SHM files being unlinked while an in-memory test store is being torn down; they did not fail the suite and are not treated as Control Center acceptance evidence.
+
+Owner video review after PR #87 exposed a design error: the rewrite correctly stabilized the shell, but incorrectly interpreted “Apple-native” as “convert every content page into Form/List.” That flattened the Overview, turned the Dictionary into a long database-like list, and regressed Personal Memory into the exact list presentation the owner had already rejected.
+
+The corrective rule is: **standardize shell, navigation, spacing and system controls; preserve the page-specific information architecture that fits the content.** Native does not mean visually identical page bodies.
 
 Do not mark this task DONE until those interactions are checked in the signed app.
