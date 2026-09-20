@@ -225,8 +225,21 @@ actor SpeechPipeline {
     ) async {
         guard activeSessionID == sessionID else { return }
         activeApplicationContextWords = words
+        DevelopmentDiagnostics.list(
+            "SpeechContext",
+            captureID: sessionID,
+            label: "lateApplicationHints",
+            words
+        )
 
-        guard let analyzer else { return }
+        guard let analyzer else {
+            DevelopmentDiagnostics.record(
+                "SpeechContext",
+                captureID: sessionID,
+                "late update stored before analyzer became available"
+            )
+            return
+        }
         let contextualWords = SpeechContextHints.merged(
             dictionaryWords: activeDictionaryWords,
             applicationContextWords: activeApplicationContextWords
@@ -497,6 +510,12 @@ actor SpeechPipeline {
         sessionID: UUID
     ) async throws {
         guard !contextualWords.isEmpty else { return }
+        DevelopmentDiagnostics.list(
+            "SpeechContext",
+            captureID: sessionID,
+            label: "applied",
+            contextualWords
+        )
         let context = AnalysisContext()
         context.contextualStrings = [.general: contextualWords]
         do {
