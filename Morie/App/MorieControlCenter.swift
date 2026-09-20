@@ -119,6 +119,7 @@ struct MorieControlCenter: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ControlCenterSidebar(selection: $selection)
+                .toolbar(removing: .sidebarToggle)
         } detail: {
             NavigationStack {
                 ControlCenterRoute(
@@ -130,10 +131,22 @@ struct MorieControlCenter: View {
                 )
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button("显示或隐藏边栏", systemImage: "sidebar.left") {
+                    toggleSidebar()
+                }
+                .help("显示或隐藏边栏")
+            }
+        }
         .frame(minWidth: 960, minHeight: 600)
         .onReceive(NotificationCenter.default.publisher(for: .morieShowSettings)) { _ in
             selection = .settings
         }
+    }
+
+    private func toggleSidebar() {
+        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
     }
 }
 
