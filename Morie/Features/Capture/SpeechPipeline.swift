@@ -48,6 +48,7 @@ actor SpeechPipeline {
     private var reportedFailure = false
     private var activeDictionaryWords: [String] = []
     private var activeApplicationContextWords: [String] = []
+    private var lastDevelopmentTranscriptLogLength = 0
     private var preparedBackend: SpeechRecognitionBackend?
 
     private static let recognitionUnavailableMessage = "语音识别暂时不可用，请稍后重试。"
@@ -109,6 +110,7 @@ actor SpeechPipeline {
         hasTranscriptEvidence = false
         activeDictionaryWords = dictionaryWords
         activeApplicationContextWords = applicationContextWords
+        lastDevelopmentTranscriptLogLength = 0
 
         let session = label(sessionID)
         Diagnostics.record("Speech", "Pipeline start requested for \(session)")
@@ -509,6 +511,18 @@ actor SpeechPipeline {
             "SpeechText",
             "Session \(sessionLabel) transcriptCharacters=\(combined.count); final=\(isFinal)"
         )
+        if isFinal
+            || combined.count < lastDevelopmentTranscriptLogLength
+            || combined.count - lastDevelopmentTranscriptLogLength >= 8 {
+            DevelopmentDiagnostics.text(
+                "SpeechLive",
+                captureID: sessionID,
+                label: isFinal ? "segmentFinal" : "partial",
+                combined,
+                limit: 8_000
+            )
+            lastDevelopmentTranscriptLogLength = combined.count
+        }
         onTranscript(sessionID, combined)
     }
 
@@ -638,6 +652,7 @@ actor SpeechPipeline {
         reportedFailure = false
         activeDictionaryWords = []
         activeApplicationContextWords = []
+        lastDevelopmentTranscriptLogLength = 0
     }
 
     private func join(_ lhs: String, _ rhs: String) -> String {
