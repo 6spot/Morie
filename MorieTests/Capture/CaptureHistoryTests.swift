@@ -68,6 +68,50 @@ final class CaptureHistoryTests: XCTestCase {
                        "A retained terminal Capture should enter History exactly after it stops being live.")
     }
 
+    func testHistoryControllerRetainsListAcrossPageSwitchAndRefreshesWhenNeeded() async throws {
+        let store = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
+        let history = CaptureHistoryController(
+            store: store,
+            locale: Locale(identifier: "zh-CN")
+        )
+
+        let firstID = UUID()
+        _ = try store.beginVoiceCapture(
+            id: firstID,
+            deliveryMode: .captureOnly,
+            applicationName: "Morie",
+            bundleIdentifier: "me.morie.mac"
+        )
+        try store.markFailed(firstID, error: "first")
+        try await store.flushPersistence(for: firstID)
+
+        history.setListVisible(true)
+        XCTAssertEqual(history.captures.map(\.id), [firstID])
+
+        history.setListVisible(false)
+
+        let secondID = UUID()
+        _ = try store.beginVoiceCapture(
+            id: secondID,
+            deliveryMode: .captureOnly,
+            applicationName: "Morie",
+            bundleIdentifier: "me.morie.mac"
+        )
+        try store.markFailed(secondID, error: "second")
+        try await store.flushPersistence(for: secondID)
+        history.captureListDidChange()
+
+        XCTAssertEqual(
+            history.captures.map(\.id),
+            [firstID],
+            "An off-screen History page should keep its existing snapshot instead of reloading."
+        )
+
+        history.setListVisible(true)
+        XCTAssertEqual(Set(history.captures.map(\.id)), [firstID, secondID])
+    }
+
     func testRetryRecoversFailedCaptureAndSurvivesRestart() async throws {
         let fixture = try HistoryFixture()
         defer { fixture.removeFiles() }
