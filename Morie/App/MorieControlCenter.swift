@@ -112,8 +112,7 @@ struct MorieControlCenter: View {
             selection = .settings
         }
     }
-
-
+}
 
 @MainActor
 private struct ControlCenterDetailHost: View {
@@ -124,60 +123,53 @@ private struct ControlCenterDetailHost: View {
     @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
 
     var body: some View {
-        Group {
-            switch selection ?? .overview {
-            case .overview:
-                NavigationStack {
-                    OverviewView(
-                        controller: controller,
-                        metricsSnapshot: $overviewMetricsSnapshot
-                    )
-                }
-
-            case .history:
-                CaptureHistoryWorkspace(
-                    controller: controller,
-                    selection: $selectedCaptureID
-                )
-
-            case .memory:
-                NavigationStack {
-                    if let memory = controller.memory {
-                        MemoryView(store: memory)
-                    } else {
-                        unavailable("个人记忆不可用")
-                    }
-                }
-
-            case .dictionary:
-                NavigationStack {
-                    if let dictionary = controller.dictionary {
-                        DictionaryView(
-                            store: dictionary,
-                            selection: $selectedDictionaryEntry
-                        )
-                    } else {
-                        unavailable("字典不可用")
-                    }
-                }
-
-            case .settings:
-                NavigationStack {
-                    MorieSettingsView(controller: controller)
-                }
-
-            case .permissions:
-                NavigationStack {
-                    PermissionManagementView(controller: controller)
-                }
-
-            case .diagnostics:
-                NavigationStack {
-                    DiagnosticLogView()
-                }
-            }
+        NavigationStack {
+            routedContent
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var routedContent: some View {
+        switch selection ?? .overview {
+        case .overview:
+            OverviewView(
+                controller: controller,
+                metricsSnapshot: $overviewMetricsSnapshot
+            )
+
+        case .history:
+            CaptureHistoryWorkspace(
+                controller: controller,
+                selection: $selectedCaptureID
+            )
+
+        case .memory:
+            if let memory = controller.memory {
+                MemoryView(store: memory)
+            } else {
+                unavailable("个人记忆不可用")
+            }
+
+        case .dictionary:
+            if let dictionary = controller.dictionary {
+                DictionaryView(
+                    store: dictionary,
+                    selection: $selectedDictionaryEntry
+                )
+            } else {
+                unavailable("字典不可用")
+            }
+
+        case .settings:
+            MorieSettingsView(controller: controller)
+
+        case .permissions:
+            PermissionManagementView(controller: controller)
+
+        case .diagnostics:
+            DiagnosticLogView()
+        }
     }
 
     private func unavailable(_ title: String) -> some View {
