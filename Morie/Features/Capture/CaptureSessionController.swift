@@ -255,7 +255,10 @@ final class CaptureSessionController {
         let sessionID = sessionContext.id
         applicationContextTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let context = await self.applicationContextCollector.capture(request)
+            let context = await self.applicationContextCollector.capture(
+                request,
+                captureID: sessionID
+            )
             guard !Task.isCancelled,
                   self.activeCaptureID == sessionID,
                   self.activeSessionContext?.id == sessionID
