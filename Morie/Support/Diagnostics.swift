@@ -151,8 +151,13 @@ private enum DiagnosticFileWriter {
     }
 }
 
-private enum ProcessMemorySnapshot {
-    static func current() -> (residentBytes: UInt64, physicalFootprintBytes: UInt64)? {
+private struct ProcessMemorySnapshot {
+    let residentBytes: UInt64
+    let physicalFootprintBytes: UInt64
+    let heapInUseBytes: UInt64
+    let heapAllocatedBytes: UInt64
+
+    static func current() -> ProcessMemorySnapshot? {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(
             MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size
@@ -168,7 +173,16 @@ private enum ProcessMemorySnapshot {
             }
         }
         guard result == KERN_SUCCESS else { return nil }
-        return (UInt64(info.resident_size), UInt64(info.phys_footprint))
+
+        var heap = malloc_statistics_t()
+        malloc_zone_statistics(malloc_default_zone(), &heap)
+
+        return ProcessMemorySnapshot(
+            residentBytes: UInt64(info.resident_size),
+            physicalFootprintBytes: UInt64(info.phys_footprint),
+            heapInUseBytes: UInt64(heap.size_in_use),
+            heapAllocatedBytes: UInt64(heap.size_allocated)
+        )
     }
 }
 
@@ -179,10 +193,12 @@ enum Diagnostics {
         record(
             "Memory",
             String(
-                format: "%@; resident=%.1fMB; footprint=%.1fMB",
+                format: "%@; resident=%.1fMB; footprint=%.1fMB; heapInUse=%.1fMB; heapAllocated=%.1fMB",
                 phase,
                 Double(memory.residentBytes) / divisor,
-                Double(memory.physicalFootprintBytes) / divisor
+                Double(memory.physicalFootprintBytes) / divisor,
+                Double(memory.heapInUseBytes) / divisor,
+                Double(memory.heapAllocatedBytes) / divisor
             )
         )
     }
