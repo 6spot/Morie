@@ -67,6 +67,7 @@ Morie/
 │   │   │   ├── SpeechRecognitionBackend.swift
 │   │   │   ├── CaptureRefinement.swift
 │   │   │   ├── InputRefiner.swift
+│   │   │   ├── RefinementPromptSettings.swift
 │   │   │   ├── CaptureHUD.swift
 │   │   │   ├── CaptureSoundFeedback.swift
 │   │   │   ├── CaptureSessionController.swift
@@ -156,7 +157,7 @@ solo configured shortcut activation (Fn / Globe release by default)
 create authoritative capture UUID; cancel optional learning/word observation
   ↓
 snapshot immutable per-Capture runtime context
-(locale + Speech dictionary hints + cleanup model/credential + correction/expression/sound preferences)
+(locale + Speech dictionary hints + cleanup model/prompt + correction/expression/sound preferences)
   ↓
 durably save the minimal Capture shell + audio destination
 (the only required synchronous History write on the live-input path)
@@ -291,7 +292,7 @@ Cleanup context is narrower than Speech hints. `speechHints()` still returns the
 Owns the authoritative live Capture lifecycle:
 
 - capture UUID and source-audio destination;
-- one immutable per-Capture runtime context containing delivery mode, locale, Speech dictionary hints and the cleanup/correction/expression/sound preferences accepted at Start;
+- one immutable per-Capture runtime context containing delivery mode, locale, Speech dictionary hints, refinement model + effective prompt, and the cleanup/correction/expression/sound preferences accepted at Start;
 - Speech asset preparation, start/finalization and live transcript state;
 - enqueueing bounded persistence snapshots without awaiting them on the current-app delivery path;
 - finish-during-Speech-startup coordination;
@@ -305,7 +306,7 @@ One shared shutdown task owns each interruption/discard. It cancels startup/fina
 
 `AppController` receives phase/transcript/failure callbacks and keeps the app/setup state machine authoritative. Returning a Capture session to idle only returns the visible app state to Ready when the current state is capture-owned; a concurrent blocked/checking state is not overwritten.
 
-Settings remain mutable application preferences, but they are sampled only when a new Capture is accepted. The active Capture never rereads those preference properties during asynchronous Speech startup, finalization, cleanup or post-insertion observation. Dictionary Speech hints are likewise resolved once for that Capture. This keeps one interaction deterministic without introducing a generalized provider/session abstraction.
+Settings remain mutable application preferences, but they are sampled only when a new Capture is accepted. The active Capture never rereads those preference properties during asynchronous Speech startup, finalization, cleanup or post-insertion observation. Dictionary Speech hints and the effective cleanup instructions are likewise resolved once for that Capture. This keeps one interaction deterministic without introducing a generalized provider/session abstraction.
 
 ### \`CapturePersistenceWriter\`
 
@@ -572,7 +573,7 @@ The non-autosaving write context shares the Capture container without touching C
 
 Basic cleanup runs with an empty or unavailable Memory store. External-model Base URL/model preferences load without touching Keychain. `RefinementModelController` resolves a persisted API key only when a completed Capture actually enters external-model refinement, caches that credential for the current process, and combines the resolved value with the immutable per-Capture endpoint/model snapshot at the refinement boundary. Local mode and incomplete external configuration therefore remain Keychain-free at launch; credential failure does not prevent Capture.
 
-`InputRefiner` creates a fresh Apple `LanguageModelSession`, supplies transcript/dictionary/context as JSON data under the [approved cleanup instructions](input-cleanup.md), and requests complete final text through greedy `@Generable` output. Native token accounting bounds the full prompt, instructions, schema and a response budget of 256–1,536 tokens. Oversized input is declined without truncating the saved text.
+`InputRefiner` creates a fresh Apple `LanguageModelSession`, supplies transcript/dictionary/context as JSON data under the [approved cleanup instructions](input-cleanup.md), and requests complete final text through greedy `@Generable` output. The shipped default instruction is a three-paragraph text resource, `DefaultRefinementInstructions.txt`; a nonempty user override is stored in `UserDefaults` and edited through the native Settings `TextEditor`. `RefinementConfiguration` freezes that effective instruction together with the selected model at Capture Start, while external credentials continue to resolve lazily only when refinement actually runs. Native token accounting bounds the full prompt, instructions, schema and a response budget of 256–1,536 tokens. Oversized input is declined without truncating the saved text.
 
 Foundation Models owns light cleanup and contextual correction through the approved instructions and `@Generable` structured result, but it receives a narrower vocabulary surface than Speech. Speech keeps the full bounded hint set; cleanup receives only transcript-relevant canonical candidates (including close Latin neighbors such as **Coldex → Codex**). Confirmed mappings are deterministic pre-model edits rather than prompt material. The save boundary still rejects empty/control-character payloads and now adds a conservative grounding check for longer generated clauses; clearly unsupported new sentences are rejected and the prepared transcript is used instead. Snapshot freshness, dictionary/Memory changes and durable-save failure remain separate consistency checks.
 
@@ -582,7 +583,7 @@ Foundation Models owns light cleanup and contextual correction through the appro
 
 Running refinement blocks History mutations/playback/re-recognition. Speech retries preserve completed final output and its earlier processing provenance. Restart clears current-version interrupted refinement without replaying delivery or restarting that model. Existing capture-only processing remains but is excluded from automatic personal learning.
 
-The local Foundation Models prompt follows a **closed-world cleanup contract**: transcript is the only source of facts/topics; spelling candidates, Memory context and expression style may only disambiguate or repair content already expressed. The instructions are deliberately shorter than cloud-oriented reference prompts to reduce competing instruction/vocabulary priming on the on-device model. A final grounding validator rejects clearly unsupported longer clauses before they can become deliverable text.
+The Foundation Models prompt follows a **closed-world cleanup contract**: transcript is the only source of facts/topics; spelling candidates, Memory context and expression style may only disambiguate or repair content already expressed. M-035 removed the deterministic `compact / semanticParagraphs / explicitList` prompt classifier and the duplicated behavioral contract formerly stored in `@Guide`. The default instructions are intentionally three direct paragraphs: task/content boundary, permitted light edits/protected content, then natural structure with explicit preservation of spoken lead-ins, explanations, questions and closings. The local `@Guide` is schema-only. A final grounding validator rejects clearly unsupported longer clauses before they can become deliverable text.
 
 ### `MemoryRecord` / `MemoryStore`
 
