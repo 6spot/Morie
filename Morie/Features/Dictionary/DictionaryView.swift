@@ -3,6 +3,7 @@ import SwiftUI
 struct DictionaryView: View {
     @ObservedObject var store: DictionaryStore
     @Binding var selection: UUID?
+
     @State private var search = ""
     @State private var showingEditor = false
     @State private var editingEntryID: UUID?
@@ -10,7 +11,11 @@ struct DictionaryView: View {
     @State private var errorMessage: String?
 
     private let columns = [
-        GridItem(.adaptive(minimum: 96, maximum: 180), spacing: 8, alignment: .leading)
+        GridItem(
+            .adaptive(minimum: 110, maximum: 190),
+            spacing: 8,
+            alignment: .leading
+        )
     ]
 
     private var selectedEntry: DictionaryDisplayEntry? {
@@ -26,7 +31,8 @@ struct DictionaryView: View {
     private var filteredEntries: [DictionaryDisplayEntry] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return store.displayEntries.filter { entry in
-            query.isEmpty || entry.name.localizedStandardContains(query)
+            query.isEmpty
+                || entry.name.localizedStandardContains(query)
         }
     }
 
@@ -43,67 +49,74 @@ struct DictionaryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ControlCenterMetrics.sectionSpacing) {
-                if let errorMessage {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+        VStack(
+            alignment: .leading,
+            spacing: ControlCenterMetrics.sectionSpacing
+        ) {
+            if let errorMessage {
+                Label(
+                    errorMessage,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(.secondary)
+            }
 
-                if search.isEmpty || !visibleUserEntries.isEmpty {
-                    ControlCenterSectionGroup(
-                        "用户添加",
-                        footer: "你添加或确认过的词语，可以编辑和删除。"
-                    ) {
-                        if visibleUserEntries.isEmpty {
-                            HStack(spacing: 10) {
-                                Text("还没有添加词语。")
-                                    .foregroundStyle(.secondary)
-                                Button("添加词语", systemImage: "plus", action: add)
-                            }
-                        } else {
-                            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-                                ForEach(visibleUserEntries) { entry in
-                                    DictionaryUserWordItem(
-                                        entry: entry,
-                                        isSelected: selection == entry.id,
-                                        select: { selection = entry.id }
-                                    )
-                                    .help(entry.source.helpText)
-                                    .contextMenu {
-                                        Button("编辑") { edit(entry.id) }
-                                        Button("删除…", role: .destructive) {
-                                            selection = entry.id
-                                            confirmsDeletion = true
-                                        }
-                                    }
-                                }
+            if search.isEmpty || !visibleUserEntries.isEmpty {
+                ControlCenterGroup(
+                    "用户添加",
+                    footer: "你添加或确认过的词语，可以编辑和删除。"
+                ) {
+                    if visibleUserEntries.isEmpty {
+                        HStack {
+                            Text("还没有添加词语。")
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Button("添加词语", systemImage: "plus", action: add)
+                        }
+                    } else {
+                        LazyVGrid(
+                            columns: columns,
+                            alignment: .leading,
+                            spacing: 8
+                        ) {
+                            ForEach(visibleUserEntries) { entry in
+                                userWord(entry)
                             }
                         }
                     }
                 }
+            }
 
-                if !visibleBuiltInEntries.isEmpty {
-                    ControlCenterSectionGroup(
-                        "系统内置",
-                        footer: "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
+            if !visibleBuiltInEntries.isEmpty {
+                ControlCenterGroup(
+                    "系统内置",
+                    footer: "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
+                ) {
+                    LazyVGrid(
+                        columns: columns,
+                        alignment: .leading,
+                        spacing: 8
                     ) {
-                        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-                            ForEach(visibleBuiltInEntries) { entry in
-                                DictionaryBuiltInWordItem(entry: entry)
-                                    .help("系统内置词语，不支持修改或删除。")
-                            }
+                        ForEach(visibleBuiltInEntries) { entry in
+                            builtInWord(entry)
                         }
                     }
                 }
+            }
 
-                if visibleCount == 0 && errorMessage == nil {
-                    ContentUnavailableView {
-                        Label("没有匹配的词语", systemImage: "character.book.closed")
-                    } description: {
-                        Text("试试其他搜索词。")
-                    }
-                    .frame(maxWidth: .infinity)
+            if visibleCount == 0 && errorMessage == nil {
+                ContentUnavailableView {
+                    Label(
+                        "没有匹配的词语",
+                        systemImage: "character.book.closed"
+                    )
+                } description: {
+                    Text("试试其他搜索词。")
                 }
+                .frame(maxWidth: .infinity)
+            }
         }
         .navigationTitle("字典")
         .navigationSubtitle("\(visibleCount) 个词语")
@@ -111,11 +124,17 @@ struct DictionaryView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("编辑词语", systemImage: "pencil") {
-                    if let selectedUserEntryID { edit(selectedUserEntryID) }
+                    if let selectedUserEntryID {
+                        edit(selectedUserEntryID)
+                    }
                 }
                 .disabled(selectedUserEntryID == nil)
 
-                Button("删除词语…", systemImage: "trash", role: .destructive) {
+                Button(
+                    "删除词语…",
+                    systemImage: "trash",
+                    role: .destructive
+                ) {
                     confirmsDeletion = true
                 }
                 .disabled(selectedUserEntryID == nil)
@@ -124,11 +143,19 @@ struct DictionaryView: View {
             }
         }
         .sheet(isPresented: $showingEditor) {
-            DictionaryEditorSheet(store: store, entryID: editingEntryID)
+            DictionaryEditorSheet(
+                store: store,
+                entryID: editingEntryID
+            )
         }
-        .confirmationDialog("删除这个字典词语？", isPresented: $confirmsDeletion, titleVisibility: .visible) {
+        .confirmationDialog(
+            "删除这个字典词语？",
+            isPresented: $confirmsDeletion,
+            titleVisibility: .visible
+        ) {
             Button("删除词语", role: .destructive) {
                 guard let id = selectedUserEntryID else { return }
+
                 do {
                     try store.delete(id)
                     selection = nil
@@ -143,6 +170,7 @@ struct DictionaryView: View {
             do {
                 try store.loadIfNeeded()
                 errorMessage = nil
+
                 if selectedEntry?.isEditable != true {
                     selection = nil
                 }
@@ -150,11 +178,65 @@ struct DictionaryView: View {
                 errorMessage = "无法加载字典。"
             }
         }
-        .onChange(of: visibleUserEntries.map(\.id), initial: true) { _, ids in
+        .onChange(
+            of: visibleUserEntries.map(\.id),
+            initial: true
+        ) { _, ids in
             if let selection, !ids.contains(selection) {
                 self.selection = nil
             }
         }
+    }
+
+    private func userWord(
+        _ entry: DictionaryDisplayEntry
+    ) -> some View {
+        Button {
+            selection = entry.id
+        } label: {
+            HStack(spacing: 8) {
+                Text(entry.name)
+                    .lineLimit(1)
+
+                Spacer(minLength: 4)
+
+                if selection == entry.id {
+                    Image(systemName: "checkmark")
+                        .imageScale(.small)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.bordered)
+        .help(entry.source.helpText)
+        .contextMenu {
+            Button("编辑") {
+                edit(entry.id)
+            }
+
+            Button("删除…", role: .destructive) {
+                selection = entry.id
+                confirmsDeletion = true
+            }
+        }
+    }
+
+    private func builtInWord(
+        _ entry: DictionaryDisplayEntry
+    ) -> some View {
+        HStack(spacing: 8) {
+            Text(entry.name)
+                .lineLimit(1)
+
+            Spacer(minLength: 4)
+
+            Image(systemName: "lock")
+                .imageScale(.small)
+                .foregroundStyle(.tertiary)
+        }
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help("系统内置词语，不支持修改或删除。")
     }
 
     private func add() {
@@ -168,48 +250,10 @@ struct DictionaryView: View {
     }
 }
 
-private struct DictionaryUserWordItem: View {
-    let entry: DictionaryDisplayEntry
-    let isSelected: Bool
-    let select: () -> Void
-
-    var body: some View {
-        if isSelected {
-            Button(action: select) {
-                Text(entry.name)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.borderedProminent)
-        } else {
-            Button(action: select) {
-                Text(entry.name)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.bordered)
-        }
-    }
-}
-
-private struct DictionaryBuiltInWordItem: View {
-    let entry: DictionaryDisplayEntry
-
-    var body: some View {
-        Text(entry.name)
-            .lineLimit(1)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 7))
-            .accessibilityLabel("\(entry.name)，系统内置，只读")
-    }
-}
-
 struct DictionaryEditorSheet: View {
     @ObservedObject var store: DictionaryStore
     var entryID: UUID?
+
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var errorMessage: String?
@@ -217,40 +261,82 @@ struct DictionaryEditorSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(entryID == nil ? "添加词语" : "编辑词语").font(.headline)
+            Text(entryID == nil ? "添加词语" : "编辑词语")
+                .font(.headline)
+
             Form {
-                TextField("词语", text: $name, prompt: Text("例如：Morie"))
-                    .focused($isWordFocused)
+                TextField(
+                    "词语",
+                    text: $name,
+                    prompt: Text("例如：Morie")
+                )
+                .focused($isWordFocused)
             }
             .formStyle(.columns)
+
             Text("添加人名、产品名或专业术语，帮助语音识别。")
-                .font(.callout).foregroundStyle(.secondary)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
             if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
-                    .font(.callout).foregroundStyle(.secondary)
+                Label(
+                    errorMessage,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
+
             HStack {
                 Spacer()
-                Button("取消", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+
+                Button("取消", role: .cancel) {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
                 Button(entryID == nil ? "添加" : "保存") {
-                    do {
-                        let draft = DictionaryDraft(name: name)
-                        if let entryID { try store.update(entryID, draft: draft) }
-                        else { try store.create(draft) }
-                        dismiss()
-                    } catch { errorMessage = error.localizedDescription }
+                    save()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(
+                    name
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .isEmpty
+                )
             }
         }
-        .padding(24).frame(width: 420).fixedSize(horizontal: false, vertical: true)
+        .padding(24)
+        .frame(width: 420)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
-            if let entryID, let entry = store.entries.first(where: { $0.id == entryID }) {
+            if let entryID,
+               let entry = store.entries.first(
+                    where: { $0.id == entryID }
+               ) {
                 name = entry.name
             }
+
             isWordFocused = true
         }
-        .onChange(of: name) { errorMessage = nil }
+        .onChange(of: name) {
+            errorMessage = nil
+        }
+    }
+
+    private func save() {
+        do {
+            let draft = DictionaryDraft(name: name)
+
+            if let entryID {
+                try store.update(entryID, draft: draft)
+            } else {
+                try store.create(draft)
+            }
+
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
