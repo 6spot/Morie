@@ -15,23 +15,27 @@ Application Context must remain distinct from Dictionary, Personal Memory and Ex
 - **Personal Memory** owns durable semantic user context.
 - **Expression Profile** owns aggregate presentation preferences.
 
-## First slice
+## Current slice
 
-Implement only the capture foundation:
+Implement the capture foundation plus bounded Speech vocabulary injection:
 
 - capture the frontmost application identity at voice-input start;
 - read bounded selected/focused/nearby text through Apple Accessibility when available;
 - pin the target application/PID at Capture Start, resolve bounded AX context asynchronously, and retain the resulting snapshot only for that active Capture;
 - keep all raw application text in process memory only;
 - log metadata/counts only, never raw application text;
-- use no app-specific adapters, screen recording or OCR.
+- use no app-specific adapters, screen recording or OCR;
+- extract at most 32 high-signal transient terms, prioritizing selected → focused → nearby text;
+- merge transient terms after durable Dictionary hints, with a total Speech context cap of 48;
+- apply the same merged hints to live Speech and saved-audio high-accuracy re-recognition;
+- allow late Application Context to update the active Speech analyzer without delaying capture startup.
 
 ## Explicit exclusions
 
 This slice does **not**:
 
-- inject Application Context vocabulary into Speech yet;
-- add Application Context to the cleanup/model prompt yet;
+- add raw Application Context text to the cleanup/model prompt;
+- use Application Context as a source of final-text facts or requests;
 - persist Application Context in Capture/History/Memory;
 - add Chrome/Xcode/WeChat-specific behavior;
 - add sensitive-app profiles or generalized privacy modes.
@@ -50,7 +54,11 @@ Secure text fields contribute no selected/focused/nearby text.
 - [x] Capture Start pins app/PID without blocking the main actor; the resulting snapshot is accepted only while that Capture remains active.
 - [x] Diagnostics contain only app identity and counts, never raw context.
 - [x] Snapshot is released when Capture session identity resets.
-- [ ] Xcode 27 product compile passes.
+- [x] High-signal Application Context vocabulary is bounded and never logged verbatim.
+- [x] Dictionary hints retain priority when transient Application Context hints are merged.
+- [x] Live Speech and saved-audio re-recognition receive the same ephemeral vocabulary.
+- [x] Context collection never gates capture startup; late hints update Speech best-effort.
+- [ ] Latest Xcode 27 product compile passes.
 - [ ] Real-device validation records actual coverage in Chrome/ChatGPT.
 - [ ] Real-device validation records actual coverage in Xcode.
 - [ ] Real-device validation records actual coverage in WeChat.
@@ -70,10 +78,10 @@ Existing stored Memory is not automatically deleted or rewritten.
 
 ## Follow-up
 
-After real-device collection evidence is understood:
+After the Speech-vocabulary slice is validated on device:
 
-1. extract bounded contextual vocabulary;
-2. merge it with Dictionary hints for Apple Speech;
-3. add runtime-only Application Context to refinement input;
+1. tune extraction quality from real Chrome/Xcode/WeChat/TextEdit evidence;
+2. decide whether runtime-only semantic Application Context should enter refinement at all;
+3. if it does, add only a bounded reference representation, never raw page text by default;
 4. update the cleanup prompt with a strict context-only/reference-material contract;
 5. extend deterministic output guards so context-only facts cannot enter final text.
