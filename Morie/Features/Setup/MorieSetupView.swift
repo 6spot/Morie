@@ -39,7 +39,11 @@ struct MorieSetupView: View {
                 }
             }
         )
-        .task { await setup.refresh() }
+        .task {
+            if setup.checks.isEmpty {
+                await setup.refresh()
+            }
+        }
     }
 }
 
