@@ -59,6 +59,11 @@ final class CapturePersonalizer {
             expressionStyle: expressionStyle
         )
 
+        Diagnostics.record(
+            "RefinementContext",
+            "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); memoryMatches=\(input.context.count); dictionaryCandidates=\(input.dictionary.count); confirmedCorrections=\(input.confirmedCorrections.count); expressionDirectives=\(input.expressionStyle.count); applicationContextIncluded=false"
+        )
+
         do {
             try store.beginRefinement(input)
         } catch {
@@ -83,6 +88,10 @@ final class CapturePersonalizer {
             case .keptOriginal(let reason):
                 return try keepOriginal(input, reason: reason, started: started)
             case .text(let text):
+                Diagnostics.record(
+                    "RefinementGeneration",
+                    "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); generatedCharacters=\(text.count); deltaCharacters=\(text.count - input.prepared.text.count); memoryMatches=\(input.context.count)"
+                )
                 let current = PersonalMemorySettings.isEnabled
                     ? ((try? memory.relevantContext(
                         for: input.prepared.text,
