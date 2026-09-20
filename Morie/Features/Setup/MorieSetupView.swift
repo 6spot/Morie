@@ -258,6 +258,16 @@ struct PermissionManagementView: View {
             }
         }
         .formStyle(.grouped)
+        .contentMargins(
+            .horizontal,
+            ControlCenterMetrics.contentInset,
+            for: .scrollContent
+        )
+        .contentMargins(
+            .vertical,
+            ControlCenterMetrics.contentInset,
+            for: .scrollContent
+        )
         .navigationTitle("权限")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
