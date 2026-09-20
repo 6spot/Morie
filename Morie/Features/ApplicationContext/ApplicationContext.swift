@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// A lightweight identity for the application that owned keyboard focus when a
@@ -38,26 +39,97 @@ struct ApplicationContextSnapshot: Equatable, Sendable {
 }
 
 
+/// The source of a transient Speech hint within the captured application context.
+enum ApplicationContextHintSource: String, CaseIterable, Sendable {
+    case selected
+    case focused
+    case nearby
+
+    var title: String {
+        switch self {
+        case .selected: "选中文字"
+        case .focused: "当前输入"
+        case .nearby: "附近内容"
+        }
+    }
+}
+
+struct ApplicationContextVocabularyHint: Identifiable, Equatable, Sendable {
+    let value: String
+    let source: ApplicationContextHintSource
+
+    var id: String {
+        "\(source.rawValue):\(value.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")))"
+    }
+}
+
+/// Runtime-only development visibility into the latest Application Context
+/// vocabulary decision. This store is never serialized and is intentionally
+/// separate from Diagnostics so hint text never reaches the log file.
+@MainActor
+final class ApplicationContextInspectionStore: ObservableObject {
+    struct Snapshot: Equatable {
+        let captureLabel: String
+        let application: ApplicationIdentity
+        let capturedAt: Date
+        let selectedCharacterCount: Int
+        let focusedCharacterCount: Int
+        let nearbyCharacterCount: Int
+        let dictionaryHintCount: Int
+        let contextualHintCount: Int
+        let hints: [ApplicationContextVocabularyHint]
+    }
+
+    @Published private(set) var latest: Snapshot?
+
+    func publish(
+        captureID: UUID,
+        context: ApplicationContextSnapshot,
+        hints: [ApplicationContextVocabularyHint],
+        dictionaryHintCount: Int,
+        contextualHintCount: Int
+    ) {
+        latest = Snapshot(
+            captureLabel: String(captureID.uuidString.prefix(8)),
+            application: context.application,
+            capturedAt: context.capturedAt,
+            selectedCharacterCount: context.selectedCharacterCount,
+            focusedCharacterCount: context.focusedCharacterCount,
+            nearbyCharacterCount: context.nearbyCharacterCount,
+            dictionaryHintCount: dictionaryHintCount,
+            contextualHintCount: contextualHintCount,
+            hints: hints
+        )
+    }
+}
+
 /// Extracts a small, high-signal vocabulary from ephemeral application text for
 /// Apple Speech contextual biasing. It deliberately favors identifiers and
 /// proper-name-like Latin tokens instead of sending page text to Speech.
 enum ApplicationContextVocabulary {
     static let maximumTerms = 32
 
-    static func extract(
+    static func inspect(
         from snapshot: ApplicationContextSnapshot,
         limit: Int = maximumTerms
-    ) -> [String] {
+    ) -> [ApplicationContextVocabularyHint] {
         guard limit > 0 else { return [] }
 
-        let sources: [(text: String?, priority: Int)] = [
-            (snapshot.selectedText, 300),
-            (snapshot.focusedText, 200),
-            (snapshot.nearbyText, 100),
+        let sources: [
+            (
+                text: String?,
+                source: ApplicationContextHintSource,
+                priority: Int
+            )
+        ] = [
+            (snapshot.selectedText, .selected, 300),
+            (snapshot.focusedText, .focused, 200),
+            (snapshot.nearbyText, .nearby, 100),
         ]
 
         struct RankedTerm {
             let value: String
+            let source: ApplicationContextHintSource
             let score: Int
             let order: Int
         }
@@ -74,6 +146,7 @@ enum ApplicationContextVocabulary {
                 let key = canonical(candidate)
                 let item = RankedTerm(
                     value: candidate,
+                    source: source.source,
                     score: source.priority + quality,
                     order: order
                 )
@@ -92,7 +165,19 @@ enum ApplicationContextVocabulary {
                 return $0.order < $1.order
             }
             .prefix(min(limit, maximumTerms))
-            .map(\.value)
+            .map {
+                ApplicationContextVocabularyHint(
+                    value: $0.value,
+                    source: $0.source
+                )
+            }
+    }
+
+    static func extract(
+        from snapshot: ApplicationContextSnapshot,
+        limit: Int = maximumTerms
+    ) -> [String] {
+        inspect(from: snapshot, limit: limit).map(\.value)
     }
 
     private static func candidates(in text: String) -> [String] {
