@@ -45,80 +45,78 @@ struct MemoryView: View {
     }
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 28) {
+            Text(
+                "Morie 会把稳定事实沉淀为长期记忆，把近期但仍可能变化的信息保留在“最近”里。"
+            )
+            .foregroundStyle(.secondary)
+
             if !memoryEnabled {
-                Section {
-                    Label(
-                        "已有内容会保留，但 Morie 暂时不会继续学习，也不会在润色时使用这些内容。",
-                        systemImage: "pause.circle"
-                    )
-                    .foregroundStyle(.secondary)
-                } header: {
-                    Text("个人记忆已关闭")
-                }
+                Label(
+                    "个人记忆已关闭。已有内容会保留，但 Morie 暂时不会继续学习，也不会在润色时使用这些内容。",
+                    systemImage: "pause.circle"
+                )
+                .foregroundStyle(.secondary)
             }
 
             if let errorMessage {
-                Section {
-                    Label(
-                        errorMessage,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.secondary)
-                }
+                Label(
+                    errorMessage,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(.secondary)
             }
 
             if !activeLongTerm.isEmpty {
-                Section("长期记忆") {
-                    MemoryTopicRows(
-                        entries: activeLongTerm,
-                        store: store
-                    )
-                }
+                memorySection(
+                    title: "长期记忆",
+                    entries: activeLongTerm
+                )
             }
 
             if !recentContext.isEmpty {
-                Section("最近") {
-                    MemoryTopicRows(
-                        entries: recentContext,
-                        store: store,
-                        showsDate: true
-                    )
-                }
+                memorySection(
+                    title: "最近",
+                    entries: recentContext,
+                    showsDate: true
+                )
             }
 
             if !history.isEmpty {
-                Section("已归档与历史") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("已归档与历史")
+                        .font(.headline)
+
                     DisclosureGroup("查看历史内容") {
                         MemoryTopicRows(
                             entries: history,
                             store: store,
                             showsStatus: true
                         )
+                        .padding(.top, 8)
                     }
                 }
             }
 
             if !hasVisibleMemory && errorMessage == nil {
-                Section {
-                    ContentUnavailableView {
-                        Label(
-                            query.isEmpty
-                                ? "Morie 还不了解你"
-                                : "没有匹配的内容",
-                            systemImage: "person.text.rectangle"
-                        )
-                    } description: {
-                        Text(
-                            query.isEmpty
-                                ? "继续正常使用即可。Morie 会逐渐形成有用的长期理解和近期上下文。"
-                                : "试试其他搜索词。"
-                        )
-                    }
-                    .frame(maxWidth: .infinity)
+                ContentUnavailableView {
+                    Label(
+                        query.isEmpty
+                            ? "Morie 还不了解你"
+                            : "没有匹配的内容",
+                        systemImage: "person.text.rectangle"
+                    )
+                } description: {
+                    Text(
+                        query.isEmpty
+                            ? "继续正常使用即可。Morie 会逐渐形成有用的长期理解和近期上下文。"
+                            : "试试其他搜索词。"
+                    )
                 }
+                .frame(maxWidth: .infinity)
             }
         }
+        .frame(maxWidth: 840, alignment: .topLeading)
         .navigationTitle("个人记忆")
         .navigationSubtitle(
             "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
@@ -129,21 +127,46 @@ struct MemoryView: View {
         )
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("告诉 Morie 一件事", systemImage: "plus") {
-                    editor = .create
-                }
+                Button(
+                    "告诉 Morie 一件事",
+                    systemImage: "plus",
+                    action: addMemory
+                )
             }
         }
         .sheet(item: $editor) {
             MemoryEditorSheet(store: store, mode: $0)
         }
-        .onAppear {
-            do {
-                try store.loadIfNeeded()
-                errorMessage = nil
-            } catch {
-                errorMessage = "无法加载个人记忆。"
-            }
+        .onAppear(perform: load)
+    }
+
+    private func memorySection(
+        title: String,
+        entries: [MemoryRecord],
+        showsDate: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+
+            MemoryTopicRows(
+                entries: entries,
+                store: store,
+                showsDate: showsDate
+            )
+        }
+    }
+
+    private func addMemory() {
+        editor = .create
+    }
+
+    private func load() {
+        do {
+            try store.loadIfNeeded()
+            errorMessage = nil
+        } catch {
+            errorMessage = "无法加载个人记忆。"
         }
     }
 
@@ -177,46 +200,56 @@ private struct MemoryTopicRows: View {
     var showsStatus = false
 
     var body: some View {
-        ForEach(entries) { entry in
-            NavigationLink {
-                MemoryDetailView(
-                    store: store,
-                    memoryID: entry.id
-                )
-            } label: {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(entry.name)
-                            .fontWeight(.medium)
+        VStack(spacing: 0) {
+            ForEach(entries) { entry in
+                NavigationLink {
+                    MemoryDetailView(
+                        store: store,
+                        memoryID: entry.id
+                    )
+                } label: {
+                    HStack(alignment: .top, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(entry.name)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
 
-                        Text(entry.notes)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
+                            Text(entry.notes)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                        }
 
-                    Spacer(minLength: 16)
+                        Spacer(minLength: 16)
 
-                    if showsStatus {
-                        Text(entry.status?.title ?? "")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    } else if showsDate {
-                        Text(
-                            entry.updatedAt.formatted(
-                                .dateTime
-                                    .locale(
-                                        Locale(identifier: "zh-Hans")
-                                    )
-                                    .month()
-                                    .day()
+                        if showsStatus {
+                            Text(entry.status?.title ?? "")
+                                .foregroundStyle(.tertiary)
+                        } else if showsDate {
+                            Text(
+                                entry.updatedAt.formatted(
+                                    .dateTime
+                                        .locale(
+                                            Locale(identifier: "zh-Hans")
+                                        )
+                                        .month()
+                                        .day()
+                                )
                             )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                            .foregroundStyle(.tertiary)
+                        }
+
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 10)
                 }
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+
+                if entry.id != entries.last?.id {
+                    Divider()
+                }
             }
         }
     }
