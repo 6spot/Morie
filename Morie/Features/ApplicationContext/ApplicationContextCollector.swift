@@ -22,12 +22,23 @@ actor ApplicationContextCollector {
     }
 
     func capture(
-        _ request: ApplicationContextCaptureRequest
+        _ request: ApplicationContextCaptureRequest,
+        captureID: UUID? = nil
     ) -> ApplicationContextSnapshot {
-        guard !Task.isCancelled,
-              AXIsProcessTrusted(),
-              !IsSecureEventInputEnabled()
-        else {
+        let trusted = AXIsProcessTrusted()
+        let secureInput = IsSecureEventInputEnabled()
+        DevelopmentDiagnostics.record(
+            "AX",
+            captureID: captureID,
+            "start; app=\(request.application.name ?? "unknown"); bundle=\(request.application.bundleIdentifier ?? "unknown"); pid=\(request.processIdentifier); trusted=\(trusted); secureInput=\(secureInput)"
+        )
+        guard !Task.isCancelled, trusted, !secureInput else {
+            DevelopmentDiagnostics.record(
+                "AX",
+                captureID: captureID,
+                level: .warning,
+                "empty; reason=\(Task.isCancelled ? "cancelled" : (!trusted ? "notTrusted" : "secureEventInput"))"
+            )
             return emptySnapshot(for: request)
         }
 
@@ -39,17 +50,50 @@ actor ApplicationContextCollector {
         guard let focusedElement = copyElement(
             kAXFocusedUIElementAttribute,
             from: applicationElement
-        ),
-        !Task.isCancelled,
-        !isSecureTextElement(focusedElement)
-        else {
+        ) else {
+            DevelopmentDiagnostics.record(
+                "AX",
+                captureID: captureID,
+                level: .warning,
+                "empty; reason=noFocusedUIElement"
+            )
             return emptySnapshot(for: request)
         }
+        guard !Task.isCancelled else {
+            DevelopmentDiagnostics.record(
+                "AX",
+                captureID: captureID,
+                level: .warning,
+                "empty; reason=cancelledAfterFocus"
+            )
+            return emptySnapshot(for: request)
+        }
+        guard !isSecureTextElement(focusedElement) else {
+            DevelopmentDiagnostics.record(
+                "AX",
+                captureID: captureID,
+                level: .warning,
+                "empty; reason=secureTextElement"
+            )
+            return emptySnapshot(for: request)
+        }
+
+        DevelopmentDiagnostics.record(
+            "AX",
+            captureID: captureID,
+            "focusedRole=\(textAttribute(kAXRoleAttribute, from: focusedElement) ?? "unknown"); focusedSubrole=\(textAttribute(kAXSubroleAttribute, from: focusedElement) ?? "none"); title=\(textAttribute(kAXTitleAttribute, from: focusedElement) ?? "none")"
+        )
 
         var actualPID: pid_t = 0
         guard AXUIElementGetPid(focusedElement, &actualPID) == .success,
               actualPID == pid_t(request.processIdentifier)
         else {
+            DevelopmentDiagnostics.record(
+                "AX",
+                captureID: captureID,
+                level: .warning,
+                "empty; reason=pidMismatch; actualPID=\(actualPID); expectedPID=\(request.processIdentifier)"
+            )
             return emptySnapshot(for: request)
         }
 
@@ -64,6 +108,12 @@ actor ApplicationContextCollector {
         let nearbyText = collectNearbyText(
             around: focusedElement,
             excluding: [selectedText, focusedText].compactMap { $0 }
+        )
+
+        DevelopmentDiagnostics.record(
+            "AX",
+            captureID: captureID,
+            "complete; selectedCharacters=\(selectedText?.count ?? 0); focusedCharacters=\(focusedText?.count ?? 0); nearbyCharacters=\(nearbyText?.count ?? 0)"
         )
 
         return ApplicationContextSnapshot(
