@@ -161,6 +161,7 @@ private struct MorieMenuContent: View {
 @MainActor
 struct MorieSettingsView: View {
     @ObservedObject var controller: AppController
+    @ObservedObject private var refinementModels: RefinementModelController
     @State private var confirmsExpressionReset = false
     @State private var cloudBaseURL: String
     @State private var cloudModelName: String
@@ -168,9 +169,10 @@ struct MorieSettingsView: View {
 
     init(controller: AppController) {
         self.controller = controller
-        _cloudBaseURL = State(initialValue: controller.cloudRefinementBaseURL)
-        _cloudModelName = State(initialValue: controller.cloudRefinementModelName)
-        _cloudAPIKey = State(initialValue: controller.cloudRefinementAPIKey)
+        _refinementModels = ObservedObject(wrappedValue: controller.refinementModels)
+        _cloudBaseURL = State(initialValue: controller.refinementModels.cloudBaseURL)
+        _cloudModelName = State(initialValue: controller.refinementModels.cloudModelName)
+        _cloudAPIKey = State(initialValue: "")
     }
 
     var body: some View {
@@ -184,8 +186,8 @@ struct MorieSettingsView: View {
                 Picker(
                     "润色模型",
                     selection: Binding(
-                        get: { controller.refinementModelMode },
-                        set: { controller.setRefinementModelMode($0) }
+                        get: { refinementModels.mode },
+                        set: { refinementModels.setMode($0) }
                     )
                 ) {
                     ForEach(RefinementModelMode.allCases) { mode in
@@ -194,7 +196,7 @@ struct MorieSettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
-                Text(controller.refinementModelMode.detail)
+                Text(refinementModels.mode.detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -219,31 +221,40 @@ struct MorieSettingsView: View {
                 .textFieldStyle(.roundedBorder)
 
                 SecureField(
-                    "API Key（可留空）",
+                    "API Key（留空保持现有）",
                     text: $cloudAPIKey,
-                    prompt: Text("sk-…")
+                    prompt: Text("输入新 Key 才会访问钥匙串")
                 )
                 .textFieldStyle(.roundedBorder)
 
                 HStack {
-                    LabeledContent("状态", value: controller.cloudRefinementConfigurationStatusTitle)
+                    LabeledContent("状态", value: refinementModels.configurationStatusTitle)
                     Spacer()
+                    Button("清除 API Key", role: .destructive) {
+                        if refinementModels.clearCloudAPIKey() {
+                            cloudAPIKey = ""
+                        }
+                    }
                     Button("保存 API 配置") {
-                        controller.saveCloudRefinementConfiguration(
+                        if refinementModels.saveCloudConfiguration(
                             baseURL: cloudBaseURL,
                             modelName: cloudModelName,
                             apiKey: cloudAPIKey
-                        )
+                        ) {
+                            cloudBaseURL = refinementModels.cloudBaseURL
+                            cloudModelName = refinementModels.cloudModelName
+                            cloudAPIKey = ""
+                        }
                     }
                 }
 
-                if let message = controller.cloudRefinementSettingsMessage {
+                if let message = refinementModels.settingsMessage {
                     Text(message)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
-                Text("兼容 OpenAI Chat Completions 的服务都可以接入。Base URL 填到服务根路径或 /v1 即可，不要包含 /chat/completions。API Key 仅保存于 macOS 钥匙串；无需鉴权的本地服务可以留空。")
+                Text("兼容 OpenAI Chat Completions 的服务都可以接入。Base URL 填到服务根路径或 /v1 即可，不要包含 /chat/completions。API Key 仅保存于 macOS 钥匙串；无需鉴权的本地服务可以留空。Morie 启动时不会读取 Key；此处留空保存会保持现有 Key 不变。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
