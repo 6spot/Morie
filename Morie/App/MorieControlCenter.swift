@@ -1,11 +1,14 @@
-import SwiftData
 import SwiftUI
 
 enum ControlCenterLayout {
     static let contentMaxWidth: CGFloat = 920
     static let readingMaxWidth: CGFloat = 760
-    static let horizontalInset: CGFloat = 28
-    static let verticalInset: CGFloat = 24
+    // Keep ordinary right-hand pages on one System Settings-like inset grid.
+    // Using one value for both axes keeps the title/content baseline visually
+    // aligned with the native sidebar instead of giving each page its own padding.
+    static let contentInset: CGFloat = 24
+    static let horizontalInset: CGFloat = contentInset
+    static let verticalInset: CGFloat = contentInset
 }
 
 extension View {
@@ -180,87 +183,76 @@ private struct ControlCenterSidebar: View {
 
 @MainActor
 private struct CaptureHistoryWorkspace: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
     @Binding var selection: UUID?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            CaptureHistoryListPane(
-                selection: $selection,
-                canStartCapture: controller.canStartCapture,
-                onRecord: controller.startCaptureOnly
+        if let history = controller.history {
+            HSplitView {
+                NavigationStack {
+                    CaptureHistoryListPane(
+                        controller: controller,
+                        history: history,
+                        selection: $selection
+                    )
+                }
+                .frame(minWidth: 250, idealWidth: 300, maxWidth: 380)
+
+                CaptureHistoryDetailPane(
+                    controller: controller,
+                    history: history,
+                    selectedCaptureID: selection
+                )
+                .id(selection)
+                .frame(minWidth: 420)
+            }
+            .onAppear {
+                history.setListVisible(true)
+            }
+            .onDisappear {
+                history.setListVisible(false)
+            }
+        } else {
+            ContentUnavailableView(
+                "历史记录不可用",
+                systemImage: "exclamationmark.triangle",
+                description: Text("记录存储尚未初始化。")
             )
-            .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 380)
-        } detail: {
-            CaptureHistoryDetailPane(
-                controller: controller,
-                selectedCaptureID: selection
-            )
-            .id(selection)
-            .navigationSplitViewColumnWidth(min: 420, ideal: 600)
         }
-        .navigationSplitViewStyle(.balanced)
     }
 }
 
 @MainActor
 private struct CaptureHistoryListPane: View {
+    @ObservedObject var controller: AppController
+    @ObservedObject var history: CaptureHistoryController
     @Binding var selection: UUID?
-    let canStartCapture: Bool
-    let onRecord: () -> Void
-    @State private var fetchLimit = 200
-
-    var body: some View {
-        CaptureHistoryQueryPane(
-            limit: fetchLimit,
-            selection: $selection,
-            canStartCapture: canStartCapture,
-            onRecord: onRecord,
-            onLoadMore: { fetchLimit += 200 }
-        )
-        .id(fetchLimit)
-    }
-}
-
-@MainActor
-private struct CaptureHistoryQueryPane: View {
-    @Query private var captures: [CaptureRecord]
-    @Binding var selection: UUID?
-    let limit: Int
-    let canStartCapture: Bool
-    let onRecord: () -> Void
-    let onLoadMore: () -> Void
-
-    init(
-        limit: Int,
-        selection: Binding<UUID?>,
-        canStartCapture: Bool,
-        onRecord: @escaping () -> Void,
-        onLoadMore: @escaping () -> Void
-    ) {
-        self.limit = limit
-        _selection = selection
-        self.canStartCapture = canStartCapture
-        self.onRecord = onRecord
-        self.onLoadMore = onLoadMore
-        _captures = Query(CaptureHistoryQuery.descriptor(limit: limit))
-    }
 
     var body: some View {
         VStack(spacing: 0) {
             CaptureHistoryView(
-                captures: captures,
+                captures: history.captures,
                 selection: $selection,
-                canStartCapture: canStartCapture,
-                onRecord: onRecord
+                canStartCapture: controller.canStartCapture,
+                onRecord: controller.startCaptureOnly
             )
 
-            if captures.count >= limit {
+            if history.canLoadMoreCaptures {
                 Divider()
-                Button("加载更早记录", action: onLoadMore)
-                    .buttonStyle(.link)
-                    .padding(.vertical, 8)
+                Button("加载更早记录") {
+                    history.loadMoreCaptures()
+                }
+                .buttonStyle(.link)
+                .padding(.vertical, 8)
+            }
+        }
+        .overlay {
+            if history.captures.isEmpty, let message = history.listError {
+                ContentUnavailableView(
+                    "无法加载历史记录",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(message)
+                )
             }
         }
     }
@@ -269,23 +261,18 @@ private struct CaptureHistoryQueryPane: View {
 @MainActor
 private struct CaptureHistoryDetailPane: View {
     @ObservedObject var controller: AppController
-    @Query private var captures: [CaptureRecord]
+    @ObservedObject var history: CaptureHistoryController
     let selectedCaptureID: UUID?
 
-    init(controller: AppController, selectedCaptureID: UUID?) {
-        self.controller = controller
-        self.selectedCaptureID = selectedCaptureID
-        let queryID = selectedCaptureID ?? UUID()
-        _captures = Query(
-            filter: #Predicate<CaptureRecord> { $0.id == queryID }
-        )
+    private var capture: CaptureRecord? {
+        guard let selectedCaptureID else { return nil }
+        return history.captures.first { $0.id == selectedCaptureID }
     }
 
     var body: some View {
         NavigationStack {
             if let id = selectedCaptureID,
-               let capture = captures.first,
-               let history = controller.history {
+               let capture {
                 CaptureDetailView(
                     capture: capture,
                     captureID: id,
