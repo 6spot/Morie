@@ -152,9 +152,11 @@ The shell itself must not observe Morie's high-frequency runtime controller. Onl
 
 ### Shared visual grid
 
-Overview, Dictionary, Personal Memory, Settings and Permissions share one 24-point scroll-content inset so their left/top content baselines do not move between sections. The leading edge is intentionally chosen to align with the native navigation-title leading edge beside the sidebar. Their ScrollView fills the whole right workspace, so the vertical scroll indicator remains at the workspace edge.
+Outer page layout is owned by the router host, not by routed feature views.
 
-Settings and Permissions no longer use top-level grouped Forms because the grouped Form adds its own outer inset and breaks title/content alignment. They use the same `ControlCenterContentPage` and `ControlCenterSectionGroup` primitives as the other ordinary pages, while the controls inside remain native SwiftUI controls.
+`ControlCenterPageHost` is the only top-level owner of ordinary-page scrolling and the 24-point horizontal/vertical content inset. Overview, Dictionary, Personal Memory, Settings and Permissions must not add their own top-level `ScrollView`, `contentMargins`, or outer `padding`. They only render functional content, section composition and page-specific toolbar/search/title behavior.
+
+History and Diagnostics use the same host with `.workspace` layout, which deliberately adds no outer inset because those pages are dense split/table workspaces. This exception is still owned centrally by the router, not inside the feature pages.
 
 ### Page families
 
