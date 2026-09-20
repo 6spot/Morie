@@ -58,31 +58,39 @@ struct OverviewView: View {
         metricsSnapshot: Binding<OverviewMetricsSnapshot?>
     ) {
         self.controller = controller
-        _refinementModels = ObservedObject(
-            wrappedValue: controller.refinementModels
-        )
+        _refinementModels = ObservedObject(wrappedValue: controller.refinementModels)
         _metricsSnapshot = metricsSnapshot
     }
 
     var body: some View {
-        Form {
-            Section {
-                if let metrics = metricsSnapshot?.metrics {
-                    metricRow(
+        ControlCenterContentPage {
+            Text("查看 Morie 的本地使用情况和当前实际使用的模型。")
+                .foregroundStyle(.secondary)
+
+            if let metrics = metricsSnapshot?.metrics {
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .adaptive(minimum: 190, maximum: 280),
+                            spacing: 12
+                        )
+                    ],
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    metricCard(
                         title: "累计识别字符",
                         value: metrics.recognizedCharacters.formatted(),
                         detail: "\(metrics.totalCaptures.formatted()) 条已完成记录",
                         systemImage: "textformat"
                     )
-
-                    metricRow(
+                    metricCard(
                         title: "成功输入",
                         value: metrics.successfulInputs.formatted(),
                         detail: "已送达当前应用",
                         systemImage: "text.cursor"
                     )
-
-                    metricRow(
+                    metricCard(
                         title: "输入失败率",
                         value: percent(metrics.failureRate),
                         detail: metrics.currentAppAttempts == 0
@@ -90,8 +98,7 @@ struct OverviewView: View {
                             : "\(metrics.failedInputs) / \(metrics.currentAppAttempts) 次",
                         systemImage: "exclamationmark.triangle"
                     )
-
-                    metricRow(
+                    metricCard(
                         title: "平均润色耗时",
                         value: duration(metrics.averageRefinementSeconds),
                         detail: metrics.refinementSamples == 0
@@ -99,105 +106,52 @@ struct OverviewView: View {
                             : "\(metrics.refinementSamples) 次润色样本",
                         systemImage: "wand.and.stars"
                     )
-                } else if let metricsError {
-                    Label(
-                        metricsError,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.secondary)
-                } else {
-                    ProgressView("正在读取使用统计…")
                 }
-            } header: {
-                Text("使用情况")
-            } footer: {
-                Text(
-                    "“输入失败率”只统计 Morie 的输入流程是否成功，不等同于语音识别失误率。当前没有足够的用户纠错真值样本，因此不计算可能误导的 ASR 错误率。"
-                )
+            } else if let metricsError {
+                Label(metricsError, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.secondary)
+            } else {
+                ProgressView("正在读取使用统计…")
             }
 
-            Section {
-                modelRow(
-                    title: "语音识别",
-                    name: controller.speechBackend?.displayName ?? "正在准备…",
-                    detail: speechDetail,
-                    status: speechStatus,
-                    systemImage: "waveform"
-                )
+            Text("“输入失败率”只统计 Morie 的输入流程是否成功，不等同于语音识别失误率。当前还没有足够的用户纠错真值样本，因此暂不计算可能误导的 ASR 错误率。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
 
-                modelRow(
-                    title: "输入润色",
-                    name: refinementModels.modelName,
-                    detail: refinementModels.modelDetail,
-                    status: refinementModels.modelStatusTitle(
-                        inputRefinementEnabled: controller.inputRefinementEnabled
-                    ),
-                    systemImage: "wand.and.stars"
-                )
-            } header: {
-                Text("当前模型")
-            } footer: {
-                Text(
-                    "这里显示当前运行实例真正使用的模型。语音识别发生回退时会直接显示回退后的后端。"
-                )
+            GroupBox {
+                VStack(spacing: 0) {
+                    modelRow(
+                        title: "语音识别",
+                        name: controller.speechBackend?.displayName ?? "正在准备…",
+                        detail: speechDetail,
+                        status: speechStatus
+                    )
+
+                    Divider()
+                        .padding(.vertical, 12)
+
+                    modelRow(
+                        title: "输入润色",
+                        name: refinementModels.modelName,
+                        detail: refinementModels.modelDetail,
+                        status: refinementModels.modelStatusTitle(
+                            inputRefinementEnabled: controller.inputRefinementEnabled
+                        )
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
+            } label: {
+                Label("当前模型", systemImage: "cpu")
             }
+
+            Text("模型状态来自当前运行实例。语音识别发生回退时，这里会直接显示 DictationTranscriber 和“回退”，而不是仍然显示首选模型。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
-        .formStyle(.grouped)
         .navigationTitle("总览")
         .task {
             await refreshMetricsIfNeeded()
-        }
-    }
-
-    private func metricRow(
-        title: String,
-        value: String,
-        detail: String,
-        systemImage: String
-    ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            Label(title, systemImage: systemImage)
-
-            Spacer(minLength: 24)
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(value)
-                    .font(.headline)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func modelRow(
-        title: String,
-        name: String,
-        detail: String,
-        status: String,
-        systemImage: String
-    ) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            Label(title, systemImage: systemImage)
-
-            Spacer(minLength: 24)
-
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(name)
-                    .fontWeight(.medium)
-
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-
-                Text(status)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -258,6 +212,66 @@ struct OverviewView: View {
             return controller.isBootstrapping ? "准备中" : "未就绪"
         }
         return backend.isFallback ? "回退" : "首选"
+    }
+
+    private func metricCard(
+        title: String,
+        value: String,
+        detail: String,
+        systemImage: String
+    ) -> some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(value)
+                    .font(
+                        .system(
+                            size: 28,
+                            weight: .semibold,
+                            design: .rounded
+                        )
+                    )
+                    .contentTransition(.numericText())
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 72,
+                alignment: .leading
+            )
+        } label: {
+            Label(title, systemImage: systemImage)
+        }
+    }
+
+    private func modelRow(
+        title: String,
+        name: String,
+        detail: String,
+        status: String
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(name)
+                    .font(.headline)
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 16)
+
+            Text(status)
+                .font(.callout.weight(.medium))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(.quaternary, in: Capsule())
+        }
     }
 
     private func percent(_ value: Double?) -> String {
