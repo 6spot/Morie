@@ -43,7 +43,7 @@ struct DictionaryView: View {
     }
 
     var body: some View {
-        ControlCenterContentPage {
+        VStack(alignment: .leading, spacing: ControlCenterMetrics.sectionSpacing) {
                 if let errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
                         .frame(maxWidth: .infinity, alignment: .leading)
