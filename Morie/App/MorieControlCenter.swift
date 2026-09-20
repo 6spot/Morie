@@ -36,7 +36,7 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var isLibrary: Bool { self == .history || self == .memory || self == .dictionary }
+    var isLibrary: Bool { self == .history || self == .dictionary }
 }
 
 @MainActor
@@ -77,6 +77,12 @@ struct MorieControlCenter: View {
                     switch selection {
                     case .overview, nil:
                         OverviewView(controller: controller)
+                    case .memory:
+                        if let memory = controller.memory {
+                            NavigationStack {
+                                MemoryView(store: memory)
+                            }
+                        }
                     case .settings:
                         MorieSettingsView(controller: controller)
                     case .permissions:
