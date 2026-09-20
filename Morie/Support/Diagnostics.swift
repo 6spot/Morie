@@ -79,8 +79,12 @@ final class DiagnosticLogStore: ObservableObject {
     }
 
     var plainText: String {
+        text(for: entries)
+    }
+
+    func text(for entries: [Entry]) -> String {
         entries.map(format)
-        .joined(separator: "\n")
+            .joined(separator: "\n")
     }
 
     private func scheduleFileFlush() {
@@ -499,7 +503,11 @@ struct DiagnosticLogView: View {
             alignment: .topLeading
         )
         .navigationTitle("诊断")
-        .navigationSubtitle("\(visibleEntries.count) 条日志")
+        .navigationSubtitle(
+            DevelopmentDiagnostics.isEnabled
+                ? "\(visibleEntries.count) 条日志 · 开发追踪已启用"
+                : "\(visibleEntries.count) 条日志"
+        )
         .searchable(text: $search, prompt: "搜索诊断日志")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -519,6 +527,19 @@ struct DiagnosticLogView: View {
                     }
                 }
                 .pickerStyle(.menu)
+
+                Button(
+                    "复制当前筛选",
+                    systemImage: "line.3.horizontal.decrease.circle"
+                ) {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(
+                        store.text(for: visibleEntries),
+                        forType: .string
+                    )
+                }
+                .disabled(visibleEntries.isEmpty)
 
                 Button(
                     "复制全部日志",
