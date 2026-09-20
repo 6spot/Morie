@@ -46,6 +46,8 @@ actor SpeechPipeline {
     private var hasTranscriptEvidence = false
     private var isFinalizing = false
     private var reportedFailure = false
+    private var activeDictionaryWords: [String] = []
+    private var activeApplicationContextWords: [String] = []
     private var preparedBackend: SpeechRecognitionBackend?
 
     private static let recognitionUnavailableMessage = "语音识别暂时不可用，请稍后重试。"
@@ -105,6 +107,8 @@ actor SpeechPipeline {
         finalizedText = ""
         volatileText = ""
         hasTranscriptEvidence = false
+        activeDictionaryWords = dictionaryWords
+        activeApplicationContextWords = applicationContextWords
 
         let session = label(sessionID)
         Diagnostics.record("Speech", "Pipeline start requested for \(session)")
@@ -158,6 +162,20 @@ actor SpeechPipeline {
             analyzer = setup.analyzer
             resultTask = setup.resultTask
 
+            let latestContextualWords = SpeechContextHints.merged(
+                dictionaryWords: activeDictionaryWords,
+                applicationContextWords: activeApplicationContextWords
+            )
+            if latestContextualWords != contextualWords {
+                try await applyRecognitionContext(
+                    latestContextualWords,
+                    dictionaryHintCount: activeDictionaryWords.count,
+                    applicationHintCount: activeApplicationContextWords.count,
+                    analyzer: setup.analyzer,
+                    sessionID: sessionID
+                )
+            }
+
             let analyzerInputs = setup.source.analyzerInputs
             analysisTask = Task {
                 do {
@@ -198,6 +216,32 @@ actor SpeechPipeline {
                 throw PipelineError.recognitionFailed(Self.recognitionUnavailableMessage, result)
             }
             throw error
+        }
+    }
+
+    func updateApplicationContextWords(
+        _ words: [String],
+        sessionID: UUID
+    ) async {
+        guard activeSessionID == sessionID else { return }
+        activeApplicationContextWords = words
+
+        guard let analyzer else { return }
+        let contextualWords = SpeechContextHints.merged(
+            dictionaryWords: activeDictionaryWords,
+            applicationContextWords: activeApplicationContextWords
+        )
+        do {
+            try await applyRecognitionContext(
+                contextualWords,
+                dictionaryHintCount: activeDictionaryWords.count,
+                applicationHintCount: activeApplicationContextWords.count,
+                analyzer: analyzer,
+                sessionID: sessionID
+            )
+        } catch {
+            // Application Context is optional. Session cancellation/teardown owns
+            // any stale-session error from this best-effort context update.
         }
     }
 
@@ -563,6 +607,8 @@ actor SpeechPipeline {
         hasTranscriptEvidence = false
         isFinalizing = false
         reportedFailure = false
+        activeDictionaryWords = []
+        activeApplicationContextWords = []
     }
 
     private func join(_ lhs: String, _ rhs: String) -> String {
