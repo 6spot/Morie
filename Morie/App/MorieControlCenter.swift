@@ -160,6 +160,12 @@ private struct ControlCenterSidebar: View {
         .listStyle(.sidebar)
         .navigationTitle("Morie")
         .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 240)
+        .onAppear {
+            Diagnostics.record("ControlCenter", "Sidebar mounted")
+        }
+        .onDisappear {
+            Diagnostics.record("ControlCenter", "Sidebar unmounted", level: .warning)
+        }
     }
 
     private func sidebarItem(_ section: ControlCenterSection) -> some View {
@@ -172,22 +178,25 @@ private struct ControlCenterSidebar: View {
 private struct CaptureHistoryWorkspace: View {
     @ObservedObject var controller: AppController
     @Binding var selection: UUID?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        HSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             CaptureHistoryListPane(
                 selection: $selection,
                 canStartCapture: controller.canStartCapture,
                 onRecord: controller.startCaptureOnly
             )
-            .frame(minWidth: 250, idealWidth: 300, maxWidth: 380)
-
+            .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 380)
+        } detail: {
             CaptureHistoryDetailPane(
                 controller: controller,
                 selectedCaptureID: selection
             )
-            .frame(minWidth: 420)
+            .id(selection)
+            .navigationSplitViewColumnWidth(min: 420, ideal: 600)
         }
+        .navigationSplitViewStyle(.balanced)
     }
 }
 
