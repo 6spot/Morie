@@ -50,6 +50,7 @@ final class AppController: ObservableObject {
 
     let setup = PermissionSetupController(locale: Locale(identifier: "zh-CN"))
     let refinementModels = RefinementModelController()
+    let refinementPrompts = RefinementPromptController()
 
     private static let setupCompletedKey = "setup.completed"
     private var setupObservation: AnyCancellable?
@@ -73,8 +74,9 @@ final class AppController: ObservableObject {
             postInsertionLearning: postInsertionLearning,
             memoryLearning: memoryLearning,
             inputRefinementEnabled: inputRefinementEnabled,
-            resolveRefinementModelConfiguration: { [weak self] snapshot in
-                self?.refinementModels.runtimeConfiguration(for: snapshot) ?? snapshot
+            resolveRefinementConfiguration: { [weak self] snapshot in
+                let model = self?.refinementModels.runtimeConfiguration(for: snapshot.model) ?? snapshot.model
+                return RefinementConfiguration(model: model, instructions: snapshot.instructions)
             },
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
             expressionLearningEnabled: expressionLearningEnabled,
@@ -511,7 +513,10 @@ final class AppController: ObservableObject {
         lastPresentedFailure = nil
         captureSession.start(
             deliveryMode: deliveryMode,
-            refinementModelConfiguration: refinementModels.configuration
+            refinementConfiguration: RefinementConfiguration(
+                model: refinementModels.configuration,
+                instructions: refinementPrompts.instructions
+            )
         )
     }
 
