@@ -16,7 +16,21 @@ final class PersonalizationTests: XCTestCase {
             capturedAt: Date()
         )
 
-        let terms = ApplicationContextVocabulary.extract(from: snapshot)
+        let inspected = ApplicationContextVocabulary.inspect(from: snapshot)
+        let terms = inspected.map(\.value)
+
+        XCTAssertEqual(
+            inspected.first(where: { $0.value == "Qelvatrix" })?.source,
+            .selected
+        )
+        XCTAssertEqual(
+            inspected.first(where: { $0.value == "Roventia" })?.source,
+            .focused
+        )
+        XCTAssertEqual(
+            inspected.first(where: { $0.value == "SwiftUI" })?.source,
+            .nearby
+        )
 
         XCTAssertTrue(terms.contains("Qelvatrix"))
         XCTAssertTrue(terms.contains("API"))
