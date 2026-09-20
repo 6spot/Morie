@@ -17,9 +17,10 @@ struct ApplicationContextCaptureRequest: Equatable, Sendable {
 
 /// Ephemeral context captured for one voice-input Capture.
 ///
-/// This type is intentionally not Codable. Raw application text must remain a
-/// runtime-only aid and must never become part of Capture persistence, History,
-/// diagnostics, Memory, or other durable user data.
+/// This type is intentionally not Codable. Raw application text must never
+/// become part of Capture persistence, History or Memory. Debug development
+/// builds may emit bounded raw text into the local development diagnostic log
+/// so context collection can be investigated; Release diagnostics never do.
 struct ApplicationContextSnapshot: Equatable, Sendable {
     let application: ApplicationIdentity
     let selectedText: String?
@@ -63,9 +64,9 @@ struct ApplicationContextVocabularyHint: Identifiable, Equatable, Sendable {
     }
 }
 
-/// Runtime-only development visibility into the latest Application Context
-/// vocabulary decision. This store is never serialized and is intentionally
-/// separate from Diagnostics so hint text never reaches the log file.
+/// Runtime-only UI visibility into the latest Application Context vocabulary
+/// decision. This store itself is never serialized. Debug builds separately
+/// emit an explicit Dev/* trace to the local diagnostic file.
 @MainActor
 final class ApplicationContextInspectionStore: ObservableObject {
     struct Snapshot: Equatable {
