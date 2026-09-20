@@ -235,6 +235,31 @@ final class MemoryLearningController: ObservableObject {
                     Diagnostics.recordMemory(
                         "memory-learning-input-ready \(sourceLabel)"
                     )
+                    DevelopmentDiagnostics.text(
+                        "MemoryLearning",
+                        captureID: source.captureID,
+                        label: "source",
+                        input.source.text,
+                        limit: 16_000
+                    )
+                    DevelopmentDiagnostics.list(
+                        "MemoryLearning",
+                        captureID: source.captureID,
+                        label: "activeContext",
+                        input.context.map {
+                            "\($0.name) | kind=\($0.kind.rawValue) | scope=\($0.scope.rawValue) | notes=\($0.notes)"
+                        },
+                        limit: 32
+                    )
+                    DevelopmentDiagnostics.list(
+                        "MemoryLearning",
+                        captureID: source.captureID,
+                        label: "blockedContext",
+                        input.blocked.map {
+                            "\($0.name) | kind=\($0.kind.rawValue) | notes=\($0.notes)"
+                        },
+                        limit: 32
+                    )
                     analyzingCaptureID = source.captureID
                     Diagnostics.recordMemory(
                         "memory-learning-start \(sourceLabel)"
@@ -243,6 +268,15 @@ final class MemoryLearningController: ObservableObject {
                     let suggestions = try await analyze(input)
                     Diagnostics.recordMemory(
                         "memory-learning-model-finish \(sourceLabel)"
+                    )
+                    DevelopmentDiagnostics.list(
+                        "MemoryLearning",
+                        captureID: source.captureID,
+                        label: "suggestions",
+                        suggestions.map {
+                            "\($0.action.rawValue) | \($0.draft.kind.rawValue) | \($0.draft.scope.rawValue) | \($0.draft.name) | notes=\($0.draft.notes) | evidence=\($0.evidence) | confidence=\($0.confidence) | existingID=\($0.existingMemoryID?.uuidString ?? "none")"
+                        },
+                        limit: 8
                     )
                     try Task.checkCancellation()
                     guard isEnabled, !isInputActive else {
@@ -270,6 +304,12 @@ final class MemoryLearningController: ObservableObject {
                         failure = (error as? MemoryAnalysisFailure)
                             ?? .generationFailed
                     }
+                    DevelopmentDiagnostics.record(
+                        "MemoryLearning",
+                        captureID: source.captureID,
+                        level: .warning,
+                        "failed; mappedFailure=\(failure.rawValue); errorType=\(DevelopmentDiagnostics.errorType(error))"
+                    )
                     try store.recordFailure(failure, for: source)
                     message = failure.message
                 }
