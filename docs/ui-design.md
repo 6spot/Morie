@@ -144,7 +144,7 @@ The recording-to-processing morph uses motion rather than another status color: 
 
 ## Control Center shell
 
-The Control Center follows one **macOS 27 System Settings-style layout contract**. Rebuild the navigation/layout architecture, but do **not** force unrelated information into the same page body control.
+The Control Center follows one **macOS 27 System Settings-style layout contract**. The owner screenshots document required functions/content only; they are not a visual-style template.
 
 The window owns one persistent `NavigationSplitView` for its entire lifetime. The left `List(.sidebar)` is created once and remains mounted while the selected section changes. The right side owns one persistent `NavigationStack`; section routing replaces only the page content inside that stack. Do not switch between different outer split-view/navigation roots for History, Dictionary, Memory or settings pages.
 
@@ -152,18 +152,19 @@ The shell itself must not observe Morie's high-frequency runtime controller. Onl
 
 ### Shared visual grid
 
-Overview, Dictionary, Personal Memory and reading surfaces share one 28-point scroll-content inset so their left/top content baselines do not move between sections. Their ScrollView fills the whole right workspace, so the vertical scroll indicator remains at the workspace edge.
+Overview, Dictionary, Personal Memory, Settings and Permissions share one 24-point scroll-content inset so their left/top content baselines do not move between sections. The leading edge is intentionally chosen to align with the native navigation-title leading edge beside the sidebar. Their ScrollView fills the whole right workspace, so the vertical scroll indicator remains at the workspace edge.
 
-Settings and Permissions use native grouped Forms. Their system-owned spacing should visually align with the same page grid; do not add a second wrapper ScrollView or arbitrary page-specific outer padding.
+Settings and Permissions no longer use top-level grouped Forms because the grouped Form adds its own outer inset and breaks title/content alignment. They use the same `ControlCenterContentPage` and `ControlCenterSectionGroup` primitives as the other ordinary pages, while the controls inside remain native SwiftUI controls.
 
 ### Page families
 
 Native-first means using the right native building blocks for the content, not making every page a Form/List:
 
-- **Overview** is a dashboard. Keep the owner-approved hierarchy: short explanatory text, adaptive system `GroupBox` metric cards, then the current-model group. Do not flatten the metrics into database-like Form rows.
-- **Dictionary** is a compact word library. Keep the adaptive grid: editable user words use native bordered buttons; system words are read-only compact items. Do not expand short words into a full-width one-row-per-word list.
-- **Personal Memory** is a maintained understanding of the user. Keep the narrative topic presentation with a natural **最近** section and collapsed **已归档与历史**. Do not regress it to a database/list manager.
-- **Settings / Permissions** use grouped native `Form`.
+- **Overview**, **Dictionary**, **Personal Memory**, **Settings**, and **Permissions** all use the same page container and section shell (`ControlCenterContentPage` + `ControlCenterSectionGroup`). Their inner controls differ only where the function requires it.
+- **Overview** keeps its metrics and model information, but the visual grouping follows the shared section style.
+- **Dictionary** keeps compact word management behavior while its outer sections follow the shared section style.
+- **Personal Memory** keeps topic/recent/history behavior while its outer sections follow the shared section style.
+- **Settings / Permissions** keep all existing native controls and actions inside the same shared section style instead of using a separately inset top-level Form.
 - **History** uses a native `HSplitView` inside the persistent right-side navigation host: an inset selectable List on the left and a reading detail on the right.
 - **Diagnostics** stays a native `Table` with a native split detail for the selected message.
 - **Reading details** such as a Capture or Memory detail use one shared ScrollView composition with 28-point scroll-content margins and a readable maximum width of 760 points.
