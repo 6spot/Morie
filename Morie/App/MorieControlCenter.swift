@@ -36,7 +36,7 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var isLibrary: Bool { self == .history || self == .memory || self == .dictionary }
+    var isLibrary: Bool { self == .history || self == .dictionary }
 }
 
 @MainActor
@@ -44,7 +44,6 @@ struct MorieControlCenter: View {
     @ObservedObject var controller: AppController
     @State private var selection: ControlCenterSection? = .overview
     @State private var selectedCaptureID: UUID?
-    @State private var selectedMemory: UUID?
     @State private var selectedDictionaryEntry: UUID?
     @State private var isSidebarVisible = true
     @AppStorage("sidebar.libraryExpanded") private var libraryExpanded = true
@@ -77,6 +76,12 @@ struct MorieControlCenter: View {
                     switch selection {
                     case .overview, nil:
                         OverviewView(controller: controller)
+                    case .memory:
+                        if let memory = controller.memory {
+                            NavigationStack {
+                                MemoryView(store: memory)
+                            }
+                        }
                     case .settings:
                         MorieSettingsView(controller: controller)
                     case .permissions:
@@ -144,9 +149,7 @@ struct MorieControlCenter: View {
         case .dictionary:
             EmptyView()
         case .memory:
-            if let memory = controller.memory {
-                MemoryView(store: memory, selection: $selectedMemory)
-            }
+            EmptyView()
         default:
             EmptyView()
         }
@@ -162,18 +165,7 @@ struct MorieControlCenter: View {
             )
             .id(selectedCaptureID)
         case .memory:
-            NavigationStack {
-                if let memory = controller.memory, let selectedMemory {
-                    MemoryDetailView(store: memory, memoryID: selectedMemory, onDelete: { self.selectedMemory = nil })
-                } else {
-                    ContentUnavailableView(
-                        "选择一条个人记忆",
-                        systemImage: "text.book.closed",
-                        description: Text("在这里查看从日常输入中自动学习的个人信息。")
-                    )
-                }
-            }
-            .id(selectedMemory)
+            EmptyView()
         case .dictionary:
             EmptyView()
         default:
