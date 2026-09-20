@@ -76,7 +76,9 @@ Code does not re-decide semantic meaning. It verifies that evidence is an exact 
 
 ### UI
 
-The Memory page stays a flat natural reading surface. It does not display the internal scope taxonomy. Internal `kind` selection is also removed from the manual editor; manual entries become durable user-authored Memory. The detail page exposes evidence/source history because provenance is useful user control, not because the storage schema should be visible.
+The Memory page is a full-width narrative overview, not a list/detail library. It begins with **Morie 了解你的这些内容** and renders durable semantic topics as natural topic + current-understanding blocks with no row chrome, record count, kind labels or long-term taxonomy. Temporary working context appears under the natural **最近** heading. Archived/superseded material is collapsed at the bottom.
+
+Opening a topic still exposes evidence/source history and edit/archive/delete actions because provenance and correction are meaningful user control. Internal `kind` and `scope` remain implementation details; manual entry asks only for topic and content.
 
 ## Acceptance criteria
 
@@ -88,7 +90,7 @@ The Memory page stays a flat natural reading surface. It does not display the in
 - [x] Evidence is persisted separately from the current visible Memory body.
 - [x] Working context expires deterministically, refreshes on evidence and can promote to long-term.
 - [x] User edits/archive/delete outrank automatic learning.
-- [x] Visible Memory UI does not expose long-term/working-context categories.
+- [x] Visible Memory UI is a full-page narrative overview rather than a record list and does not expose long-term/working-context categories.
 - [x] macOS 27 logic-test CI passes.
 - [x] macOS 27 app compile CI passes.
 - [ ] Owner-device Foundation Models testing confirms useful create/merge/update/scope decisions on real daily input.
