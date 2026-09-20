@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class PersonalizationTests: XCTestCase {
-    func testApplicationContextVocabularyPrefersNearbyTechnicalTermsWithoutPageText() {
+    func testApplicationContextVocabularyPrefersNearbyTechnicalTermsWithoutPageText() throws {
         let snapshot = ApplicationContextSnapshot(
             application: ApplicationIdentity(
                 name: "Google Chrome",
@@ -18,7 +18,7 @@ final class PersonalizationTests: XCTestCase {
 
         let terms = ApplicationContextVocabulary.extract(from: snapshot)
 
-        XCTAssertEqual(terms.first, "Qelvatrix")
+        XCTAssertTrue(terms.contains("Qelvatrix"))
         XCTAssertTrue(terms.contains("API"))
         XCTAssertTrue(terms.contains("Roventia"))
         XCTAssertTrue(terms.contains("AppController"))
@@ -26,6 +26,12 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(terms.contains("SwiftUI"))
         XCTAssertTrue(terms.contains("OpenAI"))
         XCTAssertFalse(terms.contains("This"))
+
+        let selectedIndex = try XCTUnwrap(terms.firstIndex(of: "Qelvatrix"))
+        let focusedIndex = try XCTUnwrap(terms.firstIndex(of: "Roventia"))
+        let nearbyIndex = try XCTUnwrap(terms.firstIndex(of: "SwiftUI"))
+        XCTAssertLessThan(selectedIndex, focusedIndex)
+        XCTAssertLessThan(focusedIndex, nearbyIndex)
         XCTAssertLessThanOrEqual(terms.count, ApplicationContextVocabulary.maximumTerms)
     }
 
