@@ -144,7 +144,7 @@ The recording-to-processing morph uses motion rather than another status color: 
 
 ## Control Center shell
 
-The left navigation is one persistent native sidebar for the lifetime of the Control Center window. Section changes replace only the right workspace; do not branch between separate root `NavigationSplitView` hierarchies, because doing so remounts the sidebar, resets native split-view state and causes visible redraw/folding churn.
+The left navigation is one persistent native sidebar for the lifetime of the Control Center window. Section changes replace only the routed content inside one persistent right-side detail host; do not branch between separate root `NavigationSplitView` hierarchies, because doing so remounts the sidebar, resets native split-view state and causes visible redraw/folding churn. Ordinary right-side pages share one detail `NavigationStack`; page-owned titles, search and toolbars must terminate there instead of leaking back into the outer split-navigation environment.
 
 The shell itself must not observe Morie's high-frequency runtime controller. Capture phase, transcript and other live state belong to the currently visible page that needs them. This keeps menu selection and sidebar disclosure state independent from recording/model updates.
 
@@ -152,7 +152,7 @@ For ordinary scrolling pages, the scroll container fills the full right workspac
 
 ## History recovery
 
-History uses a system selectable `List` and a simultaneous reading detail. It does not embed a second `NavigationSplitView` inside the Control Center's persistent navigation root. The History workspace owns only its native list/detail split, and the list has a local `NavigationStack` for its title, search and toolbar. The loaded History page is retained by `CaptureHistoryController`; leaving and returning to History first compares a cheap completed-record count/latest-update signature instead of rebuilding an all-record `@Query`. Capture completion, retry and deletion explicitly invalidate that retained page.
+History uses a system selectable `List` and a simultaneous reading detail. It does not embed a second `NavigationSplitView` inside the Control Center's persistent navigation root. The History workspace owns only its native list/detail split, and its list/detail navigation stays local to that workspace. The list column is capped at 340 pt and the detail may compress to 320 pt before expanding so the workspace never forces the Control Center wider than its available right-hand area. The loaded History page is retained by `CaptureHistoryController`; leaving and returning to History first compares a cheap completed-record count/latest-update signature instead of rebuilding an all-record `@Query`. Capture completion, retry and deletion explicitly invalidate that retained page.
 
 Search covers final/recognized text and the source app; filters provide All Captures, History Only and Needs Attention. History rows reserve a fixed two-line preview so progressive recognition does not continuously change native List row geometry or overlap neighboring rows. The secondary metadata stays on one line: source app followed by month/day/time, with status text only for active/error states; normal `已保存 / 已输入` badges are omitted as redundant. The audio player is AVKit's native `AVPlayerView` with inline controls; Morie does not draw a replacement playback bar. Recording playback is user-initiated, stops when leaving the detail or starting a capture, and does not publish private recordings to Now Playing.
 
