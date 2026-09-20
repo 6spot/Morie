@@ -223,6 +223,17 @@ final class CaptureSessionController {
             "Session",
             "Capture \(label(sessionID)) started; mode=\(sessionContext.deliveryMode.rawValue); deliveryTarget=currentKeyboardFocus; locale=\(sessionContext.locale.identifier); dictionaryHints=\(sessionContext.dictionaryWords.count); acceptedAt=\(sessionContext.acceptedAt.timeIntervalSince1970)"
         )
+        DevelopmentDiagnostics.record(
+            "Capture",
+            captureID: sessionID,
+            "start; mode=\(sessionContext.deliveryMode.rawValue); locale=\(sessionContext.locale.identifier); refinement=\(sessionContext.inputRefinementEnabled); correctionSuggestions=\(sessionContext.correctionSuggestionsEnabled); expressionLearning=\(sessionContext.expressionLearningEnabled); sound=\(sessionContext.soundFeedbackEnabled); targetApp=\(contextApplication?.localizedName ?? "none"); targetBundle=\(contextApplication?.bundleIdentifier ?? "none"); targetPID=\(contextApplication?.processIdentifier ?? 0); refinementMode=\(sessionContext.refinementConfiguration.model.mode.rawValue); cloudHost=\(sessionContext.refinementConfiguration.model.cloudURL?.host ?? "none"); cloudModel=\(sessionContext.refinementConfiguration.model.trimmedCloudModelName.isEmpty ? "none" : sessionContext.refinementConfiguration.model.trimmedCloudModelName); apiKeyConfigured=\(!sessionContext.refinementConfiguration.model.cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)"
+        )
+        DevelopmentDiagnostics.list(
+            "Dictionary",
+            captureID: sessionID,
+            label: "speechHints",
+            sessionContext.dictionaryWords
+        )
         beginApplicationContextCapture(for: sessionContext)
         Diagnostics.recordMemory("capture-start \(label(sessionID))")
 
@@ -270,6 +281,52 @@ final class CaptureSessionController {
                 hints: inspectedHints,
                 dictionaryHintCount: sessionContext.dictionaryWords.count,
                 contextualHintCount: contextualHintCount
+            )
+
+            DevelopmentDiagnostics.text(
+                "ApplicationContext",
+                captureID: sessionID,
+                label: "selected",
+                context.selectedText
+            )
+            DevelopmentDiagnostics.text(
+                "ApplicationContext",
+                captureID: sessionID,
+                label: "focused",
+                context.focusedText
+            )
+            DevelopmentDiagnostics.text(
+                "ApplicationContext",
+                captureID: sessionID,
+                label: "nearby",
+                context.nearbyText
+            )
+            DevelopmentDiagnostics.list(
+                "ApplicationContext",
+                captureID: sessionID,
+                label: "selectedHints",
+                inspectedHints.filter { $0.source == .selected }.map(\.value)
+            )
+            DevelopmentDiagnostics.list(
+                "ApplicationContext",
+                captureID: sessionID,
+                label: "focusedHints",
+                inspectedHints.filter { $0.source == .focused }.map(\.value)
+            )
+            DevelopmentDiagnostics.list(
+                "ApplicationContext",
+                captureID: sessionID,
+                label: "nearbyHints",
+                inspectedHints.filter { $0.source == .nearby }.map(\.value)
+            )
+            DevelopmentDiagnostics.list(
+                "ApplicationContext",
+                captureID: sessionID,
+                label: "mergedSpeechHints",
+                SpeechContextHints.merged(
+                    dictionaryWords: sessionContext.dictionaryWords,
+                    applicationContextWords: applicationContextWords
+                )
             )
 
             let elapsedMilliseconds = max(
@@ -510,6 +567,17 @@ final class CaptureSessionController {
             let result = try await speech.stop(sessionID: sessionID)
             recordLatency("speech-live-final", sessionID: sessionID)
             Diagnostics.recordMemory("speech-stop \(label(sessionID))")
+            DevelopmentDiagnostics.text(
+                "Speech",
+                captureID: sessionID,
+                label: "liveFinal",
+                result.transcript
+            )
+            DevelopmentDiagnostics.record(
+                "Audio",
+                captureID: sessionID,
+                "meaningful=\(String(describing: result.sourceAudio.hasMeaningfulAudio)); sourceBytes=\((try? Data(contentsOf: result.sourceAudio.url).count) ?? -1)"
+            )
 
             var accurateTranscript: String?
             if result.sourceAudio.hasMeaningfulAudio != false
@@ -524,6 +592,12 @@ final class CaptureSessionController {
                     Diagnostics.record(
                         "SpeechQuality",
                         "Accurate final re-recognition completed for \(label(sessionID)); liveCharacters=\(result.transcript.count); accurateCharacters=\(accurateTranscript?.count ?? 0)"
+                    )
+                    DevelopmentDiagnostics.text(
+                        "Speech",
+                        captureID: sessionID,
+                        label: "accurateFinal",
+                        accurateTranscript
                     )
                 } catch {
                     if Task.isCancelled || error is CancellationError {
@@ -559,6 +633,12 @@ final class CaptureSessionController {
 
             onTranscriptChange?(finalText)
             Diagnostics.record("Speech", "Final transcript ready; characters=\(finalText.count)")
+            DevelopmentDiagnostics.text(
+                "Speech",
+                captureID: sessionID,
+                label: "preferredFinal",
+                finalText
+            )
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 let disposition = try captureStore.finishEmptyRecognition(
@@ -595,6 +675,12 @@ final class CaptureSessionController {
                 try Task.checkCancellation()
                 guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
                 onTranscriptChange?(finalText)
+                DevelopmentDiagnostics.text(
+                    "Refinement",
+                    captureID: sessionID,
+                    label: "finalAfterRefinement",
+                    finalText
+                )
             }
 
             if deliveryMode == .captureOnly {
@@ -615,6 +701,12 @@ final class CaptureSessionController {
                 "Delivery",
                 "Resolving current keyboard focus for \(finalText.count)-character input"
             )
+            DevelopmentDiagnostics.text(
+                "Delivery",
+                captureID: sessionID,
+                label: "text",
+                finalText
+            )
             let deliveryApplication = try injector.deliver(finalText)
             let deliveredName = deliveryApplication.localizedName
             let deliveredBundle = deliveryApplication.bundleIdentifier
@@ -622,6 +714,11 @@ final class CaptureSessionController {
             Diagnostics.record(
                 "Delivery",
                 "Injection completed for \(label(sessionID)); app=\(deliveredName ?? "unknown") (\(deliveredBundle ?? "unknown"))"
+            )
+            DevelopmentDiagnostics.record(
+                "Delivery",
+                captureID: sessionID,
+                "completed; app=\(deliveredName ?? "unknown"); bundle=\(deliveredBundle ?? "unknown"); pid=\(deliveryApplication.processIdentifier)"
             )
 
             if !Task.isCancelled, stoppingCaptureID == nil {
@@ -662,6 +759,12 @@ final class CaptureSessionController {
                 "Session",
                 "Capture \(label(sessionID)) failed: \(error.localizedDescription)",
                 level: .error
+            )
+            DevelopmentDiagnostics.record(
+                "Failure",
+                captureID: sessionID,
+                level: .error,
+                "type=\(DevelopmentDiagnostics.errorType(error)); message=\(error.localizedDescription)"
             )
             await preserveFailedSpeech(sessionID: sessionID, error: error)
             failSession(sessionID, error: error)
