@@ -89,9 +89,14 @@ final class RefinementModelController: ObservableObject {
     /// A successful Keychain read/write is kept only for this process lifetime.
     /// Relaunch stays Keychain-free until an external model is actually needed.
     private var cachedAPIKey: String?
+    private let credentialReader: () throws -> String
 
-    init() {
-        let saved = RefinementModelSettings.load()
+    init(
+        load: () -> RefinementModelConfiguration = RefinementModelSettings.load,
+        credentialReader: @escaping () throws -> String = RefinementModelSettings.readAPIKey
+    ) {
+        let saved = load()
+        self.credentialReader = credentialReader
         mode = saved.mode
         cloudBaseURL = saved.cloudBaseURL
         cloudModelName = saved.cloudModelName
@@ -218,7 +223,7 @@ final class RefinementModelController: ObservableObject {
         if cachedAPIKey != nil { return base }
 
         do {
-            let apiKey = try RefinementModelSettings.readAPIKey()
+            let apiKey = try credentialReader()
             cachedAPIKey = apiKey
             return RefinementModelConfiguration(
                 mode: mode,
