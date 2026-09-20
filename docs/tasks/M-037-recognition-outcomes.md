@@ -4,7 +4,8 @@
 
 **IN PROGRESS** — 2026-09-20
 
-Issue: [#77](https://github.com/6spot/Morie/issues/77)
+Issue: [#77](https://github.com/6spot/Morie/issues/77)  
+PR: [#78](https://github.com/6spot/Morie/pull/78)
 
 ## Problem
 
