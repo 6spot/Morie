@@ -473,8 +473,7 @@ struct MorieSettingsView: View {
         } message: {
             Text("只会清除表达习惯统计，不会删除历史记录、字典或个人记忆。")
         }
-        .frame(maxWidth: 700)
-        .padding(16)
+        .controlCenterScrollMargins()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .navigationTitle("设置")
     }
