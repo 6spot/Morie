@@ -462,6 +462,16 @@ struct MorieSettingsView: View {
 
         }
         .formStyle(.grouped)
+        .contentMargins(
+            .horizontal,
+            ControlCenterMetrics.contentInset,
+            for: .scrollContent
+        )
+        .contentMargins(
+            .vertical,
+            ControlCenterMetrics.contentInset,
+            for: .scrollContent
+        )
         .confirmationDialog(
             "清除已学习的表达习惯？",
             isPresented: $confirmsExpressionReset,
