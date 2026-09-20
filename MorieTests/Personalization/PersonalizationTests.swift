@@ -171,6 +171,24 @@ final class PersonalizationTests: XCTestCase {
                 for: input
             )
         )
+
+        let correctedNumber = RefinementInput(captureID: UUID(), text: "15，不，16个")
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("16个。", for: correctedNumber).text,
+            "16个。"
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("15个。", for: correctedNumber)
+        )
+
+        let correctedWeekday = RefinementInput(captureID: UUID(), text: "周三，不，周四开会")
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("周四开会。", for: correctedWeekday).text,
+            "周四开会。"
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("周三开会。", for: correctedWeekday)
+        )
     }
 
     func testContextualChineseRecognitionCorrectionUsesContextInsteadOfACharacterLimit() throws {
