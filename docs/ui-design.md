@@ -144,43 +144,50 @@ The recording-to-processing morph uses motion rather than another status color: 
 
 ## Control Center shell
 
-The Control Center follows one **macOS 27 System Settings-style layout contract**. The owner screenshots document required functions/content only; they are not a visual-style template.
+M-039 replaces the failed M-038 presentation implementation. Owner-provided recordings/screenshots are **error evidence and functional references**, not a visual target. The visual target is current macOS system navigation/settings behavior.
 
-The window owns one persistent `NavigationSplitView` for its entire lifetime. The left `List(.sidebar)` is created once and remains mounted while the selected section changes. The right side owns one persistent `NavigationStack`; section routing replaces only the page content inside that stack. Do not switch between different outer split-view/navigation roots for History, Dictionary, Memory or settings pages.
+The management window owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. Sidebar selection only changes the routed page content. Do not create a separate navigation root for History or any other destination.
 
-The shell itself must not observe Morie's high-frequency runtime controller. Only the visible feature page observes the state it needs. Sidebar selection and disclosure state must therefore remain independent from capture, transcription, model and permission updates.
+The sidebar uses `List(.sidebar)`, system accent color, system row metrics and the sidebar toggle that `NavigationSplitView` provides. `SidebarCommands()` supplies the corresponding View-menu commands. Do not remove the system `.sidebarToggle`, do not recreate it in page toolbars, and do not build a replacement show/hide button.
 
-### Shared visual grid
+### Route-owned outer layout
 
-Outer page layout is owned by the router host, not by routed feature views.
+The routed feature page does not own the management window's outer geometry.
 
-`ControlCenterPageHost` is the only top-level owner of ordinary-page scrolling and the 24-point horizontal/vertical content inset. Overview, Dictionary, Personal Memory, Settings and Permissions must not add their own top-level `ScrollView`, `contentMargins`, or outer `padding`. They only render functional content, section composition and page-specific toolbar/search/title behavior.
+`ControlCenterRouteHost` is the only owner of:
 
-History and Diagnostics use the same host with `.workspace` layout, which deliberately adds no outer inset because those pages are dense split/table workspaces. This exception is still owned centrally by the router, not inside the feature pages.
+- the 24-point leading/trailing/top/bottom page inset;
+- whether the route gets the standard outer ScrollView or a workspace container;
+- the full available right-side width and height.
 
-### Page families
+Overview, Dictionary, Personal Memory, Settings and Permissions therefore contain no top-level ScrollView, contentMargins or outer padding. History and Diagnostics also receive their outer 24-point inset from the route host; their list/table/split layout is internal to the page.
 
-Native-first means using the right native building blocks for the content, not making every page a Form/List:
+The 24-point leading inset is the shared visual baseline: the first body content under a navigation title begins on the same leading axis as the title beside the sidebar divider. Changing this value is a shell-level change and must not require editing individual pages.
 
-- **Overview**, **Dictionary**, **Personal Memory**, **Settings**, and **Permissions** all use the same page container and section shell (`ControlCenterContentPage` + `ControlCenterSectionGroup`). Their inner controls differ only where the function requires it.
-- **Overview** keeps its metrics and model information, but the visual grouping follows the shared section style.
-- **Dictionary** keeps compact word management behavior while its outer sections follow the shared section style.
-- **Personal Memory** keeps topic/recent/history behavior while its outer sections follow the shared section style.
-- **Settings / Permissions** keep all existing native controls and actions inside the same shared section style instead of using a separately inset top-level Form.
-- **History** uses a native `HSplitView` inside the persistent right-side navigation host: an inset selectable List on the left and a reading detail on the right.
-- **Diagnostics** stays a native `Table` with a native split detail for the selected message.
-- **Reading details** such as a Capture or Memory detail use one shared ScrollView composition with 28-point scroll-content margins and a readable maximum width of 760 points.
+### Shared page language
 
-Native navigation titles, search, toolbars, split dividers, Forms, Lists, Tables, buttons, sheets, alerts and confirmation dialogs own their appearance. Custom composition is allowed when it represents the information architecture (dashboard/grid/narrative), but do not draw replacement system controls, title bars, selection chrome or decorative fake glass.
+Standard pages use `ControlCenterGroup` for Settings-style grouping: a system headline, native `GroupBox`, native controls, and optional secondary footer text. Page content may choose rows, grids, disclosures or text where function requires it, but the outer grouping, typography and spacing stay common.
 
-### Layout invariants
+Page responsibilities are limited to:
 
-- The sidebar uses the system accent color and system row/control metrics.
-- No top-level page may force the Control Center wider than its available right workspace.
-- Scroll indicators belong at the workspace edge; never place the ScrollView inside a fixed-width outer frame.
-- Page-specific content may differ, but its outer content baseline must stay on the shared grid.
-- Dense workspaces may be edge-to-edge; readable text detail alone uses the shared reading max width.
-- Page titles and toolbar/search controls terminate in the one right-side navigation hierarchy instead of leaking through nested page roots.
+- data and feature state;
+- page title/subtitle;
+- page-specific search and toolbar actions;
+- controls and content inside shared groups.
+
+Shell responsibilities are navigation, sidebar, sidebar toggle, route lifetime, scrolling and page insets.
+
+### Page-by-page contract
+
+- **总览** — grouped information rows for usage and current runtime models.
+- **历史记录** — native List/detail `HSplitView`, no nested page-level NavigationStack.
+- **字典** — searchable compact word management inside shared groups; user terms editable, built-in terms read-only.
+- **个人记忆** — grouped semantic topics for long-term/recent/history; the top level is not a raw database list.
+- **设置** — all existing settings retained in shared Settings-style groups.
+- **权限** — device-capability and permission groups with native actions/status.
+- **诊断** — native Table plus selected-message detail in a native split workspace.
+
+Reading details inside History/Memory may use their own internal ScrollView because they are child reading panes, not routed page outer layout. Keep those details readable and bounded without altering the route's outer inset.
 
 ## History recovery
 
