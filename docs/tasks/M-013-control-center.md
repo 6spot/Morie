@@ -31,8 +31,12 @@ extra navigation level.
   add actions live with the word list; there is no third detail column and no
   source/time explanation.
 - The Control Center owns one stable root `NavigationSplitView`. Changing the
-  selected section replaces only the detail workspace; it must not swap the
-  entire split-view hierarchy or remount the sidebar.
+  selected section replaces only the right-side routed page; it must not swap
+  the entire split-view hierarchy or remount the sidebar.
+- The right side has one persistent detail host. Ordinary pages share one
+  `NavigationStack` inside that host, so Settings, Permissions, Diagnostics,
+  Overview, Dictionary and Memory cannot publish navigation/title/toolbar state
+  directly into the outer sidebar navigation environment.
 - Ordinary right-hand pages follow one System Settings-like content grid:
   24-point horizontal and vertical scroll-content insets, with native navigation
   titles/toolbars outside that content inset. Dense workspaces such as History
@@ -65,13 +69,15 @@ extra navigation level.
   selection, toolbar/context edit and delete actions, and the existing compact
   editor sheet.
 - Replaced the selection-dependent three-root Control Center implementation
-  with one stable outer shell. The follow-up removes the nested
-  `NavigationSplitView` from History because two navigation owners inside the
-  same window compete for titles, toolbars and sidebar behavior. History now
-  keeps the stable outer navigation shell and uses a native split workspace;
-  its list is wrapped in its own `NavigationStack` so search/title/toolbar
-  behavior remains local to the History list instead of leaking into the outer
-  sidebar.
+  with one stable outer shell and one explicit right-side detail router.
+  Ordinary sections now share the same persistent `NavigationStack` in that
+  detail host instead of attaching their title/search/toolbar preferences
+  directly to the outer `NavigationSplitView`.
+- History remains a special dense split workspace inside the right-side host.
+  Its list and detail navigation stay local to that workspace. The previous
+  minimum-width combination could exceed the available detail width; the list
+  is now capped at 340 pt and the detail can compress to 320 pt before
+  expanding, preventing the History workspace from forcing the window wider.
 - Removed `@ObservedObject AppController` from the Control Center shell. Views
   such as Overview, History, Settings and Permissions keep their own scoped
   observation only while visible.
