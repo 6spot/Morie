@@ -144,41 +144,69 @@ The recording-to-processing morph uses motion rather than another status color: 
 
 ## Control Center shell
 
-The left navigation is one persistent native sidebar for the lifetime of the Control Center window. Section changes replace only the routed content inside one persistent right-side detail host; do not branch between separate root `NavigationSplitView` hierarchies, because doing so remounts the sidebar, resets native split-view state and causes visible redraw/folding churn. Ordinary right-side pages share one detail `NavigationStack`; page-owned titles, search and toolbars must terminate there instead of leaking back into the outer split-navigation environment.
+The Control Center follows one **macOS 27 System Settings-style layout contract**. The UI is rebuilt from native containers rather than preserving page-specific layout code.
 
-The shell itself must not observe Morie's high-frequency runtime controller. Capture phase, transcript and other live state belong to the currently visible page that needs them. This keeps menu selection and sidebar disclosure state independent from recording/model updates.
+The window owns one persistent `NavigationSplitView` for its entire lifetime. The left `List(.sidebar)` is created once and remains mounted while the selected section changes. The right side owns one persistent `NavigationStack`; section routing replaces only the page content inside that stack. Do not switch between different outer split-view/navigation roots for History, Dictionary, Memory or settings pages.
 
-For ordinary scrolling pages, the scroll container fills the full right workspace and the content uses one shared **24 pt content inset on every edge**. This intentionally follows the visual rhythm of macOS System Settings: the right-hand page has one stable content grid, while the native navigation title and toolbar remain system-owned above it. Scroll indicators stay at the workspace edge rather than moving with a page-specific fixed-width container. Top-level reading/dashboard content uses a shared 920 pt maximum reading width where appropriate. Capture/Memory detail reading can use the narrower shared reading width. Native dense workspaces (History list/detail and Diagnostics table) may remain edge-to-edge, but any textual scrolling detail uses the same content margins.
+The shell itself must not observe Morie's high-frequency runtime controller. Only the visible feature page observes the state it needs. Sidebar selection and disclosure state must therefore remain independent from capture, transcription, model and permission updates.
+
+### Page families
+
+Use the native container that matches the page's job:
+
+- **Overview, Settings and Permissions** use a full-workspace SwiftUI `Form` with `.formStyle(.grouped)`. Do not wrap these Forms in another ScrollView and do not add page-specific outer padding, fixed content widths or custom card backgrounds.
+- **Dictionary and Personal Memory** use native searchable `List` presentations with system sections, selection/navigation and toolbars. Do not imitate list rows with cards, custom rounded rectangles or grids just for visual styling.
+- **History** uses a native `HSplitView` inside the persistent right-side navigation host: an inset selectable List on the left and a reading detail on the right. It must not introduce another `NavigationSplitView` or another page-level navigation root.
+- **Diagnostics** stays a native `Table` with a native split detail for the selected message.
+- **Reading details** such as a Capture or Memory detail use one shared ScrollView composition with 28-point scroll-content margins and a readable maximum width of 760 points. The ScrollView itself still fills the whole workspace so the scroll indicator remains at the workspace edge.
+
+Native navigation titles, search, toolbars, split dividers, row selection, Forms, Lists, Tables, sheets, alerts and confirmation dialogs own their appearance. Do not draw replacement title bars, toolbar backgrounds, selection fills, cards or glass surfaces.
+
+### Layout invariants
+
+- The sidebar uses the system accent color and system row/control metrics.
+- No top-level page may force the Control Center wider than its available right workspace.
+- Scroll indicators belong at the workspace edge; never place the ScrollView inside a fixed-width outer frame.
+- Ordinary pages do not define their own outer horizontal/top padding constants.
+- Dense workspaces may be edge-to-edge; readable text detail alone uses the shared reading inset/max width.
+- Page titles and toolbar/search controls terminate in the one right-side navigation hierarchy instead of leaking through nested page roots.
 
 ## History recovery
 
-History uses a system selectable `List` and a simultaneous reading detail. It does not embed a second `NavigationSplitView` inside the Control Center's persistent navigation root. The History workspace owns only its native list/detail split, and its list/detail navigation stays local to that workspace. The list column is capped at 340 pt and the detail may compress to 320 pt before expanding so the workspace never forces the Control Center wider than its available right-hand area. The loaded History page is retained by `CaptureHistoryController`; leaving and returning to History first compares a cheap completed-record count/latest-update signature instead of rebuilding an all-record `@Query`. Capture completion, retry and deletion explicitly invalidate that retained page.
+History uses the Control Center's single right-side navigation host plus one system `HSplitView`. The list pane and detail pane do not create their own page-level NavigationStacks. Search, filter and **开始录音** belong to the History workspace toolbar; selected-record actions join that same native toolbar instead of creating a second toolbar strip.
 
-Search covers final/recognized text and the source app; filters provide All Captures, History Only and Needs Attention. History rows reserve a fixed two-line preview so progressive recognition does not continuously change native List row geometry or overlap neighboring rows. The secondary metadata stays on one line: source app followed by month/day/time, with status text only for active/error states; normal `已保存 / 已输入` badges are omitted as redundant. The audio player is AVKit's native `AVPlayerView` with inline controls; Morie does not draw a replacement playback bar. Recording playback is user-initiated, stops when leaving the detail or starting a capture, and does not publish private recordings to Now Playing.
+The list column uses a native selectable `List` and stays within a bounded 260–360 point range. The detail may compress to 360 points before expanding. These widths are workspace constraints, not decorative page widths, and must not make the overall Control Center exceed the available window.
 
-Re-recognition has a standard button, `ProgressView`, and Cancel action. Saved text stays visible while work runs. Details show **最终文字** first. **复制最终文字** is in the toolbar and **复制识别文字** is in its action menu. **识别与润色** discloses the separate recognized text and retained refinement record; **原始录音** contains playback and retry controls. A Speech retry preserves previously delivered or refined final output, including capture-only output. Retry does not automatically paste into another app. Expired/missing audio and recognition failure have readable inline explanations. Deleting a Capture uses a destructive button and a system confirmation dialog.
+The loaded History page is retained by `CaptureHistoryController`; leaving and returning to History first compares a cheap completed-record count/latest-update signature instead of rebuilding an all-record `@Query`. Capture completion, retry and deletion explicitly invalidate that retained page.
+
+Search covers final/recognized text and the source app; filters provide All Captures, History Only and Needs Attention. History rows reserve a fixed two-line preview so progressive recognition does not continuously change native List row geometry or overlap neighboring rows. The secondary metadata stays on one line: source app followed by month/day/time, with status text only for active/error states; normal `已保存 / 已输入` badges are omitted as redundant.
+
+The audio player is AVKit's native `AVPlayerView` with inline controls; Morie does not draw a replacement playback bar. Recording playback is user-initiated, stops when leaving the detail or starting a capture, and does not publish private recordings to Now Playing.
+
+Re-recognition has a standard button, `ProgressView`, and Cancel action. Saved text stays visible while work runs. Details show **最终文字** first. **复制最终文字** is in the toolbar and **复制识别文字** is in its action menu. **识别与润色** discloses the separate recognized text and retained refinement record; **原始录音** contains playback and retry controls.
 
 An empty recognition with retained audio shows “未识别，录音已保存” in the existing HUD and appears as “未能识别” in History. A discarded no-input capture hides the HUD; neither case reports “已输入”.
 
-History's native **开始录音** toolbar button starts an intentional voice capture saved to History. It is disabled while another capture is active or capabilities are unavailable. Recording uses the existing HUD finish/cancel controls and shortcut; successful completion reports “已保存”. The **原始录音** disclosure shows **保存位置：历史记录** or **当前应用**, and an unfinished record reads “正在录音…”. This entry point does not restore another app's focus, inject text or copy text automatically.
-
-Explicit cancellation shows the existing status surface as “正在停止…” until capture closes and the unfinished record is discarded. Operational interruption retains available audio/text in History as a failed Capture. Shortcut loss keeps the blocked status until setup is checked and **开始使用** succeeds; asynchronous cleanup must not report Ready or successful delivery over it. These states use the existing native status/HUD and History controls.
+History's native **开始录音** toolbar button starts an intentional voice capture saved to History. It is disabled while another capture is active or capabilities are unavailable. Recording uses the existing HUD finish/cancel controls and shortcut; successful completion reports “已保存”. The **原始录音** disclosure shows **保存位置：历史记录** or **当前应用**, and an unfinished record reads “正在录音…”.
 
 ## Dictionary
 
-The **字典** library uses one native searchable content page, **添加词语 / 编辑词语** sheets and system deletion confirmation. Each entry is just one word: no aliases, replacement pairs or additional configuration. The page presents words in a compact adaptive grid of native bordered buttons rather than spending a full list row on each short term. Built-in baseline words, manually added words and correction-confirmed words may appear together; built-in words are read-only, while user-owned words retain edit/delete actions. Source is backend provenance rather than a required visible label.
+The **字典** library is a native searchable `List`, not a custom grid. It has two system sections:
 
-The sheet is 420 points wide and fits its content, with one **词语** TextField, a brief purpose description and **取消 / 添加** (or **保存**) buttons. The word field receives initial focus. Return invokes the default action and Escape cancels; empty input disables saving. Duplicate/invalid/save errors remain inline without closing the editor, and editing clears stale error feedback. Cancel leaves saved data intact. Use the native columns Form and ordinary system controls.
+- **用户添加** — editable/selectable rows with toolbar and context-menu edit/delete actions;
+- **系统内置** — read-only rows rendered with ordinary system secondary styling and a lock affordance.
+
+Each entry is still exactly one canonical word: no aliases, replacement pairs or extra user configuration. Source remains backend provenance rather than a required visible label.
+
+Adding or editing uses the compact native **添加词语 / 编辑词语** sheet. The sheet is 420 points wide, uses a columns Form, contains one **词语** TextField, a short purpose description and standard **取消 / 添加** or **保存** buttons. Built-in words never enter selection-driven edit/delete flows.
 
 ## Personal Memory
 
-**个人记忆** is not a record list or a three-column library browser. Selecting it opens one full-width reading surface beside the sidebar. The page begins with **Morie 了解你的这些内容** and reads like a continuously maintained personal-context document: each durable semantic topic is shown as a topic heading plus Morie's current understanding, without row chrome, status badges, record counts, kind labels, or long-term taxonomy.
+Personal Memory uses a native searchable `List` with system sections for **长期记忆**, **最近**, and **已归档与历史**. Rows show the remembered topic plus a short body preview; recent/history rows may show a small date/status value on the trailing edge. Do not present Memory as custom narrative cards or expose internal `longTerm / workingContext` database labels.
 
-Temporary working context is the one intentional visual separation and appears naturally under **最近**. Archived/superseded material is collapsed under **已归档与历史** so ordinary reading stays focused on the current understanding. Search filters the document in place rather than switching to a result list.
+Selecting a row pushes the existing reading detail inside the Control Center's one NavigationStack. The detail may expose source/evidence history because provenance is meaningful user control. Manual add/edit asks only for **主题 / 内容**; internal classification and lifecycle are system-owned.
 
-A topic can still be opened to its detail for correction and provenance. **来源与历史** retains exact evidence, dates and predecessor links. Optional native create/edit/archive/restore/replace/delete actions remain available, but those management mechanics are subordinate to the reading surface. Manual creation asks only for **主题 / 内容**; internal kind/scope are not user-facing fields.
-
-History's **个人记忆** section shows idle scheduling, learning progress, outcomes, linked memories and **用于学习的文字**. Failed nonretryable analysis offers an optional retry. Opening/closing details does not control the background learner. Deleting a Capture explains that its analysis snapshots are removed while separate personal Memory remains; missing sources are labelled explicitly.
+Settings uses a standard **使用个人记忆** Toggle. Turning it off preserves existing visible Memory while stopping new learning and Memory use during cleanup.
 
 ## Input cleanup
 
