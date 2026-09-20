@@ -142,6 +142,14 @@ Do not add decorative leading status icons back to these text messages. Normal s
 
 The recording-to-processing morph uses motion rather than another status color: the wide recording capsule contracts around the waveform before `Thinking` replaces it. The processing capsule is narrower (94 pt versus 142 pt recording width). While Thinking is active, a narrow low-contrast highlight repeatedly traverses the glass from left to right. The band fully exits before a short pause and reset, so it reads as ongoing activity rather than accumulated progress. Successful completion keeps that compact shape and fades almost in place instead of collapsing to a tiny dot. Reduced Motion skips the moving shimmer and uses only the compact static glass treatment.
 
+## Control Center shell
+
+The left navigation is one persistent native sidebar for the lifetime of the Control Center window. Section changes replace only the right workspace; do not branch between separate root `NavigationSplitView` hierarchies, because doing so remounts the sidebar, resets native split-view state and causes visible redraw/folding churn.
+
+The shell itself must not observe Morie's high-frequency runtime controller. Capture phase, transcript and other live state belong to the currently visible page that needs them. This keeps menu selection and sidebar disclosure state independent from recording/model updates.
+
+For ordinary scrolling pages, the scroll container fills the full right workspace and the content uses shared **28 pt horizontal / 24 pt vertical** scroll-content margins. Scroll indicators remain at the workspace edge rather than moving with a page-specific fixed-width container. Top-level reading/dashboard content uses a shared 920 pt maximum reading width where appropriate. Capture/Memory detail reading can use the narrower shared reading width. Native dense workspaces (History list/detail and Diagnostics table) may remain edge-to-edge, but any textual scrolling detail uses the same content margins.
+
 ## History recovery
 
 History uses a system selectable `List` and a simultaneous reading detail. Search covers final/recognized text and the source app; filters provide All Captures, History Only and Needs Attention. History rows reserve a fixed two-line preview so progressive recognition does not continuously change native List row geometry or overlap neighboring rows. The secondary metadata stays on one line: source app followed by month/day/time, with status text only for active/error states; normal `已保存 / 已输入` badges are omitted as redundant. The audio player is AVKit's native `AVPlayerView` with inline controls; Morie does not draw a replacement playback bar. Recording playback is user-initiated, stops when leaving the detail or starting a capture, and does not publish private recordings to Now Playing.
