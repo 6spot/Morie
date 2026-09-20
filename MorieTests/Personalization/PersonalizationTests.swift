@@ -72,17 +72,30 @@ final class PersonalizationTests: XCTestCase {
         }
     }
 
-    func testCleanupValidationKeepsShortCorrectionsButRejectsUngroundedNewSentences() throws {
-        let input = RefinementInput(captureID: UUID(), text: "我觉得可能周四吧")
-        XCTAssertEqual(try ValidatedRefinement.accepting("周四。", for: input).text, "周四。")
-        XCTAssertThrowsError(
-            try ValidatedRefinement.accepting("这是模型给出的完整新表达。", for: input)
+    func testCleanupGuardAllowsNaturalRestructuringWithoutSimilarityThreshold() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "嗯我觉得这个事情第一个先处理登录然后第二个设置页面也要调整"
         )
+        let output = """
+        我觉得有两个问题：
+
+        1. 先处理登录。
+        2. 设置页面也要调整。
+        """
+        XCTAssertEqual(try ValidatedRefinement.accepting(output, for: input).text, output)
+
+        let shortCorrection = RefinementInput(captureID: UUID(), text: "我觉得可能周四吧")
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("周四。", for: shortCorrection).text,
+            "周四。"
+        )
+
         XCTAssertThrowsError(try ValidatedRefinement.accepting("   ", for: input))
         XCTAssertThrowsError(try ValidatedRefinement.accepting("无效\0文本", for: input))
     }
 
-    func testCleanupValidationRejectsDictionaryPrimedHallucinatedSentence() throws {
+    func testCleanupGuardRejectsUnspokenProtectedFactsAndAssistantBehavior() throws {
         let input = RefinementInput(
             captureID: UUID(),
             text: "这几个分段我也没测试，这是我自己手动分的段嗯。"
@@ -100,6 +113,81 @@ final class PersonalizationTests: XCTestCase {
                 for: input
             ).text,
             "这几个分段我也没测试，这是我自己手动分的段。"
+        )
+
+        let question = RefinementInput(captureID: UUID(), text: "这个问题怎么处理")
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("答案是重启应用。", for: question)
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("这个问题该怎么处理？", for: question).text,
+            "这个问题该怎么处理？"
+        )
+
+        let request = RefinementInput(captureID: UUID(), text: "帮我删除这个任务")
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("已经为你删除这个任务。", for: request)
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("请帮我删除这个任务。", for: request).text,
+            "请帮我删除这个任务。"
+        )
+    }
+
+    func testCleanupGuardProtectsFactsNegationAndConditions() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "如果今天测试没完成，就不要发布 Morie 2.0，接口还是 https://example.com/v1"
+        )
+
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "如果今天测试没完成，就不要发布 Morie 2.0。接口仍然是 https://example.com/v1。",
+                for: input
+            ).text,
+            "如果今天测试没完成，就不要发布 Morie 2.0。接口仍然是 https://example.com/v1。"
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "如果今天测试没完成，就发布 Morie 2.0。接口仍然是 https://example.com/v1。",
+                for: input
+            )
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "今天测试没完成，不要发布 Morie 2.0。接口仍然是 https://example.com/v1。",
+                for: input
+            )
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "如果今天测试没完成，就不要发布 Morie 2.1。接口仍然是 https://example.com/v1。",
+                for: input
+            )
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "如果今天测试没完成，就不要发布 Morie 2.0。接口仍然是 https://example.com/v2。",
+                for: input
+            )
+        )
+
+        let correctedNumber = RefinementInput(captureID: UUID(), text: "15，不，16个")
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("16个。", for: correctedNumber).text,
+            "16个。"
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("15个。", for: correctedNumber)
+        )
+
+        let correctedWeekday = RefinementInput(captureID: UUID(), text: "周三，不，周四开会")
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("周四开会。", for: correctedWeekday).text,
+            "周四开会。"
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("周三开会。", for: correctedWeekday)
         )
     }
 
@@ -423,10 +511,10 @@ final class PersonalizationTests: XCTestCase {
         }
     }
 
-    func testUngroundedGeneratedContentIsRejectedAndOriginalIsKept() async throws {
+    func testInventedProtectedFactIsRejectedAndOriginalIsKept() async throws {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("原始文字")
-        let generated = "Foundation Models 给出的结构化结果。"
+        let generated = "原始文字，另外请发布 Morie 2.0。"
         let result = try await fixture.personalizer(InputRefinementRunner { _ in generated }).refine(id, enabled: true)
 
         XCTAssertEqual(result, "原始文字")

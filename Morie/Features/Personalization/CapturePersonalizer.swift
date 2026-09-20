@@ -102,7 +102,7 @@ final class CapturePersonalizer {
                 } catch {
                     Diagnostics.record(
                         "Refinement",
-                        "Rejected cleanup output that was empty, invalid, or insufficiently grounded in the transcript",
+                        "Rejected cleanup output that crossed a protected fact or intent boundary",
                         level: .warning
                     )
                     return try keepOriginal(input, reason: .invalidEdits, started: started)
