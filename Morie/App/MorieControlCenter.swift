@@ -4,9 +4,42 @@ enum ControlCenterMetrics {
     static let sidebarMinWidth: CGFloat = 180
     static let sidebarIdealWidth: CGFloat = 220
     static let sidebarMaxWidth: CGFloat = 260
+    static let contentInset: CGFloat = 28
+    static let sectionSpacing: CGFloat = 28
     static let readingMaxWidth: CGFloat = 760
-    static let readingInset: CGFloat = 28
     static let denseInset: CGFloat = 16
+}
+
+struct ControlCenterContentPage<Content: View>: View {
+    let spacing: CGFloat
+    private let content: Content
+
+    init(
+        spacing: CGFloat = ControlCenterMetrics.sectionSpacing,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.spacing = spacing
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: spacing) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .contentMargins(
+            .horizontal,
+            ControlCenterMetrics.contentInset,
+            for: .scrollContent
+        )
+        .contentMargins(
+            .vertical,
+            ControlCenterMetrics.contentInset,
+            for: .scrollContent
+        )
+    }
 }
 
 struct ControlCenterReadingPage<Content: View>: View {
@@ -26,12 +59,12 @@ struct ControlCenterReadingPage<Content: View>: View {
         }
         .contentMargins(
             .horizontal,
-            ControlCenterMetrics.readingInset,
+            ControlCenterMetrics.contentInset,
             for: .scrollContent
         )
         .contentMargins(
             .vertical,
-            ControlCenterMetrics.readingInset,
+            ControlCenterMetrics.contentInset,
             for: .scrollContent
         )
     }
