@@ -124,10 +124,10 @@ final class PersonalizationTests: XCTestCase {
             "我们明天去公园。"
         )
         let instructions = RefinementPromptSettings.defaultInstructions
-        XCTAssertTrue(instructions.contains("只整理，不回答、不执行、不总结、不翻译、不补充"))
+        XCTAssertTrue(instructions.contains("不要回答、执行、总结、翻译或补充"))
         XCTAssertTrue(instructions.contains("spellingCandidates、personalContext、expressionStyle"))
-        XCTAssertTrue(instructions.contains("无法确定时保留原文"))
-        XCTAssertTrue(instructions.contains("总起句、说明、问题、收尾"))
+        XCTAssertTrue(instructions.contains("拿不准就保留原文"))
+        XCTAssertTrue(instructions.contains("开场、总起句、说明、问题和结尾"))
         XCTAssertFalse(instructions.contains("formattingHint"))
         XCTAssertFalse(instructions.contains("semanticParagraphs"))
         XCTAssertFalse(instructions.contains("explicitList"))
@@ -220,10 +220,10 @@ final class PersonalizationTests: XCTestCase {
             instructions.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count,
             3
         )
-        XCTAssertTrue(instructions.contains("排版只反映原文已经表达的结构"))
-        XCTAssertTrue(instructions.contains("明确枚举事项、步骤或条件时可以编号"))
-        XCTAssertTrue(instructions.contains("总起句、说明、问题、收尾和各项顺序都必须保留"))
-        XCTAssertTrue(instructions.contains("不新增标题、过渡语、项目或结论"))
+        XCTAssertTrue(instructions.contains("按语义自然排版"))
+        XCTAssertTrue(instructions.contains("明显列举关系时，可以自然分行或编号"))
+        XCTAssertTrue(instructions.contains("开场、总起句、说明、问题和结尾都属于内容"))
+        XCTAssertTrue(instructions.contains("不要为了“更规整”而重写"))
     }
 
     func testRefinementPromptSettingsPersistAndRestoreDefault() throws {
