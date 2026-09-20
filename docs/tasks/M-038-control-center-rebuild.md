@@ -85,12 +85,15 @@ The shell is uniform; the content presentation is not forced into one control ty
 - [x] Stop Permissions from unconditional refresh on every page revisit.
 - [x] Align Diagnostics selected-message margins with the shared dense-workspace metric.
 - [x] Rewrite `docs/ui-design.md` Control Center rules.
+- [x] Remove the NavigationSplitView-generated sidebar toggle and provide one persistent shell-owned toolbar toggle so page toolbar/search changes cannot replace it.
+- [x] Apply the same 28 pt scroll-content grid to Overview, Dictionary, Personal Memory, Settings and Permissions.
 - [x] Run Xcode 27 compile/tests.
 - [ ] Owner signed-app visual/interaction check.
 
 ## Acceptance criteria
 
 - [ ] Sidebar remains mounted when switching every section.
+- [ ] The top sidebar show/hide button remains visually stable while switching sections with different search/toolbars.
 - [ ] Section switching changes only routed content, not the outer split/navigation shell.
 - [ ] Overview, Dictionary, Memory, Settings and Permissions align to one shared page content grid.
 - [ ] Dictionary remains compact and Memory remains narrative while both use the same shell/margins.
@@ -119,7 +122,14 @@ GitHub Actions `macOS 27 CI` run #251 passed on 2026-09-20:
 
 The test log still contains temporary SQLite cleanup warnings about WAL/SHM files being unlinked while an in-memory test store is being torn down; they did not fail the suite and are not treated as Control Center acceptance evidence.
 
-Owner video review after PR #87 exposed a design error: the rewrite correctly stabilized the shell, but incorrectly interpreted “Apple-native” as “convert every content page into Form/List.” That flattened the Overview, turned the Dictionary into a long database-like list, and regressed Personal Memory into the exact list presentation the owner had already rejected.
+Owner video review after PR #87 exposed two separate defects:
+
+1. the page-body design was flattened into Form/List even where the information architecture called for dashboard/grid/narrative presentation;
+2. the top sidebar show/hide button visibly disappeared/reappeared during some section transitions because it was still the default `NavigationSplitView` toolbar item while child pages installed different `.toolbar` / `.searchable` preferences.
+
+Apple explicitly supports removing the default `.sidebarToggle` and placing an app-owned sidebar toggle toolbar item. M-038 now does that at the persistent shell level, bound directly to `columnVisibility`, so the toggle has one owner for the entire window lifetime.
+
+Owner video review after PR #87 also exposed a design error: the rewrite correctly stabilized the shell, but incorrectly interpreted “Apple-native” as “convert every content page into Form/List.” That flattened the Overview, turned the Dictionary into a long database-like list, and regressed Personal Memory into the exact list presentation the owner had already rejected.
 
 The corrective rule is: **standardize shell, navigation, spacing and system controls; preserve the page-specific information architecture that fits the content.** Native does not mean visually identical page bodies.
 
