@@ -317,9 +317,12 @@ struct MorieSettingsView: View {
             } header: {
                 Text("输入与润色")
             } footer: {
-                Text(
-                    "Morie 保留原意和语气，整理口头语、标点、段落与明确的列表结构。关闭润色后，字典仍然生效。"
-                )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(refinementModels.mode.detail)
+                    Text(
+                        "Morie 保留原意和语气，整理口头语、标点、段落与明确的列表结构。关闭润色后，字典仍然生效。"
+                    )
+                }
             }
 
             Section {
@@ -364,7 +367,7 @@ struct MorieSettingsView: View {
                 Text("个人化")
             } footer: {
                 Text(
-                    "个人记忆用于稳定上下文；字典与表达习惯只从你确认或修改过的 Morie 输入中学习。"
+                    "关闭个人记忆只会停止继续学习和润色引用，已有内容仍会保留。字典与表达习惯只从你确认或修改过的 Morie 输入中学习。"
                 )
             }
 
@@ -399,7 +402,6 @@ struct MorieSettingsView: View {
                                         refinementPrompts.instructions
                                 }
                             }
-                            .keyboardShortcut(.defaultAction)
                         }
 
                         if let message =
@@ -423,23 +425,32 @@ struct MorieSettingsView: View {
                     isExpanded: $cloudExpanded
                 ) {
                     VStack(alignment: .leading, spacing: 12) {
-                        TextField(
-                            "Base URL",
-                            text: $cloudBaseURL,
-                            prompt:
-                                Text("https://api.example.com/v1")
-                        )
+                        LabeledContent("Base URL") {
+                            TextField(
+                                "Base URL",
+                                text: $cloudBaseURL,
+                                prompt:
+                                    Text("https://api.example.com/v1")
+                            )
+                            .frame(maxWidth: 360)
+                        }
 
-                        TextField(
-                            "模型",
-                            text: $cloudModelName,
-                            prompt: Text("model-name")
-                        )
+                        LabeledContent("模型") {
+                            TextField(
+                                "模型",
+                                text: $cloudModelName,
+                                prompt: Text("model-name")
+                            )
+                            .frame(maxWidth: 360)
+                        }
 
-                        SecureField(
-                            "API Key（留空保持现有）",
-                            text: $cloudAPIKey
-                        )
+                        LabeledContent("API Key") {
+                            SecureField(
+                                "留空保持现有",
+                                text: $cloudAPIKey
+                            )
+                            .frame(maxWidth: 360)
+                        }
 
                         LabeledContent(
                             "状态",
@@ -490,7 +501,7 @@ struct MorieSettingsView: View {
                 Text("模型与提示词")
             } footer: {
                 Text(
-                    "外部 API 兼容 OpenAI Chat Completions。API Key 仅保存在 macOS 钥匙串。"
+                    "外部 API 兼容 OpenAI Chat Completions。API Key 仅保存在 macOS 钥匙串；无需鉴权的本地服务可以留空。"
                 )
             }
 
