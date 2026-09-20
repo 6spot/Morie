@@ -33,7 +33,7 @@ final class CaptureSessionController {
         let locale: Locale
         let dictionaryWords: [String]
         let inputRefinementEnabled: Bool
-        let refinementModelConfiguration: RefinementModelConfiguration
+        let refinementConfiguration: RefinementConfiguration
         let correctionSuggestionsEnabled: Bool
         let expressionLearningEnabled: Bool
         let soundFeedbackEnabled: Bool
@@ -60,7 +60,7 @@ final class CaptureSessionController {
     private let personalizer: CapturePersonalizer?
     private let postInsertionLearning: PostInsertionLearningController?
     private let memoryLearning: MemoryLearningController?
-    private let resolveRefinementModelConfiguration: (RefinementModelConfiguration) -> RefinementModelConfiguration
+    private let resolveRefinementConfiguration: (RefinementConfiguration) -> RefinementConfiguration
     private let speechLocale = Locale(identifier: "zh-CN")
 
     private(set) var phase: Phase = .idle
@@ -83,7 +83,7 @@ final class CaptureSessionController {
         postInsertionLearning: PostInsertionLearningController?,
         memoryLearning: MemoryLearningController?,
         inputRefinementEnabled: Bool,
-        resolveRefinementModelConfiguration: @escaping (RefinementModelConfiguration) -> RefinementModelConfiguration = { $0 },
+        resolveRefinementConfiguration: @escaping (RefinementConfiguration) -> RefinementConfiguration = { $0 },
         correctionSuggestionsEnabled: Bool,
         expressionLearningEnabled: Bool,
         soundFeedbackEnabled: Bool
@@ -95,7 +95,7 @@ final class CaptureSessionController {
         self.postInsertionLearning = postInsertionLearning
         self.memoryLearning = memoryLearning
         self.inputRefinementEnabled = inputRefinementEnabled
-        self.resolveRefinementModelConfiguration = resolveRefinementModelConfiguration
+        self.resolveRefinementConfiguration = resolveRefinementConfiguration
         self.correctionSuggestionsEnabled = correctionSuggestionsEnabled
         self.expressionLearningEnabled = expressionLearningEnabled
         self.soundFeedbackEnabled = soundFeedbackEnabled
@@ -142,7 +142,7 @@ final class CaptureSessionController {
 
     func start(
         deliveryMode: CaptureDeliveryMode,
-        refinementModelConfiguration: RefinementModelConfiguration
+        refinementConfiguration: RefinementConfiguration
     ) {
         guard !isActive, let captureStore else { return }
 
@@ -153,7 +153,7 @@ final class CaptureSessionController {
             locale: speechLocale,
             dictionaryWords: (try? dictionary?.speechHints()) ?? [],
             inputRefinementEnabled: inputRefinementEnabled,
-            refinementModelConfiguration: refinementModelConfiguration,
+            refinementConfiguration: refinementConfiguration,
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
             expressionLearningEnabled: expressionLearningEnabled,
             soundFeedbackEnabled: soundFeedbackEnabled,
@@ -492,15 +492,15 @@ final class CaptureSessionController {
             let deliveryMode = try captureStore.completeRecognition(finalText, for: sessionID)
             if let personalizer {
                 setPhase(.refining)
-                let modelConfiguration = resolveRefinementModelConfiguration(
-                    sessionContext.refinementModelConfiguration
+                let refinementConfiguration = resolveRefinementConfiguration(
+                    sessionContext.refinementConfiguration
                 )
                 finalText = try await personalizer.refine(
                     sessionID,
                     enabled: sessionContext.inputRefinementEnabled,
                     expressionStyleEnabled: sessionContext.expressionLearningEnabled,
                     otherModelWorkActive: memoryLearning?.isModelBusy == true,
-                    modelConfiguration: modelConfiguration
+                    configuration: refinementConfiguration
                 )
                 recordLatency("refinement-final", sessionID: sessionID)
                 Diagnostics.recordMemory("refinement-finish \(label(sessionID))")
