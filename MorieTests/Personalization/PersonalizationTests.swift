@@ -4,6 +4,60 @@ import XCTest
 
 @MainActor
 final class PersonalizationTests: XCTestCase {
+    func testRefinementModelControllerDoesNotReadKeychainUntilExternalRefinementNeedsIt() {
+        var credentialReads = 0
+        let controller = RefinementModelController(
+            load: {
+                RefinementModelConfiguration(
+                    mode: .cloud,
+                    cloudBaseURL: "https://example.com/v1",
+                    cloudModelName: "test-model",
+                    cloudAPIKey: "must-not-be-loaded"
+                )
+            },
+            credentialReader: {
+                credentialReads += 1
+                return "runtime-secret"
+            }
+        )
+
+        XCTAssertEqual(credentialReads, 0)
+        XCTAssertEqual(controller.configuration.cloudAPIKey, "")
+
+        let frozen = controller.configuration
+        XCTAssertEqual(credentialReads, 0)
+
+        let first = controller.runtimeConfiguration(for: frozen)
+        XCTAssertEqual(credentialReads, 1)
+        XCTAssertEqual(first.cloudAPIKey, "runtime-secret")
+
+        let second = controller.runtimeConfiguration(for: frozen)
+        XCTAssertEqual(credentialReads, 1)
+        XCTAssertEqual(second.cloudAPIKey, "runtime-secret")
+    }
+
+    func testLocalRefinementNeverReadsExternalCredential() {
+        var credentialReads = 0
+        let controller = RefinementModelController(
+            load: {
+                RefinementModelConfiguration(
+                    mode: .local,
+                    cloudBaseURL: "https://example.com/v1",
+                    cloudModelName: "test-model",
+                    cloudAPIKey: ""
+                )
+            },
+            credentialReader: {
+                credentialReads += 1
+                return "unused"
+            }
+        )
+
+        let frozen = controller.configuration
+        XCTAssertEqual(controller.runtimeConfiguration(for: frozen).mode, .local)
+        XCTAssertEqual(credentialReads, 0)
+    }
+
     func testBasicCleanupRemovesFillerAndFormatsExistingStructureWithoutMemory() throws {
         let cases = [
             ("嗯 我我今天想说的就是说先做设置", "我今天想说先做设置。"),

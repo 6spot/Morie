@@ -7,6 +7,7 @@
 
 /* Begin PBXBuildFile section */
 		A50000000000000000000001 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
+		A50000000000000000000004 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
 		A50000000000000000000002 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000001 /* FoundationModelsUtilities */; };
 		A50000000000000000000003 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000002 /* FoundationModelsUtilities */; };
 		A10000000000000000000001 /* MorieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* MorieApp.swift */; };
@@ -588,6 +589,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A50000000000000000000004 /* RefinementModelSettings.swift in Sources */,
 				A2000000000000000000001D /* CaptureHUD.swift in Sources */,
 				A2000000000000000000001E /* CaptureHUDTests.swift in Sources */,
 				A2000000000000000000001A /* PermissionSetupController.swift in Sources */,

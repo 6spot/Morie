@@ -97,7 +97,9 @@ Morie/
 │   │   ├── Capabilities/CapabilityGate.swift
 │   │   ├── Input/PushToTalkHotkey.swift
 │   │   ├── TextDelivery/TextInjector.swift
-│   │   └── Cloud/ICloudSyncSettings.swift
+│   │   └── Cloud/
+│   │       ├── ICloudSyncSettings.swift
+│   │       └── RefinementModelSettings.swift
 │   ├── Support/
 │   │   └── Diagnostics.swift
 │   ├── Resources/
@@ -126,7 +128,7 @@ Morie/
     └── tasks/
 ```
 
-The feature-first layout keeps files that change together near each other. `Platform/` owns macOS/Apple integration that is not itself a product feature, `Support/` holds cross-cutting diagnostics, and `App/` remains the composition/orchestration shell. Tests mirror the same feature boundaries. This is organizational only: target membership, runtime ownership and visibility do not change.
+The feature-first layout keeps files that change together near each other. `Platform/` owns macOS/Apple integration that is not itself a product feature, `Support/` holds cross-cutting diagnostics, and `App/` remains the composition/orchestration shell. `AppController` coordinates application/session lifecycle rather than owning feature-specific Settings state; external-refinement preferences and Keychain access are owned by `RefinementModelController` in `Platform/Cloud/RefinementModelSettings.swift`. Tests mirror the same feature boundaries. This is organizational only: target membership, runtime ownership and visibility do not change.
 
 Do not extract shared packages merely to match a future diagram. New modules need real ownership/reuse pressure first.
 
@@ -154,7 +156,7 @@ solo configured shortcut activation (Fn / Globe release by default)
 create authoritative capture UUID; cancel optional learning/word observation
   ↓
 snapshot immutable per-Capture runtime context
-(locale + Speech dictionary hints + cleanup/correction/expression/sound preferences)
+(locale + Speech dictionary hints + cleanup model/credential + correction/expression/sound preferences)
   ↓
 durably save the minimal Capture shell + audio destination
 (the only required synchronous History write on the live-input path)
@@ -568,7 +570,9 @@ The non-autosaving write context shares the Capture container without touching C
 
 `Speech → durable recognized text → dictionary corrections → optional cleanup with related personal context → validation → durable final text → delivery`
 
-Basic cleanup runs with an empty or unavailable Memory store. `InputRefiner` creates a fresh Apple `LanguageModelSession`, supplies transcript/dictionary/context as JSON data under the [approved cleanup instructions](input-cleanup.md), and requests complete final text through greedy `@Generable` output. Native token accounting bounds the full prompt, instructions, schema and a response budget of 256–1,536 tokens. Oversized input is declined without truncating the saved text.
+Basic cleanup runs with an empty or unavailable Memory store. External-model Base URL/model preferences load without touching Keychain. `RefinementModelController` resolves a persisted API key only when a completed Capture actually enters external-model refinement, caches that credential for the current process, and combines the resolved value with the immutable per-Capture endpoint/model snapshot at the refinement boundary. Local mode and incomplete external configuration therefore remain Keychain-free at launch; credential failure does not prevent Capture.
+
+`InputRefiner` creates a fresh Apple `LanguageModelSession`, supplies transcript/dictionary/context as JSON data under the [approved cleanup instructions](input-cleanup.md), and requests complete final text through greedy `@Generable` output. Native token accounting bounds the full prompt, instructions, schema and a response budget of 256–1,536 tokens. Oversized input is declined without truncating the saved text.
 
 Foundation Models owns light cleanup and contextual correction through the approved instructions and `@Generable` structured result, but it receives a narrower vocabulary surface than Speech. Speech keeps the full bounded hint set; cleanup receives only transcript-relevant canonical candidates (including close Latin neighbors such as **Coldex → Codex**). Confirmed mappings are deterministic pre-model edits rather than prompt material. The save boundary still rejects empty/control-character payloads and now adds a conservative grounding check for longer generated clauses; clearly unsupported new sentences are rejected and the prepared transcript is used instead. Snapshot freshness, dictionary/Memory changes and durable-save failure remain separate consistency checks.
 

@@ -35,12 +35,15 @@ struct OverviewMetrics {
     }
 }
 
+@MainActor
 struct OverviewView: View {
     @ObservedObject var controller: AppController
+    @ObservedObject private var refinementModels: RefinementModelController
     @Query private var captures: [CaptureRecord]
 
     init(controller: AppController) {
         self.controller = controller
+        _refinementModels = ObservedObject(wrappedValue: controller.refinementModels)
         let capturing = CaptureLifecycle.capturing.rawValue
         _captures = Query(
             filter: #Predicate<CaptureRecord> { $0.lifecycleRawValue != capturing },
@@ -115,9 +118,11 @@ struct OverviewView: View {
 
                         modelRow(
                             title: "输入润色",
-                            name: controller.refinementModelName,
-                            detail: controller.refinementModelDetail,
-                            status: controller.refinementModelStatusTitle
+                            name: refinementModels.modelName,
+                            detail: refinementModels.modelDetail,
+                            status: refinementModels.modelStatusTitle(
+                                inputRefinementEnabled: controller.inputRefinementEnabled
+                            )
                         )
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -46,7 +46,6 @@ final class CaptureSessionController {
     var onPresentFailure: ((String, String) -> Void)?
 
     var inputRefinementEnabled: Bool
-    var refinementModelConfiguration: RefinementModelConfiguration
     var correctionSuggestionsEnabled: Bool
     var expressionLearningEnabled: Bool
     var soundFeedbackEnabled: Bool
@@ -61,6 +60,7 @@ final class CaptureSessionController {
     private let personalizer: CapturePersonalizer?
     private let postInsertionLearning: PostInsertionLearningController?
     private let memoryLearning: MemoryLearningController?
+    private let resolveRefinementModelConfiguration: (RefinementModelConfiguration) -> RefinementModelConfiguration
     private let speechLocale = Locale(identifier: "zh-CN")
 
     private(set) var phase: Phase = .idle
@@ -83,7 +83,7 @@ final class CaptureSessionController {
         postInsertionLearning: PostInsertionLearningController?,
         memoryLearning: MemoryLearningController?,
         inputRefinementEnabled: Bool,
-        refinementModelConfiguration: RefinementModelConfiguration = .local,
+        resolveRefinementModelConfiguration: @escaping (RefinementModelConfiguration) -> RefinementModelConfiguration = { $0 },
         correctionSuggestionsEnabled: Bool,
         expressionLearningEnabled: Bool,
         soundFeedbackEnabled: Bool
@@ -95,7 +95,7 @@ final class CaptureSessionController {
         self.postInsertionLearning = postInsertionLearning
         self.memoryLearning = memoryLearning
         self.inputRefinementEnabled = inputRefinementEnabled
-        self.refinementModelConfiguration = refinementModelConfiguration
+        self.resolveRefinementModelConfiguration = resolveRefinementModelConfiguration
         self.correctionSuggestionsEnabled = correctionSuggestionsEnabled
         self.expressionLearningEnabled = expressionLearningEnabled
         self.soundFeedbackEnabled = soundFeedbackEnabled
@@ -140,7 +140,10 @@ final class CaptureSessionController {
         hud.showFailure()
     }
 
-    func start(deliveryMode: CaptureDeliveryMode) {
+    func start(
+        deliveryMode: CaptureDeliveryMode,
+        refinementModelConfiguration: RefinementModelConfiguration
+    ) {
         guard !isActive, let captureStore else { return }
 
         let sessionID = UUID()
@@ -489,12 +492,15 @@ final class CaptureSessionController {
             let deliveryMode = try captureStore.completeRecognition(finalText, for: sessionID)
             if let personalizer {
                 setPhase(.refining)
+                let modelConfiguration = resolveRefinementModelConfiguration(
+                    sessionContext.refinementModelConfiguration
+                )
                 finalText = try await personalizer.refine(
                     sessionID,
                     enabled: sessionContext.inputRefinementEnabled,
                     expressionStyleEnabled: sessionContext.expressionLearningEnabled,
                     otherModelWorkActive: memoryLearning?.isModelBusy == true,
-                    modelConfiguration: sessionContext.refinementModelConfiguration
+                    modelConfiguration: modelConfiguration
                 )
                 recordLatency("refinement-final", sessionID: sessionID)
                 Diagnostics.recordMemory("refinement-finish \(label(sessionID))")
