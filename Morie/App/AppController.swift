@@ -221,7 +221,7 @@ final class AppController {
 
         Diagnostics.record(
             "App",
-            "Morie controller initialized; launch bootstrap scheduled"
+            "Morie controller initialized; \(AppBuildIdentity.current.logValue); launch bootstrap scheduled"
         )
 
         Task { @MainActor [weak self] in
