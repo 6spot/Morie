@@ -15,9 +15,11 @@ That meant a single page could be invalidated by state it did not render. Permis
 ## Target architecture
 
 ```text
-AppController
+AppController (plain coordinator, not ObservableObject)
 ├── AppRuntimeController
-│   ├── state / transcript
+│   └── state / transcript
+│
+├── AppCapabilityController
 │   ├── needsSetup / setupError
 │   ├── isBootstrapping
 │   └── speechBackend
@@ -37,27 +39,29 @@ AppController
 └── MemoryStore
 ```
 
-`AppController` remains the orchestration/action boundary. It is no longer the broad observable state source for routed pages.
+`AppController` remains only the orchestration/action boundary. It is no longer an `ObservableObject` at all; views observe the focused state domains directly.
 
 ## Implementation
 
 - [x] Added `AppRuntimeController`.
 - [x] Added `AppPreferencesController`.
+- [x] Added `AppCapabilityController`.
 - [x] Removed AppController's `@Published` state ownership.
+- [x] Removed `ObservableObject` conformance from `AppController`.
 - [x] Removed setup -> AppController `objectWillChange` forwarding.
-- [x] Kept AppController actions and compatibility accessors while state storage moved to focused domains.
-- [x] Overview observes runtime + preferences + refinement model only.
+- [x] Removed the compatibility-accessor layer; coordinator code and views address the focused domains directly.
+- [x] Overview observes capability + preferences + refinement model only.
 - [x] Settings observes preferences + refinement model/prompt only.
-- [x] Permissions observes runtime + PermissionSetupController only.
-- [x] Setup window observes runtime + PermissionSetupController only.
-- [x] Menu views observe only runtime/preferences/setup domains they render.
+- [x] Permissions observes runtime + capability + PermissionSetupController only.
+- [x] Setup window observes runtime + capability + PermissionSetupController only.
+- [x] Menu views observe only runtime/capability/preferences/setup domains they render.
 - [x] History no longer observes AppController broadly.
 - [x] Added the new state-domain files to the app target.
 - [x] Updated architecture documentation.
 
 ## Acceptance
 
-- [x] No routed Control Center page uses `@ObservedObject AppController`.
+- [x] `AppController` is not observable and no routed Control Center page can subscribe to it.
 - [x] AppController does not republish `PermissionSetupController.objectWillChange`.
 - [ ] Xcode 27 product compile passes.
 - [ ] MorieTests pass.
