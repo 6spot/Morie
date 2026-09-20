@@ -54,6 +54,7 @@ Morie/
 │   │   ├── AppController.swift
 │   │   ├── AppRuntimeController.swift
 │   │   ├── AppPreferencesController.swift
+│   │   ├── AppCapabilityController.swift
 │   │   └── MorieControlCenter.swift
 │   ├── Features/
 │   │   ├── Overview/
@@ -262,21 +263,28 @@ It coordinates:
 - idle Memory learner startup outside an active capture;
 - application-level failure presentation and scheduled audio maintenance.
 
-`AppController` remains the action boundary for cross-feature operations such as starting a Capture, bootstrapping, changing the hotkey, and enabling iCloud. It deliberately does **not** republish child-controller `objectWillChange` events and no routed Control Center page observes it as a broad `ObservableObject`.
+`AppController` remains the action boundary for cross-feature operations such as starting a Capture, bootstrapping, changing the hotkey, and enabling iCloud. It is a plain `@MainActor` coordinator, not an `ObservableObject`; it publishes nothing and cannot invalidate SwiftUI views.
 
 It does not own the authoritative capture UUID/task bookkeeping, Speech lifecycle, HUD state or text delivery. Those belong to the Capture feature.
 
 ### `AppRuntimeController`
 
-Owns only high-frequency application/runtime presentation state:
+Owns only high-frequency live runtime presentation state:
 
-- visible Capture/bootstrap state;
-- progressive transcript;
+- visible application/Capture state;
+- progressive transcript.
+
+Views that render live Capture state observe this controller directly. A transcript or Capture phase change therefore cannot invalidate Settings, Dictionary, Personal Memory, Overview model metadata or permission data that do not depend on it.
+
+### `AppCapabilityController`
+
+Owns lower-frequency bootstrap/capability presentation state:
+
 - setup-required flag and setup/bootstrap error;
 - bootstrap-in-progress flag;
 - the Speech backend actually prepared for the current runtime.
 
-Views that render runtime status observe this controller directly. A transcript or Capture phase change therefore does not invalidate Settings, Dictionary, Personal Memory or permission data that do not depend on it.
+Overview and permission/setup surfaces observe this controller when they need those values. Capture transcript churn does not propagate through it.
 
 ### `AppPreferencesController`
 
@@ -337,7 +345,7 @@ Owns the authoritative live Capture lifecycle:
 
 One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; shortcut failure, microphone interruption and Speech errors retain a failed Capture. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
 
-`AppController` receives phase/transcript/failure callbacks and writes the visible runtime state into `AppRuntimeController`. Returning a Capture session to idle only returns the visible app state to Ready when the current state is capture-owned; a concurrent blocked/checking state is not overwritten.
+`AppController` receives phase/transcript/failure callbacks and writes them into the focused runtime/capability domains; it does not mirror those values as compatibility properties. Returning a Capture session to idle only returns the visible app state to Ready when the current state is capture-owned; a concurrent blocked/checking state is not overwritten.
 
 Settings remain mutable application preferences, but they are sampled only when a new Capture is accepted. The active Capture never rereads those preference properties during asynchronous Speech startup, finalization, cleanup or post-insertion observation. Dictionary Speech hints and the effective cleanup instructions are likewise resolved once for that Capture. This keeps one interaction deterministic without introducing a generalized provider/session abstraction.
 
