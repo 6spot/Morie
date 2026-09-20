@@ -30,7 +30,7 @@ The current runtime shape is:
 1. **One three-paragraph instruction:** define the cleanup task/content boundary, allowed light edits/protected content, and natural formatting.
 2. **Transcript is the only content source:** every output fact, request, judgment, question, attitude and topic must already be expressed in `transcript`.
 3. **Helper fields are non-content:** `spellingCandidates`, related Memory and Expression Profile may only disambiguate or repair text already expressed. They can never create a new sentence/topic.
-4. **Natural structure, not a classifier:** the model may format explicit spoken enumeration as a list, but any spoken lead-in, explanation, question, closing and item order remain content and must survive. No generated headings/transitions/items are authorized.
+4. **Semantic paragraphing and logic, not a classifier:** paragraph boundaries follow topic/intent/stance/stage/object changes rather than character count. The model should make logical relations already present in speech—parallel, sequence, cause/effect, contrast, condition and whole-to-parts—read clearly through punctuation, paragraphs or lists, without inventing new reasoning. Explicit spoken enumeration may become a list, but any spoken lead-in, explanation, question, closing and item order remain content and must survive. No generated headings/items are authorized.
 5. **Schema-only guided generation:** local Apple refinement keeps `@Generable`, while the field `@Guide` only identifies the final cleaned body instead of repeating the cleanup rules.
 6. **Post-generation grounding:** empty/control-character payloads and clearly unsupported longer clauses are rejected before delivery.
 
