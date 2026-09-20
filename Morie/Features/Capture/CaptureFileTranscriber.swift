@@ -34,9 +34,7 @@ enum CaptureFileTranscriber {
         }
 
         let contextualWords = SpeechContextHints.merged(
-            contextualWords: contextualWords,
-                dictionaryHintCount: dictionaryWords.count,
-                applicationHintCount: applicationContextWords.count,
+            dictionaryWords: dictionaryWords,
             applicationContextWords: applicationContextWords
         )
         Diagnostics.record(
@@ -61,8 +59,8 @@ enum CaptureFileTranscriber {
                         url,
                         locale: fallbackLocale,
                         contextualWords: contextualWords,
-                dictionaryHintCount: dictionaryWords.count,
-                applicationHintCount: applicationContextWords.count
+                        dictionaryHintCount: dictionaryWords.count,
+                        applicationHintCount: applicationContextWords.count
                     )
                 }
                 throw error
