@@ -1,0 +1,4 @@
+// Copy to LocalSigning.xcconfig, or use scripts/setup-local-signing.sh.
+// This example file is tracked; LocalSigning.xcconfig itself is ignored.
+
+MORIE_DEVELOPMENT_TEAM = YOUR_TEAM_ID
