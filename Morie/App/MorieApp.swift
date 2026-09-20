@@ -3,7 +3,7 @@ import SwiftUI
 
 @main
 struct MorieApp: App {
-    @StateObject private var controller: AppController
+    private let controller: AppController
     @Environment(\.openWindow) private var openWindow
     private let captureStore: CaptureStore?
 
@@ -12,9 +12,7 @@ struct MorieApp: App {
         do {
             let store = try CaptureStore(cloudSyncEnabled: wantsICloud)
             captureStore = store
-            _controller = StateObject(
-                wrappedValue: AppController(captureStore: store)
-            )
+            controller = AppController(captureStore: store)
         } catch where wantsICloud {
             // Optional iCloud must never make local input unusable. If the
             // CloudKit-backed SwiftData configuration cannot open, retry the
@@ -22,22 +20,22 @@ struct MorieApp: App {
             do {
                 let store = try CaptureStore(cloudSyncEnabled: false)
                 captureStore = store
-                _controller = StateObject(
-                    wrappedValue: AppController(
-                        captureStore: store,
-                        cloudSyncStartupError: error
-                    )
+                controller = AppController(
+                    captureStore: store,
+                    cloudSyncStartupError: error
                 )
             } catch {
                 captureStore = nil
-                _controller = StateObject(
-                    wrappedValue: AppController(captureStore: nil, persistenceError: error)
+                controller = AppController(
+                    captureStore: nil,
+                    persistenceError: error
                 )
             }
         } catch {
             captureStore = nil
-            _controller = StateObject(
-                wrappedValue: AppController(captureStore: nil, persistenceError: error)
+            controller = AppController(
+                captureStore: nil,
+                persistenceError: error
             )
         }
     }
@@ -144,14 +142,16 @@ private enum MorieApplicationActivation {
 @MainActor
 private struct MorieMenuBarLabel: View {
     let controller: AppController
-    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
     @Environment(\.openWindow) private var openWindow
     @State private var inspectedStartup = false
 
     init(controller: AppController) {
         self.controller = controller
-        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
         _setup = ObservedObject(wrappedValue: controller.setup)
     }
 
@@ -161,7 +161,7 @@ private struct MorieMenuBarLabel: View {
                 guard !inspectedStartup else { return }
                 inspectedStartup = true
                 await setup.refresh()
-                guard runtime.needsSetup || !setup.isReady else { return }
+                guard capabilities.needsSetup || !setup.isReady else { return }
                 MorieApplicationActivation.prepareToOpenWindow()
                 openWindow(id: "setup")
                 NSApplication.shared.activate()
@@ -196,6 +196,7 @@ private struct MorieCommands: Commands {
 private struct MorieMenuContent: View {
     let controller: AppController
     @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var preferences: AppPreferencesController
     @ObservedObject private var setup: PermissionSetupController
     @Environment(\.openWindow) private var openWindow
@@ -203,6 +204,9 @@ private struct MorieMenuContent: View {
     init(controller: AppController) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
         _preferences = ObservedObject(wrappedValue: controller.preferences)
         _setup = ObservedObject(wrappedValue: controller.setup)
     }
@@ -216,11 +220,15 @@ private struct MorieMenuContent: View {
             Task {
                 await setup.refresh()
                 MorieApplicationActivation.prepareToOpenWindow()
-                openWindow(id: runtime.needsSetup || !setup.isReady ? "setup" : "control-center")
+                openWindow(
+                    id: capabilities.needsSetup || !setup.isReady
+                        ? "setup"
+                        : "control-center"
+                )
                 NSApplication.shared.activate()
             }
         }
-        .disabled(runtime.isBootstrapping)
+        .disabled(capabilities.isBootstrapping)
 
         Divider()
 
