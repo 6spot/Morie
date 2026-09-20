@@ -98,7 +98,13 @@ struct MorieControlCenter: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ControlCenterSidebar(selection: $selection)
         } detail: {
-            detail
+            ControlCenterDetailHost(
+                controller: controller,
+                selection: $selection,
+                selectedCaptureID: $selectedCaptureID,
+                selectedDictionaryEntry: $selectedDictionaryEntry,
+                overviewMetricsSnapshot: $overviewMetricsSnapshot
+            )
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
@@ -106,40 +112,78 @@ struct MorieControlCenter: View {
             selection = .settings
         }
     }
+}
+
+@MainActor
+private struct ControlCenterDetailHost: View {
+    let controller: AppController
+    @Binding var selection: ControlCenterSection?
+    @Binding var selectedCaptureID: UUID?
+    @Binding var selectedDictionaryEntry: UUID?
+    @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
+
+    var body: some View {
+        Group {
+            if (selection ?? .overview) == .history {
+                CaptureHistoryWorkspace(
+                    controller: controller,
+                    selection: $selectedCaptureID
+                )
+            } else {
+                NavigationStack {
+                    standardPage
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
 
     @ViewBuilder
-    private var detail: some View {
+    private var standardPage: some View {
         switch selection ?? .overview {
         case .overview:
             OverviewView(
                 controller: controller,
                 metricsSnapshot: $overviewMetricsSnapshot
             )
-        case .history:
-            CaptureHistoryWorkspace(
-                controller: controller,
-                selection: $selectedCaptureID
-            )
+
         case .memory:
             if let memory = controller.memory {
-                NavigationStack {
-                    MemoryView(store: memory)
-                }
+                MemoryView(store: memory)
+            } else {
+                unavailable("个人记忆不可用")
             }
+
         case .dictionary:
             if let dictionary = controller.dictionary {
                 DictionaryView(
                     store: dictionary,
                     selection: $selectedDictionaryEntry
                 )
+            } else {
+                unavailable("字典不可用")
             }
+
         case .settings:
             MorieSettingsView(controller: controller)
+
         case .permissions:
             PermissionManagementView(controller: controller)
+
         case .diagnostics:
             DiagnosticLogView()
+
+        case .history:
+            EmptyView()
         }
+    }
+
+    private func unavailable(_ title: String) -> some View {
+        ContentUnavailableView(
+            title,
+            systemImage: "exclamationmark.triangle",
+            description: Text("记录存储尚未初始化。")
+        )
     }
 }
 
@@ -196,7 +240,7 @@ private struct CaptureHistoryWorkspace: View {
                         selection: $selection
                     )
                 }
-                .frame(minWidth: 250, idealWidth: 300, maxWidth: 380)
+                .frame(minWidth: 240, idealWidth: 300, maxWidth: 340)
 
                 CaptureHistoryDetailPane(
                     controller: controller,
@@ -204,8 +248,9 @@ private struct CaptureHistoryWorkspace: View {
                     selectedCaptureID: selection
                 )
                 .id(selection)
-                .frame(minWidth: 420)
+                .frame(minWidth: 320, maxWidth: .infinity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onAppear {
                 history.setListVisible(true)
             }
