@@ -64,6 +64,12 @@ struct MorieApp: App {
                 }
             }
             .environment(\.locale, Locale(identifier: "zh-Hans"))
+            .onAppear {
+                MorieApplicationActivation.windowDidAppear("control-center")
+            }
+            .onDisappear {
+                MorieApplicationActivation.windowDidDisappear("control-center")
+            }
         }
         .defaultSize(width: 1120, height: 720)
         .commands {
@@ -74,6 +80,12 @@ struct MorieApp: App {
         Window("欢迎使用 Morie", id: "setup") {
             MorieSetupView(controller: controller)
                 .environment(\.locale, Locale(identifier: "zh-Hans"))
+                .onAppear {
+                    MorieApplicationActivation.windowDidAppear("setup")
+                }
+                .onDisappear {
+                    MorieApplicationActivation.windowDidDisappear("setup")
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 700, height: 740)
@@ -81,6 +93,51 @@ struct MorieApp: App {
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
 
+    }
+}
+
+
+@MainActor
+private enum MorieApplicationActivation {
+    private static var visibleWindowIDs = Set<String>()
+
+    static func prepareToOpenWindow() {
+        useRegularPolicy()
+    }
+
+    static func windowDidAppear(_ id: String) {
+        visibleWindowIDs.insert(id)
+        useRegularPolicy()
+    }
+
+    static func windowDidDisappear(_ id: String) {
+        visibleWindowIDs.remove(id)
+        guard visibleWindowIDs.isEmpty else { return }
+
+        let application = NSApplication.shared
+        application.deactivate()
+        guard application.activationPolicy() != .accessory else { return }
+
+        if !application.setActivationPolicy(.accessory) {
+            Diagnostics.record(
+                "UI",
+                "Failed to restore accessory activation policy after closing Morie windows.",
+                level: .warning
+            )
+        }
+    }
+
+    private static func useRegularPolicy() {
+        let application = NSApplication.shared
+        guard application.activationPolicy() != .regular else { return }
+
+        if !application.setActivationPolicy(.regular) {
+            Diagnostics.record(
+                "UI",
+                "Failed to switch to regular activation policy for Morie window.",
+                level: .warning
+            )
+        }
     }
 }
 
@@ -97,8 +154,9 @@ private struct MorieMenuBarLabel: View {
                 inspectedStartup = true
                 await controller.setup.refresh()
                 guard controller.needsSetup || !controller.setup.isReady else { return }
+                MorieApplicationActivation.prepareToOpenWindow()
                 openWindow(id: "setup")
-                NSApplication.shared.activate(ignoringOtherApps: true)
+                NSApplication.shared.activate()
             }
     }
 }
@@ -114,8 +172,9 @@ private struct MorieCommands: Commands {
         CommandGroup(replacing: .appSettings) {
             Button("设置…") {
                 Task { @MainActor in
+                    MorieApplicationActivation.prepareToOpenWindow()
                     openWindow(id: "control-center")
-                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    NSApplication.shared.activate()
                     await Task.yield()
                     NotificationCenter.default.post(name: .morieShowSettings, object: nil)
                 }
@@ -138,8 +197,9 @@ private struct MorieMenuContent: View {
         Button("打开 Morie") {
             Task {
                 await controller.setup.refresh()
+                MorieApplicationActivation.prepareToOpenWindow()
                 openWindow(id: controller.needsSetup || !controller.setup.isReady ? "setup" : "control-center")
-                NSApplication.shared.activate(ignoringOtherApps: true)
+                NSApplication.shared.activate()
             }
         }
         .disabled(controller.isBootstrapping)

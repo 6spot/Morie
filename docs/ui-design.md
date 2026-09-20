@@ -96,6 +96,8 @@ The current menu-bar shell should stay system-native. As Phase 0 adds visible re
 
 The menu-bar extra uses the system `.menu` presentation. It contains textual status, **打开 Morie**, a native **设置…** link, **使用引导与权限…**, recording-shortcut guidance and **退出 Morie**. Navigation belongs in the management window. Settings and setup each have one native window shared by all entry points; the menu does not embed a custom panel or transcript preview.
 
+Because Morie is an `LSUIElement` app, its idle activation policy is accessory and therefore has no application menu bar. When a real management/setup window is visible, Morie temporarily uses AppKit's regular activation policy before activation so macOS can present the native application menus and keyboard/window behavior. Closing the last Morie window returns to accessory mode; do not permanently turn Morie into a Dock app and do not replace the missing menu with a custom imitation.
+
 ## Language and system conventions
 
 The current app's primary language is Simplified Chinese (`zh-Hans`), including app-owned controls, errors, accessibility descriptions and privacy usage strings. Keep user input, dictionary spelling, prompts, persisted raw values, external application names and technical diagnostics intact. Format display dates in Chinese while retaining the user's time zone.
