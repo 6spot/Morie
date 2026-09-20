@@ -15,9 +15,9 @@ actor ApplicationContextCollector {
         static let focusedCharacters = 3_000
         static let nearbyCharacters = 6_000
         static let ancestorDepth = 6
-        static let nearbyNodes = 48
+        static let nearbyNodes = 96
         static let siblingRadius = 4
-        static let childrenPerNode = 12
+        static let childrenPerNode = 24
         static let messagingTimeout: Float = 0.05
     }
 
@@ -174,11 +174,9 @@ actor ApplicationContextCollector {
                 remainingCharacters: &remainingCharacters
             )
 
-            let children = childElements(of: element)
+            let children = prioritizedChildElements(of: element)
             if !children.isEmpty {
-                queue.append(
-                    contentsOf: children.prefix(Limit.childrenPerNode)
-                )
+                queue.append(contentsOf: children)
             }
         }
     }
@@ -230,10 +228,54 @@ actor ApplicationContextCollector {
         else {
             return []
         }
-        for child in children.prefix(Limit.childrenPerNode) {
+        for child in children {
             configureTimeout(child)
         }
         return children
+    }
+
+    /// Prefer currently visible descendants because they best approximate the
+    /// text the user can actually see near the focused editor. Some web apps do
+    /// not expose a useful AXVisibleChildren list; in that case, sample both the
+    /// tail and head of very large containers. The tail is intentionally first
+    /// because chat/document composers commonly sit after their recent content.
+    private func prioritizedChildElements(
+        of element: AXUIElement
+    ) -> [AXUIElement] {
+        guard !Task.isCancelled else { return [] }
+
+        if let value = copyAttribute(kAXVisibleChildrenAttribute, from: element),
+           let visibleChildren = value as? [AXUIElement],
+           !visibleChildren.isEmpty {
+            let bounded = Array(
+                visibleChildren.prefix(Limit.childrenPerNode)
+            )
+            for child in bounded {
+                configureTimeout(child)
+            }
+            return bounded
+        }
+
+        let children = childElements(of: element)
+        guard children.count > Limit.childrenPerNode else {
+            return children
+        }
+
+        let tailCount = (Limit.childrenPerNode * 2) / 3
+        let headCount = Limit.childrenPerNode - tailCount
+        var result: [AXUIElement] = []
+        result.reserveCapacity(Limit.childrenPerNode)
+
+        for child in children.suffix(tailCount) {
+            result.append(child)
+        }
+        for child in children.prefix(headCount) {
+            if !result.contains(where: { CFEqual($0, child) }) {
+                result.append(child)
+            }
+        }
+
+        return result
     }
 
     private func copyElement(
