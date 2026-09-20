@@ -282,19 +282,46 @@ private enum RefinementOutputGuard {
         let outputSemantic = semanticText(output)
         guard !outputSemantic.isEmpty else { return false }
 
-        let separators = CharacterSet(charactersIn: "。！？!?；;\n\r")
+        // Memory notes never enter the refinement prompt anymore, but keep a
+        // deterministic local guard against accidental/contextual reuse. Split
+        // on clause punctuation so a model cannot evade the boundary by copying
+        // only one comma-delimited fragment of an older memory.
+        let separators = CharacterSet(charactersIn: "。！？!?；;，,：:\n\r")
         for match in input.context {
             for clause in match.memory.notes.components(separatedBy: separators) {
                 let candidate = semanticText(clause)
                 let counts = scriptCounts(candidate)
                 let meaningful = counts.cjk >= 4 || (counts.cjk == 0 && counts.latin >= 12)
                 guard meaningful else { continue }
+
                 if outputSemantic.contains(candidate) && !sourceSemantic.contains(candidate) {
                     return true
+                }
+
+                for fragment in contextLeakageFragments(candidate, counts: counts) {
+                    if outputSemantic.contains(fragment) && !sourceSemantic.contains(fragment) {
+                        return true
+                    }
                 }
             }
         }
         return false
+    }
+
+    private static func contextLeakageFragments(
+        _ candidate: String,
+        counts: (cjk: Int, latin: Int, total: Int)
+    ) -> [String] {
+        // Exact long CJK spans are strong evidence that output borrowed wording
+        // from context rather than transcript. Ten semantic characters keeps the
+        // guard conservative enough to avoid ordinary short phrase collisions.
+        guard counts.cjk >= 10 else { return [] }
+        let characters = Array(candidate)
+        guard characters.count > 10 else { return [] }
+
+        return (0...(characters.count - 10)).map {
+            String(characters[$0..<($0 + 10)])
+        }
     }
 
     private static func changesPrimaryScript(_ output: String, source: String) -> Bool {
