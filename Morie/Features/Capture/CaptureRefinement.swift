@@ -123,26 +123,55 @@ extension ValidatedRefinement {
 private enum RefinementOutputGuard {
     static func validate(_ output: String, source: String, input: RefinementInput) throws {
         guard !looksLikeAssistantAnswer(output, source: source) else {
-            throw RefinementReason.invalidEdits
+            try reject("assistantAnswer", input: input, source: source, output: output)
         }
         guard !claimsExecution(output, source: source) else {
-            throw RefinementReason.invalidEdits
+            try reject("claimsExecution", input: input, source: source, output: output)
         }
         guard preservesSemanticRelations(output, source: source) else {
-            throw RefinementReason.invalidEdits
+            try reject("semanticRelationChanged", input: input, source: source, output: output)
         }
         guard preservesProtectedFacts(output, source: source, input: input) else {
-            throw RefinementReason.invalidEdits
+            try reject("protectedFactChanged", input: input, source: source, output: output)
         }
         guard !introducesContextOnlyContent(output, source: source, input: input) else {
-            throw RefinementReason.invalidEdits
+            try reject("contextOnlyContentIntroduced", input: input, source: source, output: output)
         }
         guard !changesPrimaryScript(output, source: source) else {
-            throw RefinementReason.invalidEdits
+            try reject("primaryScriptChanged", input: input, source: source, output: output)
         }
         guard !isExtremeExpansion(output, source: source) else {
-            throw RefinementReason.invalidEdits
+            try reject("extremeExpansion", input: input, source: source, output: output)
         }
+    }
+
+    private static func reject(
+        _ rule: String,
+        input: RefinementInput,
+        source: String,
+        output: String
+    ) throws -> Never {
+        DevelopmentDiagnostics.record(
+            "RefinementGuard",
+            captureID: input.captureID,
+            level: .warning,
+            "rejected; rule=\(rule); sourceCharacters=\(source.count); outputCharacters=\(output.count)"
+        )
+        DevelopmentDiagnostics.text(
+            "RefinementGuard",
+            captureID: input.captureID,
+            label: "source",
+            source,
+            limit: 16_000
+        )
+        DevelopmentDiagnostics.text(
+            "RefinementGuard",
+            captureID: input.captureID,
+            label: "output",
+            output,
+            limit: 16_000
+        )
+        throw RefinementReason.invalidEdits
     }
 
     private static func looksLikeAssistantAnswer(_ output: String, source: String) -> Bool {
