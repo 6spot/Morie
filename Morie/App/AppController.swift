@@ -223,6 +223,7 @@ final class AppController {
             "App",
             "Morie controller initialized; \(AppBuildIdentity.current.logValue); launch bootstrap scheduled"
         )
+        DevelopmentDiagnostics.recordEnvironment()
 
         Task { @MainActor [weak self] in
             await self?.bootstrap()
