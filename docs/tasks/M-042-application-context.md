@@ -58,7 +58,8 @@ Secure text fields contribute no selected/focused/nearby text.
 - [x] Dictionary hints retain priority when transient Application Context hints are merged.
 - [x] Live Speech and saved-audio re-recognition receive the same ephemeral vocabulary.
 - [x] Context collection never gates capture startup; late hints update Speech best-effort.
-- [ ] Latest Xcode 27 product compile passes.
+- [x] Latest Xcode 27 product compile passes.
+- [x] MorieTests pass with Application Context vocabulary and Memory-isolation coverage.
 - [ ] Real-device validation records actual coverage in Chrome/ChatGPT.
 - [ ] Real-device validation records actual coverage in Xcode.
 - [ ] Real-device validation records actual coverage in WeChat.
