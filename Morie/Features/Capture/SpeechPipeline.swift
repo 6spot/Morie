@@ -193,6 +193,27 @@ actor SpeechPipeline {
 
         do {
             if let error = completion.error { throw error }
+
+            if !hasTranscriptEvidence, completion.sourceAudio.hasMeaningfulAudio == false {
+                Diagnostics.record(
+                    "SpeechQuality",
+                    "No speech evidence for \(session); skipping analyzer finalization and accurate retry"
+                )
+                analysisTask.cancel()
+                resultTask?.cancel()
+                await analyzer.cancelAndFinishNow()
+                _ = await analysisTask.result
+                _ = await resultTask?.result
+
+                let result = snapshot(sourceAudio: completion.sourceAudio)
+                Diagnostics.record(
+                    "Speech",
+                    "Fast no-speech stop completed for \(session)"
+                )
+                reset(sessionID: sessionID)
+                return result
+            }
+
             let lastSampleTime = try await analysisTask.value
             try requireActiveSession(sessionID)
 
@@ -265,7 +286,9 @@ actor SpeechPipeline {
         switch backend {
         case .speechTranscriber(let locale):
             let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
-            let converter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
+            let detector = SpeechDetector()
+            let modules: [any SpeechModule] = [detector, transcriber]
+            let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
             try requireActiveSession(sessionID)
 
             let source = try CaptureAudioSource(
@@ -274,7 +297,7 @@ actor SpeechPipeline {
                 destinationURL: sourceAudioURL,
                 onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
-            let analyzer = SpeechAnalyzer(modules: [transcriber])
+            let analyzer = SpeechAnalyzer(modules: modules)
             try await applyDictionaryContext(dictionaryWords, analyzer: analyzer, sessionID: sessionID)
 
             let task = Task {
@@ -302,7 +325,9 @@ actor SpeechPipeline {
 
         case .dictationTranscriber(let locale):
             let transcriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
-            let converter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
+            let detector = SpeechDetector()
+            let modules: [any SpeechModule] = [detector, transcriber]
+            let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
             try requireActiveSession(sessionID)
 
             let source = try CaptureAudioSource(
@@ -311,7 +336,7 @@ actor SpeechPipeline {
                 destinationURL: sourceAudioURL,
                 onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
-            let analyzer = SpeechAnalyzer(modules: [transcriber])
+            let analyzer = SpeechAnalyzer(modules: modules)
             try await applyDictionaryContext(dictionaryWords, analyzer: analyzer, sessionID: sessionID)
 
             let task = Task {
@@ -394,8 +419,10 @@ actor SpeechPipeline {
         case .speechTranscriber(let locale):
             let liveTranscriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
             let finalTranscriber = SpeechTranscriber(locale: locale, preset: .transcription)
+            let detector = SpeechDetector()
+            let modules: [any SpeechModule] = [detector, liveTranscriber, finalTranscriber]
             if let installation = try await AssetInventory.assetInstallationRequest(
-                supporting: [liveTranscriber, finalTranscriber]
+                supporting: modules
             ) {
                 Diagnostics.record("Speech", "SpeechTranscriber live/final asset installation required")
                 try await installation.downloadAndInstall()
@@ -407,8 +434,10 @@ actor SpeechPipeline {
         case .dictationTranscriber(let locale):
             let liveTranscriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
             let finalTranscriber = DictationTranscriber(locale: locale, preset: .longDictation)
+            let detector = SpeechDetector()
+            let modules: [any SpeechModule] = [detector, liveTranscriber, finalTranscriber]
             if let installation = try await AssetInventory.assetInstallationRequest(
-                supporting: [liveTranscriber, finalTranscriber]
+                supporting: modules
             ) {
                 Diagnostics.record("Speech", "DictationTranscriber live/final asset installation required")
                 try await installation.downloadAndInstall()
