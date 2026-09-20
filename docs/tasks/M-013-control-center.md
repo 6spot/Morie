@@ -33,6 +33,10 @@ extra navigation level.
 - The Control Center owns one stable root `NavigationSplitView`. Changing the
   selected section replaces only the detail workspace; it must not swap the
   entire split-view hierarchy or remount the sidebar.
+- Ordinary right-hand pages follow one System Settings-like content grid:
+  24-point horizontal and vertical scroll-content insets, with native navigation
+  titles/toolbars outside that content inset. Dense workspaces such as History
+  remain edge-to-edge.
 - The shell does not observe the whole `AppController`. Runtime state is
   observed only by the currently visible page that needs it, so transcript and
   capture-phase updates cannot invalidate the sidebar/navigation root.
@@ -61,21 +65,34 @@ extra navigation level.
   selection, toolbar/context edit and delete actions, and the existing compact
   editor sheet.
 - Replaced the selection-dependent three-root Control Center implementation
-  with one stable outer shell. History owns a nested native
-  `NavigationSplitView` for its list/detail columns, preserving the original
-  macOS split-view behavior without reconstructing the outer sidebar. An
-  intermediate `HSplitView` experiment was rejected after owner testing
-  because it changed History behavior without delivering a visible UX gain.
+  with one stable outer shell. The follow-up removes the nested
+  `NavigationSplitView` from History because two navigation owners inside the
+  same window compete for titles, toolbars and sidebar behavior. History now
+  keeps the stable outer navigation shell and uses a native split workspace;
+  its list is wrapped in its own `NavigationStack` so search/title/toolbar
+  behavior remains local to the History list instead of leaking into the outer
+  sidebar.
 - Removed `@ObservedObject AppController` from the Control Center shell. Views
   such as Overview, History, Settings and Permissions keep their own scoped
   observation only while visible.
 - Added shared Control Center scroll-content margins and applied them to
   Overview, Personal Memory, Dictionary, Settings, Permissions, diagnostics
-  detail and reading-detail surfaces.
+  detail and reading-detail surfaces. The grid is now one 24-point inset on
+  both axes so right-hand pages align consistently instead of mixing 28-point
+  horizontal and 24-point vertical offsets.
 - Removed the extra large in-body Personal Memory title so top-level pages use
   the native navigation title consistently.
 - Personal Memory and Dictionary now avoid repeated full store reloads when the
   user merely switches away and back.
+- History no longer recreates an all-record `@Query` each time its section is
+  selected. `CaptureHistoryController` retains the loaded page, checks a cheap
+  count/latest-update signature when History becomes visible again, and reloads
+  only after capture mutations or when that signature changes. New completed
+  captures, deletion and re-recognition explicitly invalidate the retained
+  snapshot.
+- Permissions no longer runs a full capability inspection every time the user
+  switches back to that page when a valid snapshot already exists; explicit
+  recheck and permission actions remain fresh.
 - Overview no longer owns an always-recreated all-Capture `@Query`. The
   Control Center retains one metrics snapshot for the window session; returning
   to Overview first checks only completed-record count and the latest
@@ -90,6 +107,8 @@ extra navigation level.
 - Isolated macOS 27 logic suite: **103 tests passed**, 0 failures and 0 skips.
 - Source audit found no remaining `SettingsLink`, nested filter `Menu`, or
   **使用引导与权限** product-code entry; `git diff --check` passed.
+- Added History controller coverage for retaining an off-screen list snapshot
+  and refreshing it only after invalidation when the page becomes visible.
 - Signed-app interaction/layout acceptance: pending.
 - Recheck the activation transition on owner hardware: menu-bar-only idle must
   have no Dock presence; opening Control Center/setup must show Morie's normal
