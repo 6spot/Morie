@@ -136,6 +136,41 @@ final class CaptureAudioStreamTests: XCTestCase {
         XCTAssertEqual(completion.sourceAudio.hasMeaningfulAudio, true)
     }
 
+    func testRecognitionRejectionClassifierTreatsRecogRejectedAsOutcome() {
+        let error = NSError(
+            domain: "com.apple.SpeechRecognition",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Recog Rejected"]
+        )
+
+        XCTAssertTrue(SpeechRecognitionFailureClassifier.isRejection(error))
+    }
+
+    func testRecognitionRejectionClassifierDoesNotSwallowOperationalFailure() {
+        let error = NSError(
+            domain: NSCocoaErrorDomain,
+            code: 4097,
+            userInfo: [NSLocalizedDescriptionKey: "Connection to speech service was interrupted"]
+        )
+
+        XCTAssertFalse(SpeechRecognitionFailureClassifier.isRejection(error))
+    }
+
+    func testRecognitionRejectionClassifierFindsUnderlyingRejection() {
+        let underlying = NSError(
+            domain: "com.apple.SpeechRecognition",
+            code: 2,
+            userInfo: [NSLocalizedFailureReasonErrorKey: "Recognition rejected"]
+        )
+        let wrapper = NSError(
+            domain: NSCocoaErrorDomain,
+            code: 0,
+            userInfo: [NSUnderlyingErrorKey: underlying]
+        )
+
+        XCTAssertTrue(SpeechRecognitionFailureClassifier.isRejection(wrapper))
+    }
+
     func testRuntimeInterruptionPreservesAudioAndFirstError() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

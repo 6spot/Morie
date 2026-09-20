@@ -9,6 +9,7 @@ actor SpeechPipeline {
         case noMicrophone
         case unsupportedLocale
         case notRunning
+        case recognitionRejected(Result?)
         case recognitionFailed(String, Result)
 
         var errorDescription: String? {
@@ -17,6 +18,7 @@ actor SpeechPipeline {
             case .noMicrophone: "没有可用的麦克风。"
             case .unsupportedLocale: "Apple 语音转写暂不支持当前输入语言。"
             case .notRunning: "当前没有正在进行的录音。"
+            case .recognitionRejected: "未识别到可用语音。"
             case .recognitionFailed(let reason, _): reason
             }
         }
@@ -45,6 +47,8 @@ actor SpeechPipeline {
     private var isFinalizing = false
     private var reportedFailure = false
     private var preparedBackend: SpeechRecognitionBackend?
+
+    private static let recognitionUnavailableMessage = "语音识别暂时不可用，请稍后重试。"
 
     func preparedBackendStatus() -> SpeechRecognitionBackend? {
         preparedBackend
@@ -168,9 +172,23 @@ actor SpeechPipeline {
             )
             try requireActiveSession(sessionID)
         } catch {
-            Diagnostics.record("Speech", "Pipeline start failed for \(session): \(error.localizedDescription)", level: .error)
-            if let result = await stopImmediately(sessionID: sessionID) {
-                throw PipelineError.recognitionFailed(error.localizedDescription, result)
+            let diagnostic = SpeechRecognitionFailureClassifier.diagnosticDescription(error)
+            Diagnostics.record(
+                "Speech",
+                "Pipeline start failed for \(session): \(diagnostic)",
+                level: .error
+            )
+            let rejected = SpeechRecognitionFailureClassifier.isRejection(error)
+            let result = await stopImmediately(sessionID: sessionID)
+            if rejected {
+                Diagnostics.record(
+                    "SpeechQuality",
+                    "Recognizer rejected \(session) during startup; routing as a recognition outcome"
+                )
+                throw PipelineError.recognitionRejected(result)
+            }
+            if let result {
+                throw PipelineError.recognitionFailed(Self.recognitionUnavailableMessage, result)
             }
             throw error
         }
@@ -240,9 +258,25 @@ actor SpeechPipeline {
             reset(sessionID: sessionID)
             return result
         } catch {
-            Diagnostics.record("Speech", "Normal stop failed for \(session): \(error.localizedDescription)", level: .error)
-            if let result = await stopImmediately(sessionID: sessionID) {
-                throw PipelineError.recognitionFailed(error.localizedDescription, result)
+            let diagnostic = SpeechRecognitionFailureClassifier.diagnosticDescription(error)
+            Diagnostics.record(
+                "Speech",
+                "Normal stop failed for \(session): \(diagnostic)",
+                level: .error
+            )
+            let result = await stopImmediately(sessionID: sessionID)
+            if SpeechRecognitionFailureClassifier.isRejection(error) {
+                Diagnostics.record(
+                    "SpeechQuality",
+                    "Recognizer rejected \(session) during finalization; treating it as an empty recognition outcome"
+                )
+                if let result {
+                    return result
+                }
+                throw PipelineError.recognitionRejected(nil)
+            }
+            if let result {
+                throw PipelineError.recognitionFailed(Self.recognitionUnavailableMessage, result)
             }
             throw CancellationError()
         }
@@ -465,8 +499,22 @@ actor SpeechPipeline {
         onFailure: @Sendable (UUID, String) -> Void
     ) {
         guard activeSessionID == sessionID, !isFinalizing, !reportedFailure, !Task.isCancelled else { return }
+
+        if SpeechRecognitionFailureClassifier.isRejection(error) {
+            Diagnostics.record(
+                "SpeechQuality",
+                "Live recognizer rejected \(label(sessionID)); suppressing fatal UI and waiting for normal Capture settlement"
+            )
+            return
+        }
+
         reportedFailure = true
-        onFailure(sessionID, error.localizedDescription)
+        Diagnostics.record(
+            "Speech",
+            "Live recognizer failed for \(label(sessionID)): \(SpeechRecognitionFailureClassifier.diagnosticDescription(error))",
+            level: .error
+        )
+        onFailure(sessionID, Self.recognitionUnavailableMessage)
     }
 
     private func requireActiveSession(_ sessionID: UUID) throws {

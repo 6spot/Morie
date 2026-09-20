@@ -113,6 +113,13 @@ enum CaptureFileTranscriber {
             } catch {
                 results.cancel()
                 await analyzer.cancelAndFinishNow()
+                if SpeechRecognitionFailureClassifier.isRejection(error) {
+                    Diagnostics.record(
+                        "SpeechQuality",
+                        "Saved-audio recognizer rejected the recording; treating it as empty recognition"
+                    )
+                    throw TranscriptionError.emptyRecognition
+                }
                 throw error
             }
         } onCancel: {
@@ -161,6 +168,13 @@ enum CaptureFileTranscriber {
             } catch {
                 results.cancel()
                 await analyzer.cancelAndFinishNow()
+                if SpeechRecognitionFailureClassifier.isRejection(error) {
+                    Diagnostics.record(
+                        "SpeechQuality",
+                        "Saved-audio recognizer rejected the recording; treating it as empty recognition"
+                    )
+                    throw TranscriptionError.emptyRecognition
+                }
                 throw error
             }
         } onCancel: {
@@ -206,5 +220,45 @@ enum CaptureFileTranscriber {
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: modules) {
             try await installation.downloadAndInstall()
         }
+    }
+}
+
+
+enum SpeechRecognitionFailureClassifier {
+    static func isRejection(_ error: Error) -> Bool {
+        var pending = [error as NSError]
+        var visited = Set<ObjectIdentifier>()
+
+        while let current = pending.popLast() {
+            let identity = ObjectIdentifier(current)
+            guard visited.insert(identity).inserted else { continue }
+
+            let descriptions = [
+                current.localizedDescription,
+                current.userInfo[NSLocalizedFailureReasonErrorKey] as? String,
+                current.userInfo[NSLocalizedRecoverySuggestionErrorKey] as? String,
+            ].compactMap { $0 }
+
+            if descriptions.contains(where: isRecognitionRejectionText) {
+                return true
+            }
+
+            if let underlying = current.userInfo[NSUnderlyingErrorKey] as? NSError {
+                pending.append(underlying)
+            }
+        }
+
+        return false
+    }
+
+    static func diagnosticDescription(_ error: Error) -> String {
+        let nsError = error as NSError
+        return "\(nsError.domain)(\(nsError.code)): \(nsError.localizedDescription)"
+    }
+
+    private static func isRecognitionRejectionText(_ text: String) -> Bool {
+        let normalized = text.lowercased()
+        return normalized.contains("reject")
+            && (normalized.contains("recog") || normalized.contains("recognition"))
     }
 }

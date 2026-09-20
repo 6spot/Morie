@@ -391,6 +391,11 @@ final class CaptureSessionController {
                 beginFinish(sessionID: sessionID)
             }
         } catch {
+            if case let SpeechPipeline.PipelineError.recognitionRejected(result) = error {
+                await settleRecognitionRejection(sessionID: sessionID, result: result)
+                return
+            }
+
             Diagnostics.record(
                 "Speech",
                 "Speech start failed for \(label(sessionID)): \(error.localizedDescription)",
@@ -565,6 +570,11 @@ final class CaptureSessionController {
                 }
             }
         } catch {
+            if case let SpeechPipeline.PipelineError.recognitionRejected(result) = error {
+                await settleRecognitionRejection(sessionID: sessionID, result: result)
+                return
+            }
+
             Diagnostics.record(
                 "Session",
                 "Capture \(label(sessionID)) failed: \(error.localizedDescription)",
@@ -650,8 +660,65 @@ final class CaptureSessionController {
         if case let SpeechPipeline.PipelineError.recognitionFailed(_, result) = error {
             preserveSpeechResult(result, for: sessionID)
         }
+        if case let SpeechPipeline.PipelineError.recognitionRejected(result) = error,
+           let result {
+            preserveSpeechResult(result, for: sessionID)
+        }
         let result = await speech.stopImmediately(sessionID: sessionID)
         preserveSpeechResult(result, for: sessionID)
+    }
+
+    private func settleRecognitionRejection(
+        sessionID: UUID,
+        result initialResult: SpeechPipeline.Result?
+    ) async {
+        guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
+
+        let result: SpeechPipeline.Result?
+        if let initialResult {
+            result = initialResult
+        } else {
+            result = await speech.stopImmediately(sessionID: sessionID)
+        }
+
+        do {
+            guard let captureStore else {
+                throw SessionError.persistenceUnavailable("记录存储尚未初始化。")
+            }
+
+            let disposition: CaptureStore.EmptyRecognitionDisposition
+            if let result {
+                preserveSpeechResult(result, for: sessionID)
+                disposition = try captureStore.finishEmptyRecognition(
+                    for: sessionID,
+                    sourceAudio: result.sourceAudio
+                )
+            } else {
+                try captureStore.cancel(sessionID)
+                disposition = .discarded
+            }
+
+            Diagnostics.record(
+                "SpeechQuality",
+                "Recognition rejection settled for \(label(sessionID)); disposition=\(String(describing: disposition))"
+            )
+            onCancellationEnabledChange?(false)
+            resetSessionIdentity()
+            setPhase(.idle)
+
+            if disposition == .retainedForRetry {
+                hud.showRecognitionFailure()
+            } else {
+                hud.showNoSpeech()
+            }
+        } catch {
+            Diagnostics.record(
+                "CaptureStore",
+                "Could not settle recognition rejection for \(label(sessionID)): \(error.localizedDescription)",
+                level: .error
+            )
+            failSession(sessionID, error: error)
+        }
     }
 
     private func preserveSpeechResult(_ result: SpeechPipeline.Result?, for sessionID: UUID) {
