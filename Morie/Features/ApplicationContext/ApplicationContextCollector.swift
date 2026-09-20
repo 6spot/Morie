@@ -21,6 +21,13 @@ actor ApplicationContextCollector {
         static let messagingTimeout: Float = 0.05
     }
 
+    private struct NearbyCollection {
+        let text: String?
+        let ancestorsVisited: Int
+        let nodesVisited: Int
+        let chunks: Int
+    }
+
     func capture(
         _ request: ApplicationContextCaptureRequest,
         captureID: UUID? = nil
@@ -105,15 +112,16 @@ actor ApplicationContextCollector {
             textAttribute(kAXValueAttribute, from: focusedElement),
             limit: Limit.focusedCharacters
         )
-        let nearbyText = collectNearbyText(
+        let nearby = collectNearbyText(
             around: focusedElement,
             excluding: [selectedText, focusedText].compactMap { $0 }
         )
+        let nearbyText = nearby.text
 
         DevelopmentDiagnostics.record(
             "AX",
             captureID: captureID,
-            "complete; selectedCharacters=\(selectedText?.count ?? 0); focusedCharacters=\(focusedText?.count ?? 0); nearbyCharacters=\(nearbyText?.count ?? 0)"
+            "complete; selectedCharacters=\(selectedText?.count ?? 0); focusedCharacters=\(focusedText?.count ?? 0); nearbyCharacters=\(nearbyText?.count ?? 0); ancestorsVisited=\(nearby.ancestorsVisited)/\(Limit.ancestorDepth); nodesVisited=\(nearby.nodesVisited)/\(Limit.nearbyNodes); chunks=\(nearby.chunks); nearbyCharacterBudget=\(Limit.nearbyCharacters)"
         )
 
         return ApplicationContextSnapshot(
@@ -140,7 +148,7 @@ actor ApplicationContextCollector {
     private func collectNearbyText(
         around focusedElement: AXUIElement,
         excluding excludedText: [String]
-    ) -> String? {
+    ) -> NearbyCollection {
         var chunks: [String] = []
         var seen = Set(
             excludedText
@@ -149,6 +157,7 @@ actor ApplicationContextCollector {
         )
         var remainingNodes = Limit.nearbyNodes
         var remainingCharacters = Limit.nearbyCharacters
+        var ancestorsVisited = 0
         var current = focusedElement
 
         for _ in 0..<Limit.ancestorDepth {
@@ -160,6 +169,7 @@ actor ApplicationContextCollector {
                 break
             }
 
+            ancestorsVisited += 1
             appendOwnText(
                 from: parent,
                 chunks: &chunks,
@@ -191,8 +201,12 @@ actor ApplicationContextCollector {
             current = parent
         }
 
-        guard !chunks.isEmpty else { return nil }
-        return chunks.joined(separator: "\n")
+        return NearbyCollection(
+            text: chunks.isEmpty ? nil : chunks.joined(separator: "\n"),
+            ancestorsVisited: ancestorsVisited,
+            nodesVisited: Limit.nearbyNodes - remainingNodes,
+            chunks: chunks.count
+        )
     }
 
     private func collectSubtreeText(
