@@ -128,7 +128,11 @@ private enum RefinementOutputGuard {
         guard !claimsExecution(output, source: source) else {
             try reject("claimsExecution", input: input, source: source, output: output)
         }
-        guard preservesSemanticRelations(output, source: source) else {
+        guard preservesSemanticRelations(
+            output,
+            source: source,
+            captureID: input.captureID
+        ) else {
             try reject("semanticRelationChanged", input: input, source: source, output: output)
         }
         guard preservesProtectedFacts(output, source: source, input: input) else {
@@ -137,10 +141,18 @@ private enum RefinementOutputGuard {
         guard !introducesContextOnlyContent(output, source: source, input: input) else {
             try reject("contextOnlyContentIntroduced", input: input, source: source, output: output)
         }
-        guard !changesPrimaryScript(output, source: source) else {
+        guard !changesPrimaryScript(
+            output,
+            source: source,
+            captureID: input.captureID
+        ) else {
             try reject("primaryScriptChanged", input: input, source: source, output: output)
         }
-        guard !isExtremeExpansion(output, source: source) else {
+        guard !isExtremeExpansion(
+            output,
+            source: source,
+            captureID: input.captureID
+        ) else {
             try reject("extremeExpansion", input: input, source: source, output: output)
         }
     }
@@ -199,7 +211,11 @@ private enum RefinementOutputGuard {
         return !startsWithPhrase(trimmingLeadingFillers(source), claim)
     }
 
-    private static func preservesSemanticRelations(_ output: String, source: String) -> Bool {
+    private static func preservesSemanticRelations(
+        _ output: String,
+        source: String,
+        captureID: UUID
+    ) -> Bool {
         // Explicit self-corrections intentionally remove earlier negations/facts.
         guard !hasExplicitCorrectionSignal(source) else { return true }
 
@@ -222,6 +238,7 @@ private enum RefinementOutputGuard {
             if sourceHasRelation != outputHasRelation {
                 DevelopmentDiagnostics.record(
                     "RefinementGuardDetail",
+                    captureID: captureID,
                     "semanticRelationMismatch; group=\(group.joined(separator: "|")); source=\(sourceHasRelation); output=\(outputHasRelation)"
                 )
                 return false
@@ -397,7 +414,11 @@ private enum RefinementOutputGuard {
         }
     }
 
-    private static func changesPrimaryScript(_ output: String, source: String) -> Bool {
+    private static func changesPrimaryScript(
+        _ output: String,
+        source: String,
+        captureID: UUID
+    ) -> Bool {
         let sourceCounts = scriptCounts(source)
         let outputCounts = scriptCounts(output)
         guard sourceCounts.total >= 8, outputCounts.total >= 8 else { return false }
@@ -411,13 +432,18 @@ private enum RefinementOutputGuard {
         if changed {
             DevelopmentDiagnostics.record(
                 "RefinementGuardDetail",
+                captureID: captureID,
                 "scriptChanged; sourceCJK=\(sourceCounts.cjk)/\(sourceCounts.total); outputCJK=\(outputCounts.cjk)/\(outputCounts.total); sourceRatio=\(sourceCJKRatio); outputRatio=\(outputCJKRatio)"
             )
         }
         return changed
     }
 
-    private static func isExtremeExpansion(_ output: String, source: String) -> Bool {
+    private static func isExtremeExpansion(
+        _ output: String,
+        source: String,
+        captureID: UUID
+    ) -> Bool {
         let sourceCount = max(1, semanticText(source).count)
         let outputCount = semanticText(output).count
         let ratioLimit = sourceCount * 5 / 2
@@ -426,6 +452,7 @@ private enum RefinementOutputGuard {
         if outputCount > limit {
             DevelopmentDiagnostics.record(
                 "RefinementGuardDetail",
+                captureID: captureID,
                 "extremeExpansion; sourceSemantic=\(sourceCount); outputSemantic=\(outputCount); ratioLimit=\(ratioLimit); absoluteLimit=\(absoluteLimit); effectiveLimit=\(limit)"
             )
         }
