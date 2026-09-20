@@ -121,6 +121,11 @@ actor SpeechPipeline {
                 throw PipelineError.noMicrophone
             }
             Diagnostics.record("Speech", "Default microphone resolved for \(session): \(microphone.localizedName)")
+            DevelopmentDiagnostics.record(
+                "Audio",
+                captureID: sessionID,
+                "device=\(microphone.localizedName); uniqueID=\(microphone.uniqueID); modelID=\(microphone.modelID); manufacturer=\(microphone.manufacturer); deviceType=\(microphone.deviceType.rawValue); connected=\(microphone.isConnected); requestedCaptureFormat=16000Hz/mono/float32; savedAudio=AAC-32kbps"
+            )
 
             let backend: SpeechRecognitionBackend
             if let preparedBackend {
@@ -141,6 +146,11 @@ actor SpeechPipeline {
             Diagnostics.record(
                 "SpeechQuality",
                 "Session \(session) backend=\(backend.logName); locale=\(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count); applicationHints=\(applicationContextWords.count); contextualHints=\(contextualWords.count)"
+            )
+            DevelopmentDiagnostics.record(
+                "Speech",
+                captureID: sessionID,
+                "backend=\(backend.logName); locale=\(backend.locale.identifier); sourceAudioFile=\(sourceAudioURL.lastPathComponent)"
             )
 
             let setup = try await configureLiveBackend(
