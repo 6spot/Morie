@@ -7,7 +7,14 @@ struct ApplicationIdentity: Equatable, Sendable {
     let bundleIdentifier: String?
 }
 
-/// Ephemeral context captured once when a voice-input Capture starts.
+/// Immutable request pinned at Capture Start before any Accessibility IPC runs.
+struct ApplicationContextCaptureRequest: Equatable, Sendable {
+    let application: ApplicationIdentity
+    let processIdentifier: Int32
+    let capturedAt: Date
+}
+
+/// Ephemeral context captured for one voice-input Capture.
 ///
 /// This type is intentionally not Codable. Raw application text must remain a
 /// runtime-only aid and must never become part of Capture persistence, History,
