@@ -100,6 +100,27 @@ enum InputRefiner {
     ) async throws -> String {
         try Task.checkCancellation()
         let modelConfiguration = configuration.model
+        DevelopmentDiagnostics.record(
+            "RefinementModel",
+            captureID: input.captureID,
+            "requestedMode=\(modelConfiguration.mode.rawValue); cloudHost=\(modelConfiguration.cloudURL?.host ?? "none"); cloudModel=\(modelConfiguration.trimmedCloudModelName.isEmpty ? "none" : modelConfiguration.trimmedCloudModelName); apiKeyConfigured=\(!modelConfiguration.cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)"
+        )
+        DevelopmentDiagnostics.text(
+            "RefinementPrompt",
+            captureID: input.captureID,
+            label: "instructions",
+            configuration.instructions,
+            limit: 16_000
+        )
+        if let payload = try? promptText(for: input) {
+            DevelopmentDiagnostics.text(
+                "RefinementPrompt",
+                captureID: input.captureID,
+                label: "payload",
+                payload,
+                limit: 16_000
+            )
+        }
         switch modelConfiguration.mode {
         case .local:
             return try await generateLocally(
@@ -127,6 +148,12 @@ enum InputRefiner {
                 )
             } catch {
                 if Task.isCancelled || error is CancellationError { throw CancellationError() }
+                DevelopmentDiagnostics.record(
+                    "RefinementModel",
+                    captureID: input.captureID,
+                    level: .warning,
+                    "cloudFallback; errorType=\(DevelopmentDiagnostics.errorType(error))"
+                )
                 Diagnostics.record(
                     "Refinement",
                     "External refinement failed in Auto mode; falling back to Apple on-device model",
@@ -155,6 +182,11 @@ enum InputRefiner {
             let instructionTokens = try await model.tokenCount(for: instructions)
             let schemaTokens = try await model.tokenCount(for: GeneratedRefinement.generationSchema)
             let responseBudget = min(1_536, max(256, promptTokens + 64))
+            DevelopmentDiagnostics.record(
+                "RefinementModel",
+                captureID: input.captureID,
+                "backend=apple-local; promptTokens=\(promptTokens); instructionTokens=\(instructionTokens); schemaTokens=\(schemaTokens); responseBudget=\(responseBudget); contextSize=\(model.contextSize)"
+            )
             Diagnostics.recordMemory("refinement-local-after-token-count")
             guard promptTokens + instructionTokens + schemaTokens + responseBudget + 128 <= model.contextSize else {
                 throw RefinementReason.textTooLong
@@ -173,6 +205,12 @@ enum InputRefiner {
                 Diagnostics.recordMemory("refinement-local-cancelled")
                 throw CancellationError()
             }
+            DevelopmentDiagnostics.record(
+                "RefinementModel",
+                captureID: input.captureID,
+                level: .warning,
+                "appleLocalFailed; errorType=\(DevelopmentDiagnostics.errorType(error))"
+            )
             Diagnostics.recordMemory("refinement-local-failed")
             if let reason = error as? RefinementReason { throw reason }
             // Framework errors can contain private input. Persist only fixed reasons.
@@ -224,6 +262,11 @@ enum InputRefiner {
         let promptText = try promptText(for: input)
         let prompt = Prompt { promptText }
         let responseBudget = min(1_536, max(256, input.prepared.text.count * 2))
+        DevelopmentDiagnostics.record(
+            "RefinementModel",
+            captureID: input.captureID,
+            "backend=cloud; host=\(url.host ?? "unknown"); path=\(url.path); model=\(configuration.trimmedCloudModelName); responseBudget=\(responseBudget); apiKeyConfigured=\(!key.isEmpty)"
+        )
 
         do {
             try Task.checkCancellation()
@@ -241,6 +284,12 @@ enum InputRefiner {
                 Diagnostics.recordMemory("refinement-cloud-cancelled")
                 throw CancellationError()
             }
+            DevelopmentDiagnostics.record(
+                "RefinementModel",
+                captureID: input.captureID,
+                level: .warning,
+                "cloudFailed; errorType=\(DevelopmentDiagnostics.errorType(error)); responseBodyLogged=false; credentialsLogged=false"
+            )
             Diagnostics.recordMemory("refinement-cloud-failed")
             // Remote errors may include response bodies. Never persist them into Capture history.
             throw RefinementReason.generationFailed
