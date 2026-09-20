@@ -6,7 +6,8 @@ import SwiftUI
 final class CaptureHUDController {
     private let model = CaptureHUDModel()
     private var panel: NSPanel?
-    private weak var animatedCapsuleView: NSView?
+    private weak var animationContainerView: NSView?
+    private weak var capsuleView: NSView?
     private var hideTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
     private var processingTransitionTask: Task<Void, Never>?
@@ -158,34 +159,7 @@ final class CaptureHUDController {
         collapseTask?.cancel()
         cancelProcessingTransition()
 
-        guard panel != nil, let rootView = animatedCapsuleView else {
-            releasePanel()
-            return
-        }
-
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            releasePanel()
-            return
-        }
-
-        // Successful completion is intentionally quieter than cancellation:
-        // keep the compact Thinking shape and let it mostly fade in place.
-        let duration = 0.20
-        animate(
-            rootView,
-            fromScale: currentScale(of: rootView),
-            toScale: 0.94,
-            fromOpacity: rootView.layer?.presentation()?.opacity ?? 1,
-            toOpacity: 0,
-            duration: duration,
-            timing: .easeOut
-        )
-
-        collapseTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(duration))
-            guard !Task.isCancelled else { return }
-            self?.releasePanel()
-        }
+        dismissPanel()
     }
 
     func hide() {
@@ -194,32 +168,7 @@ final class CaptureHUDController {
         collapseTask?.cancel()
         cancelProcessingTransition()
 
-        guard panel != nil, let rootView = animatedCapsuleView else {
-            releasePanel()
-            return
-        }
-
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            releasePanel()
-            return
-        }
-
-        let duration = 0.16
-        animate(
-            rootView,
-            fromScale: currentScale(of: rootView),
-            toScale: 0.10,
-            fromOpacity: rootView.layer?.presentation()?.opacity ?? 1,
-            toOpacity: 0,
-            duration: duration,
-            timing: .easeIn
-        )
-
-        collapseTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(duration))
-            guard !Task.isCancelled else { return }
-            self?.releasePanel()
-        }
+        dismissPanel()
     }
 
     private func showPanel() {
@@ -232,25 +181,25 @@ final class CaptureHUDController {
 
         if !panel.isVisible {
             panel.orderFrontRegardless()
-            if let rootView = animatedCapsuleView {
+            if let animationView = animationContainerView {
                 if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-                    setPresentation(rootView, scale: 1, opacity: 1)
+                    setPresentation(animationView, scale: 1, opacity: 1)
                 } else {
                     animate(
-                        rootView,
-                        fromScale: 0.10,
+                        animationView,
+                        fromScale: 0.82,
                         toScale: 1,
                         fromOpacity: 0,
                         toOpacity: 1,
-                        duration: 0.22,
+                        duration: 0.20,
                         timing: .easeOut
                     )
                 }
             }
         } else {
-            if let rootView = animatedCapsuleView {
-                rootView.layer?.removeAllAnimations()
-                setPresentation(rootView, scale: 1, opacity: 1)
+            if let animationView = animationContainerView {
+                animationView.layer?.removeAllAnimations()
+                setPresentation(animationView, scale: 1, opacity: 1)
             }
             panel.orderFrontRegardless()
         }
@@ -275,7 +224,9 @@ final class CaptureHUDController {
         panel.isReleasedWhenClosed = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.animationBehavior = .utilityWindow
+        // Morie owns the capsule motion. AppKit utility-window animation can
+        // scale/translate the panel from a lower corner and fights the center morph.
+        panel.animationBehavior = .none
 
         let rootView = NSView(frame: NSRect(origin: .zero, size: size))
         rootView.autoresizingMask = [.width, .height]
@@ -302,8 +253,10 @@ final class CaptureHUDController {
         hostingView.autoresizingMask = [.width, .height]
         glassView.contentView = hostingView
         rootView.addSubview(glassView)
-        configureCenterAnchor(for: glassView)
-        animatedCapsuleView = glassView
+        rootView.wantsLayer = true
+        configureCenterAnchor(for: rootView)
+        animationContainerView = rootView
+        capsuleView = glassView
         panel.contentView = rootView
 
         return panel
@@ -314,7 +267,7 @@ final class CaptureHUDController {
         animated: Bool,
         duration: TimeInterval = 0.16
     ) {
-        guard let panel, let view = animatedCapsuleView else { return }
+        guard let panel, let view = capsuleView else { return }
         let target = NSRect(
             x: ((panel.contentView?.bounds.width ?? Layout.panelSize.width) - width) / 2,
             y: Layout.effectInset,
@@ -347,9 +300,39 @@ final class CaptureHUDController {
         // Releasing the NSHostingView stops the hidden waveform TimelineView.
         panel?.contentView = nil
         panel = nil
-        animatedCapsuleView = nil
+        animationContainerView = nil
+        capsuleView = nil
         model.hide()
         Diagnostics.record("HUD", "Capture HUD hidden")
+    }
+
+    private func dismissPanel() {
+        guard panel != nil, let animationView = animationContainerView else {
+            releasePanel()
+            return
+        }
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            releasePanel()
+            return
+        }
+
+        let duration = 0.18
+        animate(
+            animationView,
+            fromScale: currentScale(of: animationView),
+            toScale: 0.92,
+            fromOpacity: animationView.layer?.presentation()?.opacity ?? 1,
+            toOpacity: 0,
+            duration: duration,
+            timing: .easeOut
+        )
+
+        collapseTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            self?.releasePanel()
+        }
     }
 
     private func configureCenterAnchor(for view: NSView) {
