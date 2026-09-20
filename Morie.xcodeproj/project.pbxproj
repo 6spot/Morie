@@ -103,6 +103,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BA0000000000000000000001 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		BA0000000000000000000002 /* LocalSigning.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = LocalSigning.xcconfig.example; sourceTree = "<group>"; };
 		B90000000000000000000001 /* SpeechContextHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechContextHints.swift; sourceTree = "<group>"; };
 		B80000000000000000000001 /* ApplicationContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationContext.swift; sourceTree = "<group>"; };
 		B80000000000000000000002 /* ApplicationContextCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationContextCollector.swift; sourceTree = "<group>"; };
@@ -196,8 +198,18 @@
 			children = (
 				D10000000000000000000002 /* Morie */,
 				D20000000000000000000001 /* MorieTests */,
+				DA0000000000000000000001 /* Config */,
 				D10000000000000000000003 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000001 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				BA0000000000000000000001 /* Signing.xcconfig */,
+				BA0000000000000000000002 /* LocalSigning.xcconfig.example */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		D10000000000000000000002 /* Morie */ = {
@@ -728,6 +740,7 @@
 		};
 		F20000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BA0000000000000000000001 /* Signing.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Morie/Morie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -748,6 +761,7 @@
 		};
 		F20000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BA0000000000000000000001 /* Signing.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Morie/Morie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
