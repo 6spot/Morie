@@ -86,7 +86,7 @@ The shell is uniform; the content presentation is not forced into one control ty
 - [x] Align Diagnostics selected-message margins with the shared dense-workspace metric.
 - [x] Rewrite `docs/ui-design.md` Control Center rules.
 - [x] Remove the NavigationSplitView-generated sidebar toggle and provide one persistent shell-owned toolbar toggle so page toolbar/search changes cannot replace it.
-- [x] Apply one shared 24 pt scroll-content grid to Overview, Dictionary, Personal Memory, Settings and Permissions so page content starts on the same leading axis as the navigation title.
+- [x] Move outer scrolling and page insets out of routed page components entirely. `ControlCenterPageHost` now owns the 24 pt standard-page grid; routed components only implement their content and page-specific controls.
 - [x] Run Xcode 27 compile/tests.
 - [ ] Owner signed-app visual/interaction check.
 
@@ -95,7 +95,7 @@ The shell is uniform; the content presentation is not forced into one control ty
 - [ ] Sidebar remains mounted when switching every section.
 - [ ] The top sidebar show/hide button remains visually stable while switching sections with different search/toolbars.
 - [ ] Section switching changes only routed content, not the outer split/navigation shell.
-- [ ] Overview, Dictionary, Memory, Settings and Permissions align to one shared page content grid.
+- [ ] Overview, Dictionary, Memory, Settings and Permissions align to one shared page content grid, with no page-owned outer margins/padding.
 - [ ] Dictionary remains compact and Memory remains narrative while both use the same shell/margins.
 - [ ] History stays within the available right workspace and no longer shows separate page-level navigation roots.
 - [ ] Scroll indicators remain at the workspace edge.
