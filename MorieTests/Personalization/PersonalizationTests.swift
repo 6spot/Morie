@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class PersonalizationTests: XCTestCase {
-    func testRefinementModelControllerDoesNotReadKeychainUntilExternalCaptureNeedsIt() {
+    func testRefinementModelControllerDoesNotReadKeychainUntilExternalRefinementNeedsIt() {
         var credentialReads = 0
         let controller = RefinementModelController(
             load: {
