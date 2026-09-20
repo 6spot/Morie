@@ -210,7 +210,7 @@ struct PermissionManagementView: View {
     }
 
     var body: some View {
-        ControlCenterContentPage {
+        VStack(alignment: .leading, spacing: ControlCenterMetrics.sectionSpacing) {
             if setup.checks.isEmpty {
                 ControlCenterSectionGroup("设备与权限") {
                     ProgressView("正在检查设备和权限…")
