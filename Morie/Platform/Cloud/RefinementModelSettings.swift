@@ -101,6 +101,10 @@ final class RefinementModelController: ObservableObject {
         cloudBaseURL = saved.cloudBaseURL
         cloudModelName = saved.cloudModelName
         settingsMessage = nil
+        DevelopmentDiagnostics.record(
+            "CloudConfig",
+            "controllerInit; mode=\(saved.mode.rawValue); host=\(saved.cloudURL?.host ?? "none"); model=\(saved.trimmedCloudModelName.isEmpty ? "none" : saved.trimmedCloudModelName); keychainRead=false"
+        )
     }
 
     var configuration: RefinementModelConfiguration {
@@ -170,6 +174,10 @@ final class RefinementModelController: ObservableObject {
     func setMode(_ mode: RefinementModelMode) {
         self.mode = mode
         RefinementModelSettings.saveMode(mode)
+        DevelopmentDiagnostics.record(
+            "CloudConfig",
+            "modeChanged=\(mode.rawValue)"
+        )
     }
 
     @discardableResult
@@ -180,6 +188,11 @@ final class RefinementModelController: ObservableObject {
     ) -> Bool {
         let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let replacementKey = trimmedAPIKey.isEmpty ? nil : trimmedAPIKey
+        let parsedURL = URL(string: baseURL.trimmingCharacters(in: .whitespacesAndNewlines))
+        DevelopmentDiagnostics.record(
+            "CloudConfig",
+            "saveRequested; host=\(parsedURL?.host ?? "none"); model=\(modelName.trimmingCharacters(in: .whitespacesAndNewlines)); replaceKey=\(replacementKey != nil); keyLength=\(replacementKey?.count ?? 0); keyContentLogged=false"
+        )
 
         do {
             let saved = try RefinementModelSettings.saveCloudConfiguration(
@@ -195,8 +208,17 @@ final class RefinementModelController: ObservableObject {
             } else {
                 settingsMessage = "API 配置已保存；API Key 保持不变。"
             }
+            DevelopmentDiagnostics.record(
+                "CloudConfig",
+                "saveSucceeded; host=\(saved.cloudURL?.host ?? "none"); model=\(saved.trimmedCloudModelName); keyReplaced=\(replacementKey != nil); keyContentLogged=false"
+            )
             return true
         } catch {
+            DevelopmentDiagnostics.record(
+                "CloudConfig",
+                level: .warning,
+                "saveFailed; errorType=\(DevelopmentDiagnostics.errorType(error)); keyContentLogged=false"
+            )
             settingsMessage = error.localizedDescription
             return false
         }
@@ -204,12 +226,25 @@ final class RefinementModelController: ObservableObject {
 
     @discardableResult
     func clearCloudAPIKey() -> Bool {
+        DevelopmentDiagnostics.record(
+            "Keychain",
+            "clearRequested; keyContentLogged=false"
+        )
         do {
             try RefinementModelSettings.clearAPIKey()
             cachedAPIKey = ""
             settingsMessage = "已清除保存的 API Key。"
+            DevelopmentDiagnostics.record(
+                "Keychain",
+                "clearSucceeded; keyContentLogged=false"
+            )
             return true
         } catch {
+            DevelopmentDiagnostics.record(
+                "Keychain",
+                level: .warning,
+                "clearFailed; errorType=\(DevelopmentDiagnostics.errorType(error)); keyContentLogged=false"
+            )
             settingsMessage = error.localizedDescription
             return false
         }
@@ -222,18 +257,45 @@ final class RefinementModelController: ObservableObject {
         for snapshot: RefinementModelConfiguration
     ) -> RefinementModelConfiguration {
         guard snapshot.mode != .local, snapshot.hasUsableCloudConfiguration else {
+            DevelopmentDiagnostics.record(
+                "Keychain",
+                "runtimeCredentialSkipped; mode=\(snapshot.mode.rawValue); cloudConfigured=\(snapshot.hasUsableCloudConfiguration)"
+            )
             return snapshot
         }
-        if !snapshot.cloudAPIKey.isEmpty { return snapshot }
+        if !snapshot.cloudAPIKey.isEmpty {
+            DevelopmentDiagnostics.record(
+                "Keychain",
+                "runtimeCredentialAlreadyFrozen; keyPresent=true; keyContentLogged=false"
+            )
+            return snapshot
+        }
 
         let apiKey: String
         if let cachedAPIKey {
             apiKey = cachedAPIKey
+            DevelopmentDiagnostics.record(
+                "Keychain",
+                "runtimeCredentialFromMemoryCache; keyPresent=\(!apiKey.isEmpty); keyContentLogged=false"
+            )
         } else {
+            DevelopmentDiagnostics.record(
+                "Keychain",
+                "runtimeCredentialReadRequested; service=me.morie.mac.refinement-cloud; keyContentLogged=false"
+            )
             do {
                 apiKey = try credentialReader()
                 cachedAPIKey = apiKey
+                DevelopmentDiagnostics.record(
+                    "Keychain",
+                    "runtimeCredentialReadSucceeded; keyPresent=\(!apiKey.isEmpty); keyLength=\(apiKey.count); keyContentLogged=false"
+                )
             } catch {
+                DevelopmentDiagnostics.record(
+                    "Keychain",
+                    level: .warning,
+                    "runtimeCredentialReadFailed; errorType=\(DevelopmentDiagnostics.errorType(error)); keyContentLogged=false"
+                )
                 settingsMessage = error.localizedDescription
                 Diagnostics.record(
                     "Refinement",
