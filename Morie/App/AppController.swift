@@ -32,6 +32,7 @@ final class AppController: ObservableObject {
     @Published private(set) var captureShortcut: CaptureShortcut
     @Published private(set) var audioRetentionDays: Int
     @Published private(set) var inputRefinementEnabled: Bool
+    @Published private(set) var personalMemoryEnabled: Bool
     @Published private(set) var correctionSuggestionsEnabled: Bool
     @Published private(set) var expressionLearningEnabled: Bool
     @Published private(set) var soundFeedbackEnabled: Bool
@@ -129,8 +130,14 @@ final class AppController: ObservableObject {
             personalizer = nil
         }
         self.personalizer = personalizer
+        let savedPersonalMemoryEnabled = PersonalMemorySettings.isEnabled
+        personalMemoryEnabled = savedPersonalMemoryEnabled
         memoryLearning = memory.map {
-            MemoryLearningController(store: $0, canUseModel: { personalizer?.isModelBusy != true })
+            MemoryLearningController(
+                store: $0,
+                enabled: savedPersonalMemoryEnabled,
+                canUseModel: { personalizer?.isModelBusy != true }
+            )
         }
         let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
@@ -201,6 +208,12 @@ final class AppController: ObservableObject {
         inputRefinementEnabled = enabled
         captureSession.inputRefinementEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: CapturePersonalizer.enabledDefaultsKey)
+    }
+
+    func setPersonalMemoryEnabled(_ enabled: Bool) {
+        personalMemoryEnabled = enabled
+        PersonalMemorySettings.setEnabled(enabled)
+        memoryLearning?.setEnabled(enabled)
     }
 
     func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
