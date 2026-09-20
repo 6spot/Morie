@@ -62,13 +62,18 @@ enum InputRefiner {
     private struct PromptInputData: Encodable {
         let transcript: String
         let spellingCandidates: [String]
-        let personalContext: [PromptMemory]
+        let personalContext: [PromptMemoryHint]
         let expressionStyle: [String]
     }
 
-    private struct PromptMemory: Encodable {
-        let name: String
-        let notes: String
+    /// Topic-level Memory hints only. Raw Memory notes/evidence are deliberately
+    /// excluded from refinement so Personal Memory can disambiguate without
+    /// becoming a second source of user-authored output.
+    private struct PromptMemoryHint: Encodable {
+        let topic: String
+        let matchedTerm: String
+        let kind: String
+        let scope: String
     }
 
     static func promptText(for input: RefinementInput) throws -> String {
@@ -76,7 +81,12 @@ enum InputRefiner {
             transcript: input.prepared.text,
             spellingCandidates: input.dictionary.map(\.name),
             personalContext: input.context.map {
-                PromptMemory(name: $0.memory.name, notes: $0.memory.notes)
+                PromptMemoryHint(
+                    topic: $0.memory.name,
+                    matchedTerm: $0.matchedTerm,
+                    kind: $0.memory.kind.rawValue,
+                    scope: $0.memory.scope.rawValue
+                )
             },
             expressionStyle: input.expressionStyle
         ))
