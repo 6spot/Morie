@@ -215,31 +215,41 @@ final class RefinementModelController: ObservableObject {
         }
     }
 
-    /// Resolves the secret only when a Capture is about to use an external model.
-    /// Local mode and incomplete cloud configuration never touch Keychain.
-    func runtimeConfiguration() -> RefinementModelConfiguration {
-        let base = configuration
-        guard mode != .local, base.hasUsableCloudConfiguration else { return base }
-        if cachedAPIKey != nil { return base }
-
-        do {
-            let apiKey = try credentialReader()
-            cachedAPIKey = apiKey
-            return RefinementModelConfiguration(
-                mode: mode,
-                cloudBaseURL: cloudBaseURL,
-                cloudModelName: cloudModelName,
-                cloudAPIKey: apiKey
-            )
-        } catch {
-            settingsMessage = error.localizedDescription
-            Diagnostics.record(
-                "Refinement",
-                "Could not read external API credential from Keychain; continuing without a credential",
-                level: .warning
-            )
-            return base
+    /// Resolves the secret only when refinement is actually about to use an
+    /// external model. The supplied configuration is the Capture's frozen
+    /// endpoint/model snapshot; current Settings changes must not rewrite it.
+    func runtimeConfiguration(
+        for snapshot: RefinementModelConfiguration
+    ) -> RefinementModelConfiguration {
+        guard snapshot.mode != .local, snapshot.hasUsableCloudConfiguration else {
+            return snapshot
         }
+        if !snapshot.cloudAPIKey.isEmpty { return snapshot }
+
+        let apiKey: String
+        if let cachedAPIKey {
+            apiKey = cachedAPIKey
+        } else {
+            do {
+                apiKey = try credentialReader()
+                cachedAPIKey = apiKey
+            } catch {
+                settingsMessage = error.localizedDescription
+                Diagnostics.record(
+                    "Refinement",
+                    "Could not read external API credential from Keychain; continuing without a credential",
+                    level: .warning
+                )
+                return snapshot
+            }
+        }
+
+        return RefinementModelConfiguration(
+            mode: snapshot.mode,
+            cloudBaseURL: snapshot.cloudBaseURL,
+            cloudModelName: snapshot.cloudModelName,
+            cloudAPIKey: apiKey
+        )
     }
 }
 
