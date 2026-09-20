@@ -186,6 +186,73 @@ private struct ProcessMemorySnapshot {
     }
 }
 
+struct AppBuildIdentity: Equatable {
+    let version: String
+    let build: String
+    let commit: String
+    let branch: String?
+    let isDirty: Bool
+
+    static let current = AppBuildIdentity(bundle: .main)
+
+    init(bundle: Bundle) {
+        version =
+            bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String
+            ?? "dev"
+        build =
+            bundle.object(forInfoDictionaryKey: "CFBundleVersion")
+            as? String
+            ?? "0"
+
+        let metadata = Self.metadata(from: bundle)
+        commit = metadata["commit"] as? String ?? "unknown"
+
+        if let value = metadata["branch"] as? String,
+           !value.isEmpty,
+           value != "detached" {
+            branch = value
+        } else {
+            branch = nil
+        }
+        isDirty = metadata["dirty"] as? Bool ?? false
+    }
+
+    var commitDisplay: String {
+        isDirty ? "\(commit)*" : commit
+    }
+
+    var compactDisplay: String {
+        "\(version) (\(build)) · \(commitDisplay)"
+    }
+
+    var logValue: String {
+        var value = "version=\(version); build=\(build); commit=\(commitDisplay)"
+        if let branch {
+            value += "; branch=\(branch)"
+        }
+        return value
+    }
+
+    private static func metadata(from bundle: Bundle) -> [String: Any] {
+        guard let url = bundle.url(
+            forResource: "MorieBuildIdentity",
+            withExtension: "plist"
+        ),
+        let data = try? Data(contentsOf: url),
+        let value = try? PropertyListSerialization.propertyList(
+            from: data,
+            options: [],
+            format: nil
+        ),
+        let dictionary = value as? [String: Any]
+        else {
+            return [:]
+        }
+        return dictionary
+    }
+}
+
 enum Diagnostics {
     static func recordMemory(_ phase: String) {
         guard let memory = ProcessMemorySnapshot.current() else { return }
