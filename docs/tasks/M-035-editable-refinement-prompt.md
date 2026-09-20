@@ -84,10 +84,11 @@ The local Apple path keeps `@Generable`, but `@Guide` only names the field as th
 
 ### 4. Runtime-editable settings
 
-The effective instruction is loaded from `UserDefaults` when a saved override exists. Settings exposes a native `TextEditor` with **保存提示词** and **恢复默认**.
+The effective instruction is loaded once into `RefinementPromptController` process memory when the app starts. Settings exposes a native `TextEditor` with **保存提示词** and **恢复默认**.
 
-- Save changes the instruction for later Captures immediately; no rebuild or relaunch is required.
-- Restore removes the override so later default-prompt updates can flow through.
+- Save replaces the in-memory runtime instruction immediately for later Captures; the hot path never rereads the bundle or `UserDefaults`.
+- The same value is persisted only so the next app launch restores it; no rebuild or relaunch is required for testing.
+- Restore replaces the in-memory value with the bundled baseline and removes the persisted override so later default-prompt updates can flow through.
 - Empty prompts are rejected.
 - Apple-local and external OpenAI-compatible refinement use the same instruction.
 
