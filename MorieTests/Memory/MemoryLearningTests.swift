@@ -497,7 +497,9 @@ final class MemoryLearningTests: XCTestCase {
 
     func testInputPreemptsUncooperativeAnalysisWithoutLosingQueuedWork() async throws {
         let fixture = try LearningFixture()
-        _ = try fixture.capture("I work on Morie.")
+        let source = try fixture.capture("I work on Morie.")
+        try await fixture.captures.flushPersistence(for: source)
+        fixture.captures.releaseCaptureOwnership(source)
         let model = PendingLearning()
         let controller = MemoryLearningController(
             store: fixture.memory,
@@ -535,6 +537,8 @@ final class MemoryLearningTests: XCTestCase {
     func testSourceDeletedDuringAnalysisCannotBeRecreated() async throws {
         let fixture = try LearningFixture()
         let id = try fixture.capture("I work on Morie.")
+        try await fixture.captures.flushPersistence(for: id)
+        fixture.captures.releaseCaptureOwnership(id)
         let model = PendingLearning()
         let controller = MemoryLearningController(
             store: fixture.memory,
@@ -594,7 +598,9 @@ final class MemoryLearningTests: XCTestCase {
 
     func testInvalidAnalysisIsRetryableAndDoesNotPartiallyWrite() async throws {
         let fixture = try LearningFixture()
-        _ = try fixture.capture("I work on Morie.")
+        let source = try fixture.capture("I work on Morie.")
+        try await fixture.captures.flushPersistence(for: source)
+        fixture.captures.releaseCaptureOwnership(source)
         let controller = MemoryLearningController(
             store: fixture.memory,
             idleDelay: .milliseconds(1),
