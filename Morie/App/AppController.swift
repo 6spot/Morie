@@ -273,9 +273,9 @@ final class AppController {
 
         switch runtime.state {
         case .ready, .failed:
-            true
+            return true
         default:
-            false
+            return false
         }
     }
 
