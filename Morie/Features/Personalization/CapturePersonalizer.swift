@@ -45,7 +45,7 @@ final class CapturePersonalizer {
         let corrected = DictionaryCorrections.apply(source, using: correctionEntries)
         let prepared = DictionarySpelling.normalize(corrected.text, using: dictionaryEntries).text
         // Neither a missing personal profile nor retrieval failure disables day-one cleanup.
-        let context = skip == nil
+        let context = skip == nil && PersonalMemorySettings.isEnabled
             ? ((try? memory.relevantContext(for: prepared, limit: Self.cleanupMemoryContextLimit)) ?? [])
             : []
         let expressionStyle = skip == nil && expressionStyleEnabled
@@ -83,10 +83,12 @@ final class CapturePersonalizer {
             case .keptOriginal(let reason):
                 return try keepOriginal(input, reason: reason, started: started)
             case .text(let text):
-                let current = (try? memory.relevantContext(
-                    for: input.prepared.text,
-                    limit: Self.cleanupMemoryContextLimit
-                )) ?? []
+                let current = PersonalMemorySettings.isEnabled
+                    ? ((try? memory.relevantContext(
+                        for: input.prepared.text,
+                        limit: Self.cleanupMemoryContextLimit
+                    )) ?? [])
+                    : []
                 guard current == input.context else {
                     return try keepOriginal(input, reason: .memoryChanged, started: started)
                 }
