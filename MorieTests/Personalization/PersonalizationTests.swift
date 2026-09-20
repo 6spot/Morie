@@ -123,19 +123,17 @@ final class PersonalizationTests: XCTestCase {
             ).text,
             "我们明天去公园。"
         )
-        XCTAssertTrue(InputRefiner.instructionsText.contains("# 最高优先级：只整理原文"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("润色不是重写，更不是扩写"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("spellingCandidates"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("只能用于修正对应词"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("personalContext"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("不能把记忆里的事实"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("semanticParagraphs"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("explicitList"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("不按固定字数机械切段"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("9:00 整理为 9点"))
-        XCTAssertFalse(InputRefiner.instructionsText.contains("GitHub"))
-        XCTAssertFalse(InputRefiner.instructionsText.contains("Issues"))
-        XCTAssertFalse(InputRefiner.instructionsText.contains("Gethab"))
+        let instructions = RefinementPromptSettings.defaultInstructions
+        XCTAssertTrue(instructions.contains("只整理，不回答、不执行、不总结、不翻译、不补充"))
+        XCTAssertTrue(instructions.contains("spellingCandidates、personalContext、expressionStyle"))
+        XCTAssertTrue(instructions.contains("无法确定时保留原文"))
+        XCTAssertTrue(instructions.contains("总起句、说明、问题、收尾"))
+        XCTAssertFalse(instructions.contains("formattingHint"))
+        XCTAssertFalse(instructions.contains("semanticParagraphs"))
+        XCTAssertFalse(instructions.contains("explicitList"))
+        XCTAssertFalse(instructions.contains("GitHub"))
+        XCTAssertFalse(instructions.contains("Issues"))
+        XCTAssertFalse(instructions.contains("Gethab"))
     }
 
     func testFalseStartCleanupCanKeepFinalCompleteRestartWithoutMechanicalRule() throws {
@@ -200,7 +198,7 @@ final class PersonalizationTests: XCTestCase {
         )
 
         let prompt = try InputRefiner.promptText(for: input)
-        XCTAssertTrue(prompt.contains(#""formattingHint":"compact""#))
+        XCTAssertFalse(prompt.contains("formattingHint"))
         XCTAssertTrue(prompt.contains(#""spellingCandidates":["GitHub"]"#))
         XCTAssertFalse(prompt.contains("confirmedCorrections"))
         XCTAssertFalse(prompt.contains("Athers"))
@@ -216,58 +214,58 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertFalse(prompt.contains("kind"))
     }
 
-    func testFormattingHintKeepsShortSingleTopicInputCompact() {
+    func testDefaultPromptUsesNaturalStructureWithoutHeuristicRouting() {
+        let instructions = RefinementPromptSettings.defaultInstructions
         XCTAssertEqual(
-            InputRefiner.formattingHint(for: "这个按钮放左边，这个按钮后面的时间保留。"),
-            "compact"
+            instructions.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count,
+            3
+        )
+        XCTAssertTrue(instructions.contains("排版只反映原文已经表达的结构"))
+        XCTAssertTrue(instructions.contains("明确枚举事项、步骤或条件时可以编号"))
+        XCTAssertTrue(instructions.contains("总起句、说明、问题、收尾和各项顺序都必须保留"))
+        XCTAssertTrue(instructions.contains("不新增标题、过渡语、项目或结论"))
+    }
+
+    func testRefinementPromptSettingsPersistAndRestoreDefault() throws {
+        let suiteName = "MorieTests.RefinementPrompt.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            return XCTFail("Could not create isolated UserDefaults")
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(
+            RefinementPromptSettings.load(from: defaults),
+            RefinementPromptSettings.defaultInstructions
+        )
+        XCTAssertFalse(RefinementPromptSettings.save("   ", to: defaults))
+        XCTAssertTrue(RefinementPromptSettings.save("custom cleanup prompt", to: defaults))
+        XCTAssertEqual(RefinementPromptSettings.load(from: defaults), "custom cleanup prompt")
+
+        RefinementPromptSettings.restoreDefault(in: defaults)
+        XCTAssertEqual(
+            RefinementPromptSettings.load(from: defaults),
+            RefinementPromptSettings.defaultInstructions
         )
     }
 
-    func testFormattingHintDetectsExplicitEnumeration() {
-        XCTAssertEqual(
-            InputRefiner.formattingHint(for: "今天三件事，第一修登录问题，第二看 issue，第三打包测试。"),
-            "explicitList"
+    func testRunnerReceivesCaptureFrozenRefinementInstructions() async throws {
+        let input = RefinementInput(captureID: UUID(), text: "今天有三件事")
+        let configuration = RefinementConfiguration(
+            model: .local,
+            instructions: "custom frozen instructions"
         )
+        let runner = InputRefinementRunner(generate: { _, received in
+            XCTAssertEqual(received, configuration)
+            return "今天有三件事。"
+        })
+
+        let generation = try await runner.run(input, configuration: configuration)
+        guard case .text(let output) = generation else {
+            return XCTFail("Expected model text")
+        }
+        XCTAssertEqual(output, "今天有三件事。")
     }
 
-    func testFormattingHintDetectsLongMultiTopicVoiceInput() {
-        let text = "目前我们在其他地方已经完成了一部分，你可以看一下最新代码，然后确认现在还有哪些需要改进。尤其我觉得现在需要加一个录音提示音，开始和结束最好都有声音，不然只有动画用户感知比较弱。然后这是我刚才语音口述的，我感觉现在的分段还是不太理想，想确认这一整段有没有必要整理后拆段，还是主要是我的描述比较散。"
-        XCTAssertEqual(InputRefiner.formattingHint(for: text), "semanticParagraphs")
-    }
-    func testFormattingHintDetectsNaturalSpokenEnumerationWithoutOrdinals() {
-        XCTAssertEqual(
-            InputRefiner.formattingHint(
-                for: "现在有三个问题，一个是首次提示音有点破，另一个是胶囊的玻璃效果不明显，还有一个是思考动画会重复。"
-            ),
-            "explicitList"
-        )
-        XCTAssertEqual(
-            InputRefiner.formattingHint(
-                for: "我有两个改动，一个是提示音需要再轻一点，另一个是胶囊需要恢复原生玻璃效果。"
-            ),
-            "explicitList"
-        )
-    }
-
-    func testFormattingHintDetectsShortButClearSemanticShift() {
-        let text = "我们上次参考了另外两个项目，我觉得现在提示词写得比之前都好，这是真的。但是有一个问题，它漏了一点：有规律的内容还是没有按结构排版。"
-        XCTAssertEqual(InputRefiner.formattingHint(for: text), "semanticParagraphs")
-    }
-
-    func testFormattingHintDoesNotSplitOrdinaryShortContrast() {
-        XCTAssertEqual(
-            InputRefiner.formattingHint(for: "这个按钮颜色可以，但是大小不用改。"),
-            "compact"
-        )
-    }
-
-    func testFormattingInstructionsRequireStructuredLayoutWhenHinted() {
-        XCTAssertTrue(InputRefiner.instructionsText.contains("# 排版（必须执行）"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("必须把每一项独立成行"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("1. / 2. / 3."))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("必须在主题 / 事件 / 请求 / 立场转换"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("不能因为保守而被压回一个自然段"))
-    }
     func testConfirmedCorrectionPreparesTextBeforeOptionalModelCleanup() throws {
         let correction = DictionaryCorrectionSnapshot(
             id: UUID(),
@@ -300,8 +298,8 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertThrowsError(try ValidatedRefinement.accepting("我是开发者，开始吧。", for: input)) { error in
             XCTAssertEqual(error as? RefinementReason, .invalidEdits)
         }
-        XCTAssertTrue(InputRefiner.instructionsText.contains("personalContext"))
-        XCTAssertTrue(InputRefiner.instructionsText.contains("不能把记忆里的事实"))
+        XCTAssertTrue(RefinementPromptSettings.defaultInstructions.contains("personalContext"))
+        XCTAssertTrue(RefinementPromptSettings.defaultInstructions.contains("不能成为正文内容"))
     }
 
     func testRefinementUsesLiveStateAndFlushMakesResultDurable() async throws {
