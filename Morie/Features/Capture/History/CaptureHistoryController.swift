@@ -11,6 +11,8 @@ final class CaptureHistoryController: ObservableObject {
     @Published private(set) var recognizingCaptureID: UUID?
     @Published private(set) var recognitionMessage: String?
     @Published private(set) var isInputActive = false
+    @Published private(set) var captures: [CaptureRecord] = []
+    @Published private(set) var listError: String?
 
     private let store: CaptureStore
     private let locale: Locale
@@ -18,6 +20,10 @@ final class CaptureHistoryController: ObservableObject {
     private var selectedCaptureID: UUID?
     private var recognitionTask: Task<Void, Never>?
     private var playbackObservation: NSKeyValueObservation?
+    private var listLimit = 0
+    private var listSignature: CaptureHistorySignature?
+    private var listNeedsRefresh = false
+    private var isListVisible = false
 
     init(
         store: CaptureStore,
@@ -27,6 +33,73 @@ final class CaptureHistoryController: ObservableObject {
         self.store = store
         self.locale = locale
         self.recognizeFile = recognizeFile
+    }
+
+    var canLoadMoreCaptures: Bool {
+        listLimit > 0 && captures.count >= listLimit
+    }
+
+    func setListVisible(_ visible: Bool) {
+        isListVisible = visible
+        guard visible else { return }
+        refreshListIfNeeded()
+    }
+
+    func loadMoreCaptures() {
+        reloadList(limit: max(listLimit + 200, 200))
+    }
+
+    func captureListDidChange() {
+        guard listLimit > 0 else { return }
+        listNeedsRefresh = true
+        guard isListVisible else { return }
+        reloadList(limit: listLimit)
+    }
+
+    private func refreshListIfNeeded() {
+        guard listLimit > 0 else {
+            reloadList(limit: 200)
+            return
+        }
+
+        do {
+            let signature = try CaptureHistoryQuery.signature(in: store.container.mainContext)
+            guard listNeedsRefresh || signature != listSignature else {
+                listError = nil
+                return
+            }
+            reloadList(limit: listLimit, signature: signature)
+        } catch {
+            listError = "无法加载历史记录。"
+            Diagnostics.record(
+                "History",
+                "History signature refresh failed: \(error.localizedDescription)",
+                level: .warning
+            )
+        }
+    }
+
+    private func reloadList(
+        limit: Int,
+        signature prefetchedSignature: CaptureHistorySignature? = nil
+    ) {
+        do {
+            let context = store.container.mainContext
+            let records = try context.fetch(CaptureHistoryQuery.descriptor(limit: limit))
+            let signature = try prefetchedSignature ?? CaptureHistoryQuery.signature(in: context)
+            captures = records
+            listLimit = limit
+            listSignature = signature
+            listNeedsRefresh = false
+            listError = nil
+        } catch {
+            listError = "无法加载历史记录。"
+            Diagnostics.record(
+                "History",
+                "History list refresh failed: \(error.localizedDescription)",
+                level: .warning
+            )
+        }
     }
 
     func open(_ id: UUID) {
@@ -114,6 +187,7 @@ final class CaptureHistoryController: ObservableObject {
                 try Task.checkCancellation()
                 guard !self.isInputActive else { throw CancellationError() }
                 try self.store.saveReRecognition(text, for: id)
+                self.captureListDidChange()
                 if self.selectedCaptureID == id {
                     self.recognitionMessage = "识别结果已保存，可复制文字到其他应用使用。"
                 }
@@ -126,6 +200,7 @@ final class CaptureHistoryController: ObservableObject {
                 var message = error.localizedDescription
                 do {
                     try self.store.recordReRecognitionFailure(message, for: id)
+                    self.captureListDidChange()
                 } catch {
                     message += " The retry status could not be saved: \(error.localizedDescription)"
                 }
@@ -156,6 +231,7 @@ final class CaptureHistoryController: ObservableObject {
         // same Capture so a late writer cannot race this History mutation.
         try await store.flushPersistence(for: id)
         try store.deleteCapture(id)
+        captureListDidChange()
     }
 
     private func releasePlayer() {
