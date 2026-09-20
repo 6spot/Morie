@@ -351,7 +351,7 @@ private enum RefinementOutputGuard {
         }
 
         guard let start = starts.max() else { return nil }
-        let tail = text[start...].trimmingCharacters(in: .whitespacesAndNewlines)
+        let tail = String(text[start...]).trimmingCharacters(in: .whitespacesAndNewlines)
         return tail.isEmpty ? nil : tail
     }
 
