@@ -1,3 +1,5 @@
+import Foundation
+
 // Logic tests must not truncate or append to the running app's diagnostic log.
 enum DiagnosticLevel: Sendable {
     case info
