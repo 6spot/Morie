@@ -61,7 +61,7 @@ final class RefinementPromptController: ObservableObject {
     @Published private(set) var instructions: String
     @Published private(set) var settingsMessage: String?
 
-    init(load: () -> String = RefinementPromptSettings.load) {
+    init(load: @escaping () -> String = { RefinementPromptSettings.load() }) {
         instructions = load()
     }
 
