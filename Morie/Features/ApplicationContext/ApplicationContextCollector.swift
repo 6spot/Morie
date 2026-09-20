@@ -152,6 +152,7 @@ actor ApplicationContextCollector {
         remainingNodes: inout Int,
         remainingCharacters: inout Int
     ) {
+        configureTimeout(root)
         var queue: [AXUIElement] = [root]
         var index = 0
 
@@ -227,9 +228,6 @@ actor ApplicationContextCollector {
               let children = value as? [AXUIElement]
         else {
             return []
-        }
-        for child in children {
-            configureTimeout(child)
         }
         return children
     }
