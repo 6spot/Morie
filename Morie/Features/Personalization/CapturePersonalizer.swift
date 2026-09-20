@@ -59,6 +59,54 @@ final class CapturePersonalizer {
             expressionStyle: expressionStyle
         )
 
+        DevelopmentDiagnostics.text(
+            "RefinementInput",
+            captureID: captureID,
+            label: "recognizedSource",
+            source
+        )
+        DevelopmentDiagnostics.text(
+            "RefinementInput",
+            captureID: captureID,
+            label: "dictionaryPrepared",
+            input.prepared.text
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "dictionaryCandidates",
+            input.dictionary.map(\.name)
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "confirmedCorrections",
+            input.confirmedCorrections.map { "\($0.original) → \($0.replacement)" }
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "expressionStyle",
+            input.expressionStyle
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "memoryMatches",
+            input.context.map {
+                "\($0.memory.name) | matched=\($0.matchedTerm) | kind=\($0.memory.kind.rawValue) | scope=\($0.memory.scope.rawValue)"
+            }
+        )
+        for match in input.context {
+            DevelopmentDiagnostics.text(
+                "RefinementMemory",
+                captureID: captureID,
+                label: "notes[\(match.memory.name)]",
+                match.memory.notes,
+                limit: 4_000
+            )
+        }
+
         Diagnostics.record(
             "RefinementContext",
             "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); memoryMatches=\(input.context.count); dictionaryCandidates=\(input.dictionary.count); confirmedCorrections=\(input.confirmedCorrections.count); expressionDirectives=\(input.expressionStyle.count); applicationContextIncluded=false; memoryNotesIncluded=false"
@@ -74,7 +122,14 @@ final class CapturePersonalizer {
             )
             return input.prepared.text
         }
-        if let skip { return try keepOriginal(input, reason: skip, started: started) }
+        if let skip {
+            DevelopmentDiagnostics.record(
+                "RefinementDecision",
+                captureID: captureID,
+                "skippedBeforeModel; reason=\(skip.rawValue)"
+            )
+            return try keepOriginal(input, reason: skip, started: started)
+        }
         do {
             let generation = try await runner.run(input, configuration: configuration)
             try Task.checkCancellation()
@@ -86,8 +141,20 @@ final class CapturePersonalizer {
             }
             switch generation {
             case .keptOriginal(let reason):
+                DevelopmentDiagnostics.record(
+                    "RefinementDecision",
+                    captureID: captureID,
+                    "modelKeptOriginal; reason=\(reason.rawValue)"
+                )
                 return try keepOriginal(input, reason: reason, started: started)
             case .text(let text):
+                DevelopmentDiagnostics.text(
+                    "RefinementOutput",
+                    captureID: captureID,
+                    label: "generated",
+                    text,
+                    limit: 16_000
+                )
                 Diagnostics.record(
                     "RefinementGeneration",
                     "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); generatedCharacters=\(text.count); deltaCharacters=\(text.count - input.prepared.text.count); memoryMatches=\(input.context.count)"
@@ -110,7 +177,26 @@ final class CapturePersonalizer {
                 let result: ValidatedRefinement
                 do {
                     result = try ValidatedRefinement.accepting(text, for: input)
+                    DevelopmentDiagnostics.text(
+                        "RefinementOutput",
+                        captureID: captureID,
+                        label: "accepted",
+                        result.text,
+                        limit: 16_000
+                    )
+                    DevelopmentDiagnostics.list(
+                        "RefinementOutput",
+                        captureID: captureID,
+                        label: "edits",
+                        result.edits.map { "\($0.original) → \($0.replacement)" }
+                    )
                 } catch {
+                    DevelopmentDiagnostics.record(
+                        "RefinementDecision",
+                        captureID: captureID,
+                        level: .warning,
+                        "guardRejected; errorType=\(DevelopmentDiagnostics.errorType(error))"
+                    )
                     Diagnostics.record(
                         "Refinement",
                         "Rejected cleanup output that crossed a protected fact or intent boundary",
@@ -138,6 +224,11 @@ final class CapturePersonalizer {
 
     private func keepOriginal(_ input: RefinementInput, reason: RefinementReason, started: ContinuousClock.Instant) throws -> String {
         try store.requireRefinementSource(input)
+        DevelopmentDiagnostics.record(
+            "RefinementDecision",
+            captureID: input.captureID,
+            "keepOriginal; reason=\(reason.rawValue)"
+        )
         do {
             let mayApplyDictionary = reason != .dictionaryChanged && reason != .saveFailed
                 && (try? dictionary.relevantEntries(for: input.text)) == input.dictionary
