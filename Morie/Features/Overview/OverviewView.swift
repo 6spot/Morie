@@ -67,87 +67,80 @@ struct OverviewView: View {
             Text("查看 Morie 的本地使用情况和当前实际使用的模型。")
                 .foregroundStyle(.secondary)
 
-            if let metrics = metricsSnapshot?.metrics {
-                LazyVGrid(
-                    columns: [
-                        GridItem(
-                            .adaptive(minimum: 190, maximum: 280),
-                            spacing: 12
+            ControlCenterSectionGroup(
+                "使用情况",
+                footer: "“输入失败率”只统计 Morie 的输入流程是否成功，不等同于语音识别失误率。当前还没有足够的用户纠错真值样本，因此暂不计算可能误导的 ASR 错误率。"
+            ) {
+                if let metrics = metricsSnapshot?.metrics {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(
+                                .adaptive(minimum: 190, maximum: 280),
+                                spacing: 12
+                            )
+                        ],
+                        alignment: .leading,
+                        spacing: 12
+                    ) {
+                        metricCard(
+                            title: "累计识别字符",
+                            value: metrics.recognizedCharacters.formatted(),
+                            detail: "\(metrics.totalCaptures.formatted()) 条已完成记录",
+                            systemImage: "textformat"
                         )
-                    ],
-                    alignment: .leading,
-                    spacing: 12
-                ) {
-                    metricCard(
-                        title: "累计识别字符",
-                        value: metrics.recognizedCharacters.formatted(),
-                        detail: "\(metrics.totalCaptures.formatted()) 条已完成记录",
-                        systemImage: "textformat"
-                    )
-                    metricCard(
-                        title: "成功输入",
-                        value: metrics.successfulInputs.formatted(),
-                        detail: "已送达当前应用",
-                        systemImage: "text.cursor"
-                    )
-                    metricCard(
-                        title: "输入失败率",
-                        value: percent(metrics.failureRate),
-                        detail: metrics.currentAppAttempts == 0
-                            ? "暂无可统计的当前应用输入"
-                            : "\(metrics.failedInputs) / \(metrics.currentAppAttempts) 次",
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    metricCard(
-                        title: "平均润色耗时",
-                        value: duration(metrics.averageRefinementSeconds),
-                        detail: metrics.refinementSamples == 0
-                            ? "暂无润色耗时样本"
-                            : "\(metrics.refinementSamples) 次润色样本",
-                        systemImage: "wand.and.stars"
-                    )
+                        metricCard(
+                            title: "成功输入",
+                            value: metrics.successfulInputs.formatted(),
+                            detail: "已送达当前应用",
+                            systemImage: "text.cursor"
+                        )
+                        metricCard(
+                            title: "输入失败率",
+                            value: percent(metrics.failureRate),
+                            detail: metrics.currentAppAttempts == 0
+                                ? "暂无可统计的当前应用输入"
+                                : "\(metrics.failedInputs) / \(metrics.currentAppAttempts) 次",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        metricCard(
+                            title: "平均润色耗时",
+                            value: duration(metrics.averageRefinementSeconds),
+                            detail: metrics.refinementSamples == 0
+                                ? "暂无润色耗时样本"
+                                : "\(metrics.refinementSamples) 次润色样本",
+                            systemImage: "wand.and.stars"
+                        )
+                    }
+                } else if let metricsError {
+                    Label(metricsError, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView("正在读取使用统计…")
                 }
-            } else if let metricsError {
-                Label(metricsError, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.secondary)
-            } else {
-                ProgressView("正在读取使用统计…")
             }
 
-            Text("“输入失败率”只统计 Morie 的输入流程是否成功，不等同于语音识别失误率。当前还没有足够的用户纠错真值样本，因此暂不计算可能误导的 ASR 错误率。")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            ControlCenterSectionGroup(
+                "当前模型",
+                footer: "模型状态来自当前运行实例。语音识别发生回退时，这里会直接显示 DictationTranscriber 和“回退”，而不是仍然显示首选模型。"
+            ) {
+                modelRow(
+                    title: "语音识别",
+                    name: controller.speechBackend?.displayName ?? "正在准备…",
+                    detail: speechDetail,
+                    status: speechStatus
+                )
 
-            GroupBox {
-                VStack(spacing: 0) {
-                    modelRow(
-                        title: "语音识别",
-                        name: controller.speechBackend?.displayName ?? "正在准备…",
-                        detail: speechDetail,
-                        status: speechStatus
+                Divider()
+
+                modelRow(
+                    title: "输入润色",
+                    name: refinementModels.modelName,
+                    detail: refinementModels.modelDetail,
+                    status: refinementModels.modelStatusTitle(
+                        inputRefinementEnabled: controller.inputRefinementEnabled
                     )
-
-                    Divider()
-                        .padding(.vertical, 12)
-
-                    modelRow(
-                        title: "输入润色",
-                        name: refinementModels.modelName,
-                        detail: refinementModels.modelDetail,
-                        status: refinementModels.modelStatusTitle(
-                            inputRefinementEnabled: controller.inputRefinementEnabled
-                        )
-                    )
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 4)
-            } label: {
-                Label("当前模型", systemImage: "cpu")
+                )
             }
-
-            Text("模型状态来自当前运行实例。语音识别发生回退时，这里会直接显示 DictationTranscriber 和“回退”，而不是仍然显示首选模型。")
-                .font(.callout)
-                .foregroundStyle(.secondary)
         }
         .navigationTitle("总览")
         .task {
