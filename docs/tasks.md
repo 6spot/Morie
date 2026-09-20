@@ -47,6 +47,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-032 | Capture lifecycle | Freeze per-Capture settings and Speech hint context | DONE | [#50](https://github.com/6spot/Morie/issues/50) | [`M-032`](./tasks/M-032-capture-session-context.md) |
 | M-033 | Capture UX | Soften capsule controls and success/status feedback | IN PROGRESS | [#54](https://github.com/6spot/Morie/issues/54) | [`M-033`](./tasks/M-033-quiet-capture-hud.md) |
 | M-034 | Refinement models | Add user-configured OpenAI-compatible cleanup models with Apple-local fallback | IN PROGRESS | — | [`M-034`](./tasks/M-034-external-refinement-models.md) |
+| M-035 | Input quality | Simplify cleanup prompt and make it editable at runtime | IN PROGRESS | [#71](https://github.com/6spot/Morie/issues/71) | [`M-035`](./tasks/M-035-editable-refinement-prompt.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
