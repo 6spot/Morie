@@ -46,7 +46,9 @@ Disabling signing here is for compile validation only; normal local launch/distr
 
 ### Development data after schema changes
 
-Only the current data structure is supported. When changing a persisted structure, verify writing and reading a fresh temporary store in separate processes. Recreating a `ModelContainer` in the same test process is useful coverage but does not establish a cold launch. Compilation also cannot establish that an existing development database is readable.
+Only the current data structure is supported. M-036 changes persisted Personal Memory payloads and adds `MemoryEvidenceRecord`; an older development store is not a supported input to this schema. Preserve any required backup, then use the explicit reset process below before launching the signed app on the M-036 schema.
+
+Only the current schema is supported. When changing a persisted structure, verify writing and reading a fresh temporary store in separate processes. Recreating a `ModelContainer` in the same test process is useful coverage but does not establish a cold launch. Compilation also cannot establish that an existing development database is readable.
 
 SwiftData can add a column while leaving it null in existing rows. In particular, adding a nonoptional array inside a persisted Codable value can make reading an older value abort inside SwiftData, even though the container opened successfully. Do not add legacy decoding defaults, schema migrations or automatic data deletion to hide this development-data mismatch.
 
@@ -82,11 +84,11 @@ xcodebuild \
 
 Audio stream tests use synthetic 16 kHz mono PCM and Apple's real AAC writer/decoder. They verify readable audio after conversion/flush failure, immediate stop, repeated finalization, restart preservation and explicit discard. Controller timing, capture-session notifications, microphone release and cross-app delivery still need the signed-app interruption checks in [`validation.md`](./validation.md#m-003-interruption-and-discard).
 
-Memory tests use isolated SwiftData containers and native NaturalLanguage tokenization to check provenance, lifecycle and bounded personal-context retrieval. Memory and Dictionary write through separate contexts in the same container; development requires no legacy schema or migration setup.
+Memory tests use isolated SwiftData containers and native NaturalLanguage tokenization to check semantic topic/evidence provenance, working-context lifecycle and bounded cleanup retrieval. Memory and Dictionary write through separate contexts in the same container; development requires no legacy schema or migration setup.
 
 Dictionary tests cover word-only persistence, letter-case duplicates, distinct full-/half-width forms, invalid-input protection, bounded Speech hints, same-word letter-case normalization, overlap and technical-content protection. Correction detector tests cover Chinese/mixed words, shared letters, added/deleted/joined letters, stable-edit timing and undo. They do not observe real Accessibility fields or display prompts.
 
-Learning tests inject structured evidence and delayed models. They verify exact committed final-text sources, idle queue/restart discovery, automatic admission/accumulation, merging/updates, user edits/archive/delete, atomic failure/backoff and input preemption. A cancelled model cannot create late Memory. Personalization tests inject full final text and uncooperative models to check independent cleanup, dictionary fallback, original/final save ordering, provenance, stale source/context, History retry, deadline/cancellation and current-version recovery.
+Learning tests inject semantic writer decisions and delayed models. They verify exact committed final-text sources, idle queue/restart discovery, disabled-period skip semantics, create/merge/update/reinforce by supplied topic UUID, separate evidence, working-context expiry/refresh/promotion, user edits/archive/delete, atomic failure/backoff and input preemption. A cancelled model cannot create late Memory. Personalization tests inject full final text and uncooperative models to check independent cleanup, dictionary fallback, original/final save ordering, provenance, stale source/context, History retry, deadline/cancellation and current-version recovery.
 
 Permission setup tests inject read-only snapshots and authorization/settings actions. They verify complete mandatory checks, explicit actions, denied/restricted/unsupported states, revocation/recovery, stale buttons and concurrent refresh/request behavior. The real Speech authorization bridge is tested with injected `SFSpeechRecognizer` subclasses that return background allow/deny callbacks or a synchronous callback, without querying or requesting real TCC. Preserve this Objective-C call boundary in regression tests: a plain Swift closure fake does not reproduce the SDK callback's runtime isolation check.
 
@@ -225,14 +227,15 @@ Interactive checks remain deferred to the evening of 2026-09-18. Use disposable 
 
 ## Automatic personal Memory smoke test
 
-1. Dictate a disposable explicit personal fact/project through ordinary current-app input. Let Morie idle, then inspect **个人记忆** and History's learning status. No manual confirmation should be needed.
-2. Confirm **用于学习的文字** matches saved final text, including cleanup/dictionary changes. Recognition stays separate. Capture-only/active/cancelled/raw-only input is not automatically learned.
-3. Repeat supported information, test weaker evidence across distinct captures, then express a clear later change. Inspect merged sources and superseded history; an ambiguous/older claim must not overwrite current information.
-4. Test quotes, third-person/hypothetical/temporary statements and uncertain personal information. Inspect actual evidence rather than assuming model confidence guarantees correctness.
-5. Edit/archive/delete personal information. User edits take precedence and the same normalized deleted topic is not immediately relearned. Inspect source links; deleting a source removes analysis snapshots but retains independent Memory.
-6. Begin new input during analysis, then relaunch with pending work. New input remains responsive, late cancelled results cannot save, and unfinished work resumes during idle time. Opening/closing History does not govern background learning.
+1. Verify **设置 → 使用个人记忆** defaults on. Dictate a disposable durable fact/project through ordinary current-app input, let Morie idle, then inspect **个人记忆** and History's learning status. No manual confirmation should be required.
+2. Confirm **用于学习的文字** and the Memory detail's evidence match the saved final text. Recognition remains separate. Capture-only/active/cancelled/raw-only input is not automatically learned.
+3. Describe the same project/topic again using different wording, then state a real change. The model should merge/update the existing semantic topic rather than create rows merely because its generated title changed. Inspect the independent evidence trail.
+4. Dictate a useful temporary focus such as a current debugging task and a clearly durable preference/decision. The former should be treated internally as working context while the latter is durable; the UI should present both naturally without exposing lifecycle taxonomy. Repeated evidence should refresh working context, and clearly durable later evidence may promote it.
+5. Edit a Memory body, then provide conflicting automatic evidence: the user-edited body must not be overwritten. Archive/delete a disposable topic and confirm automatic learning does not recreate it under a cosmetic rename. Source deletion may remove analysis history but must not erase already-independent evidence.
+6. Turn **使用个人记忆** off, complete another ordinary input, then turn it back on. The disabled-period input must not be learned later, existing Memory remains visible, and cleanup must receive no Personal Memory while the switch is off.
+7. Begin new input during analysis, then relaunch with pending enabled-period work. New input remains responsive, late cancelled results cannot save, and unfinished eligible work resumes during idle time. Opening/closing History does not govern background learning.
 
-See [the Memory device checklist](validation.md#m-004-memory-foundation). Model selectivity, stable topic identity and energy use require actual evaluation.
+See [the Memory device checklist](validation.md#m-004-memory-foundation). Real Foundation Models topic identity, scope classification, merge/update quality and energy use require actual owner-device evaluation.
 
 ## Word-correction suggestion smoke test
 
