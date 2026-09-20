@@ -4,7 +4,7 @@ enum ControlCenterMetrics {
     static let sidebarMinWidth: CGFloat = 180
     static let sidebarIdealWidth: CGFloat = 220
     static let sidebarMaxWidth: CGFloat = 260
-    static let contentInset: CGFloat = 28
+    static let contentInset: CGFloat = 24
     static let sectionSpacing: CGFloat = 28
     static let readingMaxWidth: CGFloat = 760
     static let denseInset: CGFloat = 16
@@ -39,6 +39,43 @@ struct ControlCenterContentPage<Content: View>: View {
             ControlCenterMetrics.contentInset,
             for: .scrollContent
         )
+    }
+}
+
+struct ControlCenterSectionGroup<Content: View>: View {
+    let title: String
+    let footer: String?
+    private let content: Content
+
+    init(
+        _ title: String,
+        footer: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.footer = footer
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    content
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let footer {
+                Text(footer)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
