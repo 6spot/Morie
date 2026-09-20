@@ -88,6 +88,7 @@ struct MorieControlCenter: View {
     @State private var selection: ControlCenterSection? = .overview
     @State private var selectedCaptureID: UUID?
     @State private var selectedDictionaryEntry: UUID?
+    @State private var overviewMetricsSnapshot: OverviewMetricsSnapshot?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
@@ -107,7 +108,10 @@ struct MorieControlCenter: View {
     private var detail: some View {
         switch selection ?? .overview {
         case .overview:
-            OverviewView(controller: controller)
+            OverviewView(
+                controller: controller,
+                metricsSnapshot: $overviewMetricsSnapshot
+            )
         case .history:
             CaptureHistoryWorkspace(
                 controller: controller,
