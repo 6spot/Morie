@@ -632,6 +632,19 @@ final class CaptureSessionController {
                 live: result.transcript,
                 accurate: accurateTranscript
             )
+            let preferredRecognitionSource: String
+            if let accurateTranscript,
+               !accurateTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               finalText == accurateTranscript {
+                preferredRecognitionSource = "accurate"
+            } else {
+                preferredRecognitionSource = "live"
+            }
+            DevelopmentDiagnostics.record(
+                "Speech",
+                captureID: sessionID,
+                "preferredSource=\(preferredRecognitionSource); liveCharacters=\(result.transcript.count); accurateCharacters=\(accurateTranscript?.count ?? 0); preferredCharacters=\(finalText.count)"
+            )
             recordLatency("speech-final", sessionID: sessionID)
 
             guard let captureStore else {
@@ -702,6 +715,11 @@ final class CaptureSessionController {
                     "CapturePersistence",
                     "Capture-only final state is durable for \(label(sessionID))"
                 )
+                DevelopmentDiagnostics.record(
+                    "Capture",
+                    captureID: sessionID,
+                    "success; mode=captureOnly; elapsedMs=\(Int(Date().timeIntervalSince(sessionContext.acceptedAt) * 1_000)); finalCharacters=\(finalText.count)"
+                )
                 completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
                 return
             }
@@ -747,6 +765,11 @@ final class CaptureSessionController {
                 sessionID,
                 applicationName: deliveredName,
                 bundleIdentifier: deliveredBundle
+            )
+            DevelopmentDiagnostics.record(
+                "Capture",
+                captureID: sessionID,
+                "success; elapsedMs=\(Int(Date().timeIntervalSince(sessionContext.acceptedAt) * 1_000)); deliveredCharacters=\(finalText.count)"
             )
             completeSuccessfulSession(sessionID, deliveryMode: deliveryMode)
             Task { @MainActor [weak self, weak captureStore] in
