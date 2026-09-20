@@ -493,6 +493,7 @@
 				C10000000000000000000002 /* Sources */,
 				C10000000000000000000001 /* Frameworks */,
 				C10000000000000000000003 /* Resources */,
+				C90000000000000000000001 /* Stamp Build Identity */,
 			);
 			buildRules = ();
 			dependencies = ();
@@ -585,6 +586,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		C90000000000000000000001 /* Stamp Build Identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/stamp-build-identity.sh",
+			);
+			name = "Stamp Build Identity";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/MorieBuildIdentity.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/scripts/stamp-build-identity.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C10000000000000000000002 /* Sources */ = {
