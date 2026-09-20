@@ -1,71 +1,52 @@
-import AppKit
 import ApplicationServices
 import Foundation
 
 /// Captures a bounded, runtime-only snapshot of the user's current editing
 /// environment through macOS Accessibility.
 ///
-/// The collector is deliberately generic: no application-specific adapters, no
-/// screen capture, and no OCR. It starts from the current focused AX element and
-/// expands outward through nearby siblings/ancestors with hard node/character
-/// budgets. Secure text fields never contribute text.
-@MainActor
-struct ApplicationContextCollector {
+/// Accessibility calls are blocking cross-process IPC, so the collector owns a
+/// dedicated actor executor and applies a short native messaging timeout to
+/// every AX element it touches. The collector is deliberately generic: no
+/// application-specific adapters, no screen capture, and no OCR.
+actor ApplicationContextCollector {
     private enum Limit {
         static let selectedCharacters = 2_000
         static let focusedCharacters = 3_000
         static let nearbyCharacters = 6_000
         static let ancestorDepth = 6
-        static let nearbyNodes = 96
+        static let nearbyNodes = 48
         static let siblingRadius = 4
-        static let childrenPerNode = 16
+        static let childrenPerNode = 12
+        static let messagingTimeout: Float = 0.05
     }
 
-    func capture() -> ApplicationContextSnapshot? {
-        guard let application = NSWorkspace.shared.frontmostApplication else {
-            return nil
-        }
-
-        let identity = ApplicationIdentity(
-            name: application.localizedName,
-            bundleIdentifier: application.bundleIdentifier
-        )
-        let capturedAt = Date()
-
-        guard AXIsProcessTrusted() else {
-            return ApplicationContextSnapshot(
-                application: identity,
-                selectedText: nil,
-                focusedText: nil,
-                nearbyText: nil,
-                capturedAt: capturedAt
-            )
+    func capture(
+        _ request: ApplicationContextCaptureRequest
+    ) -> ApplicationContextSnapshot {
+        guard !Task.isCancelled, AXIsProcessTrusted() else {
+            return emptySnapshot(for: request)
         }
 
         let applicationElement = AXUIElementCreateApplication(
-            application.processIdentifier
+            pid_t(request.processIdentifier)
         )
+        configureTimeout(applicationElement)
+
         guard let focusedElement = copyElement(
             kAXFocusedUIElementAttribute,
             from: applicationElement
-        ) else {
-            return ApplicationContextSnapshot(
-                application: identity,
-                selectedText: nil,
-                focusedText: nil,
-                nearbyText: nil,
-                capturedAt: capturedAt
-            )
+        ),
+        !Task.isCancelled,
+        !isSecureTextElement(focusedElement)
+        else {
+            return emptySnapshot(for: request)
         }
 
-        guard !isSecureTextElement(focusedElement) else {
-            return ApplicationContextSnapshot(
-                application: identity,
-                selectedText: nil,
-                focusedText: nil,
-                nearbyText: nil,
-                capturedAt: capturedAt
-            )
+        var actualPID: pid_t = 0
+        guard AXUIElementGetPid(focusedElement, &actualPID) == .success,
+              actualPID == pid_t(request.processIdentifier)
+        else {
+            return emptySnapshot(for: request)
         }
 
         let selectedText = boundedText(
@@ -82,11 +63,23 @@ struct ApplicationContextCollector {
         )
 
         return ApplicationContextSnapshot(
-            application: identity,
+            application: request.application,
             selectedText: selectedText,
             focusedText: focusedText,
             nearbyText: nearbyText,
-            capturedAt: capturedAt
+            capturedAt: request.capturedAt
+        )
+    }
+
+    private func emptySnapshot(
+        for request: ApplicationContextCaptureRequest
+    ) -> ApplicationContextSnapshot {
+        ApplicationContextSnapshot(
+            application: request.application,
+            selectedText: nil,
+            focusedText: nil,
+            nearbyText: nil,
+            capturedAt: request.capturedAt
         )
     }
 
@@ -105,7 +98,8 @@ struct ApplicationContextCollector {
         var current = focusedElement
 
         for _ in 0..<Limit.ancestorDepth {
-            guard remainingNodes > 0,
+            guard !Task.isCancelled,
+                  remainingNodes > 0,
                   remainingCharacters > 0,
                   let parent = copyElement(kAXParentAttribute, from: current)
             else {
@@ -124,6 +118,7 @@ struct ApplicationContextCollector {
                 CFEqual($0, current)
             }) {
                 for offset in proximityOffsets(radius: Limit.siblingRadius) {
+                    guard !Task.isCancelled else { break }
                     let index = currentIndex + offset
                     guard siblings.indices.contains(index) else { continue }
                     collectSubtreeText(
@@ -156,7 +151,8 @@ struct ApplicationContextCollector {
         var queue: [AXUIElement] = [root]
         var index = 0
 
-        while index < queue.count,
+        while !Task.isCancelled,
+              index < queue.count,
               remainingNodes > 0,
               remainingCharacters > 0 {
             let element = queue[index]
@@ -189,7 +185,7 @@ struct ApplicationContextCollector {
         seen: inout Set<String>,
         remainingCharacters: inout Int
     ) {
-        guard remainingCharacters > 0 else { return }
+        guard !Task.isCancelled, remainingCharacters > 0 else { return }
 
         let candidates = [
             textAttribute(kAXTitleAttribute, from: element),
@@ -198,7 +194,8 @@ struct ApplicationContextCollector {
         ]
 
         for candidate in candidates {
-            guard remainingCharacters > 0,
+            guard !Task.isCancelled,
+                  remainingCharacters > 0,
                   let candidate,
                   !candidate.isEmpty
             else {
@@ -223,10 +220,14 @@ struct ApplicationContextCollector {
     }
 
     private func childElements(of element: AXUIElement) -> [AXUIElement] {
-        guard let value = copyAttribute(kAXChildrenAttribute, from: element),
+        guard !Task.isCancelled,
+              let value = copyAttribute(kAXChildrenAttribute, from: element),
               let children = value as? [AXUIElement]
         else {
             return []
+        }
+        for child in children.prefix(Limit.childrenPerNode) {
+            configureTimeout(child)
         }
         return children
     }
@@ -235,19 +236,24 @@ struct ApplicationContextCollector {
         _ attribute: CFString,
         from element: AXUIElement
     ) -> AXUIElement? {
-        guard let value = copyAttribute(attribute, from: element),
+        guard !Task.isCancelled,
+              let value = copyAttribute(attribute, from: element),
               CFGetTypeID(value) == AXUIElementGetTypeID()
         else {
             return nil
         }
-        return (value as! AXUIElement)
+        let child = value as! AXUIElement
+        configureTimeout(child)
+        return child
     }
 
     private func textAttribute(
         _ attribute: CFString,
         from element: AXUIElement
     ) -> String? {
-        guard let value = copyAttribute(attribute, from: element) else {
+        guard !Task.isCancelled,
+              let value = copyAttribute(attribute, from: element)
+        else {
             return nil
         }
 
@@ -264,6 +270,7 @@ struct ApplicationContextCollector {
         _ attribute: CFString,
         from element: AXUIElement
     ) -> CFTypeRef? {
+        guard !Task.isCancelled else { return nil }
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
@@ -279,7 +286,11 @@ struct ApplicationContextCollector {
         guard let value = textAttribute(kAXSubroleAttribute, from: element) else {
             return false
         }
-        return value == "AXSecureTextField"
+        return value == (kAXSecureTextFieldSubrole as String)
+    }
+
+    private func configureTimeout(_ element: AXUIElement) {
+        AXUIElementSetMessagingTimeout(element, Limit.messagingTimeout)
     }
 
     private func boundedText(_ text: String?, limit: Int) -> String? {
