@@ -4,6 +4,44 @@ import XCTest
 
 @MainActor
 final class PersonalizationTests: XCTestCase {
+    func testApplicationContextVocabularyPrefersNearbyTechnicalTermsWithoutPageText() {
+        let snapshot = ApplicationContextSnapshot(
+            application: ApplicationIdentity(
+                name: "Google Chrome",
+                bundleIdentifier: "com.google.Chrome"
+            ),
+            selectedText: "Use Qelvatrix with API",
+            focusedText: "Roventia works with AppController and Keychain",
+            nearbyText: "This page also mentions SwiftUI, OpenAI and Google Chrome.",
+            capturedAt: Date()
+        )
+
+        let terms = ApplicationContextVocabulary.extract(from: snapshot)
+
+        XCTAssertEqual(terms.first, "Qelvatrix")
+        XCTAssertTrue(terms.contains("API"))
+        XCTAssertTrue(terms.contains("Roventia"))
+        XCTAssertTrue(terms.contains("AppController"))
+        XCTAssertTrue(terms.contains("Keychain"))
+        XCTAssertTrue(terms.contains("SwiftUI"))
+        XCTAssertTrue(terms.contains("OpenAI"))
+        XCTAssertFalse(terms.contains("This"))
+        XCTAssertLessThanOrEqual(terms.count, ApplicationContextVocabulary.maximumTerms)
+    }
+
+    func testSpeechContextHintsKeepDictionaryPriorityAndDeduplicateContext() {
+        let merged = SpeechContextHints.merged(
+            dictionaryWords: ["Morie", "AppController"],
+            applicationContextWords: ["morie", "Qelvatrix", "AppController", "Roventia"]
+        )
+
+        XCTAssertEqual(
+            merged,
+            ["Morie", "AppController", "Qelvatrix", "Roventia"]
+        )
+        XCTAssertLessThanOrEqual(merged.count, SpeechContextHints.maximumCount)
+    }
+
     func testRefinementModelControllerDoesNotReadKeychainUntilExternalRefinementNeedsIt() {
         var credentialReads = 0
         let controller = RefinementModelController(
