@@ -122,11 +122,23 @@ struct OverviewView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                Text(buildIdentity.configuration)
+                    .font(.caption)
+                    .foregroundStyle(
+                        DevelopmentDiagnostics.isEnabled
+                            ? .orange
+                            : .secondary
+                    )
             }
 
-            Text("Git Commit 会在每次构建时写入 App；带 * 表示构建时工作区存在未提交改动。")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Text(
+                DevelopmentDiagnostics.isEnabled
+                    ? "Git Commit 会在每次构建时写入 App；带 * 表示构建时工作区存在未提交改动。当前为开发构建，诊断日志可能包含语音正文、页面上下文和模型输入输出，请勿把日志公开上传。"
+                    : "Git Commit 会在每次构建时写入 App；带 * 表示构建时工作区存在未提交改动。"
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
         }
     }
 
