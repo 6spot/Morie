@@ -50,9 +50,9 @@ struct DictionaryView: View {
                 }
 
                 if search.isEmpty || !visibleUserEntries.isEmpty {
-                    dictionarySection(
-                        title: "用户添加",
-                        description: "你添加或确认过的词语，可以编辑和删除。"
+                    ControlCenterSectionGroup(
+                        "用户添加",
+                        footer: "你添加或确认过的词语，可以编辑和删除。"
                     ) {
                         if visibleUserEntries.isEmpty {
                             HStack(spacing: 10) {
@@ -83,9 +83,9 @@ struct DictionaryView: View {
                 }
 
                 if !visibleBuiltInEntries.isEmpty {
-                    dictionarySection(
-                        title: "系统内置",
-                        description: "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
+                    ControlCenterSectionGroup(
+                        "系统内置",
+                        footer: "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
                     ) {
                         LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
                             ForEach(visibleBuiltInEntries) { entry in
@@ -155,25 +155,6 @@ struct DictionaryView: View {
                 self.selection = nil
             }
         }
-    }
-
-    @ViewBuilder
-    private func dictionarySection<Content: View>(
-        title: String,
-        description: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                Text(description)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func add() {
