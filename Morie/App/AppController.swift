@@ -29,6 +29,7 @@ final class AppController {
     )
     let refinementModels = RefinementModelController()
     let refinementPrompts = RefinementPromptController()
+    let applicationContextInspector = ApplicationContextInspectionStore()
 
     private static let setupCompletedKey = "setup.completed"
 
@@ -51,6 +52,7 @@ final class AppController {
             personalizer: personalizer,
             postInsertionLearning: postInsertionLearning,
             memoryLearning: memoryLearning,
+            applicationContextInspector: applicationContextInspector,
             inputRefinementEnabled: preferences.inputRefinementEnabled,
             resolveRefinementConfiguration: { [weak self] snapshot in
                 let model =
