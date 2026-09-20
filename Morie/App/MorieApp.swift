@@ -240,7 +240,7 @@ struct MorieSettingsView: View {
     }
 
     var body: some View {
-        ControlCenterContentPage {
+        VStack(alignment: .leading, spacing: ControlCenterMetrics.sectionSpacing) {
             ControlCenterSectionGroup("输入润色") {
                 Toggle(
                     "自动润色语音输入",
