@@ -21,7 +21,7 @@ final class CaptureAudioStreamTests: XCTestCase {
             onAudioLevel: { _ in }
         )
 
-        stream.append(try makeAudio())
+        stream.append(try makeSpeechLikeAudio())
         let completion = stream.finish()
 
         XCTAssertEqual(completion.error as? Failure, .conversion)
@@ -110,11 +110,26 @@ final class CaptureAudioStreamTests: XCTestCase {
         XCTAssertEqual(completion.sourceAudio.hasMeaningfulAudio, false)
     }
 
-    func testSustainedSpeechLikeSignalIsMeaningfulEvenWithoutTranscript() throws {
+    func testSteadyEnvironmentalToneIsNotClassifiedAsMeaningfulSpeech() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stream = try makeStream(at: directory.appending(path: "steady-noise.m4a"))
+        stream.append(try makeAudio(amplitude: 0.12, frames: 16_000))
+
+        let completion = stream.finish()
+
+        XCTAssertEqual(
+            completion.sourceAudio.hasMeaningfulAudio,
+            false,
+            "Sustained energy alone must not make background noise retryable"
+        )
+    }
+
+    func testSpeechLikeDynamicSignalIsMeaningfulEvenWithoutTranscript() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let stream = try makeStream(at: directory.appending(path: "speech-like.m4a"))
-        stream.append(try makeAudio(amplitude: 0.12, frames: 4_000))
+        stream.append(try makeSpeechLikeAudio())
 
         let completion = stream.finish()
 
@@ -263,6 +278,25 @@ final class CaptureAudioStreamTests: XCTestCase {
         let channel = try XCTUnwrap(buffer.floatChannelData?[0])
         for index in 0..<Int(buffer.frameLength) {
             channel[index] = amplitude * sin(2 * .pi * 440 * Float(index) / 16_000)
+        }
+        return buffer
+    }
+
+    private func makeSpeechLikeAudio(
+        frames: AVAudioFrameCount = 8_000
+    ) throws -> AVAudioPCMBuffer {
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
+        buffer.frameLength = frames
+        let channel = try XCTUnwrap(buffer.floatChannelData?[0])
+        let amplitudes: [Float] = [0.018, 0.045, 0.11, 0.035, 0.14, 0.055, 0.095, 0.025]
+        let window = max(1, Int(buffer.frameLength) / amplitudes.count)
+
+        for index in 0..<Int(buffer.frameLength) {
+            let envelope = amplitudes[min(index / window, amplitudes.count - 1)]
+            let voiced = sin(2 * .pi * 180 * Float(index) / 16_000)
+            let harmonic = 0.35 * sin(2 * .pi * 360 * Float(index) / 16_000)
+            channel[index] = envelope * (voiced + harmonic)
         }
         return buffer
     }
