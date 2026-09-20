@@ -222,16 +222,15 @@ struct PermissionManagementView: View {
     }
 
     var body: some View {
-        VStack(
-            alignment: .leading,
-            spacing: ControlCenterMetrics.sectionSpacing
-        ) {
+        Group {
             if setup.checks.isEmpty {
-                ControlCenterGroup("设备与权限") {
+                Section {
                     ProgressView("正在检查设备和权限…")
+                } header: {
+                    Text("设备与权限")
                 }
             } else {
-                ControlCenterGroup("设备能力") {
+                Section("设备能力") {
                     capabilityRows(
                         setup.checks.filter {
                             !$0.requirement.isPermission
@@ -239,20 +238,47 @@ struct PermissionManagementView: View {
                     )
                 }
 
-                ControlCenterGroup(
-                    "使用权限",
-                    footer: "权限由 macOS 管理。从系统设置返回后，状态会自动更新。"
-                ) {
+                Section {
                     capabilityRows(
                         setup.checks.filter {
                             $0.requirement.isPermission
                         }
                     )
+
+                    Button(
+                        "重新检查",
+                        systemImage: "arrow.clockwise"
+                    ) {
+                        Task {
+                            await setup.refresh()
+                        }
+                    }
+                    .disabled(isBusy)
+
+                    if setup.isReady
+                        && !controller.canStartCapture {
+                        Button("重新启用 Morie") {
+                            Task {
+                                await controller.bootstrap(
+                                    completingSetup: true
+                                )
+                            }
+                        }
+                        .disabled(
+                            isBusy || controller.isCaptureActive
+                        )
+                    }
+                } header: {
+                    Text("使用权限")
+                } footer: {
+                    Text(
+                        "权限由 macOS 管理。从系统设置返回后，状态会自动更新。"
+                    )
                 }
             }
 
             if let error = capabilities.setupError {
-                ControlCenterGroup("状态") {
+                Section("状态") {
                     Label(
                         error,
                         systemImage: "exclamationmark.triangle"
@@ -262,29 +288,9 @@ struct PermissionManagementView: View {
             }
         }
         .navigationTitle("权限")
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button("重新检查", systemImage: "arrow.clockwise") {
-                    Task {
-                        await setup.refresh()
-                    }
-                }
-                .disabled(isBusy)
-
-                if setup.isReady && !controller.canStartCapture {
-                    Button("重新启用 Morie") {
-                        Task {
-                            await controller.bootstrap(
-                                completingSetup: true
-                            )
-                        }
-                    }
-                    .disabled(
-                        isBusy || controller.isCaptureActive
-                    )
-                }
-            }
-        }
+        .navigationSubtitle(
+            setup.isReady ? "设备与权限已就绪" : "检查 Morie 所需的系统能力"
+        )
         .task {
             if setup.checks.isEmpty {
                 await setup.refresh()
@@ -296,20 +302,13 @@ struct PermissionManagementView: View {
     private func capabilityRows(
         _ checks: [CapabilityCheck]
     ) -> some View {
-        ForEach(Array(checks.enumerated()), id: \.element.id) {
-            index,
-            check in
-
+        ForEach(checks) { check in
             PermissionRequirementRow(
                 check: check,
                 activeRequest: setup.activeRequest,
                 isBusy: isBusy,
                 onAction: perform
             )
-
-            if index < checks.count - 1 {
-                Divider()
-            }
         }
     }
 
