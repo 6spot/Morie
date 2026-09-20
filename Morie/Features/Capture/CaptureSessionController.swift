@@ -268,7 +268,8 @@ final class CaptureSessionController {
 
             self.activeApplicationContext = context
             let inspectedHints = ApplicationContextVocabulary.inspect(
-                from: context
+                from: context,
+                captureID: sessionID
             )
             let applicationContextWords = inspectedHints.map(\.value)
             self.activeApplicationContextWords = applicationContextWords
