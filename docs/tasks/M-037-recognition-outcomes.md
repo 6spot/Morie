@@ -40,7 +40,7 @@ Operational failures continue to be logged with NSError domain/code/description.
 - [x] operational failure remains distinguishable from rejection.
 - [x] diagnostics retain NSError domain/code/description.
 - [x] regression tests cover direct, nested, and non-rejection errors.
-- [ ] macOS 27 CI compile/test passes.
+- [x] macOS 27 CI compile/test passes.
 - [ ] owner-device reproduction confirms no `Morie 输入失败 / Recog Rejected` alert.
 
 ## Implementation notes
@@ -51,4 +51,8 @@ The UI never branches on the framework string. Controllers only receive the sema
 
 ## Validation
 
-Pending CI and owner-device validation.
+GitHub Actions macOS 27 CI run #234 passed both the Xcode 27 app compile and the MorieTests logic-test job on the corrected branch head.
+
+The first CI attempt exposed that the test target did not compile `SpeechPipeline.swift`; the rejection classifier was moved into the shared Speech source already included by both app and logic-test targets, then the full CI gate passed.
+
+Owner-device validation remains open.
