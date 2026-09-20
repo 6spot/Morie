@@ -15,33 +15,85 @@ final class AppController: ObservableObject {
         }
     }
 
-    enum State: Equatable {
-        case checking
-        case blocked(String)
-        case ready
-        case recording
-        case stopping
-        case finalizing
-        case refining
-        case delivering
-        case failed(String)
+    typealias State = AppRuntimeController.State
+
+    let runtime = AppRuntimeController()
+    let preferences: AppPreferencesController
+
+    var state: State {
+        get { runtime.state }
+        private set { runtime.state = newValue }
     }
 
-    @Published private(set) var state: State = .checking
-    @Published private(set) var transcript = ""
-    @Published private(set) var captureShortcut: CaptureShortcut
-    @Published private(set) var audioRetentionDays: Int
-    @Published private(set) var inputRefinementEnabled: Bool
-    @Published private(set) var personalMemoryEnabled: Bool
-    @Published private(set) var correctionSuggestionsEnabled: Bool
-    @Published private(set) var expressionLearningEnabled: Bool
-    @Published private(set) var soundFeedbackEnabled: Bool
-    @Published private(set) var iCloudSyncEnabled: Bool
-    @Published private(set) var iCloudSyncState: ICloudSyncState
-    @Published private(set) var needsSetup = false
-    @Published private(set) var setupError: String?
-    @Published private(set) var isBootstrapping = false
-    @Published private(set) var speechBackend: SpeechRecognitionBackend?
+    var transcript: String {
+        get { runtime.transcript }
+        private set { runtime.transcript = newValue }
+    }
+
+    var captureShortcut: CaptureShortcut {
+        get { preferences.captureShortcut }
+        private set { preferences.captureShortcut = newValue }
+    }
+
+    var audioRetentionDays: Int {
+        get { preferences.audioRetentionDays }
+        private set { preferences.audioRetentionDays = newValue }
+    }
+
+    var inputRefinementEnabled: Bool {
+        get { preferences.inputRefinementEnabled }
+        private set { preferences.inputRefinementEnabled = newValue }
+    }
+
+    var personalMemoryEnabled: Bool {
+        get { preferences.personalMemoryEnabled }
+        private set { preferences.personalMemoryEnabled = newValue }
+    }
+
+    var correctionSuggestionsEnabled: Bool {
+        get { preferences.correctionSuggestionsEnabled }
+        private set { preferences.correctionSuggestionsEnabled = newValue }
+    }
+
+    var expressionLearningEnabled: Bool {
+        get { preferences.expressionLearningEnabled }
+        private set { preferences.expressionLearningEnabled = newValue }
+    }
+
+    var soundFeedbackEnabled: Bool {
+        get { preferences.soundFeedbackEnabled }
+        private set { preferences.soundFeedbackEnabled = newValue }
+    }
+
+    var iCloudSyncEnabled: Bool {
+        get { preferences.iCloudSyncEnabled }
+        private set { preferences.iCloudSyncEnabled = newValue }
+    }
+
+    var iCloudSyncState: ICloudSyncState {
+        get { preferences.iCloudSyncState }
+        private set { preferences.iCloudSyncState = newValue }
+    }
+
+    var needsSetup: Bool {
+        get { runtime.needsSetup }
+        private set { runtime.needsSetup = newValue }
+    }
+
+    var setupError: String? {
+        get { runtime.setupError }
+        private set { runtime.setupError = newValue }
+    }
+
+    var isBootstrapping: Bool {
+        get { runtime.isBootstrapping }
+        private set { runtime.isBootstrapping = newValue }
+    }
+
+    var speechBackend: SpeechRecognitionBackend? {
+        get { runtime.speechBackend }
+        private set { runtime.speechBackend = newValue }
+    }
 
     let history: CaptureHistoryController?
     let memory: MemoryStore?
@@ -54,7 +106,6 @@ final class AppController: ObservableObject {
     let refinementPrompts = RefinementPromptController()
 
     private static let setupCompletedKey = "setup.completed"
-    private var setupObservation: AnyCancellable?
     private let captureStore: CaptureStore?
     private let personalizer: CapturePersonalizer?
     private let postInsertionLearning: PostInsertionLearningController?
@@ -131,7 +182,51 @@ final class AppController: ObservableObject {
         }
         self.personalizer = personalizer
         let savedPersonalMemoryEnabled = PersonalMemorySettings.isEnabled
-        personalMemoryEnabled = savedPersonalMemoryEnabled
+        let savedShortcut = UserDefaults.standard
+            .string(forKey: CaptureShortcut.defaultsKey)
+            .flatMap(CaptureShortcut.init(rawValue:))
+            ?? CaptureShortcut.defaultValue
+        let savedInputRefinementEnabled = UserDefaults.standard
+            .object(forKey: CapturePersonalizer.enabledDefaultsKey) as? Bool
+            ?? true
+        let savedCorrectionSuggestionsEnabled = UserDefaults.standard.bool(
+            forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
+        )
+        let savedExpressionLearningEnabled = UserDefaults.standard.bool(
+            forKey: ExpressionProfileStore.enabledDefaultsKey
+        )
+        let savedSoundFeedbackEnabled = UserDefaults.standard.object(
+            forKey: CaptureSoundFeedback.enabledDefaultsKey
+        ) as? Bool ?? true
+        let savedICloudSyncEnabled = ICloudSyncSettings.isEnabled
+
+        let initialICloudSyncState: ICloudSyncState
+        if cloudSyncStartupError != nil {
+            initialICloudSyncState = .unavailable(
+                "iCloud 同步未能启动，当前继续使用本地数据。"
+            )
+        } else if savedICloudSyncEnabled {
+            initialICloudSyncState = captureStore?.cloudSyncEnabled == true
+                ? .checking
+                : .restartRequired("已开启，重启 Morie 后开始 iCloud 同步。")
+        } else {
+            initialICloudSyncState = captureStore?.cloudSyncEnabled == true
+                ? .restartRequired("已关闭，重启 Morie 后停止 iCloud 同步。")
+                : .off
+        }
+
+        preferences = AppPreferencesController(
+            captureShortcut: savedShortcut,
+            audioRetentionDays: CaptureStore.audioRetentionDays,
+            inputRefinementEnabled: savedInputRefinementEnabled,
+            personalMemoryEnabled: savedPersonalMemoryEnabled,
+            correctionSuggestionsEnabled: savedCorrectionSuggestionsEnabled,
+            expressionLearningEnabled: savedExpressionLearningEnabled,
+            soundFeedbackEnabled: savedSoundFeedbackEnabled,
+            iCloudSyncEnabled: savedICloudSyncEnabled,
+            iCloudSyncState: initialICloudSyncState
+        )
+
         memoryLearning = memory.map {
             MemoryLearningController(
                 store: $0,
@@ -139,40 +234,15 @@ final class AppController: ObservableObject {
                 canUseModel: { personalizer?.isModelBusy != true }
             )
         }
-        let savedShortcut = UserDefaults.standard.string(forKey: CaptureShortcut.defaultsKey)
-            .flatMap(CaptureShortcut.init(rawValue:))
-        captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
-        audioRetentionDays = CaptureStore.audioRetentionDays
-        inputRefinementEnabled = UserDefaults.standard.object(forKey: CapturePersonalizer.enabledDefaultsKey) as? Bool ?? true
-        correctionSuggestionsEnabled = UserDefaults.standard.bool(
-            forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
-        )
-        expressionLearningEnabled = UserDefaults.standard.bool(forKey: ExpressionProfileStore.enabledDefaultsKey)
-        soundFeedbackEnabled = UserDefaults.standard.object(
-            forKey: CaptureSoundFeedback.enabledDefaultsKey
-        ) as? Bool ?? true
-        let savedICloudSyncEnabled = ICloudSyncSettings.isEnabled
-        iCloudSyncEnabled = savedICloudSyncEnabled
+
         if let cloudSyncStartupError {
-            iCloudSyncState = .unavailable("iCloud 同步未能启动，当前继续使用本地数据。")
             Diagnostics.record(
                 "iCloud",
                 "Managed CloudKit store failed to open; using local store: \(cloudSyncStartupError.localizedDescription)",
                 level: .error
             )
-        } else if savedICloudSyncEnabled {
-            iCloudSyncState = captureStore?.cloudSyncEnabled == true
-                ? .checking
-                : .restartRequired("已开启，重启 Morie 后开始 iCloud 同步。")
-        } else {
-            iCloudSyncState = captureStore?.cloudSyncEnabled == true
-                ? .restartRequired("已关闭，重启 Morie 后停止 iCloud 同步。")
-                : .off
         }
 
-        setupObservation = setup.objectWillChange.sink { [weak self] in
-            self?.objectWillChange.send()
-        }
         Diagnostics.record("App", "Morie controller initialized; launch bootstrap scheduled")
         Task { @MainActor [weak self] in
             await self?.bootstrap()
