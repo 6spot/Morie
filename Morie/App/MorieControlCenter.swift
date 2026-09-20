@@ -4,9 +4,90 @@ enum ControlCenterMetrics {
     static let sidebarMinWidth: CGFloat = 180
     static let sidebarIdealWidth: CGFloat = 220
     static let sidebarMaxWidth: CGFloat = 260
+    static let contentInset: CGFloat = 24
+    static let sectionSpacing: CGFloat = 28
     static let readingMaxWidth: CGFloat = 760
-    static let readingInset: CGFloat = 28
     static let denseInset: CGFloat = 16
+}
+
+private enum ControlCenterPageLayout {
+    case standard
+    case workspace
+}
+
+private struct ControlCenterPageHost<Content: View>: View {
+    let layout: ControlCenterPageLayout
+    private let content: Content
+
+    init(
+        layout: ControlCenterPageLayout,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.layout = layout
+        self.content = content()
+    }
+
+    @ViewBuilder
+    var body: some View {
+        switch layout {
+        case .standard:
+            ScrollView {
+                content
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .contentMargins(
+                .horizontal,
+                ControlCenterMetrics.contentInset,
+                for: .scrollContent
+            )
+            .contentMargins(
+                .vertical,
+                ControlCenterMetrics.contentInset,
+                for: .scrollContent
+            )
+
+        case .workspace:
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+struct ControlCenterSectionGroup<Content: View>: View {
+    let title: String
+    let footer: String?
+    private let content: Content
+
+    init(
+        _ title: String,
+        footer: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.footer = footer
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    content
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let footer {
+                Text(footer)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 struct ControlCenterReadingPage<Content: View>: View {
@@ -26,12 +107,12 @@ struct ControlCenterReadingPage<Content: View>: View {
         }
         .contentMargins(
             .horizontal,
-            ControlCenterMetrics.readingInset,
+            ControlCenterMetrics.contentInset,
             for: .scrollContent
         )
         .contentMargins(
             .vertical,
-            ControlCenterMetrics.readingInset,
+            ControlCenterMetrics.contentInset,
             for: .scrollContent
         )
     }
@@ -71,6 +152,15 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         case .diagnostics: "ladybug"
         }
     }
+
+    var pageLayout: ControlCenterPageLayout {
+        switch self {
+        case .history, .diagnostics:
+            .workspace
+        case .overview, .dictionary, .memory, .settings, .permissions:
+            .standard
+        }
+    }
 }
 
 @MainActor
@@ -86,6 +176,7 @@ struct MorieControlCenter: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ControlCenterSidebar(selection: $selection)
+                .toolbar(removing: .sidebarToggle)
         } detail: {
             NavigationStack {
                 ControlCenterRoute(
@@ -97,10 +188,22 @@ struct MorieControlCenter: View {
                 )
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button("显示或隐藏边栏", systemImage: "sidebar.left") {
+                    toggleSidebar()
+                }
+                .help("显示或隐藏边栏")
+            }
+        }
         .frame(minWidth: 960, minHeight: 600)
         .onReceive(NotificationCenter.default.publisher(for: .morieShowSettings)) { _ in
             selection = .settings
         }
+    }
+
+    private func toggleSidebar() {
+        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
     }
 }
 
@@ -112,8 +215,14 @@ private struct ControlCenterRoute: View {
     @Binding var selectedDictionaryEntry: UUID?
     @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
 
-    @ViewBuilder
     var body: some View {
+        ControlCenterPageHost(layout: selection.pageLayout) {
+            routedPage
+        }
+    }
+
+    @ViewBuilder
+    private var routedPage: some View {
         switch selection {
         case .overview:
             OverviewView(
