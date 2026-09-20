@@ -214,16 +214,23 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertFalse(prompt.contains("kind"))
     }
 
-    func testDefaultPromptUsesNaturalStructureWithoutHeuristicRouting() {
+    func testDefaultPromptUsesSemanticParagraphingAndLogicWithoutHeuristicRouting() {
         let instructions = RefinementPromptSettings.defaultInstructions
         XCTAssertEqual(
             instructions.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count,
             3
         )
-        XCTAssertTrue(instructions.contains("按语义自然排版"))
+        XCTAssertTrue(instructions.contains("按语义和原文已有的逻辑关系自然整理"))
+        XCTAssertTrue(instructions.contains("不是按字数或固定模板排版"))
+        XCTAssertTrue(instructions.contains("同一主题、同一件事尽量放在一起"))
+        XCTAssertTrue(instructions.contains("话题、诉求、立场、阶段或讨论对象明显切换时自然分段"))
+        XCTAssertTrue(instructions.contains("并列、先后、因果、转折、条件、总分"))
         XCTAssertTrue(instructions.contains("明显列举关系时，可以自然分行或编号"))
-        XCTAssertTrue(instructions.contains("开场、总起句、说明、问题和结尾都属于内容"))
-        XCTAssertTrue(instructions.contains("不要为了“更规整”而重写"))
+        XCTAssertTrue(instructions.contains("开场、总起句、说明、问题和结尾都属于正文"))
+        XCTAssertTrue(instructions.contains("不要新增标题"))
+        XCTAssertFalse(instructions.contains("formattingHint"))
+        XCTAssertFalse(instructions.contains("semanticParagraphs"))
+        XCTAssertFalse(instructions.contains("explicitList"))
     }
 
     func testRefinementPromptSettingsPersistAndRestoreDefault() throws {
