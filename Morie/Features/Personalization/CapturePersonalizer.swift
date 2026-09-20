@@ -61,7 +61,7 @@ final class CapturePersonalizer {
 
         Diagnostics.record(
             "RefinementContext",
-            "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); memoryMatches=\(input.context.count); dictionaryCandidates=\(input.dictionary.count); confirmedCorrections=\(input.confirmedCorrections.count); expressionDirectives=\(input.expressionStyle.count); applicationContextIncluded=false"
+            "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); memoryMatches=\(input.context.count); dictionaryCandidates=\(input.dictionary.count); confirmedCorrections=\(input.confirmedCorrections.count); expressionDirectives=\(input.expressionStyle.count); applicationContextIncluded=false; memoryNotesIncluded=false"
         )
 
         do {
