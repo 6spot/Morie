@@ -178,6 +178,9 @@ accepted finish action
 stop capture input and enter Thinking
   ↓
 finish Speech analysis for consumed audio
+  ├─ recognizer rejection + confirmed no speech → discard Capture / “未检测到语音”
+  ├─ recognizer rejection + meaningful/uncertain audio → retain Capture / “未识别，录音已保留”
+  └─ framework rejection details remain diagnostic-only; they never become modal UI text
   ↓
 recognized text in live state
   ├─ enqueue recognized/audio snapshot
