@@ -60,10 +60,42 @@ Secure text fields contribute no selected/focused/nearby text.
 - [x] Context collection never gates capture startup; late hints update Speech best-effort.
 - [x] Latest Xcode 27 product compile passes.
 - [x] MorieTests pass with Application Context vocabulary and Memory-isolation coverage.
+- [x] Debug Capture traces expose AX, vocabulary and exact Speech context decisions without persisting them into Capture/History/Memory.
+- [x] Release builds hide raw Application Context inspection and keep privacy-preserving diagnostics.
 - [ ] Real-device validation records actual coverage in Chrome/ChatGPT.
 - [ ] Real-device validation records actual coverage in Xcode.
 - [ ] Real-device validation records actual coverage in WeChat.
 - [ ] Real-device validation records actual coverage in TextEdit.
+
+## Development observability
+
+Real-device validation also showed that counts alone are not sufficient to debug
+context-aware dictation. Morie now treats development observability as shared
+infrastructure rather than temporary logging.
+
+Debug builds provide a Capture-correlated `Dev/*` trace covering:
+
+- build/runtime identity and frozen Capture settings;
+- microphone and Speech backend selection;
+- Accessibility trust/secure-input/focused-element/traversal decisions;
+- bounded raw selected/focused/nearby context;
+- every vocabulary candidate, ranking/rejection/de-duplication decision;
+- exact contextual strings applied to live and accurate Apple Speech;
+- throttled live recognition evolution plus live/accurate/preferred final text;
+- Dictionary, Memory and Expression Profile inputs to refinement;
+- effective refinement instructions/payload, model backend and token budgets;
+- generated output, exact deterministic guard rejection rule/evidence and final text;
+- delivery destination and post-insertion learning;
+- Memory learner prompts, suggestions, grounding and admission decisions.
+
+Debug diagnostics may contain user-authored/current-app/model text and are local
+development artifacts. Release builds keep the existing privacy-preserving
+summary logs and hide the raw Application Context inspector. API keys,
+authorization headers, Keychain credential contents, secure text fields and
+unrelated clipboard contents are never logged.
+
+See [development diagnostics](../development-diagnostics.md) for the complete
+contract and troubleshooting workflow.
 
 ## Refinement safety prerequisite discovered during validation
 
