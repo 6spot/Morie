@@ -232,7 +232,7 @@ struct OverviewView: View {
                     )
                 }
 
-                Text("这里只显示最近一次 Capture 的临时词汇决策与原始上下文预览；内容仅驻留内存，不写入历史、数据库或诊断日志。")
+                Text("这里只显示最近一次 Capture 的临时词汇决策与原始上下文预览；不会写入历史、Capture 数据库或个人记忆。当前为开发构建，原始上下文也会写入本机 Dev 诊断日志用于排查。")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
