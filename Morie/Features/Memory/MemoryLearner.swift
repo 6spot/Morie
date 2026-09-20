@@ -58,7 +58,7 @@ enum MemoryLearner {
             Diagnostics.recordMemory("memory-model-session-scope-exited")
             try Task.checkCancellation()
 
-            let suggestions = generated.observations.compactMap { value in
+            let suggestions: [MemorySuggestion] = generated.observations.compactMap { value -> MemorySuggestion? in
                 guard let kind = MemoryKind(rawValue: value.kind.rawValue),
                       let evidenceKind = MemoryEvidenceKind(rawValue: value.evidenceKind.rawValue) else { return nil }
                 // An invalid supplied ID must not silently become a new memory.
