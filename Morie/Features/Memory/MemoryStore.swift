@@ -47,6 +47,7 @@ final class MemoryStore: ObservableObject {
     private let container: ModelContainer
     private var context: ModelContext
     private let commit: (ModelContext) throws -> Void
+    private var hasLoadedEntries = false
 
     init(
         container: ModelContainer,
@@ -86,6 +87,12 @@ final class MemoryStore: ObservableObject {
             )
         }
         entries = records
+        hasLoadedEntries = true
+    }
+
+    func loadIfNeeded(now: Date = Date()) throws {
+        guard !hasLoadedEntries else { return }
+        try load(now: now)
     }
 
     func analysisSource(for captureID: UUID) throws -> MemoryAnalysisSource {
