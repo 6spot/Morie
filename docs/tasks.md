@@ -24,7 +24,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-009 | Mac input loop | Independent cleanup, custom dictionary and automatic personal Memory | IN PROGRESS | — | [`M-009`](./tasks/M-009-macos-input-memory.md) |
 | M-010 | macOS usability | Simplified Chinese, native menus/sidebar and permission setup | IN PROGRESS | — | [`M-010`](./tasks/M-010-macos-native-setup.md) |
 | M-011 | Dictionary usability | Add a single word without alias configuration | IN PROGRESS | — | [`M-011`](./tasks/M-011-simple-dictionary.md) |
-| M-012 | Performance | Stop hidden HUD rendering and establish idle CPU/RSS baseline | IN PROGRESS | — | [`M-012`](./tasks/M-012-idle-performance.md) |
+| M-012 | Performance | Stop hidden HUD rendering and establish idle CPU/RSS baseline | IN PROGRESS | [PR #68](https://github.com/6spot/Morie/pull/68) | [`M-012`](./tasks/M-012-idle-performance.md) |
 | M-013 | macOS UX | Simplify menu, setup, filters, Settings and Dictionary navigation | IN PROGRESS | — | [`M-013`](./tasks/M-013-control-center.md) |
 | M-014 | Input routing | Deliver final text to current keyboard focus like a system input method | IN PROGRESS | — | [`M-014`](./tasks/M-014-current-focus-input.md) |
 | M-015 | Speech quality | Use Apple dictation punctuation for live and saved-audio transcription | IN PROGRESS | — | [`M-015`](./tasks/M-015-native-dictation-punctuation.md) |
