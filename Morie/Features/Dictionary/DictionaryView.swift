@@ -95,15 +95,15 @@ struct DictionaryView: View {
                         }
                     }
                 }
-        }
-        .overlay {
-            if visibleCount == 0 && errorMessage == nil {
-                ContentUnavailableView {
-                    Label("没有匹配的词语", systemImage: "character.book.closed")
-                } description: {
-                    Text("试试其他搜索词。")
+
+                if visibleCount == 0 && errorMessage == nil {
+                    ContentUnavailableView {
+                        Label("没有匹配的词语", systemImage: "character.book.closed")
+                    } description: {
+                        Text("试试其他搜索词。")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-            }
         }
         .navigationTitle("字典")
         .navigationSubtitle("\(visibleCount) 个词语")
