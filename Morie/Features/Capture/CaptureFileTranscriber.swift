@@ -113,6 +113,13 @@ enum CaptureFileTranscriber {
             } catch {
                 results.cancel()
                 await analyzer.cancelAndFinishNow()
+                if SpeechRecognitionFailureClassifier.isRejection(error) {
+                    Diagnostics.record(
+                        "SpeechQuality",
+                        "Saved-audio recognizer rejected the recording; treating it as empty recognition"
+                    )
+                    throw TranscriptionError.emptyRecognition
+                }
                 throw error
             }
         } onCancel: {
@@ -161,6 +168,13 @@ enum CaptureFileTranscriber {
             } catch {
                 results.cancel()
                 await analyzer.cancelAndFinishNow()
+                if SpeechRecognitionFailureClassifier.isRejection(error) {
+                    Diagnostics.record(
+                        "SpeechQuality",
+                        "Saved-audio recognizer rejected the recording; treating it as empty recognition"
+                    )
+                    throw TranscriptionError.emptyRecognition
+                }
                 throw error
             }
         } onCancel: {
