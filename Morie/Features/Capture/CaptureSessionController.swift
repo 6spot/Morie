@@ -32,6 +32,7 @@ final class CaptureSessionController {
         let deliveryMode: CaptureDeliveryMode
         let locale: Locale
         let dictionaryWords: [String]
+        let applicationContext: ApplicationContextSnapshot?
         let inputRefinementEnabled: Bool
         let refinementConfiguration: RefinementConfiguration
         let correctionSuggestionsEnabled: Bool
@@ -147,11 +148,15 @@ final class CaptureSessionController {
         guard !isActive, let captureStore else { return }
 
         let sessionID = UUID()
+        let applicationContext = deliveryMode == .currentApp
+            ? ApplicationContextCollector().capture()
+            : nil
         let sessionContext = CaptureSessionContext(
             id: sessionID,
             deliveryMode: deliveryMode,
             locale: speechLocale,
             dictionaryWords: (try? dictionary?.speechHints()) ?? [],
+            applicationContext: applicationContext,
             inputRefinementEnabled: inputRefinementEnabled,
             refinementConfiguration: refinementConfiguration,
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
@@ -200,6 +205,20 @@ final class CaptureSessionController {
             "Session",
             "Capture \(label(sessionID)) started; mode=\(sessionContext.deliveryMode.rawValue); deliveryTarget=currentKeyboardFocus; locale=\(sessionContext.locale.identifier); dictionaryHints=\(sessionContext.dictionaryWords.count); acceptedAt=\(sessionContext.acceptedAt.timeIntervalSince1970)"
         )
+        if sessionContext.deliveryMode == .currentApp {
+            if let context = sessionContext.applicationContext {
+                Diagnostics.record(
+                    "ApplicationContext",
+                    "Capture \(label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); focusedCharacters=\(context.focusedCharacterCount); nearbyCharacters=\(context.nearbyCharacterCount); rawContextPersisted=false"
+                )
+            } else {
+                Diagnostics.record(
+                    "ApplicationContext",
+                    "Capture \(label(sessionID)); snapshot unavailable; rawContextPersisted=false",
+                    level: .warning
+                )
+            }
+        }
         Diagnostics.recordMemory("capture-start \(label(sessionID))")
 
         captureStartTask = Task { @MainActor [weak self] in
