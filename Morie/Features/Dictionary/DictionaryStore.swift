@@ -144,6 +144,7 @@ final class DictionaryStore: ObservableObject {
     }
 
     private let context: ModelContext
+    private var hasLoadedEntries = false
 
     init(container: ModelContainer) {
         context = ModelContext(container)
@@ -152,6 +153,12 @@ final class DictionaryStore: ObservableObject {
 
     func load() throws {
         entries = try context.fetch(FetchDescriptor<DictionaryEntry>(sortBy: [SortDescriptor(\.name)]))
+        hasLoadedEntries = true
+    }
+
+    func loadIfNeeded() throws {
+        guard !hasLoadedEntries else { return }
+        try load()
     }
 
     @discardableResult
