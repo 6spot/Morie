@@ -40,7 +40,7 @@ struct ApplicationContextSnapshot: Equatable, Sendable {
 
 
 /// The source of a transient Speech hint within the captured application context.
-enum ApplicationContextHintSource: String, CaseIterable, Sendable {
+enum ApplicationContextHintSource: String, CaseIterable, Hashable, Sendable {
     case selected
     case focused
     case nearby
