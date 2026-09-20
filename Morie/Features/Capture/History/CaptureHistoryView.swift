@@ -74,9 +74,11 @@ struct CaptureHistoryWorkspace: View {
                         onRecord: controller.startCaptureOnly
                     )
                     .frame(
-                        minWidth: 260,
-                        idealWidth: 320,
-                        maxWidth: 360
+                        minWidth: 280,
+                        idealWidth: 340,
+                        maxWidth: 420,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
                     )
 
                     CaptureHistoryDetailPane(
@@ -84,8 +86,17 @@ struct CaptureHistoryWorkspace: View {
                         history: history,
                         selectedCaptureID: selection
                     )
-                    .frame(minWidth: 360, maxWidth: .infinity)
+                    .frame(
+                        minWidth: 420,
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
                 }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
                 .onAppear {
                     history.setListVisible(true)
                 }
@@ -100,6 +111,11 @@ struct CaptureHistoryWorkspace: View {
                 )
             }
         }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
         .navigationTitle("历史记录")
         .searchable(text: $search, prompt: "搜索历史记录")
         .toolbar {
@@ -181,6 +197,11 @@ struct CaptureHistoryView: View {
             .tag(capture.id)
         }
         .listStyle(.inset)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
         .overlay {
             if visibleCaptures.isEmpty {
                 ContentUnavailableView {
@@ -275,6 +296,10 @@ private struct CaptureHistoryDetailPane: View {
                 description: Text(
                     "在这里查看保存的文字、识别结果和原始录音。"
                 )
+            )
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
             )
         }
     }

@@ -102,7 +102,7 @@ Because Morie is an `LSUIElement` app, its idle activation policy is accessory a
 
 The current app's primary language is Simplified Chinese (`zh-Hans`), including app-owned controls, errors, accessibility descriptions and privacy usage strings. Keep user input, dictionary spelling, prompts, persisted raw values, external application names and technical diagnostics intact. Format display dates in Chinese while retaining the user's time zone.
 
-Use the system Settings scene and **⌘,**. Sidebar and menu SettingsLink controls open that same scene. These are app-scoped commands; the global recording shortcut retains its existing behavior. NavigationSplitView and SidebarCommands own show/hide-sidebar controls. Native expandable Section headers fold **资料库 / 应用**, with saved expansion state. Do not build a replacement toggle, title bar, menu or shortcut listener.
+Use the system Settings scene and **⌘,**. Sidebar and menu SettingsLink controls open that same scene. These are app-scoped commands; the global recording shortcut retains its existing behavior. NavigationSplitView and SidebarCommands own show/hide-sidebar controls. Sidebar groups **资料库 / 应用** are ordinary native section headers; do not add a second disclosure/folding interaction unless a concrete product requirement appears. Do not build a replacement toggle, title bar, menu or shortcut listener.
 
 ## Permission and capability guide
 
@@ -116,7 +116,7 @@ Permission check/authorization state and bootstrap preparation feedback remain d
 
 ## Management window
 
-M-008/M-010/M-013 use one native navigation language. The sidebar groups **资料库** (历史记录, 字典, 个人记忆) and **应用** (设置, 权限, 诊断). History and Personal Memory show list and detail in three columns. Dictionary, Settings, Permissions and Diagnostics use one full-width detail beside the sidebar; Dictionary edits the selected word from its list toolbar or context menu instead of opening a third column. Both split configurations share visibility state so switching sections preserves the sidebar preference. The default management window is 1120 × 720; the minimum is 960 × 600. System split dividers control resizing.
+M-008/M-010/M-013 use one native navigation language. The sidebar groups **资料库** (历史记录, 字典, 个人记忆) and **应用** (设置, 权限, 诊断). History uses a full-height list/detail workspace inside the single right-side navigation host. Dictionary and Personal Memory are full-width collection/reading pages that push detail destinations only when needed. Settings and Permissions use grouped Forms; Diagnostics uses a full-width Table/detail workspace. All routes share the same persistent sidebar visibility state. The default management window is 1120 × 720; the minimum is 960 × 600. System split dividers control resizing.
 
 Lists use standard search, direct menu-style Pickers for single-dimension filters, system selection and meaningful empty states. Search/filter/deletion clear hidden selections. Reading a source or linked memory uses the selected detail's NavigationStack; selecting a different record resets that stack. Creation/recording and filter controls belong to the list toolbar; copy/edit and the secondary action menu belong to the detail toolbar.
 
@@ -144,47 +144,50 @@ The recording-to-processing morph uses motion rather than another status color: 
 
 ## Control Center shell
 
-The Control Center follows the current native macOS navigation/settings model rather than a custom card system.
+The Control Center uses one persistent native macOS navigation shell. The shell does **not** force unrelated pages into one universal visual container.
 
-The management window owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. Sidebar selection only changes the routed page content. The sidebar uses `List(.sidebar)`, native selection, native expandable Sections and the sidebar toggle supplied by `NavigationSplitView`. `SidebarCommands()` supplies the matching menu command. Do not remove or recreate the system sidebar toggle.
+The management window owns exactly one `NavigationSplitView` and one persistent detail `NavigationStack`. Sidebar selection only changes routed page content. The sidebar uses a native `List(.sidebar)`, native section headers, and the sidebar toggle supplied by `NavigationSplitView`. Do not remove or recreate the system sidebar toggle. Do not override the native sidebar width unless a concrete content requirement proves it necessary.
 
-### Route-owned page containers
+### Route-owned page families
 
-`ControlCenterRouteHost` owns the page container style. Routed feature pages never own the management window's outer geometry.
+`ControlCenterRouteHost` decides which native container family a route needs:
 
-**Standard pages** — Overview, Dictionary, Personal Memory, Settings and Permissions — are inserted into one route-owned `Form(.grouped)`. The Form owns scrolling, section spacing, row backgrounds and outer content geometry. Feature pages provide only `Section` content plus title/search/toolbar preferences. Do not add a top-level ScrollView, page padding, contentMargins, or a custom headline + GroupBox wrapper to these pages.
+- **Scrolling reading/collection pages** — Overview, Dictionary and Personal Memory use one route-owned `ScrollView`. The feature view supplies its semantic content but does not create another page-level scroll container.
+- **Settings pages** — Settings and Permissions use one route-owned `Form(.grouped)`.
+- **Workspaces** — History and Diagnostics fill the entire detail region with native split/list/table workspaces.
 
-This deliberately removes hand-tuned leading insets. Native grouped Form geometry is the shared baseline under the system navigation title, so every ordinary page follows the same macOS spacing rules automatically.
+This distinction is deliberate. “Follow System Settings” means use current macOS navigation, controls, metrics, hierarchy and interaction conventions; it does **not** mean every destination must be rendered as a Settings Form.
 
-**Workspace pages** — History and Diagnostics — fill the detail region with native List/Table/split-view workspaces. A child reading/detail pane may have its own internal scroll margins; those are content margins inside the workspace and not routed-page geometry.
-
-### Shared page language
-
-Use native macOS controls directly:
-
-- `Section` for semantic groups;
-- `Toggle(.switch)` for important on/off settings;
-- menu `Picker` for compact single-choice preferences;
-- `LabeledContent` for value/status rows;
-- `DisclosureGroup` for advanced or infrequently edited settings;
-- `List`, `Table`, `HSplitView`, `VSplitView` for dense data workspaces;
-- native toolbar/search actions only when they act on the visible page.
-
-Do not create a Morie-specific settings-card style, custom glass, replacement system rows, or decorative status chrome.
-
-State observation follows the same ownership rule. `AppController` is a plain coordinator, not an ObservableObject. Routed pages observe only the focused state domain or feature store they render, preventing unrelated transcript/setup/preference changes from forcing the navigation/toolbar preference tree to recompute.
+Use default/system spacing where possible. Shared route-level padding may be used for scrolling reading/collection pages, but feature pages must not each invent their own outer margin system.
 
 ### Page-by-page contract
 
-- **总览** — two concise grouped sections: usage and actual runtime models. Explanatory copy belongs in the navigation subtitle or section footer rather than a standalone intro block.
-- **历史记录** — native selectable List + `HSplitView` detail. No nested page-level NavigationStack.
-- **字典** — searchable user/system Sections with a compact adaptive word layout; editable terms use small native bordered capsule buttons.
-- **个人记忆** — long-term, recent and archived/history Sections with semantic topic rows. The top level is not a raw database manager.
-- **设置** — five logical groups: input/refinement, personalization, model/prompt, sync/storage and shortcuts/feedback. Prompt/API editors use progressive disclosure instead of remaining expanded.
-- **权限** — device capability and system permission Sections. Routine recheck/re-enable actions live in the page content instead of consuming toolbar space.
-- **诊断** — native Table + stable lower detail pane. The lower pane remains present when nothing is selected so selection does not change the workspace geometry.
+- **总览** — compact reading/dashboard surface with usage metrics and current runtime model status. It is not a settings form.
+- **历史记录** — full-height native `HSplitView`; the selectable List and reading detail begin directly below the toolbar and fill to the bottom.
+- **字典** — searchable compact collection using `LazyVGrid`; editable user words and read-only built-ins stay visually distinct without becoming a database table.
+- **个人记忆** — natural semantic topic reading surface with Long-term / Recent / Archived sections. It is not a settings form and not a raw database manager.
+- **设置** — grouped Form with native controls and progressive disclosure for advanced configuration.
+- **权限** — grouped Form for device capability and system permission state/actions.
+- **诊断** — full-size native Table + `VSplitView` detail. The split geometry remains stable with or without a selected event.
 
-Reading details inside History/Memory may use an internal ScrollView with a restrained reading width. Keep those details readable without changing the route-owned page container.
+### SwiftUI implementation review
+
+Morie may consult `twostraws/SwiftUI-Agent-Skill` as external review guidance, but it is not a project dependency and never overrides Morie's product constraints.
+
+For Control Center code in particular:
+
+- prefer system components and hierarchical styles;
+- use `ContentUnavailableView` for empty states;
+- keep view identity stable and avoid unnecessary conditional container replacement;
+- avoid large page bodies by extracting meaningful subviews when a view becomes hard to reason about;
+- avoid arbitrary hard-coded geometry when current system layout can own it;
+- keep expensive filtering/sorting out of repeatedly rebuilt views where practical;
+- keep action/business logic outside large inline layout closures;
+- do not introduce third-party UI or a custom replacement for native macOS controls.
+
+State observation remains scoped by domain. `AppController` is a plain coordinator; routed pages observe only the focused runtime/capability/preferences controller or feature store they actually render.
+
+Reading details inside History/Memory may use their own internal ScrollView because they are child panes/destinations rather than routed page containers.
 
 ## History recovery
 

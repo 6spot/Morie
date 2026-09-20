@@ -1,49 +1,31 @@
 import SwiftUI
 
-enum ControlCenterMetrics {
-    static let sidebarMinWidth: CGFloat = 190
-    static let sidebarIdealWidth: CGFloat = 224
-    static let sidebarMaxWidth: CGFloat = 260
-
-    // Standard routed pages use the system grouped Form geometry.
-    // Only nested reading panes use an explicit inset.
-    static let readingInset: CGFloat = 20
-    static let readingMaxWidth: CGFloat = 760
-}
-
-enum ControlCenterPageKind {
-    case standard
+enum ControlCenterPageFamily {
+    case scrolling
+    case form
     case workspace
 }
 
-struct ControlCenterReadingContent<Content: View>: View {
-    private let content: Content
+private enum ControlCenterLayout {
+    static let contentInset: CGFloat = 24
+    static let readingMaxWidth: CGFloat = 760
+}
 
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
+struct ControlCenterReadingContent<Content: View>: View {
+    @ViewBuilder let content: Content
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading) {
                 content
             }
             .frame(
-                maxWidth: ControlCenterMetrics.readingMaxWidth,
+                maxWidth: ControlCenterLayout.readingMaxWidth,
                 alignment: .leading
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(ControlCenterLayout.contentInset)
         }
-        .contentMargins(
-            .horizontal,
-            ControlCenterMetrics.readingInset,
-            for: .scrollContent
-        )
-        .contentMargins(
-            .vertical,
-            ControlCenterMetrics.readingInset,
-            for: .scrollContent
-        )
     }
 }
 
@@ -82,12 +64,14 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var pageKind: ControlCenterPageKind {
+    var pageFamily: ControlCenterPageFamily {
         switch self {
+        case .overview, .dictionary, .memory:
+            .scrolling
+        case .settings, .permissions:
+            .form
         case .history, .diagnostics:
             .workspace
-        case .overview, .dictionary, .memory, .settings, .permissions:
-            .standard
         }
     }
 }
@@ -134,31 +118,24 @@ struct MorieControlCenter: View {
 
 private struct ControlCenterSidebar: View {
     @Binding var selection: ControlCenterSection?
-    @AppStorage("sidebar.libraryExpanded") private var libraryExpanded = true
-    @AppStorage("sidebar.appExpanded") private var appExpanded = true
 
     var body: some View {
         List(selection: $selection) {
             sidebarItem(.overview)
 
-            Section("资料库", isExpanded: $libraryExpanded) {
+            Section("资料库") {
                 sidebarItem(.history)
                 sidebarItem(.dictionary)
                 sidebarItem(.memory)
             }
 
-            Section("应用", isExpanded: $appExpanded) {
+            Section("应用") {
                 sidebarItem(.settings)
                 sidebarItem(.permissions)
                 sidebarItem(.diagnostics)
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(
-            min: ControlCenterMetrics.sidebarMinWidth,
-            ideal: ControlCenterMetrics.sidebarIdealWidth,
-            max: ControlCenterMetrics.sidebarMaxWidth
-        )
         .onAppear {
             Diagnostics.record("ControlCenter", "Sidebar mounted")
         }
@@ -183,8 +160,15 @@ private struct ControlCenterRouteHost: View {
 
     @ViewBuilder
     var body: some View {
-        switch section.pageKind {
-        case .standard:
+        switch section.pageFamily {
+        case .scrolling:
+            ScrollView {
+                routedPage
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(ControlCenterLayout.contentInset)
+            }
+
+        case .form:
             Form {
                 routedPage
             }
@@ -192,7 +176,11 @@ private struct ControlCenterRouteHost: View {
 
         case .workspace:
             routedPage
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
         }
     }
 
@@ -249,11 +237,7 @@ private struct ControlCenterRouteHost: View {
 }
 
 struct ManagementDetailContent<Content: View>: View {
-    private let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
+    @ViewBuilder let content: Content
 
     var body: some View {
         ControlCenterReadingContent {

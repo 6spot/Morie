@@ -49,27 +49,38 @@ struct DictionaryView: View {
     }
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 28) {
             if let errorMessage {
-                Section {
-                    Label(
-                        errorMessage,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.secondary)
-                }
+                Label(
+                    errorMessage,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(.secondary)
             }
 
             if search.isEmpty || !visibleUserEntries.isEmpty {
-                Section {
+                dictionarySection(
+                    title: "用户添加",
+                    description: "你添加或确认过的词语，可以编辑和删除。"
+                ) {
                     if visibleUserEntries.isEmpty {
-                        LabeledContent("自定义词语") {
+                        ContentUnavailableView {
+                            Label(
+                                "还没有自定义词语",
+                                systemImage: "character.book.closed"
+                            )
+                        } description: {
+                            Text(
+                                "添加人名、产品名或专业术语，帮助语音识别。"
+                            )
+                        } actions: {
                             Button(
                                 "添加词语",
                                 systemImage: "plus",
                                 action: add
                             )
                         }
+                        .frame(maxWidth: .infinity)
                     } else {
                         LazyVGrid(
                             columns: columns,
@@ -80,19 +91,18 @@ struct DictionaryView: View {
                                 userWord(entry)
                             }
                         }
-                        .padding(.vertical, 2)
                     }
-                } header: {
-                    Text("用户添加")
-                } footer: {
-                    Text(
-                        "你添加或确认过的词语，可以编辑和删除。"
-                    )
                 }
             }
 
             if !visibleBuiltInEntries.isEmpty {
-                Section {
+                Divider()
+
+                dictionarySection(
+                    title: "系统内置",
+                    description:
+                        "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
+                ) {
                     LazyVGrid(
                         columns: columns,
                         alignment: .leading,
@@ -102,30 +112,22 @@ struct DictionaryView: View {
                             builtInWord(entry)
                         }
                     }
-                    .padding(.vertical, 2)
-                } header: {
-                    Text("系统内置")
-                } footer: {
-                    Text(
-                        "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
-                    )
                 }
             }
 
             if visibleCount == 0 && errorMessage == nil {
-                Section {
-                    ContentUnavailableView {
-                        Label(
-                            "没有匹配的词语",
-                            systemImage: "character.book.closed"
-                        )
-                    } description: {
-                        Text("试试其他搜索词。")
-                    }
-                    .frame(maxWidth: .infinity)
+                ContentUnavailableView {
+                    Label(
+                        "没有匹配的词语",
+                        systemImage: "magnifyingglass"
+                    )
+                } description: {
+                    Text("试试其他搜索词。")
                 }
+                .frame(maxWidth: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .navigationTitle("字典")
         .navigationSubtitle("\(visibleCount) 个词语")
         .searchable(text: $search, prompt: "搜索词语")
@@ -162,30 +164,12 @@ struct DictionaryView: View {
             titleVisibility: .visible
         ) {
             Button("删除词语", role: .destructive) {
-                guard let id = selectedUserEntryID else { return }
-
-                do {
-                    try store.delete(id)
-                    selection = nil
-                } catch {
-                    errorMessage = error.localizedDescription
-                }
+                deleteSelectedEntry()
             }
         } message: {
             Text("已保存的输入和个人记忆会保留。")
         }
-        .onAppear {
-            do {
-                try store.loadIfNeeded()
-                errorMessage = nil
-
-                if selectedEntry?.isEditable != true {
-                    selection = nil
-                }
-            } catch {
-                errorMessage = "无法加载字典。"
-            }
-        }
+        .onAppear(perform: load)
         .onChange(
             of: visibleUserEntries.map(\.id),
             initial: true
@@ -193,6 +177,48 @@ struct DictionaryView: View {
             if let selection, !ids.contains(selection) {
                 self.selection = nil
             }
+        }
+    }
+
+    private func dictionarySection<Content: View>(
+        title: String,
+        description: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+
+            content()
+
+            Text(description)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func load() {
+        do {
+            try store.loadIfNeeded()
+            errorMessage = nil
+
+            if selectedEntry?.isEditable != true {
+                selection = nil
+            }
+        } catch {
+            errorMessage = "无法加载字典。"
+        }
+    }
+
+    private func deleteSelectedEntry() {
+        guard let id = selectedUserEntryID else { return }
+
+        do {
+            try store.delete(id)
+            selection = nil
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
