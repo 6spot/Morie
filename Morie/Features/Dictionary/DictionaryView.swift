@@ -43,8 +43,7 @@ struct DictionaryView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+        ControlCenterScrollPage(spacing: 28) {
                 if let errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -96,8 +95,6 @@ struct DictionaryView: View {
                         }
                     }
                 }
-            }
-            .padding(20)
         }
         .overlay {
             if visibleCount == 0 && errorMessage == nil {
