@@ -56,6 +56,18 @@ Secure text fields contribute no selected/focused/nearby text.
 - [ ] Real-device validation records actual coverage in WeChat.
 - [ ] Real-device validation records actual coverage in TextEdit.
 
+## Refinement safety prerequisite discovered during validation
+
+Real-device validation exposed an existing Personal Memory leakage path: raw Memory notes were included in refinement prompts and a model could reuse an older clause as new user-authored text. Before Application Context is allowed into refinement:
+
+- automatic long-term Memory admission is now conservative about one-off assistant/test/debug requests;
+- machine-style automatic Memory names such as snake_case category labels are rejected;
+- refinement receives topic-level Memory hints only, never raw Memory notes/evidence;
+- raw Memory notes remain local-only for deterministic leakage checks;
+- the output guard now checks comma-delimited clauses and long CJK fragments, not only complete Memory sentences.
+
+Existing stored Memory is not automatically deleted or rewritten.
+
 ## Follow-up
 
 After real-device collection evidence is understood:
