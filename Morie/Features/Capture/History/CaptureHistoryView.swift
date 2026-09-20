@@ -23,9 +23,80 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
         case .all:
             true
         case .captureOnly:
-            capture.deliveryModeRawValue == CaptureDeliveryMode.captureOnly.rawValue
+            capture.deliveryModeRawValue
+                == CaptureDeliveryMode.captureOnly.rawValue
         case .needsAttention:
-            capture.lifecycle == .failed || capture.lifecycle == .deliveryFailed
+            capture.lifecycle == .failed
+                || capture.lifecycle == .deliveryFailed
+        }
+    }
+}
+
+@MainActor
+struct CaptureHistoryWorkspace: View {
+    let controller: AppController
+    @Binding var selection: UUID?
+
+    @State private var search = ""
+    @State private var filter: CaptureHistoryFilter = .all
+
+    var body: some View {
+        Group {
+            if let history = controller.history {
+                HSplitView {
+                    CaptureHistoryView(
+                        captures: history.captures,
+                        selection: $selection,
+                        search: $search,
+                        filter: $filter,
+                        canStartCapture: controller.canStartCapture,
+                        onRecord: controller.startCaptureOnly
+                    )
+                    .frame(
+                        minWidth: 260,
+                        idealWidth: 320,
+                        maxWidth: 360
+                    )
+
+                    CaptureHistoryDetailPane(
+                        controller: controller,
+                        history: history,
+                        selectedCaptureID: selection
+                    )
+                    .frame(minWidth: 360, maxWidth: .infinity)
+                }
+                .onAppear {
+                    history.setListVisible(true)
+                }
+                .onDisappear {
+                    history.setListVisible(false)
+                }
+            } else {
+                ContentUnavailableView(
+                    "历史记录不可用",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("记录存储尚未初始化。")
+                )
+            }
+        }
+        .navigationTitle("历史记录")
+        .searchable(text: $search, prompt: "搜索历史记录")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Picker("筛选记录", selection: $filter) {
+                    ForEach(CaptureHistoryFilter.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button(
+                    "开始录音",
+                    systemImage: "mic",
+                    action: controller.startCaptureOnly
+                )
+                .disabled(!controller.canStartCapture)
+            }
         }
     }
 }
@@ -40,15 +111,19 @@ struct CaptureHistoryView: View {
 
     private var visibleCaptures: [CaptureRecord] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+
         return captures.filter { capture in
-            filter.includes(capture) && (
-                query.isEmpty
-                    || [
-                        capture.finalText,
-                        capture.recognizedText,
-                        capture.sourceApplicationName ?? ""
-                    ].contains { $0.localizedStandardContains(query) }
-            )
+            filter.includes(capture)
+                && (
+                    query.isEmpty
+                        || [
+                            capture.finalText,
+                            capture.recognizedText,
+                            capture.sourceApplicationName ?? ""
+                        ].contains {
+                            $0.localizedStandardContains(query)
+                        }
+                )
         }
     }
 
@@ -89,7 +164,9 @@ struct CaptureHistoryView: View {
             if visibleCaptures.isEmpty {
                 ContentUnavailableView {
                     Label(
-                        captures.isEmpty ? "还没有记录" : "没有匹配的记录",
+                        captures.isEmpty
+                            ? "还没有记录"
+                            : "没有匹配的记录",
                         systemImage: "waveform"
                     )
                 } description: {
@@ -115,10 +192,46 @@ struct CaptureHistoryView: View {
                 }
             }
         }
-        .onChange(of: visibleCaptures.map(\.id), initial: true) { _, ids in
+        .onChange(
+            of: visibleCaptures.map(\.id),
+            initial: true
+        ) { _, ids in
             if let selection, !ids.contains(selection) {
                 self.selection = nil
             }
+        }
+    }
+}
+
+@MainActor
+private struct CaptureHistoryDetailPane: View {
+    @ObservedObject var controller: AppController
+    @ObservedObject var history: CaptureHistoryController
+    let selectedCaptureID: UUID?
+
+    private var capture: CaptureRecord? {
+        guard let selectedCaptureID else { return nil }
+        return history.captures.first { $0.id == selectedCaptureID }
+    }
+
+    var body: some View {
+        if let selectedCaptureID,
+           let capture {
+            CaptureDetailView(
+                capture: capture,
+                captureID: selectedCaptureID,
+                history: history,
+                canRecognize: controller.canStartCapture,
+                onRecognize: controller.recognizeHistoryCapture
+            )
+        } else {
+            ContentUnavailableView(
+                "选择一条记录",
+                systemImage: "waveform",
+                description: Text(
+                    "在这里查看保存的文字、识别结果和原始录音。"
+                )
+            )
         }
     }
 }
@@ -134,7 +247,7 @@ struct CaptureDetailView: View {
     @State private var deletionError: String?
 
     var body: some View {
-        ManagementDetailContent {
+        ControlCenterReadingContent {
             VStack(alignment: .leading, spacing: 10) {
                 Text(capture.finalText.isEmpty ? "识别文字" : "最终文字")
                     .font(.title)
@@ -164,8 +277,11 @@ struct CaptureDetailView: View {
                 .foregroundStyle(.secondary)
 
                 if let issue = capture.deliveryErrorDescription {
-                    Label(issue, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
+                    Label(
+                        issue,
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .foregroundStyle(.secondary)
                 }
             }
 
@@ -178,7 +294,6 @@ struct CaptureDetailView: View {
                 .foregroundStyle(.secondary)
             } else {
                 Text(capture.historyText)
-                    .font(.body)
                     .lineSpacing(5)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -186,36 +301,37 @@ struct CaptureDetailView: View {
 
             DisclosureGroup("识别与润色") {
                 VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("原始语音识别")
-                            .font(.headline)
+                    Text("原始语音识别")
+                        .font(.headline)
 
-                        Text(
-                            capture.recognizedText.isEmpty
-                                ? "暂无识别文字。"
-                                : capture.recognizedText
-                        )
-                        .textSelection(.enabled)
+                    Text(
+                        capture.recognizedText.isEmpty
+                            ? "暂无识别文字。"
+                            : capture.recognizedText
+                    )
+                    .textSelection(.enabled)
 
-                        if let date = capture.lastRecognitionAttemptAt {
-                            LabeledContent(
-                                "上次识别",
-                                value: date.formatted(
-                                    .dateTime
-                                        .locale(Locale(identifier: "zh-Hans"))
-                                        .year()
-                                        .month()
-                                        .day()
-                                        .hour()
-                                        .minute()
-                                )
+                    if let date = capture.lastRecognitionAttemptAt {
+                        LabeledContent(
+                            "上次识别",
+                            value: date.formatted(
+                                .dateTime
+                                    .locale(Locale(identifier: "zh-Hans"))
+                                    .year()
+                                    .month()
+                                    .day()
+                                    .hour()
+                                    .minute()
                             )
-                        }
+                        )
+                    }
 
-                        if let error = capture.lastRecognitionErrorDescription {
-                            Label(error, systemImage: "exclamationmark.triangle")
-                                .foregroundStyle(.secondary)
-                        }
+                    if let error = capture.lastRecognitionErrorDescription {
+                        Label(
+                            error,
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .foregroundStyle(.secondary)
                     }
 
                     if let refinement = capture.refinement {
@@ -277,7 +393,9 @@ struct CaptureDetailView: View {
                 }
             }
         } message: {
-            Text("此记录的文字、识别与润色信息和原始录音将被永久删除。")
+            Text(
+                "此记录的文字、识别与润色信息和原始录音将被永久删除。"
+            )
         }
         .alert(
             "无法删除记录",
@@ -315,7 +433,9 @@ struct CaptureDetailView: View {
 
             do {
                 try await Task.sleep(
-                    for: .seconds(max(0, expiresAt.timeIntervalSinceNow))
+                    for: .seconds(
+                        max(0, expiresAt.timeIntervalSinceNow)
+                    )
                 )
                 try Task.checkCancellation()
                 history.refreshAudio(for: captureID)
@@ -410,7 +530,10 @@ struct CaptureRefinementSection: View {
             Text("输入润色")
                 .font(.headline)
 
-            LabeledContent("处理结果", value: refinement.status.title)
+            LabeledContent(
+                "处理结果",
+                value: refinement.status.title
+            )
 
             if let seconds = refinement.durationSeconds {
                 LabeledContent(
@@ -440,7 +563,10 @@ private struct CaptureAudioPlayer: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ view: AVPlayerView, context: Context) {
+    func updateNSView(
+        _ view: AVPlayerView,
+        context: Context
+    ) {
         if view.player !== player {
             view.player?.pause()
             view.player = player
@@ -468,7 +594,9 @@ private extension CaptureRecord {
                 .joined(separator: " ")
         }
 
-        return lifecycle == .capturing ? "正在录音…" : "未识别到语音"
+        return lifecycle == .capturing
+            ? "正在录音…"
+            : "未识别到语音"
     }
 
     var historyListDate: String {
@@ -493,7 +621,9 @@ private extension CaptureRecord {
         case .cancelled:
             "已取消"
         case .failed:
-            historyText.isEmpty ? "未能识别" : "录音失败"
+            historyText.isEmpty
+                ? "未能识别"
+                : "录音失败"
         }
     }
 }

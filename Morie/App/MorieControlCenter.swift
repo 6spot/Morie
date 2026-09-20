@@ -4,56 +4,20 @@ enum ControlCenterMetrics {
     static let sidebarMinWidth: CGFloat = 180
     static let sidebarIdealWidth: CGFloat = 220
     static let sidebarMaxWidth: CGFloat = 260
-    static let contentInset: CGFloat = 24
-    static let sectionSpacing: CGFloat = 28
+
+    // This is the only outer content inset used by routed Control Center pages.
+    // Feature pages must not add their own top-level padding/contentMargins.
+    static let pageInset: CGFloat = 24
+    static let sectionSpacing: CGFloat = 24
     static let readingMaxWidth: CGFloat = 760
-    static let denseInset: CGFloat = 16
 }
 
-private enum ControlCenterPageLayout {
+enum ControlCenterPageKind {
     case standard
     case workspace
 }
 
-private struct ControlCenterPageHost<Content: View>: View {
-    let layout: ControlCenterPageLayout
-    private let content: Content
-
-    init(
-        layout: ControlCenterPageLayout,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.layout = layout
-        self.content = content()
-    }
-
-    @ViewBuilder
-    var body: some View {
-        switch layout {
-        case .standard:
-            ScrollView {
-                content
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .contentMargins(
-                .horizontal,
-                ControlCenterMetrics.contentInset,
-                for: .scrollContent
-            )
-            .contentMargins(
-                .vertical,
-                ControlCenterMetrics.contentInset,
-                for: .scrollContent
-            )
-
-        case .workspace:
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-}
-
-struct ControlCenterSectionGroup<Content: View>: View {
+struct ControlCenterGroup<Content: View>: View {
     let title: String
     let footer: String?
     private let content: Content
@@ -90,7 +54,7 @@ struct ControlCenterSectionGroup<Content: View>: View {
     }
 }
 
-struct ControlCenterReadingPage<Content: View>: View {
+struct ControlCenterReadingContent<Content: View>: View {
     private let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -102,17 +66,20 @@ struct ControlCenterReadingPage<Content: View>: View {
             VStack(alignment: .leading, spacing: 24) {
                 content
             }
-            .frame(maxWidth: ControlCenterMetrics.readingMaxWidth, alignment: .leading)
+            .frame(
+                maxWidth: ControlCenterMetrics.readingMaxWidth,
+                alignment: .leading
+            )
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .contentMargins(
             .horizontal,
-            ControlCenterMetrics.contentInset,
+            ControlCenterMetrics.pageInset,
             for: .scrollContent
         )
         .contentMargins(
             .vertical,
-            ControlCenterMetrics.contentInset,
+            ControlCenterMetrics.pageInset,
             for: .scrollContent
         )
     }
@@ -153,7 +120,7 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var pageLayout: ControlCenterPageLayout {
+    var pageKind: ControlCenterPageKind {
         switch self {
         case .history, .diagnostics:
             .workspace
@@ -176,54 +143,111 @@ struct MorieControlCenter: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ControlCenterSidebar(selection: $selection)
-                .toolbar(removing: .sidebarToggle)
         } detail: {
             NavigationStack {
-                ControlCenterRoute(
+                ControlCenterRouteHost(
                     controller: controller,
-                    selection: selection ?? .overview,
+                    section: selection ?? .overview,
                     selectedCaptureID: $selectedCaptureID,
                     selectedDictionaryEntry: $selectedDictionaryEntry,
                     overviewMetricsSnapshot: $overviewMetricsSnapshot
                 )
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button("显示或隐藏边栏", systemImage: "sidebar.left") {
-                    toggleSidebar()
-                }
-                .help("显示或隐藏边栏")
-            }
-        }
+        .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
-        .onReceive(NotificationCenter.default.publisher(for: .morieShowSettings)) { _ in
+        .onAppear {
+            Diagnostics.record("ControlCenter", "Shell mounted")
+        }
+        .onDisappear {
+            Diagnostics.record("ControlCenter", "Shell unmounted")
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .morieShowSettings)
+        ) { _ in
             selection = .settings
         }
     }
+}
 
-    private func toggleSidebar() {
-        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+private struct ControlCenterSidebar: View {
+    @Binding var selection: ControlCenterSection?
+    @AppStorage("sidebar.libraryExpanded") private var libraryExpanded = true
+    @AppStorage("sidebar.appExpanded") private var appExpanded = true
+
+    var body: some View {
+        List(selection: $selection) {
+            sidebarItem(.overview)
+
+            Section("资料库", isExpanded: $libraryExpanded) {
+                sidebarItem(.history)
+                sidebarItem(.dictionary)
+                sidebarItem(.memory)
+            }
+
+            Section("应用", isExpanded: $appExpanded) {
+                sidebarItem(.settings)
+                sidebarItem(.permissions)
+                sidebarItem(.diagnostics)
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationSplitViewColumnWidth(
+            min: ControlCenterMetrics.sidebarMinWidth,
+            ideal: ControlCenterMetrics.sidebarIdealWidth,
+            max: ControlCenterMetrics.sidebarMaxWidth
+        )
+        .onAppear {
+            Diagnostics.record("ControlCenter", "Sidebar mounted")
+        }
+        .onDisappear {
+            Diagnostics.record("ControlCenter", "Sidebar unmounted")
+        }
+    }
+
+    private func sidebarItem(_ section: ControlCenterSection) -> some View {
+        Label(section.title, systemImage: section.systemImage)
+            .tag(section)
     }
 }
 
 @MainActor
-private struct ControlCenterRoute: View {
+private struct ControlCenterRouteHost: View {
     let controller: AppController
-    let selection: ControlCenterSection
+    let section: ControlCenterSection
     @Binding var selectedCaptureID: UUID?
     @Binding var selectedDictionaryEntry: UUID?
     @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
 
+    @ViewBuilder
     var body: some View {
-        ControlCenterPageHost(layout: selection.pageLayout) {
+        switch section.pageKind {
+        case .standard:
+            ScrollView {
+                routedPage
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .contentMargins(
+                .horizontal,
+                ControlCenterMetrics.pageInset,
+                for: .scrollContent
+            )
+            .contentMargins(
+                .vertical,
+                ControlCenterMetrics.pageInset,
+                for: .scrollContent
+            )
+
+        case .workspace:
             routedPage
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(ControlCenterMetrics.pageInset)
         }
     }
 
     @ViewBuilder
     private var routedPage: some View {
-        switch selection {
+        switch section {
         case .overview:
             OverviewView(
                 controller: controller,
@@ -273,179 +297,6 @@ private struct ControlCenterRoute: View {
     }
 }
 
-private struct ControlCenterSidebar: View {
-    @Binding var selection: ControlCenterSection?
-    @AppStorage("sidebar.libraryExpanded") private var libraryExpanded = true
-    @AppStorage("sidebar.appExpanded") private var appExpanded = true
-
-    var body: some View {
-        List(selection: $selection) {
-            sidebarItem(.overview)
-
-            Section("资料库", isExpanded: $libraryExpanded) {
-                sidebarItem(.history)
-                sidebarItem(.dictionary)
-                sidebarItem(.memory)
-            }
-
-            Section("应用", isExpanded: $appExpanded) {
-                sidebarItem(.settings)
-                sidebarItem(.permissions)
-                sidebarItem(.diagnostics)
-            }
-        }
-        .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(
-            min: ControlCenterMetrics.sidebarMinWidth,
-            ideal: ControlCenterMetrics.sidebarIdealWidth,
-            max: ControlCenterMetrics.sidebarMaxWidth
-        )
-    }
-
-    private func sidebarItem(_ section: ControlCenterSection) -> some View {
-        Label(section.title, systemImage: section.systemImage)
-            .tag(section)
-    }
-}
-
-@MainActor
-private struct CaptureHistoryWorkspace: View {
-    let controller: AppController
-    @Binding var selection: UUID?
-
-    @State private var search = ""
-    @State private var filter: CaptureHistoryFilter = .all
-
-    var body: some View {
-        if let history = controller.history {
-            HSplitView {
-                CaptureHistoryListPane(
-                    controller: controller,
-                    history: history,
-                    selection: $selection,
-                    search: $search,
-                    filter: $filter
-                )
-                .frame(minWidth: 260, idealWidth: 320, maxWidth: 360)
-
-                CaptureHistoryDetailPane(
-                    controller: controller,
-                    history: history,
-                    selectedCaptureID: selection
-                )
-                .id(selection)
-                .frame(minWidth: 360, maxWidth: .infinity)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("历史记录")
-            .searchable(text: $search, prompt: "搜索历史记录")
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Picker("筛选记录", selection: $filter) {
-                        ForEach(CaptureHistoryFilter.allCases) { item in
-                            Text(item.title).tag(item)
-                        }
-                    }
-                    .pickerStyle(.menu)
-
-                    Button(
-                        "开始录音",
-                        systemImage: "mic",
-                        action: controller.startCaptureOnly
-                    )
-                    .disabled(!controller.canStartCapture)
-                    .help("录音并保存到历史记录。")
-                }
-            }
-            .onAppear {
-                history.setListVisible(true)
-            }
-            .onDisappear {
-                history.setListVisible(false)
-            }
-        } else {
-            ContentUnavailableView(
-                "历史记录不可用",
-                systemImage: "exclamationmark.triangle",
-                description: Text("记录存储尚未初始化。")
-            )
-            .navigationTitle("历史记录")
-        }
-    }
-}
-
-@MainActor
-private struct CaptureHistoryListPane: View {
-    @ObservedObject var controller: AppController
-    @ObservedObject var history: CaptureHistoryController
-    @Binding var selection: UUID?
-    @Binding var search: String
-    @Binding var filter: CaptureHistoryFilter
-
-    var body: some View {
-        VStack(spacing: 0) {
-            CaptureHistoryView(
-                captures: history.captures,
-                selection: $selection,
-                search: $search,
-                filter: $filter,
-                canStartCapture: controller.canStartCapture,
-                onRecord: controller.startCaptureOnly
-            )
-
-            if history.canLoadMoreCaptures {
-                Divider()
-
-                Button("加载更早记录") {
-                    history.loadMoreCaptures()
-                }
-                .buttonStyle(.link)
-                .padding(.vertical, 8)
-            }
-        }
-        .overlay {
-            if history.captures.isEmpty, let message = history.listError {
-                ContentUnavailableView(
-                    "无法加载历史记录",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(message)
-                )
-            }
-        }
-    }
-}
-
-@MainActor
-private struct CaptureHistoryDetailPane: View {
-    @ObservedObject var controller: AppController
-    @ObservedObject var history: CaptureHistoryController
-    let selectedCaptureID: UUID?
-
-    private var capture: CaptureRecord? {
-        guard let selectedCaptureID else { return nil }
-        return history.captures.first { $0.id == selectedCaptureID }
-    }
-
-    var body: some View {
-        if let id = selectedCaptureID,
-           let capture {
-            CaptureDetailView(
-                capture: capture,
-                captureID: id,
-                history: history,
-                canRecognize: controller.canStartCapture,
-                onRecognize: controller.recognizeHistoryCapture
-            )
-        } else {
-            ContentUnavailableView(
-                "选择一条记录",
-                systemImage: "waveform",
-                description: Text("在这里查看保存的文字、识别结果和原始录音。")
-            )
-        }
-    }
-}
-
 struct ManagementDetailContent<Content: View>: View {
     private let content: Content
 
@@ -454,7 +305,7 @@ struct ManagementDetailContent<Content: View>: View {
     }
 
     var body: some View {
-        ControlCenterReadingPage {
+        ControlCenterReadingContent {
             content
         }
     }
