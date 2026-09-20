@@ -219,7 +219,13 @@ private enum RefinementOutputGuard {
         for group in relationGroups {
             let sourceHasRelation = group.contains { containsPhrase(source, $0) }
             let outputHasRelation = group.contains { containsPhrase(output, $0) }
-            if sourceHasRelation != outputHasRelation { return false }
+            if sourceHasRelation != outputHasRelation {
+                DevelopmentDiagnostics.record(
+                    "RefinementGuardDetail",
+                    "semanticRelationMismatch; group=\(group.joined(separator: "|")); source=\(sourceHasRelation); output=\(outputHasRelation)"
+                )
+                return false
+            }
         }
         return true
     }
@@ -238,11 +244,31 @@ private enum RefinementOutputGuard {
             // but the final spoken replacement is still authoritative.
             let finalFacts = protectedFacts(in: finalSegment, knownTerms: knownTerms)
             if !finalFacts.isEmpty {
-                if !finalFacts.isSubset(of: outputFacts) { return false }
+                if !finalFacts.isSubset(of: outputFacts) {
+                    DevelopmentDiagnostics.list(
+                        "RefinementGuardDetail",
+                        captureID: input.captureID,
+                        label: "missingFinalCorrectionFacts",
+                        Array(finalFacts.subtracting(outputFacts)).sorted()
+                    )
+                    return false
+                }
             } else if !sourceFacts.isEmpty && sourceFacts.isDisjoint(with: outputFacts) {
+                DevelopmentDiagnostics.list(
+                    "RefinementGuardDetail",
+                    captureID: input.captureID,
+                    label: "sourceFactsDisjointFromOutput",
+                    Array(sourceFacts).sorted()
+                )
                 return false
             }
         } else if !sourceFacts.isSubset(of: outputFacts) {
+            DevelopmentDiagnostics.list(
+                "RefinementGuardDetail",
+                captureID: input.captureID,
+                label: "missingSourceFacts",
+                Array(sourceFacts.subtracting(outputFacts)).sorted()
+            )
             return false
         }
 
@@ -254,6 +280,14 @@ private enum RefinementOutputGuard {
             knownTerms: knownTerms
         )
         let additions = outputFacts.subtracting(sourceFacts).subtracting(hintFacts)
+        if !additions.isEmpty {
+            DevelopmentDiagnostics.list(
+                "RefinementGuardDetail",
+                captureID: input.captureID,
+                label: "unsupportedAddedFacts",
+                Array(additions).sorted()
+            )
+        }
         return additions.isEmpty
     }
 
@@ -324,11 +358,21 @@ private enum RefinementOutputGuard {
                 guard meaningful else { continue }
 
                 if outputSemantic.contains(candidate) && !sourceSemantic.contains(candidate) {
+                    DevelopmentDiagnostics.record(
+                        "RefinementGuardDetail",
+                        captureID: input.captureID,
+                        "memoryLeak; memory=\(match.memory.name); matchedClause=\(clause)"
+                    )
                     return true
                 }
 
                 for fragment in contextLeakageFragments(candidate, counts: counts) {
                     if outputSemantic.contains(fragment) && !sourceSemantic.contains(fragment) {
+                        DevelopmentDiagnostics.record(
+                            "RefinementGuardDetail",
+                            captureID: input.captureID,
+                            "memoryLeakFragment; memory=\(match.memory.name); fragment=\(fragment)"
+                        )
                         return true
                     }
                 }
@@ -362,8 +406,15 @@ private enum RefinementOutputGuard {
 
         let sourceCJKRatio = Double(sourceCounts.cjk) / Double(sourceCounts.total)
         let outputCJKRatio = Double(outputCounts.cjk) / Double(outputCounts.total)
-        return (sourceCJKRatio >= 0.65 && outputCJKRatio <= 0.2)
+        let changed = (sourceCJKRatio >= 0.65 && outputCJKRatio <= 0.2)
             || (sourceCJKRatio <= 0.2 && outputCJKRatio >= 0.65)
+        if changed {
+            DevelopmentDiagnostics.record(
+                "RefinementGuardDetail",
+                "scriptChanged; sourceCJK=\(sourceCounts.cjk)/\(sourceCounts.total); outputCJK=\(outputCounts.cjk)/\(outputCounts.total); sourceRatio=\(sourceCJKRatio); outputRatio=\(outputCJKRatio)"
+            )
+        }
+        return changed
     }
 
     private static func isExtremeExpansion(_ output: String, source: String) -> Bool {
@@ -371,7 +422,14 @@ private enum RefinementOutputGuard {
         let outputCount = semanticText(output).count
         let ratioLimit = sourceCount * 5 / 2
         let absoluteLimit = sourceCount + 48
-        return outputCount > max(ratioLimit, absoluteLimit)
+        let limit = max(ratioLimit, absoluteLimit)
+        if outputCount > limit {
+            DevelopmentDiagnostics.record(
+                "RefinementGuardDetail",
+                "extremeExpansion; sourceSemantic=\(sourceCount); outputSemantic=\(outputCount); ratioLimit=\(ratioLimit); absoluteLimit=\(absoluteLimit); effectiveLimit=\(limit)"
+            )
+        }
+        return outputCount > limit
     }
 
     private static func hasExplicitCorrectionSignal(_ text: String) -> Bool {
