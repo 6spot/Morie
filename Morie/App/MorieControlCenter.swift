@@ -5,9 +5,9 @@ enum ControlCenterMetrics {
     static let sidebarIdealWidth: CGFloat = 224
     static let sidebarMaxWidth: CGFloat = 260
 
-    // The route host is the only owner of top-level page geometry.
-    static let pageHorizontalInset: CGFloat = 20
-    static let pageVerticalInset: CGFloat = 16
+    // Standard routed pages use the system grouped Form geometry.
+    // Only nested reading panes use an explicit inset.
+    static let readingInset: CGFloat = 20
     static let readingMaxWidth: CGFloat = 760
 }
 
@@ -36,12 +36,12 @@ struct ControlCenterReadingContent<Content: View>: View {
         }
         .contentMargins(
             .horizontal,
-            ControlCenterMetrics.pageHorizontalInset,
+            ControlCenterMetrics.readingInset,
             for: .scrollContent
         )
         .contentMargins(
             .vertical,
-            ControlCenterMetrics.pageVerticalInset,
+            ControlCenterMetrics.readingInset,
             for: .scrollContent
         )
     }
@@ -189,16 +189,6 @@ private struct ControlCenterRouteHost: View {
                 routedPage
             }
             .formStyle(.grouped)
-            .contentMargins(
-                .horizontal,
-                ControlCenterMetrics.pageHorizontalInset,
-                for: .scrollContent
-            )
-            .contentMargins(
-                .vertical,
-                ControlCenterMetrics.pageVerticalInset,
-                for: .scrollContent
-            )
 
         case .workspace:
             routedPage
