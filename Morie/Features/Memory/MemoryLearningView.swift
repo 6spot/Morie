@@ -16,20 +16,20 @@ struct CaptureMemorySection: View {
                 } else if let analysis {
                     if let failure = analysis.failure {
                         Text(failure.message).foregroundStyle(.secondary)
-                        if analysis.state == .skipped {
+                        if analysis.state == .skipped && failure != .disabled {
                             Button("重新学习个人记忆") { controller.retry(analysis.source) }
-                                .disabled(controller.isInputActive)
+                                .disabled(controller.isInputActive || !controller.isEnabled)
                         }
                     } else if analysis.state == .pending {
                         Text("将在空闲时自动分析并学习个人记忆。").foregroundStyle(.secondary)
                     } else if linked.isEmpty {
-                        Text("已完成分析，没有发现需要长期记住的新个人信息。").foregroundStyle(.secondary)
+                        Text("已完成分析，没有发现值得保留的新上下文。").foregroundStyle(.secondary)
                     } else {
                         Text("个人记忆已自动更新。").foregroundStyle(.secondary)
                     }
                     MemoryAnalysisSourceView(sourceText: analysis.sourceText)
                 } else if capture.lifecycle == .delivered || capture.lifecycle == .deliveryFailed {
-                    Text("已保存的输入将在空闲时自动分析。").foregroundStyle(.secondary)
+                    Text(controller.isEnabled ? "已保存的输入将在空闲时自动分析。" : "个人记忆已关闭，这次输入不会参与自动学习。").foregroundStyle(.secondary)
                 }
                 ForEach(linked) { entry in
                     VStack(alignment: .leading, spacing: 4) {
