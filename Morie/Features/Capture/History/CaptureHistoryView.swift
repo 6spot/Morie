@@ -36,6 +36,8 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 struct CaptureHistoryWorkspace: View {
     let controller: AppController
     @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
+    @ObservedObject private var setup: PermissionSetupController
     @Binding var selection: UUID?
 
     @State private var search = ""
@@ -47,6 +49,10 @@ struct CaptureHistoryWorkspace: View {
     ) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
+        _setup = ObservedObject(wrappedValue: controller.setup)
         _selection = selection
     }
 
@@ -222,6 +228,8 @@ struct CaptureHistoryView: View {
 private struct CaptureHistoryDetailPane: View {
     let controller: AppController
     @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
+    @ObservedObject private var setup: PermissionSetupController
     @ObservedObject var history: CaptureHistoryController
     let selectedCaptureID: UUID?
 
@@ -232,6 +240,10 @@ private struct CaptureHistoryDetailPane: View {
     ) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
+        _setup = ObservedObject(wrappedValue: controller.setup)
         _history = ObservedObject(wrappedValue: history)
         self.selectedCaptureID = selectedCaptureID
     }
