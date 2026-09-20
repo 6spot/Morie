@@ -570,7 +570,7 @@ The non-autosaving write context shares the Capture container without touching C
 
 `Speech → durable recognized text → dictionary corrections → optional cleanup with related personal context → validation → durable final text → delivery`
 
-Basic cleanup runs with an empty or unavailable Memory store. External-model Base URL/model preferences load without touching Keychain. `RefinementModelController` resolves a persisted API key only when a Capture that can use the external model starts, caches that credential for the current process, and passes the resolved value into the immutable per-Capture session context. Local mode and incomplete external configuration therefore remain Keychain-free at launch; credential failure does not prevent Capture.
+Basic cleanup runs with an empty or unavailable Memory store. External-model Base URL/model preferences load without touching Keychain. `RefinementModelController` resolves a persisted API key only when a completed Capture actually enters external-model refinement, caches that credential for the current process, and combines the resolved value with the immutable per-Capture endpoint/model snapshot at the refinement boundary. Local mode and incomplete external configuration therefore remain Keychain-free at launch; credential failure does not prevent Capture.
 
 `InputRefiner` creates a fresh Apple `LanguageModelSession`, supplies transcript/dictionary/context as JSON data under the [approved cleanup instructions](input-cleanup.md), and requests complete final text through greedy `@Generable` output. Native token accounting bounds the full prompt, instructions, schema and a response budget of 256–1,536 tokens. Oversized input is declined without truncating the saved text.
 
