@@ -483,6 +483,7 @@ final class CaptureSessionController {
                     for: sessionID,
                     sourceAudio: result.sourceAudio
                 )
+                history?.captureListDidChange()
                 onCancellationEnabledChange?(false)
                 resetSessionIdentity()
                 setPhase(.idle)
@@ -636,6 +637,7 @@ final class CaptureSessionController {
                     try captureStore?.cancel(sessionID)
                 case .interrupted(let message):
                     try captureStore?.markFailed(sessionID, error: message)
+                    history?.captureListDidChange()
                 }
             } catch {
                 Diagnostics.record(
@@ -693,6 +695,7 @@ final class CaptureSessionController {
                     for: sessionID,
                     sourceAudio: result.sourceAudio
                 )
+                history?.captureListDidChange()
             } else {
                 try captureStore.cancel(sessionID)
                 disposition = .discarded
@@ -754,6 +757,7 @@ final class CaptureSessionController {
         guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
 
         Diagnostics.record("Session", "Capture \(label(sessionID)) completed successfully")
+        history?.captureListDidChange()
         onCancellationEnabledChange?(false)
         resetSessionIdentity()
         setPhase(.idle)
@@ -780,6 +784,7 @@ final class CaptureSessionController {
         do {
             if preservedOnClipboard {
                 try captureStore?.markDeliveryFailed(sessionID, error: message)
+                history?.captureListDidChange()
                 if let captureStore {
                     Task { @MainActor [weak self, weak captureStore] in
                         guard let self, let captureStore else { return }
@@ -797,6 +802,7 @@ final class CaptureSessionController {
                 }
             } else if stoppingCaptureID != sessionID {
                 try captureStore?.markFailed(sessionID, error: message)
+                history?.captureListDidChange()
             }
         } catch {
             Diagnostics.record(
