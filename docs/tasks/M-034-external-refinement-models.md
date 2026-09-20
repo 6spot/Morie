@@ -13,7 +13,7 @@ Allow Morie cleanup to use a user-configured OpenAI-compatible Chat Completions 
 - Settings can select Apple local, external API, or automatic fallback.
 - External configuration stores Base URL/model in preferences and API key in Keychain.
 - Launch and ordinary Settings rendering never read the Keychain credential.
-- Each Capture freezes the selected refinement configuration, resolving the API key only when that Capture is actually configured to use an external model.
+- Each Capture freezes the selected refinement configuration, resolving the API key only when that Capture actually reaches external-model refinement.
 - External refinement uses Apple's `foundation-models-utilities` `ChatCompletionsLanguageModel` adapter instead of a Morie-owned protocol implementation.
 - The Xcode project pins the Apple package to revision `2aa12937e30d310687f40fc470ea35495816c9a4`.
 - The repository commits the shared Xcode SwiftPM `Package.resolved` so clones/pulls resolve the same package revision.
@@ -45,7 +45,7 @@ The corrected ownership is:
 - Startup loads only non-secret `UserDefaults` metadata.
 - The Settings secure field is intentionally blank rather than reading the existing secret; leaving it blank preserves the existing Keychain item.
 - Replacing or clearing a key is an explicit user action.
-- A persisted key is first read only when a Capture that can use the external model starts; that resolved value is frozen into the per-Capture runtime configuration and cached for the rest of the process.
+- A persisted key is first read only when a completed Capture actually enters external-model refinement; that resolved value is frozen into the per-Capture runtime configuration and cached for the rest of the process.
 - Keychain read failure never blocks Capture; cloud-only refinement may keep the original text, while Automatic mode retains its normal Apple-local fallback.
 
 This preserves the M-032 per-Capture settings snapshot while removing Keychain from the application launch path.
@@ -56,7 +56,7 @@ This preserves the M-032 per-Capture settings snapshot while removing Keychain f
 - [x] External OpenAI-compatible refinement configuration is user-controlled.
 - [x] API key is stored in Keychain rather than UserDefaults.
 - [x] App launch and normal Settings construction do not read the API key from Keychain.
-- [x] External-model Captures resolve and freeze the credential only when needed.
+- [x] External-model Captures resolve the credential only at the refinement boundary; recording start remains Keychain-free.
 - [x] Refinement-model settings ownership is extracted from AppController.
 - [x] Package revision is pinned in the Xcode project.
 - [x] Shared `Package.resolved` is committed for reproducible local resolution.
