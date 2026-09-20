@@ -98,7 +98,7 @@ The Memory page stays a flat natural reading surface. It does not display the in
 
 Deterministic tests cover storage/restart, evidence survival, disabled-period skip semantics, stale-source rejection, semantic merge by existing UUID, keyword-free update admission, user edit precedence, working-context refresh/expiry/promotion, protected delete/archive context, atomic failure, retry/backoff and input preemption.
 
-Hosted macOS 27 CI run [35486727249](https://github.com/6spot/Morie/actions/runs/35486727249) passed both gates after the working-context fixture was corrected to use a current evidence date: the Release product compile succeeded and **143 logic tests passed with 0 failures / 0 unexpected failures**. The initial test run correctly exposed that a 1970-dated fixture had already expired under the new lifecycle policy; no product workaround was added.
+Hosted macOS 27 CI run [35487372229](https://github.com/6spot/Morie/actions/runs/35487372229) passed both gates: the Release product compile succeeded and **143 logic tests passed with 0 failures / 0 unexpected failures**. Validation also exposed two test-fixture issues rather than product defects: a 1970-dated working-context fixture was correctly expired by the new lifecycle policy, and file-backed SwiftData fixtures were unlinking temporary SQLite stores while CoreData could still be draining work. The lifecycle fixture now uses current time; tests that do not actually validate restart persistence use in-memory stores, while the two true restart tests keep unique OS-owned temporary stores. No product exception was added.
 
 Model quality is not established by injected suggestions. Real Foundation Models behavior remains device acceptance.
 
