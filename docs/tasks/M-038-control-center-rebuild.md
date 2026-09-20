@@ -4,7 +4,8 @@
 
 **IN PROGRESS** — 2026-09-20
 
-Issue: [#86](https://github.com/6spot/Morie/issues/86)
+Issue: [#86](https://github.com/6spot/Morie/issues/86)  
+Pull request: [#87](https://github.com/6spot/Morie/pull/87)
 
 ## Why
 
@@ -78,7 +79,7 @@ The implementation follows:
 - [x] Stop Permissions from unconditional refresh on every page revisit.
 - [x] Align Diagnostics selected-message margins with the shared dense-workspace metric.
 - [x] Rewrite `docs/ui-design.md` Control Center rules.
-- [ ] Run Xcode 27 compile/tests.
+- [x] Run Xcode 27 compile/tests.
 - [ ] Owner signed-app visual/interaction check.
 
 ## Acceptance criteria
@@ -91,7 +92,7 @@ The implementation follows:
 - [ ] Scroll indicators remain at the workspace edge.
 - [ ] The 960 × 600 minimum window does not overflow.
 - [ ] Search, toolbar, edit/delete, record, retry and permission actions remain functional.
-- [ ] Xcode 27 product build and logic tests pass.
+- [x] Xcode 27 product build and logic tests pass.
 - [ ] Signed macOS 27 visual check confirms stable sidebar and consistent page rhythm.
 
 ## Validation notes
@@ -104,5 +105,12 @@ Hosted CI can verify compilation and logic tests, but it cannot replace the owne
 - sidebar persistence and disclosure behavior;
 - minimum-window split sizing;
 - absence of visible selection/page-switch flashing.
+
+GitHub Actions `macOS 27 CI` run #251 passed on 2026-09-20:
+
+- **Xcode 27 compile**: passed.
+- **MorieTests**: **147 tests passed, 0 failures**.
+
+The test log still contains temporary SQLite cleanup warnings about WAL/SHM files being unlinked while an in-memory test store is being torn down; they did not fail the suite and are not treated as Control Center acceptance evidence.
 
 Do not mark this task DONE until those interactions are checked in the signed app.
