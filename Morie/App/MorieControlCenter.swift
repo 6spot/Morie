@@ -8,7 +8,6 @@ enum ControlCenterMetrics {
     // The route host is the only owner of top-level page geometry.
     static let pageHorizontalInset: CGFloat = 20
     static let pageVerticalInset: CGFloat = 16
-    static let workspaceInset: CGFloat = 16
     static let readingMaxWidth: CGFloat = 760
 }
 
@@ -42,7 +41,7 @@ struct ControlCenterReadingContent<Content: View>: View {
         )
         .contentMargins(
             .vertical,
-            ControlCenterMetrics.pageHorizontalInset,
+            ControlCenterMetrics.pageVerticalInset,
             for: .scrollContent
         )
     }
@@ -204,7 +203,6 @@ private struct ControlCenterRouteHost: View {
         case .workspace:
             routedPage
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(ControlCenterMetrics.workspaceInset)
         }
     }
 
