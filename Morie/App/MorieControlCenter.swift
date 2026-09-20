@@ -123,25 +123,28 @@ private struct ControlCenterDetailHost: View {
     @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
 
     var body: some View {
-        NavigationStack {
-            routedContent
+        Group {
+            if (selection ?? .overview) == .history {
+                CaptureHistoryWorkspace(
+                    controller: controller,
+                    selection: $selectedCaptureID
+                )
+            } else {
+                NavigationStack {
+                    standardPage
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
-    private var routedContent: some View {
+    private var standardPage: some View {
         switch selection ?? .overview {
         case .overview:
             OverviewView(
                 controller: controller,
                 metricsSnapshot: $overviewMetricsSnapshot
-            )
-
-        case .history:
-            CaptureHistoryWorkspace(
-                controller: controller,
-                selection: $selectedCaptureID
             )
 
         case .memory:
@@ -169,6 +172,9 @@ private struct ControlCenterDetailHost: View {
 
         case .diagnostics:
             DiagnosticLogView()
+
+        case .history:
+            EmptyView()
         }
     }
 
