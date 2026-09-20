@@ -3,85 +3,131 @@ import SwiftUI
 
 struct MemoryView: View {
     @ObservedObject var store: MemoryStore
-    @Binding var selection: UUID?
     @AppStorage(PersonalMemorySettings.enabledDefaultsKey) private var memoryEnabled = true
     @State private var search = ""
-    @State private var status: MemoryStatus = .active
     @State private var editor: MemoryEditorMode?
     @State private var errorMessage: String?
 
-    private var visibleEntries: [MemoryRecord] {
-        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        return store.entries.filter { entry in
-            entry.status == status
-                && (
-                    query.isEmpty
-                    || entry.name.localizedStandardContains(query)
-                    || entry.notes.localizedStandardContains(query)
-                )
-        }
+    private var query: String {
+        search.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var activeLongTerm: [MemoryRecord] {
+        matching(
+            store.entries.filter {
+                $0.status == .active && $0.scope != .workingContext
+            }
+        )
+    }
+
+    private var recentContext: [MemoryRecord] {
+        matching(
+            store.entries.filter {
+                $0.status == .active && $0.scope == .workingContext
+            }
+        )
+    }
+
+    private var history: [MemoryRecord] {
+        matching(
+            store.entries.filter {
+                $0.status == .archived || $0.status == .superseded
+            }
+        )
+    }
+
+    private var hasVisibleMemory: Bool {
+        !activeLongTerm.isEmpty || !recentContext.isEmpty || !history.isEmpty
     }
 
     var body: some View {
-        List(selection: $selection) {
-            if !memoryEnabled {
-                Label(
-                    "个人记忆已关闭，已有内容仍会保留。",
-                    systemImage: "pause.circle"
-                )
-                .foregroundStyle(.secondary)
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 32) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Morie 了解你的这些内容")
+                        .font(.largeTitle)
+                        .fontWeight(.semibold)
 
-            if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
-            }
+                    Text("这些内容来自你日常使用 Morie 时表达过的信息，并会随着新的输入持续更新。")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
 
-            ForEach(visibleEntries) { entry in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(entry.name)
-                        .font(.headline)
-                        .lineLimit(2)
-                    Text(entry.notes)
+                    if !memoryEnabled {
+                        Label(
+                            "个人记忆已关闭。已有内容会保留，但 Morie 暂时不会继续学习或在润色时使用它们。",
+                            systemImage: "pause.circle"
+                        )
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                }
-                .padding(.vertical, 6)
-                .tag(entry.id)
-            }
-        }
-        .listStyle(.inset)
-        .overlay {
-            if visibleEntries.isEmpty && errorMessage == nil {
-                ContentUnavailableView {
-                    Label(
-                        search.isEmpty
-                            ? "暂无(status.title)的个人记忆"
-                            : "没有匹配的个人记忆",
-                        systemImage: "person.text.rectangle"
-                    )
-                } description: {
-                    Text(
-                        search.isEmpty
-                            ? "Morie 会从日常输入中逐渐形成对你有用的上下文，并在后续输入中参考。"
-                            : "试试其他搜索词或筛选条件。"
-                    )
-                }
-            }
-        }
-        .navigationTitle("个人记忆")
-        .navigationSubtitle("\(visibleEntries.count) 条")
-        .searchable(text: $search, prompt: "搜索个人记忆")
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Picker("筛选个人记忆", selection: $status) {
-                    ForEach(MemoryStatus.allCases) {
-                        Text($0.title).tag($0)
+                        .padding(.top, 4)
                     }
                 }
-                .pickerStyle(.menu)
 
-                Button("新增个人记忆", systemImage: "plus") {
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                }
+
+                if !activeLongTerm.isEmpty {
+                    MemoryNarrativeGroup(
+                        entries: activeLongTerm,
+                        store: store
+                    )
+                }
+
+                if !recentContext.isEmpty {
+                    VStack(alignment: .leading, spacing: 18) {
+                        Text("最近")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+
+                        MemoryNarrativeGroup(
+                            entries: recentContext,
+                            store: store,
+                            showsDate: true
+                        )
+                    }
+                }
+
+                if !history.isEmpty {
+                    DisclosureGroup("已归档与历史") {
+                        MemoryNarrativeGroup(
+                            entries: history,
+                            store: store,
+                            showsStatus: true
+                        )
+                        .padding(.top, 16)
+                    }
+                    .font(.headline)
+                }
+
+                if !hasVisibleMemory && errorMessage == nil {
+                    ContentUnavailableView {
+                        Label(
+                            query.isEmpty ? "Morie 还不了解你" : "没有匹配的内容",
+                            systemImage: "person.text.rectangle"
+                        )
+                    } description: {
+                        Text(
+                            query.isEmpty
+                                ? "继续正常使用即可。Morie 会在空闲时逐渐形成有用的长期理解和近期上下文。"
+                                : "试试其他搜索词。"
+                        )
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 56)
+                }
+            }
+            .frame(maxWidth: 760, alignment: .leading)
+            .padding(.horizontal, 36)
+            .padding(.vertical, 32)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .navigationTitle("个人记忆")
+        .searchable(text: $search, prompt: "搜索 Morie 记住的内容")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("告诉 Morie 一件事", systemImage: "plus") {
                     editor = .create
                 }
             }
@@ -97,9 +143,76 @@ struct MemoryView: View {
                 errorMessage = "无法加载个人记忆。"
             }
         }
-        .onChange(of: visibleEntries.map(\.id), initial: true) { _, ids in
-            if let selection, !ids.contains(selection) {
-                self.selection = nil
+    }
+
+    private func matching(_ entries: [MemoryRecord]) -> [MemoryRecord] {
+        let result: [MemoryRecord]
+        if query.isEmpty {
+            result = entries
+        } else {
+            result = entries.filter {
+                $0.name.localizedStandardContains(query)
+                    || $0.notes.localizedStandardContains(query)
+            }
+        }
+
+        return result.sorted {
+            if $0.updatedAt != $1.updatedAt {
+                return $0.updatedAt > $1.updatedAt
+            }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+    }
+}
+
+private struct MemoryNarrativeGroup: View {
+    let entries: [MemoryRecord]
+    @ObservedObject var store: MemoryStore
+    var showsDate = false
+    var showsStatus = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 26) {
+            ForEach(entries) { entry in
+                NavigationLink {
+                    MemoryDetailView(store: store, memoryID: entry.id)
+                } label: {
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(entry.name)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.primary)
+
+                            Spacer(minLength: 12)
+
+                            if showsStatus {
+                                Text(entry.status?.title ?? "")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            } else if showsDate {
+                                Text(
+                                    entry.updatedAt.formatted(
+                                        .dateTime
+                                            .locale(Locale(identifier: "zh-Hans"))
+                                            .month()
+                                            .day()
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                            }
+                        }
+
+                        Text(entry.notes)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
