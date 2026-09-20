@@ -1,6 +1,11 @@
 import Foundation
 import SwiftData
 
+struct CaptureHistorySignature: Equatable {
+    let count: Int
+    let latestUpdatedAt: Date?
+}
+
 enum CaptureHistoryQuery {
     static func descriptor(limit: Int) -> FetchDescriptor<CaptureRecord> {
         let capturing = CaptureLifecycle.capturing.rawValue
@@ -10,5 +15,24 @@ enum CaptureHistoryQuery {
         )
         descriptor.fetchLimit = limit
         return descriptor
+    }
+
+    static func signature(in context: ModelContext) throws -> CaptureHistorySignature {
+        let capturing = CaptureLifecycle.capturing.rawValue
+        let base = FetchDescriptor<CaptureRecord>(
+            predicate: #Predicate { $0.lifecycleRawValue != capturing }
+        )
+        let count = try context.fetchCount(base)
+
+        var latest = FetchDescriptor<CaptureRecord>(
+            predicate: #Predicate { $0.lifecycleRawValue != capturing },
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        latest.fetchLimit = 1
+
+        return CaptureHistorySignature(
+            count: count,
+            latestUpdatedAt: try context.fetch(latest).first?.updatedAt
+        )
     }
 }
