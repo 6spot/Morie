@@ -52,7 +52,9 @@ struct OverviewMetricsSnapshot: Equatable {
 
 @MainActor
 struct OverviewView: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var preferences: AppPreferencesController
     @ObservedObject private var refinementModels: RefinementModelController
 
     @Environment(\.modelContext) private var modelContext
@@ -64,6 +66,8 @@ struct OverviewView: View {
         metricsSnapshot: Binding<OverviewMetricsSnapshot?>
     ) {
         self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _preferences = ObservedObject(wrappedValue: controller.preferences)
         _refinementModels = ObservedObject(
             wrappedValue: controller.refinementModels
         )
@@ -124,7 +128,7 @@ struct OverviewView: View {
             ) {
                 modelRow(
                     title: "语音识别",
-                    name: controller.speechBackend?.displayName ?? "正在准备…",
+                    name: runtime.speechBackend?.displayName ?? "正在准备…",
                     detail: speechDetail,
                     status: speechStatus
                 )
@@ -136,7 +140,7 @@ struct OverviewView: View {
                     name: refinementModels.modelName,
                     detail: refinementModels.modelDetail,
                     status: refinementModels.modelStatusTitle(
-                        inputRefinementEnabled: controller.inputRefinementEnabled
+                        inputRefinementEnabled: preferences.inputRefinementEnabled
                     )
                 )
             }
@@ -228,15 +232,15 @@ struct OverviewView: View {
     }
 
     private var speechDetail: String {
-        guard let backend = controller.speechBackend else {
+        guard let backend = runtime.speechBackend else {
             return "等待 Speech 资源准备完成"
         }
         return "\(backend.localeIdentifier) · Apple 本机"
     }
 
     private var speechStatus: String {
-        guard let backend = controller.speechBackend else {
-            return controller.isBootstrapping ? "准备中" : "未就绪"
+        guard let backend = runtime.speechBackend else {
+            return runtime.isBootstrapping ? "准备中" : "未就绪"
         }
         return backend.isFallback ? "回退" : "首选"
     }
