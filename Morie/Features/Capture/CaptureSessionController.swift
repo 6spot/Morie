@@ -674,7 +674,13 @@ final class CaptureSessionController {
     ) async {
         guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
 
-        let result = initialResult ?? await speech.stopImmediately(sessionID: sessionID)
+        let result: SpeechPipeline.Result?
+        if let initialResult {
+            result = initialResult
+        } else {
+            result = await speech.stopImmediately(sessionID: sessionID)
+        }
+
         do {
             guard let captureStore else {
                 throw SessionError.persistenceUnavailable("记录存储尚未初始化。")
