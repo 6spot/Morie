@@ -32,7 +32,7 @@ final class CaptureSessionController {
         let deliveryMode: CaptureDeliveryMode
         let locale: Locale
         let dictionaryWords: [String]
-        let applicationContext: ApplicationContextSnapshot?
+        let applicationContextRequest: ApplicationContextCaptureRequest?
         let inputRefinementEnabled: Bool
         let refinementConfiguration: RefinementConfiguration
         let correctionSuggestionsEnabled: Bool
@@ -52,6 +52,7 @@ final class CaptureSessionController {
     var soundFeedbackEnabled: Bool
 
     private let speech = SpeechPipeline()
+    private let applicationContextCollector = ApplicationContextCollector()
     private let soundFeedback = CaptureSoundFeedback()
     private let injector = TextInjector()
     private let hud = CaptureHUDController()
@@ -74,6 +75,8 @@ final class CaptureSessionController {
     private var captureShutdownTask: Task<Void, Never>?
     private var stoppingCaptureID: UUID?
     private var activeSourceAudioURL: URL?
+    private var applicationContextTask: Task<Void, Never>?
+    private var activeApplicationContext: ApplicationContextSnapshot?
     private var finishRequestedAt: ContinuousClock.Instant?
 
     init(
@@ -148,21 +151,32 @@ final class CaptureSessionController {
         guard !isActive, let captureStore else { return }
 
         let sessionID = UUID()
-        let applicationContext = deliveryMode == .currentApp
-            ? ApplicationContextCollector().capture()
+        let acceptedAt = Date()
+        let contextApplication = deliveryMode == .currentApp
+            ? NSWorkspace.shared.frontmostApplication
             : nil
+        let applicationContextRequest = contextApplication.map {
+            ApplicationContextCaptureRequest(
+                application: ApplicationIdentity(
+                    name: $0.localizedName,
+                    bundleIdentifier: $0.bundleIdentifier
+                ),
+                processIdentifier: Int32($0.processIdentifier),
+                capturedAt: acceptedAt
+            )
+        }
         let sessionContext = CaptureSessionContext(
             id: sessionID,
             deliveryMode: deliveryMode,
             locale: speechLocale,
             dictionaryWords: (try? dictionary?.speechHints()) ?? [],
-            applicationContext: applicationContext,
+            applicationContextRequest: applicationContextRequest,
             inputRefinementEnabled: inputRefinementEnabled,
             refinementConfiguration: refinementConfiguration,
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
             expressionLearningEnabled: expressionLearningEnabled,
             soundFeedbackEnabled: soundFeedbackEnabled,
-            acceptedAt: Date()
+            acceptedAt: acceptedAt
         )
         let sourceApplication: NSRunningApplication? = sessionContext.deliveryMode == .captureOnly ? .current : nil
 
@@ -205,24 +219,44 @@ final class CaptureSessionController {
             "Session",
             "Capture \(label(sessionID)) started; mode=\(sessionContext.deliveryMode.rawValue); deliveryTarget=currentKeyboardFocus; locale=\(sessionContext.locale.identifier); dictionaryHints=\(sessionContext.dictionaryWords.count); acceptedAt=\(sessionContext.acceptedAt.timeIntervalSince1970)"
         )
-        if sessionContext.deliveryMode == .currentApp {
-            if let context = sessionContext.applicationContext {
-                Diagnostics.record(
-                    "ApplicationContext",
-                    "Capture \(label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); focusedCharacters=\(context.focusedCharacterCount); nearbyCharacters=\(context.nearbyCharacterCount); rawContextPersisted=false"
-                )
-            } else {
-                Diagnostics.record(
-                    "ApplicationContext",
-                    "Capture \(label(sessionID)); snapshot unavailable; rawContextPersisted=false",
-                    level: .warning
-                )
-            }
-        }
+        beginApplicationContextCapture(for: sessionContext)
         Diagnostics.recordMemory("capture-start \(label(sessionID))")
 
         captureStartTask = Task { @MainActor [weak self] in
             await self?.startCapture(sessionID: sessionID)
+        }
+    }
+
+    private func beginApplicationContextCapture(
+        for sessionContext: CaptureSessionContext
+    ) {
+        guard let request = sessionContext.applicationContextRequest else {
+            return
+        }
+
+        applicationContextTask?.cancel()
+        activeApplicationContext = nil
+        let sessionID = sessionContext.id
+        applicationContextTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let context = await self.applicationContextCollector.capture(request)
+            guard !Task.isCancelled,
+                  self.activeCaptureID == sessionID,
+                  self.activeSessionContext?.id == sessionID
+            else {
+                return
+            }
+
+            self.activeApplicationContext = context
+            self.applicationContextTask = nil
+            let elapsedMilliseconds = max(
+                0,
+                Int(Date().timeIntervalSince(request.capturedAt) * 1_000)
+            )
+            Diagnostics.record(
+                "ApplicationContext",
+                "Capture \(self.label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); focusedCharacters=\(context.focusedCharacterCount); nearbyCharacters=\(context.nearbyCharacterCount); collectionMilliseconds=\(elapsedMilliseconds); rawContextPersisted=false"
+            )
         }
     }
 
@@ -856,6 +890,9 @@ final class CaptureSessionController {
     }
 
     private func resetSessionIdentity() {
+        applicationContextTask?.cancel()
+        applicationContextTask = nil
+        activeApplicationContext = nil
         activeCaptureID = nil
         activeSessionContext = nil
         activeSourceAudioURL = nil
