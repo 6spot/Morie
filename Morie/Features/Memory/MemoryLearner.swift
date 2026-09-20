@@ -33,22 +33,32 @@ enum MemoryLearner {
         }
         let data = try JSONEncoder().encode(input)
         let prompt = Prompt { String(decoding: data, as: UTF8.self) }
+
         do {
+            Diagnostics.recordMemory("memory-model-before-token-count")
             let promptTokens = try await model.tokenCount(for: prompt)
             let instructionTokens = try await model.tokenCount(for: instructions)
             let schemaTokens = try await model.tokenCount(for: GeneratedMemories.generationSchema)
             let responseBudget = 1_024
+            Diagnostics.recordMemory("memory-model-after-token-count")
             guard promptTokens + instructionTokens + schemaTokens + responseBudget + 128 <= model.contextSize else {
                 throw MemoryAnalysisFailure.textTooLong
             }
             try Task.checkCancellation()
-            let session = LanguageModelSession(model: model, instructions: instructions)
-            let response = try await session.respond(
-                to: prompt, generating: GeneratedMemories.self,
-                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: responseBudget)
+
+            let generated = try await generate(
+                model: model,
+                instructions: instructions,
+                prompt: prompt,
+                responseBudget: responseBudget
             )
+            // The helper owns LanguageModelSession. Reaching here proves the session
+            // and response objects have left their lexical scope even if the framework
+            // keeps process-wide model pages cached.
+            Diagnostics.recordMemory("memory-model-session-scope-exited")
             try Task.checkCancellation()
-            return response.content.observations.compactMap { value in
+
+            let suggestions = generated.observations.compactMap { value in
                 guard let kind = MemoryKind(rawValue: value.kind.rawValue),
                       let evidenceKind = MemoryEvidenceKind(rawValue: value.evidenceKind.rawValue) else { return nil }
                 // An invalid supplied ID must not silently become a new memory.
@@ -60,8 +70,14 @@ enum MemoryLearner {
                     action: value.action == .update ? .update : .remember, existingMemoryID: existingID
                 )
             }
+            Diagnostics.recordMemory("memory-model-decoded")
+            return suggestions
         } catch {
-            if Task.isCancelled || error is CancellationError { throw CancellationError() }
+            if Task.isCancelled || error is CancellationError {
+                Diagnostics.recordMemory("memory-model-cancelled")
+                throw CancellationError()
+            }
+            Diagnostics.recordMemory("memory-model-failed")
             if let error = error as? MemoryAnalysisFailure { throw error }
             switch error {
             case LanguageModelError.contextSizeExceeded: throw MemoryAnalysisFailure.textTooLong
@@ -70,6 +86,24 @@ enum MemoryLearner {
             default: throw MemoryAnalysisFailure.generationFailed
             }
         }
+    }
+
+    private static func generate(
+        model: SystemLanguageModel,
+        instructions: Instructions,
+        prompt: Prompt,
+        responseBudget: Int
+    ) async throws -> GeneratedMemories {
+        Diagnostics.recordMemory("memory-model-before-session")
+        let session = LanguageModelSession(model: model, instructions: instructions)
+        Diagnostics.recordMemory("memory-model-session-created")
+        let response = try await session.respond(
+            to: prompt, generating: GeneratedMemories.self,
+            options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: responseBudget)
+        )
+        Diagnostics.recordMemory("memory-model-respond-finished")
+        try Task.checkCancellation()
+        return response.content
     }
 }
 
