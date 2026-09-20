@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @main
@@ -219,8 +220,105 @@ private struct MorieMenuContent: View {
 }
 
 @MainActor
+private final class ControlCenterSettingsState: ObservableObject {
+    @Published private(set) var inputRefinementEnabled: Bool
+    @Published private(set) var personalMemoryEnabled: Bool
+    @Published private(set) var correctionSuggestionsEnabled: Bool
+    @Published private(set) var expressionLearningEnabled: Bool
+    @Published private(set) var soundFeedbackEnabled: Bool
+    @Published private(set) var iCloudSyncEnabled: Bool
+    @Published private(set) var iCloudSyncState: ICloudSyncState
+    @Published private(set) var captureShortcut: CaptureShortcut
+    @Published private(set) var audioRetentionDays: Int
+
+    private let controller: AppController
+    private var cancellables = Set<AnyCancellable>()
+
+    init(controller: AppController) {
+        self.controller = controller
+        _settingsState = StateObject(
+            wrappedValue: ControlCenterSettingsState(controller: controller)
+        )
+        inputRefinementEnabled = controller.inputRefinementEnabled
+        personalMemoryEnabled = controller.personalMemoryEnabled
+        correctionSuggestionsEnabled = controller.correctionSuggestionsEnabled
+        expressionLearningEnabled = controller.expressionLearningEnabled
+        soundFeedbackEnabled = controller.soundFeedbackEnabled
+        iCloudSyncEnabled = controller.iCloudSyncEnabled
+        iCloudSyncState = controller.iCloudSyncState
+        captureShortcut = controller.captureShortcut
+        audioRetentionDays = controller.audioRetentionDays
+
+        controller.$inputRefinementEnabled
+            .sink { [weak self] in self?.inputRefinementEnabled = $0 }
+            .store(in: &cancellables)
+        controller.$personalMemoryEnabled
+            .sink { [weak self] in self?.personalMemoryEnabled = $0 }
+            .store(in: &cancellables)
+        controller.$correctionSuggestionsEnabled
+            .sink { [weak self] in self?.correctionSuggestionsEnabled = $0 }
+            .store(in: &cancellables)
+        controller.$expressionLearningEnabled
+            .sink { [weak self] in self?.expressionLearningEnabled = $0 }
+            .store(in: &cancellables)
+        controller.$soundFeedbackEnabled
+            .sink { [weak self] in self?.soundFeedbackEnabled = $0 }
+            .store(in: &cancellables)
+        controller.$iCloudSyncEnabled
+            .sink { [weak self] in self?.iCloudSyncEnabled = $0 }
+            .store(in: &cancellables)
+        controller.$iCloudSyncState
+            .sink { [weak self] in self?.iCloudSyncState = $0 }
+            .store(in: &cancellables)
+        controller.$captureShortcut
+            .sink { [weak self] in self?.captureShortcut = $0 }
+            .store(in: &cancellables)
+        controller.$audioRetentionDays
+            .sink { [weak self] in self?.audioRetentionDays = $0 }
+            .store(in: &cancellables)
+    }
+
+    func setInputRefinementEnabled(_ enabled: Bool) {
+        controller.setInputRefinementEnabled(enabled)
+    }
+
+    func setPersonalMemoryEnabled(_ enabled: Bool) {
+        controller.setPersonalMemoryEnabled(enabled)
+    }
+
+    func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
+        controller.setCorrectionSuggestionsEnabled(enabled)
+    }
+
+    func setExpressionLearningEnabled(_ enabled: Bool) {
+        controller.setExpressionLearningEnabled(enabled)
+    }
+
+    func setSoundFeedbackEnabled(_ enabled: Bool) {
+        controller.setSoundFeedbackEnabled(enabled)
+    }
+
+    func setICloudSyncEnabled(_ enabled: Bool) {
+        controller.setICloudSyncEnabled(enabled)
+    }
+
+    func refreshICloudSyncState() {
+        settingsState.refreshICloudSyncState()
+    }
+
+    func setCaptureShortcut(_ shortcut: CaptureShortcut) {
+        controller.setCaptureShortcut(shortcut)
+    }
+
+    func setAudioRetentionDays(_ days: Int) {
+        controller.setAudioRetentionDays(days)
+    }
+}
+
+@MainActor
 struct MorieSettingsView: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @StateObject private var settingsState: ControlCenterSettingsState
     @ObservedObject private var refinementModels: RefinementModelController
     @ObservedObject private var refinementPrompts: RefinementPromptController
 
@@ -259,8 +357,8 @@ struct MorieSettingsView: View {
                 Toggle(
                     "自动润色语音输入",
                     isOn: Binding(
-                        get: { controller.inputRefinementEnabled },
-                        set: { controller.setInputRefinementEnabled($0) }
+                        get: { settingsState.inputRefinementEnabled },
+                        set: { settingsState.setInputRefinementEnabled($0) }
                     )
                 )
 
@@ -294,8 +392,8 @@ struct MorieSettingsView: View {
                 Toggle(
                     "使用个人记忆",
                     isOn: Binding(
-                        get: { controller.personalMemoryEnabled },
-                        set: { controller.setPersonalMemoryEnabled($0) }
+                        get: { settingsState.personalMemoryEnabled },
+                        set: { settingsState.setPersonalMemoryEnabled($0) }
                     )
                 )
 
@@ -413,9 +511,9 @@ struct MorieSettingsView: View {
                 Toggle(
                     "修改输入后建议加入字典",
                     isOn: Binding(
-                        get: { controller.correctionSuggestionsEnabled },
+                        get: { settingsState.correctionSuggestionsEnabled },
                         set: {
-                            controller.setCorrectionSuggestionsEnabled($0)
+                            settingsState.setCorrectionSuggestionsEnabled($0)
                         }
                     )
                 )
@@ -431,8 +529,8 @@ struct MorieSettingsView: View {
                 Toggle(
                     "学习我的表达习惯",
                     isOn: Binding(
-                        get: { controller.expressionLearningEnabled },
-                        set: { controller.setExpressionLearningEnabled($0) }
+                        get: { settingsState.expressionLearningEnabled },
+                        set: { settingsState.setExpressionLearningEnabled($0) }
                     )
                 )
 
@@ -454,11 +552,11 @@ struct MorieSettingsView: View {
                 Toggle(
                     "使用 iCloud 同步与备份",
                     isOn: Binding(
-                        get: { controller.iCloudSyncEnabled },
-                        set: { controller.setICloudSyncEnabled($0) }
+                        get: { settingsState.iCloudSyncEnabled },
+                        set: { settingsState.setICloudSyncEnabled($0) }
                     )
                 )
-                .disabled(controller.iCloudSyncState.isChecking)
+                .disabled(settingsState.iCloudSyncState.isChecking)
 
                 Text(
                     "同步历史文字、字典、个人记忆和表达习惯到你的 iCloud 私有数据库。原始录音仍只保存在这台 Mac 上。"
@@ -468,14 +566,14 @@ struct MorieSettingsView: View {
 
                 LabeledContent(
                     "状态",
-                    value: controller.iCloudSyncState.detail
+                    value: settingsState.iCloudSyncState.detail
                 )
 
-                if controller.iCloudSyncEnabled {
+                if settingsState.iCloudSyncEnabled {
                     Button("重新检查 iCloud") {
-                        controller.refreshICloudSyncState()
+                        settingsState.refreshICloudSyncState()
                     }
-                    .disabled(controller.iCloudSyncState.isChecking)
+                    .disabled(settingsState.iCloudSyncState.isChecking)
                 }
             }
 
@@ -483,8 +581,8 @@ struct MorieSettingsView: View {
                 Toggle(
                     "录音开始和结束提示音",
                     isOn: Binding(
-                        get: { controller.soundFeedbackEnabled },
-                        set: { controller.setSoundFeedbackEnabled($0) }
+                        get: { settingsState.soundFeedbackEnabled },
+                        set: { settingsState.setSoundFeedbackEnabled($0) }
                     )
                 )
 
@@ -499,8 +597,8 @@ struct MorieSettingsView: View {
                 Picker(
                     "开始或结束录音",
                     selection: Binding(
-                        get: { controller.captureShortcut },
-                        set: { controller.setCaptureShortcut($0) }
+                        get: { settingsState.captureShortcut },
+                        set: { settingsState.setCaptureShortcut($0) }
                     )
                 ) {
                     ForEach(CaptureShortcut.allCases) { shortcut in
@@ -519,10 +617,10 @@ struct MorieSettingsView: View {
 
             ControlCenterGroup("原始录音") {
                 Stepper(
-                    "录音保留 \(controller.audioRetentionDays) 天",
+                    "录音保留 \(settingsState.audioRetentionDays) 天",
                     value: Binding(
-                        get: { controller.audioRetentionDays },
-                        set: { controller.setAudioRetentionDays($0) }
+                        get: { settingsState.audioRetentionDays },
+                        set: { settingsState.setAudioRetentionDays($0) }
                     ),
                     in: 1...365
                 )
