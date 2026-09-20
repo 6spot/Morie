@@ -545,7 +545,8 @@ final class MemoryStore: ObservableObject {
     ) -> MemorySuggestion? {
         guard suggestion.confidence.isFinite,
               (0.75...1).contains(suggestion.confidence),
-              let draft = try? validated(suggestion.draft)
+              let draft = try? validated(suggestion.draft),
+              !looksMachineGeneratedMemoryName(draft.name)
         else { return nil }
 
         let evidence = suggestion.evidence
@@ -558,6 +559,22 @@ final class MemoryStore: ObservableObject {
         var accepted = suggestion
         accepted.draft = draft
         return accepted
+    }
+
+    private func looksMachineGeneratedMemoryName(_ name: String) -> Bool {
+        let value = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.contains("_") else { return false }
+
+        let parts = value.split(separator: "_", omittingEmptySubsequences: false)
+        guard parts.count >= 2,
+              parts.allSatisfy({ part in
+                  !part.isEmpty && part.unicodeScalars.allSatisfy {
+                      CharacterSet.alphanumerics.contains($0)
+                  }
+              })
+        else { return false }
+
+        return true
     }
 
     func memory(_ id: UUID) throws -> MemoryRecord {
