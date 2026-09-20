@@ -192,6 +192,10 @@ struct AppBuildIdentity: Equatable {
     let build: String
     let commit: String
     let branch: String?
+    let configuration: String
+    let sdk: String
+    let archs: String
+    let xcodeVersion: String
     let isDirty: Bool
 
     static let current = AppBuildIdentity(bundle: .main)
@@ -216,6 +220,10 @@ struct AppBuildIdentity: Equatable {
         } else {
             branch = nil
         }
+        configuration = metadata["configuration"] as? String ?? "unknown"
+        sdk = metadata["sdk"] as? String ?? "unknown"
+        archs = metadata["archs"] as? String ?? "unknown"
+        xcodeVersion = metadata["xcodeVersion"] as? String ?? "unknown"
         isDirty = metadata["dirty"] as? Bool ?? false
     }
 
@@ -232,6 +240,7 @@ struct AppBuildIdentity: Equatable {
         if let branch {
             value += "; branch=\(branch)"
         }
+        value += "; configuration=\(configuration); sdk=\(sdk); archs=\(archs); xcode=\(xcodeVersion)"
         return value
     }
 
