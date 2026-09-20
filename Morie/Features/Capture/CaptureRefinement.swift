@@ -204,11 +204,13 @@ private enum RefinementOutputGuard {
         let sourceFacts = protectedFacts(in: source, knownTerms: knownTerms)
         let outputFacts = protectedFacts(in: output, knownTerms: knownTerms)
 
-        if hasExplicitCorrectionSignal(source) {
-            // A correction such as "15，不，16个" may legitimately drop the
-            // superseded fact, but it still has to retain at least one factual
-            // anchor from the spoken source.
-            if !sourceFacts.isEmpty && sourceFacts.isDisjoint(with: outputFacts) {
+        if let finalSegment = finalCorrectionSegment(source) {
+            // A correction such as "15，不，16个" may drop the superseded fact,
+            // but the final spoken replacement is still authoritative.
+            let finalFacts = protectedFacts(in: finalSegment, knownTerms: knownTerms)
+            if !finalFacts.isEmpty {
+                if !finalFacts.isSubset(of: outputFacts) { return false }
+            } else if !sourceFacts.isEmpty && sourceFacts.isDisjoint(with: outputFacts) {
                 return false
             }
         } else if !sourceFacts.isSubset(of: outputFacts) {
@@ -317,12 +319,40 @@ private enum RefinementOutputGuard {
     }
 
     private static func hasExplicitCorrectionSignal(_ text: String) -> Bool {
+        finalCorrectionSegment(text) != nil
+    }
+
+    private static func finalCorrectionSegment(_ text: String) -> String? {
+        var starts: [String.Index] = []
         let phrases = [
-            "不对", "不是", "改成", "应该是", "准确说", "更正", "哦不",
-            "i mean", "sorry, no", "rather",
+            "不对", "改成", "应该是", "准确说", "更正", "哦不",
+            "算了我重新说", "重新说", "i mean", "sorry, no", "rather",
         ]
-        if phrases.contains(where: { containsPhrase(text, $0) }) { return true }
-        return !regexMatches(#"[，,]\s*不\s*[，,]"#, in: text).isEmpty
+        for phrase in phrases {
+            if let range = text.range(
+                of: phrase,
+                options: [.backwards, .caseInsensitive, .diacriticInsensitive]
+            ) {
+                starts.append(range.upperBound)
+            }
+        }
+
+        let correctionPatterns = [
+            #"[，,]\s*不\s*[，,]"#,
+            #"不是.{1,24}?[，,]\s*是"#,
+        ]
+        for pattern in correctionPatterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            let fullRange = NSRange(text.startIndex..<text.endIndex, in: text)
+            guard let match = regex.matches(in: text, range: fullRange).last,
+                  let range = Range(match.range, in: text)
+            else { continue }
+            starts.append(range.upperBound)
+        }
+
+        guard let start = starts.max() else { return nil }
+        let tail = text[start...].trimmingCharacters(in: .whitespacesAndNewlines)
+        return tail.isEmpty ? nil : tail
     }
 
     private static func trimmingLeadingFillers(_ text: String) -> String {
@@ -342,6 +372,9 @@ private enum RefinementOutputGuard {
 
     private static func startsWithPhrase(_ text: String, _ phrase: String) -> Bool {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isASCII = phrase.unicodeScalars.allSatisfy { $0.value < 128 }
+        if !isASCII { return value.hasPrefix(phrase) }
+
         let escaped = NSRegularExpression.escapedPattern(for: phrase)
         let pattern = #"(?i)^"# + escaped + #"(?![A-Za-z0-9_])"#
         return !regexMatches(pattern, in: value).isEmpty
