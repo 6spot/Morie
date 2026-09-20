@@ -52,8 +52,7 @@ struct OverviewMetricsSnapshot: Equatable {
 
 @MainActor
 struct OverviewView: View {
-    let controller: AppController
-    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var preferences: AppPreferencesController
     @ObservedObject private var refinementModels: RefinementModelController
 
@@ -65,8 +64,9 @@ struct OverviewView: View {
         controller: AppController,
         metricsSnapshot: Binding<OverviewMetricsSnapshot?>
     ) {
-        self.controller = controller
-        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
         _preferences = ObservedObject(wrappedValue: controller.preferences)
         _refinementModels = ObservedObject(
             wrappedValue: controller.refinementModels
@@ -128,7 +128,7 @@ struct OverviewView: View {
             ) {
                 modelRow(
                     title: "语音识别",
-                    name: runtime.speechBackend?.displayName ?? "正在准备…",
+                    name: capabilities.speechBackend?.displayName ?? "正在准备…",
                     detail: speechDetail,
                     status: speechStatus
                 )
@@ -232,15 +232,15 @@ struct OverviewView: View {
     }
 
     private var speechDetail: String {
-        guard let backend = runtime.speechBackend else {
+        guard let backend = capabilities.speechBackend else {
             return "等待 Speech 资源准备完成"
         }
         return "\(backend.localeIdentifier) · Apple 本机"
     }
 
     private var speechStatus: String {
-        guard let backend = runtime.speechBackend else {
-            return runtime.isBootstrapping ? "准备中" : "未就绪"
+        guard let backend = capabilities.speechBackend else {
+            return capabilities.isBootstrapping ? "准备中" : "未就绪"
         }
         return backend.isFallback ? "回退" : "首选"
     }
