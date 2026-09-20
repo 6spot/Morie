@@ -70,7 +70,7 @@ struct MemoryView: View {
             }
         }
         .navigationTitle("个人记忆")
-        .navigationSubtitle("(visibleEntries.count) 条")
+        .navigationSubtitle("\\(visibleEntries.count) 条")
         .searchable(text: $search, prompt: "搜索个人记忆")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -370,9 +370,9 @@ enum MemoryEditorMode: Identifiable {
         case .create:
             "create"
         case .edit(let id):
-            "edit-(id)"
+            "edit-\\(id)"
         case .replace(let id):
-            "replace-(id)"
+            "replace-\\(id)"
         }
     }
 
