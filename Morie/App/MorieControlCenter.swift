@@ -1,57 +1,19 @@
 import SwiftUI
 
 enum ControlCenterMetrics {
-    static let sidebarMinWidth: CGFloat = 180
-    static let sidebarIdealWidth: CGFloat = 220
+    static let sidebarMinWidth: CGFloat = 190
+    static let sidebarIdealWidth: CGFloat = 224
     static let sidebarMaxWidth: CGFloat = 260
 
-    // This is the only outer content inset used by routed Control Center pages.
-    // Feature pages must not add their own top-level padding/contentMargins.
-    static let pageInset: CGFloat = 24
-    static let sectionSpacing: CGFloat = 24
+    // Standard routed pages use the system grouped Form geometry.
+    // Only nested reading panes use an explicit inset.
+    static let readingInset: CGFloat = 20
     static let readingMaxWidth: CGFloat = 760
 }
 
 enum ControlCenterPageKind {
     case standard
     case workspace
-}
-
-struct ControlCenterGroup<Content: View>: View {
-    let title: String
-    let footer: String?
-    private let content: Content
-
-    init(
-        _ title: String,
-        footer: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.footer = footer
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    content
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if let footer {
-                Text(footer)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 }
 
 struct ControlCenterReadingContent<Content: View>: View {
@@ -74,12 +36,12 @@ struct ControlCenterReadingContent<Content: View>: View {
         }
         .contentMargins(
             .horizontal,
-            ControlCenterMetrics.pageInset,
+            ControlCenterMetrics.readingInset,
             for: .scrollContent
         )
         .contentMargins(
             .vertical,
-            ControlCenterMetrics.pageInset,
+            ControlCenterMetrics.readingInset,
             for: .scrollContent
         )
     }
@@ -223,25 +185,14 @@ private struct ControlCenterRouteHost: View {
     var body: some View {
         switch section.pageKind {
         case .standard:
-            ScrollView {
+            Form {
                 routedPage
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .contentMargins(
-                .horizontal,
-                ControlCenterMetrics.pageInset,
-                for: .scrollContent
-            )
-            .contentMargins(
-                .vertical,
-                ControlCenterMetrics.pageInset,
-                for: .scrollContent
-            )
+            .formStyle(.grouped)
 
         case .workspace:
             routedPage
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(ControlCenterMetrics.pageInset)
         }
     }
 
