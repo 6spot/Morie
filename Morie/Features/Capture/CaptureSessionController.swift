@@ -77,6 +77,7 @@ final class CaptureSessionController {
     private var activeSourceAudioURL: URL?
     private var applicationContextTask: Task<Void, Never>?
     private var activeApplicationContext: ApplicationContextSnapshot?
+    private var activeApplicationContextWords: [String] = []
     private var finishRequestedAt: ContinuousClock.Instant?
 
     init(
@@ -372,11 +373,31 @@ final class CaptureSessionController {
                 throw SessionError.persistenceUnavailable("原始录音存储尚未初始化。")
             }
 
+            if let contextTask = applicationContextTask {
+                await contextTask.value
+            }
+            try Task.checkCancellation()
+            guard activeCaptureID == sessionID,
+                  activeSessionContext?.id == sessionID
+            else {
+                throw CancellationError()
+            }
+
+            let applicationContextWords = activeApplicationContext.map {
+                ApplicationContextVocabulary.extract(from: $0)
+            } ?? []
+            activeApplicationContextWords = applicationContextWords
+            Diagnostics.record(
+                "ApplicationContextVocabulary",
+                "Capture \(label(sessionID)); extractedHints=\(applicationContextWords.count); rawTermsLogged=false"
+            )
+
             try await speech.start(
                 sessionID: sessionID,
                 locale: sessionContext.locale,
                 sourceAudioURL: sourceAudioURL,
                 dictionaryWords: sessionContext.dictionaryWords,
+                applicationContextWords: applicationContextWords,
                 onTranscript: { [weak self] resultSessionID, text in
                     Task { @MainActor in
                         guard let self,
@@ -490,7 +511,8 @@ final class CaptureSessionController {
                     accurateTranscript = try await CaptureFileTranscriber.recognize(
                         result.sourceAudio.url,
                         locale: sessionContext.locale,
-                        dictionaryWords: sessionContext.dictionaryWords
+                        dictionaryWords: sessionContext.dictionaryWords,
+                        applicationContextWords: activeApplicationContextWords
                     )
                     Diagnostics.record(
                         "SpeechQuality",
@@ -893,6 +915,7 @@ final class CaptureSessionController {
         applicationContextTask?.cancel()
         applicationContextTask = nil
         activeApplicationContext = nil
+        activeApplicationContextWords = []
         activeCaptureID = nil
         activeSessionContext = nil
         activeSourceAudioURL = nil
