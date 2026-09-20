@@ -87,8 +87,10 @@ struct OverviewView: View {
             usageSection
             Divider()
             modelSection
-            Divider()
-            applicationContextSection
+            if DevelopmentDiagnostics.isEnabled {
+                Divider()
+                applicationContextSection
+            }
         }
         .frame(maxWidth: 820, alignment: .topLeading)
         .navigationTitle("总览")
