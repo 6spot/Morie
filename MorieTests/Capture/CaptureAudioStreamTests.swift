@@ -283,7 +283,7 @@ final class CaptureAudioStreamTests: XCTestCase {
     }
 
     private func makeSpeechLikeAudio(
-        frames: AVAudioFrameCount = 8_000
+        frames: AVAudioFrameCount = 16_000
     ) throws -> AVAudioPCMBuffer {
         let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
