@@ -15,7 +15,7 @@ private enum ControlCenterPageLayout {
     case workspace
 }
 
-struct ControlCenterPageHost<Content: View>: View {
+private struct ControlCenterPageHost<Content: View>: View {
     let layout: ControlCenterPageLayout
     private let content: Content
 
