@@ -16,6 +16,8 @@
 		A50000000000000000000003 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000002 /* FoundationModelsUtilities */; };
 		A10000000000000000000001 /* MorieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* MorieApp.swift */; };
 		A10000000000000000000002 /* AppController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* AppController.swift */; };
+		A70000000000000000000001 /* AppRuntimeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000001 /* AppRuntimeController.swift */; };
+		A70000000000000000000002 /* AppPreferencesController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000002 /* AppPreferencesController.swift */; };
 		A10000000000000000000003 /* CapabilityGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* CapabilityGate.swift */; };
 		A10000000000000000000004 /* SpeechPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* SpeechPipeline.swift */; };
 		A10000000000000000000005 /* PushToTalkHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* PushToTalkHotkey.swift */; };
@@ -100,6 +102,8 @@
 		B60000000000000000000002 /* DefaultRefinementInstructions.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = DefaultRefinementInstructions.txt; sourceTree = "<group>"; };
 		B10000000000000000000001 /* MorieApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieApp.swift; sourceTree = "<group>"; };
 		B10000000000000000000002 /* AppController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppController.swift; sourceTree = "<group>"; };
+		B70000000000000000000001 /* AppRuntimeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRuntimeController.swift; sourceTree = "<group>"; };
+		B70000000000000000000002 /* AppPreferencesController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferencesController.swift; sourceTree = "<group>"; };
 		B10000000000000000000003 /* CapabilityGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilityGate.swift; sourceTree = "<group>"; };
 		B10000000000000000000004 /* SpeechPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechPipeline.swift; sourceTree = "<group>"; };
 		B10000000000000000000005 /* PushToTalkHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushToTalkHotkey.swift; sourceTree = "<group>"; };
@@ -204,6 +208,8 @@
 			children = (
 				B10000000000000000000001 /* MorieApp.swift */,
 				B10000000000000000000002 /* AppController.swift */,
+				B70000000000000000000001 /* AppRuntimeController.swift */,
+				B70000000000000000000002 /* AppPreferencesController.swift */,
 				B10000000000000000000013 /* MorieControlCenter.swift */,
 			);
 			path = App;
@@ -557,6 +563,8 @@
 				A10000000000000000000021 /* MorieSetupView.swift in Sources */,
 				A10000000000000000000001 /* MorieApp.swift in Sources */,
 				A10000000000000000000002 /* AppController.swift in Sources */,
+				A70000000000000000000001 /* AppRuntimeController.swift in Sources */,
+				A70000000000000000000002 /* AppPreferencesController.swift in Sources */,
 				A10000000000000000000003 /* CapabilityGate.swift in Sources */,
 				A10000000000000000000004 /* SpeechPipeline.swift in Sources */,
 				A10000000000000000000005 /* PushToTalkHotkey.swift in Sources */,
