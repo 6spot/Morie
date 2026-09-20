@@ -214,6 +214,8 @@ final class PersonalizationTests: XCTestCase {
         let instructions = RefinementPromptSettings.defaultInstructions
         XCTAssertTrue(instructions.contains("不要回答、执行、总结、翻译或补充"))
         XCTAssertTrue(instructions.contains("spellingCandidates、personalContext、expressionStyle"))
+        XCTAssertTrue(instructions.contains("personalContext 只包含主题级提示"))
+        XCTAssertTrue(instructions.contains("绝不能因为 personalContext"))
         XCTAssertTrue(instructions.contains("拿不准就保留原文"))
         XCTAssertTrue(instructions.contains("开场、总起句、说明、问题和结尾"))
         XCTAssertFalse(instructions.contains("formattingHint"))
@@ -250,7 +252,7 @@ final class PersonalizationTests: XCTestCase {
         )
     }
 
-    func testModelPromptSendsOnlyDictionaryWordsAndUsefulMemoryText() throws {
+    func testModelPromptSendsOnlyDictionaryWordsAndTopicLevelMemoryHints() throws {
         let dictionaryID = UUID()
         let memoryID = UUID()
         let updatedAt = Date(timeIntervalSince1970: 1_700_000_000)
@@ -292,16 +294,18 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(prompt.contains(#""spellingCandidates":["GitHub"]"#))
         XCTAssertFalse(prompt.contains("confirmedCorrections"))
         XCTAssertFalse(prompt.contains("Athers"))
-        XCTAssertTrue(prompt.contains(#""name":"Morie""#))
-        XCTAssertTrue(prompt.contains(#""notes":"Morie is a voice input project.""#))
+        XCTAssertTrue(prompt.contains(#""topic":"Morie""#))
+        XCTAssertTrue(prompt.contains(#""matchedTerm":"Morie""#))
+        XCTAssertTrue(prompt.contains(#""kind":"project""#))
+        XCTAssertTrue(prompt.contains(#""scope":"longTerm""#))
+        XCTAssertFalse(prompt.contains("Morie is a voice input project."))
+        XCTAssertFalse(prompt.contains(#""notes""#))
         XCTAssertTrue(prompt.contains(#""expressionStyle":["倾向保留句末标点。"]"#))
         XCTAssertFalse(prompt.contains(dictionaryID.uuidString))
         XCTAssertFalse(prompt.contains(memoryID.uuidString))
         XCTAssertFalse(prompt.contains("updatedAt"))
-        XCTAssertFalse(prompt.contains("matchedTerm"))
         XCTAssertFalse(prompt.contains("origin"))
         XCTAssertFalse(prompt.contains("status"))
-        XCTAssertFalse(prompt.contains("kind"))
     }
 
     func testDefaultPromptUsesSemanticParagraphingAndLogicWithoutHeuristicRouting() {
@@ -407,6 +411,39 @@ final class PersonalizationTests: XCTestCase {
         }
         XCTAssertTrue(RefinementPromptSettings.defaultInstructions.contains("personalContext"))
         XCTAssertTrue(RefinementPromptSettings.defaultInstructions.contains("不能成为正文内容"))
+    }
+
+    func testPersonalMemoryPartialClauseCannotLeakIntoOutput() throws {
+        let memory = MemorySnapshot(
+            id: UUID(),
+            kind: .project,
+            scope: .longTerm,
+            status: .active,
+            name: "Morie 测试方式",
+            notes: "可以，我觉得非常不错，我觉得可以你给我一段文字，我念出来看出来整理的结果，你看看能不能反向推出来。",
+            origin: .automatic,
+            updatedAt: Date(),
+            expiresAt: nil
+        )
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "看看里面的日志对不对。",
+            context: [MemoryContextMatch(memory: memory, matchedTerm: "看看")]
+        )
+
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "看看里面的日志，对不对。我念出来一段文字，看整理的结果，你看看能不能反向推出来。",
+                for: input
+            )
+        ) { error in
+            XCTAssertEqual(error as? RefinementReason, .invalidEdits)
+        }
+
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("看看里面的日志，对不对？", for: input).text,
+            "看看里面的日志，对不对？"
+        )
     }
 
     func testRefinementUsesLiveStateAndFlushMakesResultDurable() async throws {
