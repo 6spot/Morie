@@ -83,9 +83,10 @@ No Type4Me source or external dependency is copied.
   including the new HUD lifecycle regression (0 failures, 0 skipped).
 - 2026-09-19: isolated unsigned macOS 27 Debug app build succeeded.
 - `git diff --check` passed.
-- 2026-09-20 model-memory diagnostics branch: macOS/Xcode CI pending; owner-device
-  reproduction is still required to identify whether the retained ~200–250 MB
-  is malloc heap, model-session lifetime, or framework-level VM/cache.
+- 2026-09-20 PR #68 macOS 27 CI passed: Xcode compile succeeded and
+  MorieTests executed **142 tests** with 0 failures. Owner-device reproduction
+  is still required to identify whether the retained ~200–250 MB is malloc heap,
+  model-session lifetime, or framework-level VM/cache.
 - Event-driven/data-query changes require the branch CI and updated logic tests
   before merge; real-device behavior remains a separate acceptance gate.
 - Real-device idle CPU, Energy Impact and RSS measurements: pending.
