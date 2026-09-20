@@ -35,10 +35,20 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 @MainActor
 struct CaptureHistoryWorkspace: View {
     let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
     @Binding var selection: UUID?
 
     @State private var search = ""
     @State private var filter: CaptureHistoryFilter = .all
+
+    init(
+        controller: AppController,
+        selection: Binding<UUID?>
+    ) {
+        self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _selection = selection
+    }
 
     var body: some View {
         Group {
@@ -205,9 +215,21 @@ struct CaptureHistoryView: View {
 
 @MainActor
 private struct CaptureHistoryDetailPane: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
     @ObservedObject var history: CaptureHistoryController
     let selectedCaptureID: UUID?
+
+    init(
+        controller: AppController,
+        history: CaptureHistoryController,
+        selectedCaptureID: UUID?
+    ) {
+        self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        self.history = history
+        self.selectedCaptureID = selectedCaptureID
+    }
 
     private var capture: CaptureRecord? {
         guard let selectedCaptureID else { return nil }
