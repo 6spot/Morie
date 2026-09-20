@@ -116,7 +116,7 @@ Permission check/authorization state and bootstrap preparation feedback remain d
 
 ## Management window
 
-M-008/M-010/M-013 use one native navigation language. The sidebar groups **资料库** (历史记录, 字典, 个人记忆) and **应用** (设置, 权限, 诊断). History and Personal Memory show list and detail in three columns. Dictionary, Settings, Permissions and Diagnostics use one full-width detail beside the sidebar; Dictionary edits the selected word from its list toolbar or context menu instead of opening a third column. Both split configurations share visibility state so switching sections preserves the sidebar preference. The default management window is 1120 × 720; the minimum is 960 × 600. System split dividers control resizing.
+M-008/M-010/M-013 use one native navigation language. The sidebar groups **资料库** (历史记录, 字典, 个人记忆) and **应用** (设置, 权限, 诊断). History uses a full-height list/detail workspace inside the single right-side navigation host. Dictionary and Personal Memory are full-width collection/reading pages that push detail destinations only when needed. Settings and Permissions use grouped Forms; Diagnostics uses a full-width Table/detail workspace. All routes share the same persistent sidebar visibility state. The default management window is 1120 × 720; the minimum is 960 × 600. System split dividers control resizing.
 
 Lists use standard search, direct menu-style Pickers for single-dimension filters, system selection and meaningful empty states. Search/filter/deletion clear hidden selections. Reading a source or linked memory uses the selected detail's NavigationStack; selecting a different record resets that stack. Creation/recording and filter controls belong to the list toolbar; copy/edit and the secondary action menu belong to the detail toolbar.
 
