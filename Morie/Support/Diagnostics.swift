@@ -292,49 +292,14 @@ struct DiagnosticLogView: View {
                     )
                 }
             }
-            .frame(minHeight: 240)
+            .frame(minHeight: 260)
 
-            if let entry = visibleEntries.first(
-                where: { $0.id == selection }
-            ) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 12) {
-                            Label(
-                                entry.level.title,
-                                systemImage: entry.level.systemImage
-                            )
-                            .foregroundStyle(entry.level.color)
-
-                            Text(entry.category)
-
-                            Text(entry.timestamp, format: .dateTime)
-                                .foregroundStyle(.secondary)
-                        }
-                        .font(.caption)
-
-                        Text(entry.message)
-                            .font(.body.monospaced())
-                            .textSelection(.enabled)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .contentMargins(
-                    .horizontal,
-                    16,
-                    for: .scrollContent
-                )
-                .contentMargins(
-                    .vertical,
-                    16,
-                    for: .scrollContent
-                )
+            diagnosticDetail
                 .frame(
-                    minHeight: 120,
+                    minHeight: 130,
                     idealHeight: 180,
                     maxHeight: 260
                 )
-            }
         }
         .navigationTitle("诊断")
         .navigationSubtitle("\(visibleEntries.count) 条日志")
@@ -409,6 +374,46 @@ struct DiagnosticLogView: View {
             if let selection, !ids.contains(selection) {
                 self.selection = nil
             }
+        }
+    }
+
+    @ViewBuilder
+    private var diagnosticDetail: some View {
+        if let entry = visibleEntries.first(
+            where: { $0.id == selection }
+        ) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        Label(
+                            entry.level.title,
+                            systemImage: entry.level.systemImage
+                        )
+                        .foregroundStyle(entry.level.color)
+
+                        Text(entry.category)
+
+                        Spacer()
+
+                        Text(entry.timestamp, format: .dateTime)
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption)
+
+                    Text(entry.message)
+                        .font(.body.monospaced())
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .contentMargins(.vertical, 14, for: .scrollContent)
+        } else {
+            ContentUnavailableView(
+                "选择一条日志",
+                systemImage: "doc.text.magnifyingglass",
+                description: Text("查看完整的诊断信息。")
+            )
         }
     }
 }

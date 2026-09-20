@@ -49,31 +49,26 @@ struct DictionaryView: View {
     }
 
     var body: some View {
-        VStack(
-            alignment: .leading,
-            spacing: ControlCenterMetrics.sectionSpacing
-        ) {
+        Group {
             if let errorMessage {
-                Label(
-                    errorMessage,
-                    systemImage: "exclamationmark.triangle"
-                )
-                .foregroundStyle(.secondary)
+                Section {
+                    Label(
+                        errorMessage,
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .foregroundStyle(.secondary)
+                }
             }
 
             if search.isEmpty || !visibleUserEntries.isEmpty {
-                ControlCenterGroup(
-                    "用户添加",
-                    footer: "你添加或确认过的词语，可以编辑和删除。"
-                ) {
+                Section {
                     if visibleUserEntries.isEmpty {
-                        HStack {
-                            Text("还没有添加词语。")
-                                .foregroundStyle(.secondary)
-
-                            Spacer()
-
-                            Button("添加词语", systemImage: "plus", action: add)
+                        LabeledContent("自定义词语") {
+                            Button(
+                                "添加词语",
+                                systemImage: "plus",
+                                action: add
+                            )
                         }
                     } else {
                         LazyVGrid(
@@ -85,15 +80,19 @@ struct DictionaryView: View {
                                 userWord(entry)
                             }
                         }
+                        .padding(.vertical, 2)
                     }
+                } header: {
+                    Text("用户添加")
+                } footer: {
+                    Text(
+                        "你添加或确认过的词语，可以编辑和删除。"
+                    )
                 }
             }
 
             if !visibleBuiltInEntries.isEmpty {
-                ControlCenterGroup(
-                    "系统内置",
-                    footer: "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
-                ) {
+                Section {
                     LazyVGrid(
                         columns: columns,
                         alignment: .leading,
@@ -103,19 +102,28 @@ struct DictionaryView: View {
                             builtInWord(entry)
                         }
                     }
+                    .padding(.vertical, 2)
+                } header: {
+                    Text("系统内置")
+                } footer: {
+                    Text(
+                        "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
+                    )
                 }
             }
 
             if visibleCount == 0 && errorMessage == nil {
-                ContentUnavailableView {
-                    Label(
-                        "没有匹配的词语",
-                        systemImage: "character.book.closed"
-                    )
-                } description: {
-                    Text("试试其他搜索词。")
+                Section {
+                    ContentUnavailableView {
+                        Label(
+                            "没有匹配的词语",
+                            systemImage: "character.book.closed"
+                        )
+                    } description: {
+                        Text("试试其他搜索词。")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
             }
         }
         .navigationTitle("字典")
@@ -208,6 +216,8 @@ struct DictionaryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
         .help(entry.source.helpText)
         .contextMenu {
             Button("编辑") {

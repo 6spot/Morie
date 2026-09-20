@@ -75,38 +75,25 @@ struct OverviewView: View {
     }
 
     var body: some View {
-        VStack(
-            alignment: .leading,
-            spacing: ControlCenterMetrics.sectionSpacing
-        ) {
-            Text("查看 Morie 的本地使用情况和当前运行状态。")
-                .foregroundStyle(.secondary)
-
-            ControlCenterGroup(
-                "使用情况",
-                footer: "输入失败率只统计 Morie 是否成功将文字送入当前应用，不等同于语音识别错误率。"
-            ) {
+        Group {
+            Section {
                 if let metrics = metricsSnapshot?.metrics {
                     infoRow(
                         title: "累计识别字符",
                         value: metrics.recognizedCharacters.formatted()
                     )
-                    Divider()
                     infoRow(
                         title: "已完成记录",
                         value: metrics.totalCaptures.formatted()
                     )
-                    Divider()
                     infoRow(
                         title: "成功输入",
                         value: metrics.successfulInputs.formatted()
                     )
-                    Divider()
                     infoRow(
                         title: "输入失败率",
                         value: percent(metrics.failureRate)
                     )
-                    Divider()
                     infoRow(
                         title: "平均润色耗时",
                         value: duration(metrics.averageRefinementSeconds)
@@ -120,32 +107,44 @@ struct OverviewView: View {
                 } else {
                     ProgressView("正在读取使用统计…")
                 }
+            } header: {
+                Text("使用情况")
+            } footer: {
+                Text(
+                    "输入失败率只统计 Morie 是否成功将文字送入当前应用，不等同于语音识别错误率。"
+                )
             }
 
-            ControlCenterGroup(
-                "当前模型",
-                footer: "这里显示当前运行实例实际使用的后端；发生回退时会直接显示回退后的模型。"
-            ) {
+            Section {
                 modelRow(
                     title: "语音识别",
-                    name: capabilities.speechBackend?.displayName ?? "正在准备…",
+                    name:
+                        capabilities.speechBackend?.displayName
+                        ?? "正在准备…",
                     detail: speechDetail,
                     status: speechStatus
                 )
-
-                Divider()
 
                 modelRow(
                     title: "输入润色",
                     name: refinementModels.modelName,
                     detail: refinementModels.modelDetail,
-                    status: refinementModels.modelStatusTitle(
-                        inputRefinementEnabled: preferences.inputRefinementEnabled
-                    )
+                    status:
+                        refinementModels.modelStatusTitle(
+                            inputRefinementEnabled:
+                                preferences.inputRefinementEnabled
+                        )
+                )
+            } header: {
+                Text("当前模型")
+            } footer: {
+                Text(
+                    "这里显示当前运行实例实际使用的后端；发生回退时会直接显示回退后的模型。"
                 )
             }
         }
         .navigationTitle("总览")
+        .navigationSubtitle("本地使用情况与当前运行状态")
         .task {
             await refreshMetricsIfNeeded()
         }
