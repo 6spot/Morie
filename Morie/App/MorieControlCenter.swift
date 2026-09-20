@@ -98,7 +98,13 @@ struct MorieControlCenter: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ControlCenterSidebar(selection: $selection)
         } detail: {
-            detail
+            ControlCenterDetailHost(
+                controller: controller,
+                selection: $selection,
+                selectedCaptureID: $selectedCaptureID,
+                selectedDictionaryEntry: $selectedDictionaryEntry,
+                overviewMetricsSnapshot: $overviewMetricsSnapshot
+            )
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
@@ -107,39 +113,79 @@ struct MorieControlCenter: View {
         }
     }
 
-    @ViewBuilder
-    private var detail: some View {
-        switch selection ?? .overview {
-        case .overview:
-            OverviewView(
-                controller: controller,
-                metricsSnapshot: $overviewMetricsSnapshot
-            )
-        case .history:
-            CaptureHistoryWorkspace(
-                controller: controller,
-                selection: $selectedCaptureID
-            )
-        case .memory:
-            if let memory = controller.memory {
+
+
+@MainActor
+private struct ControlCenterDetailHost: View {
+    let controller: AppController
+    @Binding var selection: ControlCenterSection?
+    @Binding var selectedCaptureID: UUID?
+    @Binding var selectedDictionaryEntry: UUID?
+    @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
+
+    var body: some View {
+        Group {
+            switch selection ?? .overview {
+            case .overview:
                 NavigationStack {
-                    MemoryView(store: memory)
+                    OverviewView(
+                        controller: controller,
+                        metricsSnapshot: $overviewMetricsSnapshot
+                    )
+                }
+
+            case .history:
+                CaptureHistoryWorkspace(
+                    controller: controller,
+                    selection: $selectedCaptureID
+                )
+
+            case .memory:
+                NavigationStack {
+                    if let memory = controller.memory {
+                        MemoryView(store: memory)
+                    } else {
+                        unavailable("个人记忆不可用")
+                    }
+                }
+
+            case .dictionary:
+                NavigationStack {
+                    if let dictionary = controller.dictionary {
+                        DictionaryView(
+                            store: dictionary,
+                            selection: $selectedDictionaryEntry
+                        )
+                    } else {
+                        unavailable("字典不可用")
+                    }
+                }
+
+            case .settings:
+                NavigationStack {
+                    MorieSettingsView(controller: controller)
+                }
+
+            case .permissions:
+                NavigationStack {
+                    PermissionManagementView(controller: controller)
+                }
+
+            case .diagnostics:
+                NavigationStack {
+                    DiagnosticLogView()
                 }
             }
-        case .dictionary:
-            if let dictionary = controller.dictionary {
-                DictionaryView(
-                    store: dictionary,
-                    selection: $selectedDictionaryEntry
-                )
-            }
-        case .settings:
-            MorieSettingsView(controller: controller)
-        case .permissions:
-            PermissionManagementView(controller: controller)
-        case .diagnostics:
-            DiagnosticLogView()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func unavailable(_ title: String) -> some View {
+        ContentUnavailableView(
+            title,
+            systemImage: "exclamationmark.triangle",
+            description: Text("记录存储尚未初始化。")
+        )
     }
 }
 
@@ -196,7 +242,7 @@ private struct CaptureHistoryWorkspace: View {
                         selection: $selection
                     )
                 }
-                .frame(minWidth: 250, idealWidth: 300, maxWidth: 380)
+                .frame(minWidth: 240, idealWidth: 300, maxWidth: 340)
 
                 CaptureHistoryDetailPane(
                     controller: controller,
@@ -204,8 +250,9 @@ private struct CaptureHistoryWorkspace: View {
                     selectedCaptureID: selection
                 )
                 .id(selection)
-                .frame(minWidth: 420)
+                .frame(minWidth: 320, maxWidth: .infinity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onAppear {
                 history.setListVisible(true)
             }
