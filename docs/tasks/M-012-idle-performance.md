@@ -3,7 +3,7 @@
 - **Status:** IN PROGRESS
 - **Owner:** macOS input foundation
 - **Depends on:** M-002 capture HUD
-- **Current PR:** [#68](https://github.com/6spot/Morie/pull/68)
+- **Current PR:** [#80](https://github.com/6spot/Morie/pull/80)
 
 ## Goal
 
@@ -76,6 +76,15 @@ No Type4Me source or external dependency is copied.
   actually returns. The existing uncooperative-analysis regression continues to
   cover this cancellation path; this follow-up intentionally adds diagnostics
   without changing worker ownership semantics.
+- 2026-09-20 owner-device heap diagnostics showed Apple-local refinement and
+  automatic Memory learning staying essentially flat after their sessions
+  completed, while Capability inspections continued for hours with no Capture
+  or model work. The setup and permission-management views no longer refresh
+  the full Apple Intelligence/Speech capability gate on every
+  `NSApplication.didBecomeActiveNotification`. First appearance, explicit
+  "重新检查", startup validation and each permission action's final inspection
+  remain intact. Remaining capability inspections now emit a memory checkpoint
+  so any future probe can be correlated directly with heap/footprint growth.
 
 ## Validation
 
@@ -84,9 +93,12 @@ No Type4Me source or external dependency is copied.
 - 2026-09-19: isolated unsigned macOS 27 Debug app build succeeded.
 - `git diff --check` passed.
 - 2026-09-20 PR #68 macOS 27 CI passed: Xcode compile succeeded and
-  MorieTests executed **142 tests** with 0 failures. Owner-device reproduction
-  is still required to identify whether the retained ~200–250 MB is malloc heap,
-  model-session lifetime, or framework-level VM/cache.
+  MorieTests executed **142 tests** with 0 failures.
+- 2026-09-20 owner-device diagnostics narrowed the active-Capture path to a
+  ~36–38 MB malloc heap and ~75–81 MB physical footprint. Local refinement
+  changed heap by roughly 0.5 MB, and a complete Memory-learning inference
+  changed heap by roughly 0.1 MB; neither reproduced the previous 300+ MB
+  growth. PR #80 targets the remaining repeated idle Capability reprobes.
 - Event-driven/data-query changes require the branch CI and updated logic tests
   before merge; real-device behavior remains a separate acceptance gate.
 - Real-device idle CPU, Energy Impact and RSS measurements: pending.

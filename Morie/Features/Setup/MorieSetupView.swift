@@ -40,9 +40,6 @@ struct MorieSetupView: View {
             }
         )
         .task { await setup.refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await setup.refresh() }
-        }
     }
 }
 
@@ -252,8 +249,5 @@ struct PermissionManagementView: View {
             }
         }
         .task { await setup.refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await setup.refresh() }
-        }
     }
 }

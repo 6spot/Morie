@@ -48,6 +48,7 @@ struct CapabilityGate {
                     detail: "在“隐私与安全性 → 辅助功能”中开启 Morie，然后返回这里。", action: .openSettings)
         let checks = [intelligence, transcription, microphone, recognition, accessibility]
         Diagnostics.record("Capability", checks.map { "\($0.requirement)=\($0.state)" }.joined(separator: "; "))
+        Diagnostics.recordMemory("capability-inspect-finish")
         return checks
     }
 
