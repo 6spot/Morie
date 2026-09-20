@@ -2,7 +2,7 @@
 
 ## Status
 
-**IN PROGRESS** — 2026-09-20
+**BLOCKED** — 2026-09-20
 
 Issue: [#94](https://github.com/6spot/Morie/issues/94)
 
@@ -117,3 +117,9 @@ History and Diagnostics fill the detail region with their native split/list/tabl
 - [ ] Confirm Settings remains usable at the 960 × 600 minimum window.
 
 Do not mark DONE until owner-device visual review passes.
+
+## Owner visual result
+
+The merged grouped-Form direction was rejected in owner-device review. The failure was conceptual, not a small spacing defect: M-041 treated Overview, Dictionary and Personal Memory as Settings pages, and the History/Diagnostics workspaces still failed to occupy the available detail region correctly.
+
+M-043 supersedes the M-041 visual contract. Do not continue extending the "one grouped Form for every ordinary page" rule.

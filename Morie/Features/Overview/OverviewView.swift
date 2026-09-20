@@ -75,74 +75,12 @@ struct OverviewView: View {
     }
 
     var body: some View {
-        Group {
-            Section {
-                if let metrics = metricsSnapshot?.metrics {
-                    infoRow(
-                        title: "累计识别字符",
-                        value: metrics.recognizedCharacters.formatted()
-                    )
-                    infoRow(
-                        title: "已完成记录",
-                        value: metrics.totalCaptures.formatted()
-                    )
-                    infoRow(
-                        title: "成功输入",
-                        value: metrics.successfulInputs.formatted()
-                    )
-                    infoRow(
-                        title: "输入失败率",
-                        value: percent(metrics.failureRate)
-                    )
-                    infoRow(
-                        title: "平均润色耗时",
-                        value: duration(metrics.averageRefinementSeconds)
-                    )
-                } else if let metricsError {
-                    Label(
-                        metricsError,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.secondary)
-                } else {
-                    ProgressView("正在读取使用统计…")
-                }
-            } header: {
-                Text("使用情况")
-            } footer: {
-                Text(
-                    "输入失败率只统计 Morie 是否成功将文字送入当前应用，不等同于语音识别错误率。"
-                )
-            }
-
-            Section {
-                modelRow(
-                    title: "语音识别",
-                    name:
-                        capabilities.speechBackend?.displayName
-                        ?? "正在准备…",
-                    detail: speechDetail,
-                    status: speechStatus
-                )
-
-                modelRow(
-                    title: "输入润色",
-                    name: refinementModels.modelName,
-                    detail: refinementModels.modelDetail,
-                    status:
-                        refinementModels.modelStatusTitle(
-                            inputRefinementEnabled:
-                                preferences.inputRefinementEnabled
-                        )
-                )
-            } header: {
-                Text("当前模型")
-            } footer: {
-                Text(
-                    "这里显示当前运行实例实际使用的后端；发生回退时会直接显示回退后的模型。"
-                )
-            }
+        VStack(alignment: .leading, spacing: 28) {
+            usageSection
+            Divider()
+            modelSection
         }
+        .frame(maxWidth: 820, alignment: .topLeading)
         .navigationTitle("总览")
         .navigationSubtitle("本地使用情况与当前运行状态")
         .task {
@@ -150,15 +88,112 @@ struct OverviewView: View {
         }
     }
 
-    private func infoRow(
+    @ViewBuilder
+    private var usageSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("使用情况")
+                .font(.headline)
+
+            if let metrics = metricsSnapshot?.metrics {
+                Grid(
+                    alignment: .leading,
+                    horizontalSpacing: 40,
+                    verticalSpacing: 16
+                ) {
+                    GridRow {
+                        metric(
+                            title: "累计识别字符",
+                            value: metrics.recognizedCharacters.formatted()
+                        )
+                        metric(
+                            title: "已完成记录",
+                            value: metrics.totalCaptures.formatted()
+                        )
+                    }
+
+                    GridRow {
+                        metric(
+                            title: "成功输入",
+                            value: metrics.successfulInputs.formatted()
+                        )
+                        metric(
+                            title: "输入失败率",
+                            value: percent(metrics.failureRate)
+                        )
+                    }
+
+                    GridRow {
+                        metric(
+                            title: "平均润色耗时",
+                            value: duration(metrics.averageRefinementSeconds)
+                        )
+                    }
+                }
+
+                Text(
+                    "输入失败率只统计 Morie 是否成功将文字送入当前应用，不等同于语音识别错误率。"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            } else if let metricsError {
+                Label(
+                    metricsError,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(.secondary)
+            } else {
+                ProgressView("正在读取使用统计…")
+            }
+        }
+    }
+
+    private var modelSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("当前模型")
+                .font(.headline)
+
+            modelRow(
+                title: "语音识别",
+                name:
+                    capabilities.speechBackend?.displayName
+                    ?? "正在准备…",
+                detail: speechDetail,
+                status: speechStatus
+            )
+
+            Divider()
+
+            modelRow(
+                title: "输入润色",
+                name: refinementModels.modelName,
+                detail: refinementModels.modelDetail,
+                status:
+                    refinementModels.modelStatusTitle(
+                        inputRefinementEnabled:
+                            preferences.inputRefinementEnabled
+                    )
+            )
+
+            Text(
+                "这里显示当前运行实例实际使用的后端；发生回退时会直接显示回退后的模型。"
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func metric(
         title: String,
         value: String
     ) -> some View {
-        LabeledContent(title) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(value)
+                .font(.title2)
                 .monospacedDigit()
+            Text(title)
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func modelRow(
@@ -171,7 +206,7 @@ struct OverviewView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                 Text(name)
-                    .fontWeight(.medium)
+                    .bold()
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -292,15 +292,24 @@ struct DiagnosticLogView: View {
                     )
                 }
             }
-            .frame(minHeight: 260)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
 
             diagnosticDetail
                 .frame(
-                    minHeight: 130,
-                    idealHeight: 180,
-                    maxHeight: 260
+                    maxWidth: .infinity,
+                    minHeight: 160,
+                    idealHeight: 220,
+                    maxHeight: 320
                 )
         }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
         .navigationTitle("诊断")
         .navigationSubtitle("\(visibleEntries.count) 条日志")
         .searchable(text: $search, prompt: "搜索诊断日志")
@@ -413,6 +422,10 @@ struct DiagnosticLogView: View {
                 "选择一条日志",
                 systemImage: "doc.text.magnifyingglass",
                 description: Text("查看完整的诊断信息。")
+            )
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
             )
         }
     }
