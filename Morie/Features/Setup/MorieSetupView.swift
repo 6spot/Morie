@@ -210,13 +210,13 @@ struct PermissionManagementView: View {
     }
 
     var body: some View {
-        Form {
+        ControlCenterContentPage {
             if setup.checks.isEmpty {
-                Section {
+                ControlCenterSectionGroup("设备与权限") {
                     ProgressView("正在检查设备和权限…")
                 }
             } else {
-                Section("设备能力") {
+                ControlCenterSectionGroup("设备能力") {
                     ForEach(
                         setup.checks.filter { !$0.requirement.isPermission }
                     ) { check in
@@ -229,7 +229,10 @@ struct PermissionManagementView: View {
                     }
                 }
 
-                Section {
+                ControlCenterSectionGroup(
+                    "使用权限",
+                    footer: "权限由 macOS 管理。从系统设置返回后，状态会自动更新。"
+                ) {
                     ForEach(
                         setup.checks.filter { $0.requirement.isPermission }
                     ) { check in
@@ -240,15 +243,11 @@ struct PermissionManagementView: View {
                             onAction: perform
                         )
                     }
-                } header: {
-                    Text("使用权限")
-                } footer: {
-                    Text("权限由 macOS 管理。从系统设置返回后，状态会自动更新。")
                 }
             }
 
             if let error = controller.setupError {
-                Section("状态") {
+                ControlCenterSectionGroup("状态") {
                     Label(
                         error,
                         systemImage: "exclamationmark.triangle"
@@ -257,17 +256,6 @@ struct PermissionManagementView: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .contentMargins(
-            .horizontal,
-            ControlCenterMetrics.contentInset,
-            for: .scrollContent
-        )
-        .contentMargins(
-            .vertical,
-            ControlCenterMetrics.contentInset,
-            for: .scrollContent
-        )
         .navigationTitle("权限")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
