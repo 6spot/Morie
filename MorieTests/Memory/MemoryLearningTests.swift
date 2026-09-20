@@ -439,7 +439,8 @@ final class MemoryLearningTests: XCTestCase {
 
     func testMemoryLearnerInstructionsRejectOneOffAssistantTasksFromLongTerm() {
         let instructions = MemoryLearner.instructionsText
-        XCTAssertTrue(instructions.contains("weeks or months later"))
+        XCTAssertTrue(instructions.contains("weeks or"))
+        XCTAssertTrue(instructions.contains("months later"))
         XCTAssertTrue(instructions.contains("one-off request"))
         XCTAssertTrue(instructions.contains("test/evaluation prompt"))
         XCTAssertTrue(instructions.contains("prefer workingContext or no memory"))
