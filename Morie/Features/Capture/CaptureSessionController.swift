@@ -53,6 +53,7 @@ final class CaptureSessionController {
 
     private let speech = SpeechPipeline()
     private let applicationContextCollector = ApplicationContextCollector()
+    private let applicationContextInspector: ApplicationContextInspectionStore?
     private let soundFeedback = CaptureSoundFeedback()
     private let injector = TextInjector()
     private let hud = CaptureHUDController()
@@ -87,6 +88,7 @@ final class CaptureSessionController {
         personalizer: CapturePersonalizer?,
         postInsertionLearning: PostInsertionLearningController?,
         memoryLearning: MemoryLearningController?,
+        applicationContextInspector: ApplicationContextInspectionStore? = nil,
         inputRefinementEnabled: Bool,
         resolveRefinementConfiguration: @escaping (RefinementConfiguration) -> RefinementConfiguration = { $0 },
         correctionSuggestionsEnabled: Bool,
@@ -99,6 +101,7 @@ final class CaptureSessionController {
         self.personalizer = personalizer
         self.postInsertionLearning = postInsertionLearning
         self.memoryLearning = memoryLearning
+        self.applicationContextInspector = applicationContextInspector
         self.inputRefinementEnabled = inputRefinementEnabled
         self.resolveRefinementConfiguration = resolveRefinementConfiguration
         self.correctionSuggestionsEnabled = correctionSuggestionsEnabled
@@ -250,11 +253,25 @@ final class CaptureSessionController {
             }
 
             self.activeApplicationContext = context
-            let applicationContextWords = ApplicationContextVocabulary.extract(
+            let inspectedHints = ApplicationContextVocabulary.inspect(
                 from: context
             )
+            let applicationContextWords = inspectedHints.map(\.value)
             self.activeApplicationContextWords = applicationContextWords
             self.applicationContextTask = nil
+
+            let contextualHintCount = SpeechContextHints.merged(
+                dictionaryWords: sessionContext.dictionaryWords,
+                applicationContextWords: applicationContextWords
+            ).count
+            self.applicationContextInspector?.publish(
+                captureID: sessionID,
+                context: context,
+                hints: inspectedHints,
+                dictionaryHintCount: sessionContext.dictionaryWords.count,
+                contextualHintCount: contextualHintCount
+            )
+
             let elapsedMilliseconds = max(
                 0,
                 Int(Date().timeIntervalSince(request.capturedAt) * 1_000)
