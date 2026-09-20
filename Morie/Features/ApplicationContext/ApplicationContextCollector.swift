@@ -237,7 +237,7 @@ actor ApplicationContextCollector {
     }
 
     private func copyElement(
-        _ attribute: CFString,
+        _ attribute: String,
         from element: AXUIElement
     ) -> AXUIElement? {
         guard !Task.isCancelled,
@@ -252,7 +252,7 @@ actor ApplicationContextCollector {
     }
 
     private func textAttribute(
-        _ attribute: CFString,
+        _ attribute: String,
         from element: AXUIElement
     ) -> String? {
         guard !Task.isCancelled,
@@ -271,14 +271,14 @@ actor ApplicationContextCollector {
     }
 
     private func copyAttribute(
-        _ attribute: CFString,
+        _ attribute: String,
         from element: AXUIElement
     ) -> CFTypeRef? {
         guard !Task.isCancelled else { return nil }
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             element,
-            attribute,
+            attribute as CFString,
             &value
         ) == .success else {
             return nil
@@ -290,7 +290,7 @@ actor ApplicationContextCollector {
         guard let value = textAttribute(kAXSubroleAttribute, from: element) else {
             return false
         }
-        return value == (kAXSecureTextFieldSubrole as String)
+        return value == kAXSecureTextFieldSubrole
     }
 
     private func configureTimeout(_ element: AXUIElement) {
