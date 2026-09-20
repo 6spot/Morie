@@ -144,31 +144,39 @@ The recording-to-processing morph uses motion rather than another status color: 
 
 ## Control Center shell
 
-The Control Center follows one **macOS 27 System Settings-style layout contract**. The UI is rebuilt from native containers rather than preserving page-specific layout code.
+The Control Center follows one **macOS 27 System Settings-style layout contract**. Rebuild the navigation/layout architecture, but do **not** force unrelated information into the same page body control.
 
 The window owns one persistent `NavigationSplitView` for its entire lifetime. The left `List(.sidebar)` is created once and remains mounted while the selected section changes. The right side owns one persistent `NavigationStack`; section routing replaces only the page content inside that stack. Do not switch between different outer split-view/navigation roots for History, Dictionary, Memory or settings pages.
 
 The shell itself must not observe Morie's high-frequency runtime controller. Only the visible feature page observes the state it needs. Sidebar selection and disclosure state must therefore remain independent from capture, transcription, model and permission updates.
 
+### Shared visual grid
+
+Overview, Dictionary, Personal Memory and reading surfaces share one 28-point scroll-content inset so their left/top content baselines do not move between sections. Their ScrollView fills the whole right workspace, so the vertical scroll indicator remains at the workspace edge.
+
+Settings and Permissions use native grouped Forms. Their system-owned spacing should visually align with the same page grid; do not add a second wrapper ScrollView or arbitrary page-specific outer padding.
+
 ### Page families
 
-Use the native container that matches the page's job:
+Native-first means using the right native building blocks for the content, not making every page a Form/List:
 
-- **Overview, Settings and Permissions** use a full-workspace SwiftUI `Form` with `.formStyle(.grouped)`. Do not wrap these Forms in another ScrollView and do not add page-specific outer padding, fixed content widths or custom card backgrounds.
-- **Dictionary and Personal Memory** use native searchable `List` presentations with system sections, selection/navigation and toolbars. Do not imitate list rows with cards, custom rounded rectangles or grids just for visual styling.
-- **History** uses a native `HSplitView` inside the persistent right-side navigation host: an inset selectable List on the left and a reading detail on the right. It must not introduce another `NavigationSplitView` or another page-level navigation root.
+- **Overview** is a dashboard. Keep the owner-approved hierarchy: short explanatory text, adaptive system `GroupBox` metric cards, then the current-model group. Do not flatten the metrics into database-like Form rows.
+- **Dictionary** is a compact word library. Keep the adaptive grid: editable user words use native bordered buttons; system words are read-only compact items. Do not expand short words into a full-width one-row-per-word list.
+- **Personal Memory** is a maintained understanding of the user. Keep the narrative topic presentation with a natural **最近** section and collapsed **已归档与历史**. Do not regress it to a database/list manager.
+- **Settings / Permissions** use grouped native `Form`.
+- **History** uses a native `HSplitView` inside the persistent right-side navigation host: an inset selectable List on the left and a reading detail on the right.
 - **Diagnostics** stays a native `Table` with a native split detail for the selected message.
-- **Reading details** such as a Capture or Memory detail use one shared ScrollView composition with 28-point scroll-content margins and a readable maximum width of 760 points. The ScrollView itself still fills the whole workspace so the scroll indicator remains at the workspace edge.
+- **Reading details** such as a Capture or Memory detail use one shared ScrollView composition with 28-point scroll-content margins and a readable maximum width of 760 points.
 
-Native navigation titles, search, toolbars, split dividers, row selection, Forms, Lists, Tables, sheets, alerts and confirmation dialogs own their appearance. Do not draw replacement title bars, toolbar backgrounds, selection fills, cards or glass surfaces.
+Native navigation titles, search, toolbars, split dividers, Forms, Lists, Tables, buttons, sheets, alerts and confirmation dialogs own their appearance. Custom composition is allowed when it represents the information architecture (dashboard/grid/narrative), but do not draw replacement system controls, title bars, selection chrome or decorative fake glass.
 
 ### Layout invariants
 
 - The sidebar uses the system accent color and system row/control metrics.
 - No top-level page may force the Control Center wider than its available right workspace.
 - Scroll indicators belong at the workspace edge; never place the ScrollView inside a fixed-width outer frame.
-- Ordinary pages do not define their own outer horizontal/top padding constants.
-- Dense workspaces may be edge-to-edge; readable text detail alone uses the shared reading inset/max width.
+- Page-specific content may differ, but its outer content baseline must stay on the shared grid.
+- Dense workspaces may be edge-to-edge; readable text detail alone uses the shared reading max width.
 - Page titles and toolbar/search controls terminate in the one right-side navigation hierarchy instead of leaking through nested page roots.
 
 ## History recovery
@@ -191,20 +199,22 @@ History's native **开始录音** toolbar button starts an intentional voice cap
 
 ## Dictionary
 
-The **字典** library is a native searchable `List`, not a custom grid. It has two system sections:
+The **字典** library is one searchable full-width page beside the sidebar. The content is a compact adaptive grid because the primary objects are short canonical words rather than row-shaped records.
 
-- **用户添加** — editable/selectable rows with toolbar and context-menu edit/delete actions;
-- **系统内置** — read-only rows rendered with ordinary system secondary styling and a lock affordance.
+- **用户添加**: editable/selectable native bordered buttons with toolbar/context-menu edit and delete.
+- **系统内置**: compact read-only terms with restrained secondary styling; they do not enter edit/delete selection flows.
 
-Each entry is still exactly one canonical word: no aliases, replacement pairs or extra user configuration. Source remains backend provenance rather than a required visible label.
+Each entry remains one canonical word: no aliases, replacement pairs or additional user configuration. Source is backend provenance rather than a required visible label.
 
-Adding or editing uses the compact native **添加词语 / 编辑词语** sheet. The sheet is 420 points wide, uses a columns Form, contains one **词语** TextField, a short purpose description and standard **取消 / 添加** or **保存** buttons. Built-in words never enter selection-driven edit/delete flows.
+The editor remains a compact native **添加词语 / 编辑词语** sheet, 420 points wide, using a columns Form with one **词语** TextField, short purpose text and standard **取消 / 添加** or **保存** buttons.
 
 ## Personal Memory
 
-Personal Memory uses a native searchable `List` with system sections for **长期记忆**, **最近**, and **已归档与历史**. Rows show the remembered topic plus a short body preview; recent/history rows may show a small date/status value on the trailing edge. Do not present Memory as custom narrative cards or expose internal `longTerm / workingContext` database labels.
+**个人记忆** is intentionally not a database list. It is a full-width reading surface that shows Morie's current understanding as semantic topics.
 
-Selecting a row pushes the existing reading detail inside the Control Center's one NavigationStack. The detail may expose source/evidence history because provenance is meaningful user control. Manual add/edit asks only for **主题 / 内容**; internal classification and lifecycle are system-owned.
+Durable topics are rendered as natural topic + body blocks. Temporary working context is separated only under the natural **最近** heading. Archived/superseded material stays collapsed under **已归档与历史** so the ordinary page remains focused on current understanding. Search filters these topic blocks in place.
+
+Opening a topic pushes the existing detail inside the Control Center's one NavigationStack for correction and provenance. The detail may expose source/evidence history because provenance is meaningful user control. Manual add/edit asks only for **主题 / 内容**; internal classification and lifecycle are system-owned.
 
 Settings uses a standard **使用个人记忆** Toggle. Turning it off preserves existing visible Memory while stopping new learning and Memory use during cleanup.
 
