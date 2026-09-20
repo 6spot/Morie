@@ -50,7 +50,7 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-035 | Input quality | Simplify cleanup prompt and make it editable at runtime | IN PROGRESS | [#71](https://github.com/6spot/Morie/issues/71) | [`M-035`](./tasks/M-035-editable-refinement-prompt.md) |
 | M-036 | Personal Memory | Rebuild Memory around semantic topics, evidence and lifecycle | IN PROGRESS | [#75](https://github.com/6spot/Morie/issues/75) / [PR #76](https://github.com/6spot/Morie/pull/76) | [`M-036`](./tasks/M-036-semantic-memory.md) |
 | M-037 | Speech outcomes | Fast-exit no-speech captures and keep recognizer rejection out of fatal UI | IN PROGRESS | [#77](https://github.com/6spot/Morie/issues/77) | [`M-037`](./tasks/M-037-recognition-outcomes.md) |
-| M-038 | Control Center | Rebuild the management UI around one macOS 27 System Settings-style layout contract | IN PROGRESS | [#86](https://github.com/6spot/Morie/issues/86) | [`M-038`](./tasks/M-038-control-center-rebuild.md) |
+| M-038 | Control Center | Rebuild the management UI around one macOS 27 System Settings-style layout contract | IN PROGRESS | [#86](https://github.com/6spot/Morie/issues/86) | [`M-038`](./tasks/M-038-control-center-rebuild.md) |\n| M-039 | Control Center | Clean rebuild with one persistent macOS System Settings-style shell and route-owned page geometry | IN PROGRESS | [#89](https://github.com/6spot/Morie/issues/89) | [`M-039`](./tasks/M-039-control-center-clean-rebuild.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
 
