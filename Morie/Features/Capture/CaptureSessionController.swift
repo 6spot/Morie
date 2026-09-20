@@ -737,6 +737,7 @@ final class CaptureSessionController {
                 postInsertionLearning?.observeInsertion(
                     finalText,
                     in: deliveryApplication,
+                    captureID: sessionID,
                     dictionarySuggestionsEnabled: sessionContext.correctionSuggestionsEnabled,
                     expressionLearningEnabled: sessionContext.expressionLearningEnabled
                 )
