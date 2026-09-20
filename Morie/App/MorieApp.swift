@@ -236,9 +236,6 @@ private final class ControlCenterSettingsState: ObservableObject {
 
     init(controller: AppController) {
         self.controller = controller
-        _settingsState = StateObject(
-            wrappedValue: ControlCenterSettingsState(controller: controller)
-        )
         inputRefinementEnabled = controller.inputRefinementEnabled
         personalMemoryEnabled = controller.personalMemoryEnabled
         correctionSuggestionsEnabled = controller.correctionSuggestionsEnabled
@@ -303,7 +300,7 @@ private final class ControlCenterSettingsState: ObservableObject {
     }
 
     func refreshICloudSyncState() {
-        settingsState.refreshICloudSyncState()
+        controller.refreshICloudSyncState()
     }
 
     func setCaptureShortcut(_ shortcut: CaptureShortcut) {
@@ -330,6 +327,9 @@ struct MorieSettingsView: View {
 
     init(controller: AppController) {
         self.controller = controller
+        _settingsState = StateObject(
+            wrappedValue: ControlCenterSettingsState(controller: controller)
+        )
         _refinementModels = ObservedObject(
             wrappedValue: controller.refinementModels
         )
