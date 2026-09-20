@@ -17,3 +17,7 @@ xcuserdata/
 .env
 .env.*
 !.env.example
+
+
+# Local Apple signing
+Config/LocalSigning.xcconfig
