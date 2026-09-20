@@ -35,10 +35,31 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 @MainActor
 struct CaptureHistoryWorkspace: View {
     let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
+    @ObservedObject private var setup: PermissionSetupController
     @Binding var selection: UUID?
 
     @State private var search = ""
     @State private var filter: CaptureHistoryFilter = .all
+
+    init(
+        controller: AppController,
+        selection: Binding<UUID?>
+    ) {
+        self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
+        _setup = ObservedObject(wrappedValue: controller.setup)
+        _selection = selection
+    }
+
+    private var canStartCapture: Bool {
+        _ = runtime.state
+        return controller.canStartCapture
+    }
 
     var body: some View {
         Group {
@@ -49,7 +70,7 @@ struct CaptureHistoryWorkspace: View {
                         selection: $selection,
                         search: $search,
                         filter: $filter,
-                        canStartCapture: controller.canStartCapture,
+                        canStartCapture: canStartCapture,
                         onRecord: controller.startCaptureOnly
                     )
                     .frame(
@@ -95,7 +116,7 @@ struct CaptureHistoryWorkspace: View {
                     systemImage: "mic",
                     action: controller.startCaptureOnly
                 )
-                .disabled(!controller.canStartCapture)
+                .disabled(!canStartCapture)
             }
         }
     }
@@ -205,13 +226,36 @@ struct CaptureHistoryView: View {
 
 @MainActor
 private struct CaptureHistoryDetailPane: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
+    @ObservedObject private var setup: PermissionSetupController
     @ObservedObject var history: CaptureHistoryController
     let selectedCaptureID: UUID?
+
+    init(
+        controller: AppController,
+        history: CaptureHistoryController,
+        selectedCaptureID: UUID?
+    ) {
+        self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
+        _setup = ObservedObject(wrappedValue: controller.setup)
+        _history = ObservedObject(wrappedValue: history)
+        self.selectedCaptureID = selectedCaptureID
+    }
 
     private var capture: CaptureRecord? {
         guard let selectedCaptureID else { return nil }
         return history.captures.first { $0.id == selectedCaptureID }
+    }
+
+    private var canStartCapture: Bool {
+        _ = runtime.state
+        return controller.canStartCapture
     }
 
     var body: some View {
@@ -221,7 +265,7 @@ private struct CaptureHistoryDetailPane: View {
                 capture: capture,
                 captureID: selectedCaptureID,
                 history: history,
-                canRecognize: controller.canStartCapture,
+                canRecognize: canStartCapture,
                 onRecognize: controller.recognizeHistoryCapture
             )
         } else {

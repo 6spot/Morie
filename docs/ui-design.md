@@ -177,6 +177,8 @@ Page responsibilities are limited to:
 
 Shell responsibilities are navigation, sidebar, sidebar toggle, route lifetime, scrolling and page insets.
 
+State observation follows the same ownership rule. Routed pages never observe `AppController` as a broad `ObservableObject`. They observe only the focused domain they render: `AppRuntimeController` for capture/bootstrap runtime, `AppPreferencesController` for application preferences, `PermissionSetupController` for capability/permission state, or the relevant feature store/controller. This prevents unrelated transcript, setup or preference changes from forcing the navigation/toolbar preference tree to recompute.
+
 ### Page-by-page contract
 
 - **总览** — grouped information rows for usage and current runtime models.

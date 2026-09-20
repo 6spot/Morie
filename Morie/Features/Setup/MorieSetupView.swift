@@ -3,13 +3,19 @@ import SwiftUI
 
 @MainActor
 struct MorieSetupView: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
     init(controller: AppController) {
         self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
         _setup = ObservedObject(wrappedValue: controller.setup)
     }
 
@@ -18,16 +24,16 @@ struct MorieSetupView: View {
             checks: setup.checks,
             isRefreshing: setup.isRefreshing,
             activeRequest: setup.activeRequest,
-            isPreparing: controller.isBootstrapping,
+            isPreparing: capabilities.isBootstrapping,
             isInputActive: controller.isCaptureActive,
             canFinish: setup.isReady && controller.canCompleteSetup,
-            preparationError: controller.setupError,
+            preparationError: capabilities.setupError,
             onRefresh: { Task { await setup.refresh() } },
             onAction: { requirement in Task { await setup.performAction(for: requirement) } },
             onLater: { dismissWindow(id: "setup") },
             onFinish: {
                 Task {
-                    if controller.state == .ready {
+                    if runtime.state == .ready {
                         await setup.refresh()
                     } else {
                         await controller.bootstrap(completingSetup: true)
@@ -195,18 +201,24 @@ private struct PermissionRequirementRow: View {
 
 @MainActor
 struct PermissionManagementView: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
 
     init(controller: AppController) {
         self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
         _setup = ObservedObject(wrappedValue: controller.setup)
     }
 
     private var isBusy: Bool {
         setup.isRefreshing
             || setup.activeRequest != nil
-            || controller.isBootstrapping
+            || capabilities.isBootstrapping
     }
 
     var body: some View {
@@ -239,7 +251,7 @@ struct PermissionManagementView: View {
                 }
             }
 
-            if let error = controller.setupError {
+            if let error = capabilities.setupError {
                 ControlCenterGroup("状态") {
                     Label(
                         error,
