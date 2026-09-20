@@ -645,7 +645,7 @@ private final class LearningFixture {
     init() throws {
         directory = FileManager.default.temporaryDirectory
             .appending(
-                path: "MorieLearning-\\(UUID())",
+                path: "MorieLearning-\(UUID())",
                 directoryHint: .isDirectory
             )
         try FileManager.default.createDirectory(
