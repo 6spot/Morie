@@ -160,9 +160,11 @@ The sheet is 420 points wide and fits its content, with one **词语** TextField
 
 ## Personal Memory
 
-**个人记忆** shows active, archived and superseded personal projects, people, preferences, facts and decisions. Topics and personal information are the primary reading content. Automatic/user origin and current use are visible; **来源与历史** discloses provenance, dates, exact learning snapshots and predecessor links.
+**个人记忆** is not a record list or a three-column library browser. Selecting it opens one full-width reading surface beside the sidebar. The page begins with **Morie 了解你的这些内容** and reads like a continuously maintained personal-context document: each durable semantic topic is shown as a topic heading plus Morie's current understanding, without row chrome, status badges, record counts, kind labels, or long-term taxonomy.
 
-Entries appear automatically from completed daily input. There is no candidate inbox or mandatory review. Optional native creation/editing, archive/restore/replace and system-confirmed deletion remain available to correct the profile. The editor uses a grouped Form with a kind Picker, topic TextField and multiline personal-information TextEditor. Dictionary words belong to their separate single-field editor.
+Temporary working context is the one intentional visual separation and appears naturally under **最近**. Archived/superseded material is collapsed under **已归档与历史** so ordinary reading stays focused on the current understanding. Search filters the document in place rather than switching to a result list.
+
+A topic can still be opened to its detail for correction and provenance. **来源与历史** retains exact evidence, dates and predecessor links. Optional native create/edit/archive/restore/replace/delete actions remain available, but those management mechanics are subordinate to the reading surface. Manual creation asks only for **主题 / 内容**; internal kind/scope are not user-facing fields.
 
 History's **个人记忆** section shows idle scheduling, learning progress, outcomes, linked memories and **用于学习的文字**. Failed nonretryable analysis offers an optional retry. Opening/closing details does not control the background learner. Deleting a Capture explains that its analysis snapshots are removed while separate personal Memory remains; missing sources are labelled explicitly.
 
