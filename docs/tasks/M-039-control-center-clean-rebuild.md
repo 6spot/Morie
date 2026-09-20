@@ -119,11 +119,11 @@ The routed feature page must not own:
 
 ## Validation still required
 
-- [ ] Xcode 27 product build.
-- [ ] MorieTests.
+- [x] Xcode 27 product build.
+- [x] MorieTests.
 - [ ] Owner-device page-by-page visual check.
 - [ ] Switch all sidebar destinations repeatedly and confirm the system sidebar toggle never disappears/reappears as a page-owned control.
 - [ ] Confirm title/body leading alignment on every destination.
 - [ ] Confirm 960 × 600 minimum-size behavior.
 
-Do not merge before the build/test gate passes. Do not mark DONE before the owner-device visual check passes.
+macOS 27 CI run #275 passed on 2026-09-20: Xcode 27 product build passed and MorieTests passed. Do not mark DONE before the owner-device visual check passes.
