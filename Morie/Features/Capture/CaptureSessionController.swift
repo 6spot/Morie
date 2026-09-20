@@ -586,6 +586,15 @@ final class CaptureSessionController {
             if result.sourceAudio.hasMeaningfulAudio != false
                 || !result.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 do {
+                    DevelopmentDiagnostics.list(
+                        "SpeechContext",
+                        captureID: sessionID,
+                        label: "accurateRecognitionHints",
+                        SpeechContextHints.merged(
+                            dictionaryWords: sessionContext.dictionaryWords,
+                            applicationContextWords: activeApplicationContextWords
+                        )
+                    )
                     accurateTranscript = try await CaptureFileTranscriber.recognize(
                         result.sourceAudio.url,
                         locale: sessionContext.locale,
