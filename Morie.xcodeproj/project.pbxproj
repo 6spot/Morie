@@ -6,6 +6,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A80000000000000000000001 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
+		A80000000000000000000002 /* ApplicationContextCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000002 /* ApplicationContextCollector.swift */; };
 		A50000000000000000000001 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
 		A50000000000000000000004 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
 		A60000000000000000000001 /* RefinementPromptSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000001 /* RefinementPromptSettings.swift */; };
@@ -98,6 +100,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B80000000000000000000001 /* ApplicationContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationContext.swift; sourceTree = "<group>"; };
+		B80000000000000000000002 /* ApplicationContextCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationContextCollector.swift; sourceTree = "<group>"; };
 		B50000000000000000000001 /* RefinementModelSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementModelSettings.swift; sourceTree = "<group>"; };
 		B60000000000000000000001 /* RefinementPromptSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementPromptSettings.swift; sourceTree = "<group>"; };
 		B60000000000000000000002 /* DefaultRefinementInstructions.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = DefaultRefinementInstructions.txt; sourceTree = "<group>"; };
@@ -222,6 +226,7 @@
 			isa = PBXGroup;
 			children = (
 				D30000000000000000000010 /* Overview */,
+				D80000000000000000000001 /* ApplicationContext */,
 				D30000000000000000000003 /* Capture */,
 				D30000000000000000000005 /* Memory */,
 				D30000000000000000000006 /* Dictionary */,
@@ -237,6 +242,15 @@
 				B10000000000000000000042 /* OverviewView.swift */,
 			);
 			path = Overview;
+			sourceTree = "<group>";
+		};
+		D80000000000000000000001 /* ApplicationContext */ = {
+			isa = PBXGroup;
+			children = (
+				B80000000000000000000001 /* ApplicationContext.swift */,
+				B80000000000000000000002 /* ApplicationContextCollector.swift */,
+			);
+			path = ApplicationContext;
 			sourceTree = "<group>";
 		};
 		D30000000000000000000003 /* Capture */ = {
@@ -560,6 +574,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A80000000000000000000001 /* ApplicationContext.swift in Sources */,
+				A80000000000000000000002 /* ApplicationContextCollector.swift in Sources */,
 				A50000000000000000000001 /* RefinementModelSettings.swift in Sources */,
 				A60000000000000000000001 /* RefinementPromptSettings.swift in Sources */,
 				A10000000000000000000020 /* PermissionSetupController.swift in Sources */,
