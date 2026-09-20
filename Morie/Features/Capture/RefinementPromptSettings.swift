@@ -71,11 +71,18 @@ final class RefinementPromptController: ObservableObject {
 
     @discardableResult
     func save(_ value: String) -> Bool {
-        guard RefinementPromptSettings.save(value) else {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
             settingsMessage = "提示词不能为空。"
             return false
         }
-        instructions = RefinementPromptSettings.load()
+        guard RefinementPromptSettings.save(normalized) else {
+            settingsMessage = "提示词不能为空。"
+            return false
+        }
+        // The runtime source of truth is process memory. Persistence is only for
+        // restoring the same prompt on the next launch; the hot path never rereads it.
+        instructions = normalized
         settingsMessage = "润色提示词已保存，将从下一次录音开始生效。"
         return true
     }
