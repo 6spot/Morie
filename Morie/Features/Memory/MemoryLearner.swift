@@ -55,7 +55,22 @@ enum MemoryLearner {
         let instructions = Instructions { instructionsText }
 
         let data = try JSONEncoder().encode(input)
-        let prompt = Prompt { String(decoding: data, as: UTF8.self) }
+        let promptText = String(decoding: data, as: UTF8.self)
+        let prompt = Prompt { promptText }
+        DevelopmentDiagnostics.text(
+            "MemoryPrompt",
+            captureID: input.source.captureID,
+            label: "instructions",
+            instructionsText,
+            limit: 16_000
+        )
+        DevelopmentDiagnostics.text(
+            "MemoryPrompt",
+            captureID: input.source.captureID,
+            label: "payload",
+            promptText,
+            limit: 24_000
+        )
 
         do {
             Diagnostics.recordMemory("memory-model-before-token-count")
@@ -63,6 +78,11 @@ enum MemoryLearner {
             let instructionTokens = try await model.tokenCount(for: instructions)
             let schemaTokens = try await model.tokenCount(for: GeneratedMemories.generationSchema)
             let responseBudget = 1_024
+            DevelopmentDiagnostics.record(
+                "MemoryModel",
+                captureID: input.source.captureID,
+                "promptTokens=\(promptTokens); instructionTokens=\(instructionTokens); schemaTokens=\(schemaTokens); responseBudget=\(responseBudget); contextSize=\(model.contextSize)"
+            )
             Diagnostics.recordMemory("memory-model-after-token-count")
             guard promptTokens + instructionTokens + schemaTokens + responseBudget + 128 <= model.contextSize else {
                 throw MemoryAnalysisFailure.textTooLong
@@ -77,6 +97,15 @@ enum MemoryLearner {
             )
             Diagnostics.recordMemory("memory-model-session-scope-exited")
             try Task.checkCancellation()
+            DevelopmentDiagnostics.list(
+                "MemoryModel",
+                captureID: input.source.captureID,
+                label: "rawObservations",
+                generated.observations.map {
+                    "\($0.action.rawValue) | \($0.kind.rawValue) | \($0.scope.rawValue) | \($0.name) | notes=\($0.notes) | evidence=\($0.evidence) | confidence=\($0.confidence) | existingID=\($0.existingMemoryID)"
+                },
+                limit: 8
+            )
 
             let suggestions: [MemorySuggestion] = generated.observations.compactMap { value in
                 guard let kind = MemoryKind(rawValue: value.kind.rawValue),
@@ -109,6 +138,12 @@ enum MemoryLearner {
                 Diagnostics.recordMemory("memory-model-cancelled")
                 throw CancellationError()
             }
+            DevelopmentDiagnostics.record(
+                "MemoryModel",
+                captureID: input.source.captureID,
+                level: .warning,
+                "failed; errorType=\(DevelopmentDiagnostics.errorType(error))"
+            )
             Diagnostics.recordMemory("memory-model-failed")
             if let error = error as? MemoryAnalysisFailure { throw error }
             switch error {
