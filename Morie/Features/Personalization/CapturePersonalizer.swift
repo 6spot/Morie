@@ -33,7 +33,7 @@ final class CapturePersonalizer {
         enabled: Bool,
         expressionStyleEnabled: Bool = false,
         otherModelWorkActive: Bool = false,
-        modelConfiguration: RefinementModelConfiguration = .local
+        configuration: RefinementConfiguration = .local
     ) async throws -> String {
         try Task.checkCancellation()
         let started = ContinuousClock.now
@@ -71,7 +71,7 @@ final class CapturePersonalizer {
         }
         if let skip { return try keepOriginal(input, reason: skip, started: started) }
         do {
-            let generation = try await runner.run(input, configuration: modelConfiguration)
+            let generation = try await runner.run(input, configuration: configuration)
             try Task.checkCancellation()
             try store.requireRefinementSource(input)
 
