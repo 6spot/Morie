@@ -22,8 +22,8 @@ Implement the capture foundation plus bounded Speech vocabulary injection:
 - capture the frontmost application identity at voice-input start;
 - read bounded selected/focused/nearby text through Apple Accessibility when available;
 - pin the target application/PID at Capture Start, resolve bounded AX context asynchronously, and retain the resulting snapshot only for that active Capture;
-- keep all raw application text in process memory only;
-- log metadata/counts only, never raw application text;
+- keep raw application text out of Capture/History/Memory and refinement input;
+- Release diagnostics log metadata/counts only; Debug development tracing may log bounded raw context locally for troubleshooting;
 - use no app-specific adapters, screen recording or OCR;
 - extract at most 32 high-signal transient terms, prioritizing selected → focused → nearby text;
 - merge transient terms after durable Dictionary hints, with a total Speech context cap of 48;
@@ -42,9 +42,9 @@ This slice does **not**:
 
 ## Privacy boundary
 
-`ApplicationContextSnapshot` is intentionally not `Codable`. It must never be attached to `RefinementInput`, `CaptureRefinement`, SwiftData records, History, Memory evidence, or diagnostic message bodies.
+`ApplicationContextSnapshot` is intentionally not `Codable`. It must never be attached to `RefinementInput`, `CaptureRefinement`, SwiftData records, History, or Memory evidence. Release diagnostics never include raw context. Debug builds may emit bounded raw context to the local `Dev/*` diagnostic trace as an explicit development-only exception.
 
-Secure text fields contribute no selected/focused/nearby text.
+Secure Event Input and secure text fields contribute no selected/focused/nearby text and therefore cannot enter either standard or development diagnostics.
 
 ## Acceptance criteria
 
@@ -52,9 +52,9 @@ Secure text fields contribute no selected/focused/nearby text.
 - [x] Collector uses only Apple Accessibility/AppKit APIs and runs blocking AX IPC on its own actor with native message timeouts.
 - [x] Selected/focused/nearby reads have explicit character/node/depth bounds.
 - [x] Capture Start pins app/PID without blocking the main actor; the resulting snapshot is accepted only while that Capture remains active.
-- [x] Diagnostics contain only app identity and counts, never raw context.
+- [x] Release/standard diagnostics contain only app identity and counts; Debug-only `Dev/*` diagnostics can expose bounded raw context locally for troubleshooting.
 - [x] Snapshot is released when Capture session identity resets.
-- [x] High-signal Application Context vocabulary is bounded and never logged verbatim.
+- [x] High-signal Application Context vocabulary is bounded; verbatim vocabulary appears only in Debug-only `Dev/*` traces and the runtime inspector.
 - [x] Dictionary hints retain priority when transient Application Context hints are merged.
 - [x] Live Speech and saved-audio re-recognition receive the same ephemeral vocabulary.
 - [x] Context collection never gates capture startup; late hints update Speech best-effort.
