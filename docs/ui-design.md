@@ -102,7 +102,7 @@ Because Morie is an `LSUIElement` app, its idle activation policy is accessory a
 
 The current app's primary language is Simplified Chinese (`zh-Hans`), including app-owned controls, errors, accessibility descriptions and privacy usage strings. Keep user input, dictionary spelling, prompts, persisted raw values, external application names and technical diagnostics intact. Format display dates in Chinese while retaining the user's time zone.
 
-Use the system Settings scene and **⌘,**. Sidebar and menu SettingsLink controls open that same scene. These are app-scoped commands; the global recording shortcut retains its existing behavior. NavigationSplitView and SidebarCommands own show/hide-sidebar controls. Native expandable Section headers fold **资料库 / 应用**, with saved expansion state. Do not build a replacement toggle, title bar, menu or shortcut listener.
+Use the system Settings scene and **⌘,**. Sidebar and menu SettingsLink controls open that same scene. These are app-scoped commands; the global recording shortcut retains its existing behavior. NavigationSplitView and SidebarCommands own show/hide-sidebar controls. Sidebar groups **资料库 / 应用** are ordinary native section headers; do not add a second disclosure/folding interaction unless a concrete product requirement appears. Do not build a replacement toggle, title bar, menu or shortcut listener.
 
 ## Permission and capability guide
 
