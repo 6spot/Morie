@@ -6,6 +6,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A90000000000000000000001 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
+		A90000000000000000000002 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
+		A80000000000000000000003 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
 		A80000000000000000000001 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
 		A80000000000000000000002 /* ApplicationContextCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000002 /* ApplicationContextCollector.swift */; };
 		A50000000000000000000001 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
@@ -100,6 +103,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B90000000000000000000001 /* SpeechContextHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechContextHints.swift; sourceTree = "<group>"; };
 		B80000000000000000000001 /* ApplicationContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationContext.swift; sourceTree = "<group>"; };
 		B80000000000000000000002 /* ApplicationContextCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationContextCollector.swift; sourceTree = "<group>"; };
 		B50000000000000000000001 /* RefinementModelSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementModelSettings.swift; sourceTree = "<group>"; };
@@ -261,6 +265,7 @@
 				B10000000000000000000015 /* CaptureAudioSource.swift */,
 				B10000000000000000000018 /* CaptureAudioStream.swift */,
 				B10000000000000000000016 /* CaptureFileTranscriber.swift */,
+				B90000000000000000000001 /* SpeechContextHints.swift */,
 				B10000000000000000000004 /* SpeechPipeline.swift */,
 				B10000000000000000000027 /* CaptureRefinement.swift */,
 				B10000000000000000000028 /* InputRefiner.swift */,
@@ -574,6 +579,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A90000000000000000000001 /* SpeechContextHints.swift in Sources */,
 				A80000000000000000000001 /* ApplicationContext.swift in Sources */,
 				A80000000000000000000002 /* ApplicationContextCollector.swift in Sources */,
 				A50000000000000000000001 /* RefinementModelSettings.swift in Sources */,
@@ -629,6 +635,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A90000000000000000000002 /* SpeechContextHints.swift in Sources */,
+				A80000000000000000000003 /* ApplicationContext.swift in Sources */,
 				A50000000000000000000004 /* RefinementModelSettings.swift in Sources */,
 				A60000000000000000000002 /* RefinementPromptSettings.swift in Sources */,
 				A2000000000000000000001D /* CaptureHUD.swift in Sources */,
