@@ -56,16 +56,11 @@ struct OverviewView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("总览")
-                        .font(.largeTitle.bold())
-                    Text("查看 Morie 的本地使用情况和当前实际使用的模型。")
-                        .foregroundStyle(.secondary)
-                }
+        ControlCenterScrollPage {
+            Text("查看 Morie 的本地使用情况和当前实际使用的模型。")
+                .foregroundStyle(.secondary)
 
-                LazyVGrid(
+            LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: 190, maximum: 280), spacing: 12)],
                     alignment: .leading,
                     spacing: 12
@@ -131,13 +126,9 @@ struct OverviewView: View {
                     Label("当前模型", systemImage: "cpu")
                 }
 
-                Text("模型状态来自当前运行实例。语音识别发生回退时，这里会直接显示 DictationTranscriber 和“回退”，而不是仍然显示首选模型。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: 920, alignment: .leading)
-            .padding(28)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            Text("模型状态来自当前运行实例。语音识别发生回退时，这里会直接显示 DictationTranscriber 和“回退”，而不是仍然显示首选模型。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
         .navigationTitle("总览")
     }

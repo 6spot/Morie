@@ -41,8 +41,7 @@ struct MemoryView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
+        ControlCenterScrollPage(spacing: 32) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Morie 了解你的这些内容")
                         .font(.largeTitle)
@@ -117,11 +116,6 @@ struct MemoryView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 56)
                 }
-            }
-            .frame(maxWidth: 760, alignment: .leading)
-            .padding(.horizontal, 36)
-            .padding(.vertical, 32)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .navigationTitle("个人记忆")
         .searchable(text: $search, prompt: "搜索 Morie 记住的内容")

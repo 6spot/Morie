@@ -283,8 +283,8 @@ struct DiagnosticLogView: View {
                             .textSelection(.enabled)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(24)
                 }
+                .controlCenterScrollMargins()
                 .frame(minHeight: 100, idealHeight: 160, maxHeight: 240)
             }
         }

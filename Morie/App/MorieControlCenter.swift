@@ -1,6 +1,50 @@
 import SwiftData
 import SwiftUI
 
+enum ControlCenterLayout {
+    static let contentMaxWidth: CGFloat = 920
+    static let readingMaxWidth: CGFloat = 760
+    static let horizontalInset: CGFloat = 28
+    static let verticalInset: CGFloat = 24
+}
+
+extension View {
+    func controlCenterScrollMargins(
+        horizontal: CGFloat = ControlCenterLayout.horizontalInset,
+        vertical: CGFloat = ControlCenterLayout.verticalInset
+    ) -> some View {
+        contentMargins(.horizontal, horizontal, for: .scrollContent)
+            .contentMargins(.vertical, vertical, for: .scrollContent)
+    }
+}
+
+struct ControlCenterScrollPage<Content: View>: View {
+    let maxWidth: CGFloat
+    let spacing: CGFloat
+    private let content: Content
+
+    init(
+        maxWidth: CGFloat = ControlCenterLayout.contentMaxWidth,
+        spacing: CGFloat = 24,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.maxWidth = maxWidth
+        self.spacing = spacing
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: spacing) {
+                content
+            }
+            .frame(maxWidth: maxWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .controlCenterScrollMargins()
+    }
+}
+
 private enum ControlCenterSection: String, CaseIterable, Identifiable {
     case overview
     case history
@@ -35,64 +79,22 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         case .diagnostics: "ladybug"
         }
     }
-
-    var isLibrary: Bool { self == .history || self == .dictionary }
 }
 
 @MainActor
 struct MorieControlCenter: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+
     @State private var selection: ControlCenterSection? = .overview
     @State private var selectedCaptureID: UUID?
     @State private var selectedDictionaryEntry: UUID?
-    @State private var isSidebarVisible = true
-    @AppStorage("sidebar.libraryExpanded") private var libraryExpanded = true
-    @AppStorage("sidebar.appExpanded") private var appExpanded = true
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        Group {
-            if selection == .dictionary {
-                NavigationSplitView(columnVisibility: columnVisibility(isLibrary: false)) {
-                    sidebar
-                } detail: {
-                    if let dictionary = controller.dictionary {
-                        DictionaryView(store: dictionary, selection: $selectedDictionaryEntry)
-                    }
-                }
-            } else if (selection ?? .overview).isLibrary {
-                NavigationSplitView(columnVisibility: columnVisibility(isLibrary: true)) {
-                    sidebar
-                } content: {
-                    libraryList
-                        .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 380)
-                } detail: {
-                    libraryDetail
-                        .navigationSplitViewColumnWidth(min: 420, ideal: 600)
-                }
-            } else {
-                NavigationSplitView(columnVisibility: columnVisibility(isLibrary: false)) {
-                    sidebar
-                } detail: {
-                    switch selection {
-                    case .overview, nil:
-                        OverviewView(controller: controller)
-                    case .memory:
-                        if let memory = controller.memory {
-                            NavigationStack {
-                                MemoryView(store: memory)
-                            }
-                        }
-                    case .settings:
-                        MorieSettingsView(controller: controller)
-                    case .permissions:
-                        PermissionManagementView(controller: controller)
-                    case .diagnostics:
-                        DiagnosticLogView()
-                    default:
-                        EmptyView()
-                    }
-                }
-            }
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            ControlCenterSidebar(selection: $selection)
+        } detail: {
+            detail
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
@@ -101,19 +103,45 @@ struct MorieControlCenter: View {
         }
     }
 
-    private func columnVisibility(isLibrary: Bool) -> Binding<NavigationSplitViewVisibility> {
-        // Hiding a sidebar means two columns in the library, but detail-only
-        // in Diagnostics. Preserve one user choice across both native layouts.
-        Binding(
-            get: { isSidebarVisible ? .all : (isLibrary ? .doubleColumn : .detailOnly) },
-            set: { visibility in
-                isSidebarVisible = visibility == .all || visibility == .automatic
-                    || (!isLibrary && visibility == .doubleColumn)
+    @ViewBuilder
+    private var detail: some View {
+        switch selection ?? .overview {
+        case .overview:
+            OverviewView(controller: controller)
+        case .history:
+            CaptureHistoryWorkspace(
+                controller: controller,
+                selection: $selectedCaptureID
+            )
+        case .memory:
+            if let memory = controller.memory {
+                NavigationStack {
+                    MemoryView(store: memory)
+                }
             }
-        )
+        case .dictionary:
+            if let dictionary = controller.dictionary {
+                DictionaryView(
+                    store: dictionary,
+                    selection: $selectedDictionaryEntry
+                )
+            }
+        case .settings:
+            MorieSettingsView(controller: controller)
+        case .permissions:
+            PermissionManagementView(controller: controller)
+        case .diagnostics:
+            DiagnosticLogView()
+        }
     }
+}
 
-    private var sidebar: some View {
+private struct ControlCenterSidebar: View {
+    @Binding var selection: ControlCenterSection?
+    @AppStorage("sidebar.libraryExpanded") private var libraryExpanded = true
+    @AppStorage("sidebar.appExpanded") private var appExpanded = true
+
+    var body: some View {
         List(selection: $selection) {
             sidebarItem(.overview)
 
@@ -122,6 +150,7 @@ struct MorieControlCenter: View {
                 sidebarItem(.dictionary)
                 sidebarItem(.memory)
             }
+
             Section("应用", isExpanded: $appExpanded) {
                 sidebarItem(.settings)
                 sidebarItem(.permissions)
@@ -134,42 +163,30 @@ struct MorieControlCenter: View {
     }
 
     private func sidebarItem(_ section: ControlCenterSection) -> some View {
-        Label(section.title, systemImage: section.systemImage).tag(section)
+        Label(section.title, systemImage: section.systemImage)
+            .tag(section)
     }
+}
 
-    @ViewBuilder
-    private var libraryList: some View {
-        switch selection ?? .history {
-        case .history:
+@MainActor
+private struct CaptureHistoryWorkspace: View {
+    @ObservedObject var controller: AppController
+    @Binding var selection: UUID?
+
+    var body: some View {
+        HSplitView {
             CaptureHistoryListPane(
-                selection: $selectedCaptureID,
+                selection: $selection,
                 canStartCapture: controller.canStartCapture,
                 onRecord: controller.startCaptureOnly
             )
-        case .dictionary:
-            EmptyView()
-        case .memory:
-            EmptyView()
-        default:
-            EmptyView()
-        }
-    }
+            .frame(minWidth: 250, idealWidth: 300, maxWidth: 380)
 
-    @ViewBuilder
-    private var libraryDetail: some View {
-        switch selection ?? .history {
-        case .history:
             CaptureHistoryDetailPane(
                 controller: controller,
-                selectedCaptureID: selectedCaptureID
+                selectedCaptureID: selection
             )
-            .id(selectedCaptureID)
-        case .memory:
-            EmptyView()
-        case .dictionary:
-            EmptyView()
-        default:
-            EmptyView()
+            .frame(minWidth: 420)
         }
     }
 }
@@ -214,7 +231,6 @@ private struct CaptureHistoryQueryPane: View {
         self.canStartCapture = canStartCapture
         self.onRecord = onRecord
         self.onLoadMore = onLoadMore
-
         _captures = Query(CaptureHistoryQuery.descriptor(limit: limit))
     }
 
@@ -247,7 +263,9 @@ private struct CaptureHistoryDetailPane: View {
         self.controller = controller
         self.selectedCaptureID = selectedCaptureID
         let queryID = selectedCaptureID ?? UUID()
-        _captures = Query(filter: #Predicate<CaptureRecord> { $0.id == queryID })
+        _captures = Query(
+            filter: #Predicate<CaptureRecord> { $0.id == queryID }
+        )
     }
 
     var body: some View {
@@ -273,18 +291,18 @@ private struct CaptureHistoryDetailPane: View {
     }
 }
 
-/// A reading surface shared by Capture and Memory details. Controls stay native.
 struct ManagementDetailContent<Content: View>: View {
     private let content: Content
 
-    init(@ViewBuilder content: () -> Content) { self.content = content() }
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) { content }
-                .frame(maxWidth: 760, alignment: .leading)
-                .padding(28)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+        ControlCenterScrollPage(
+            maxWidth: ControlCenterLayout.readingMaxWidth
+        ) {
+            content
         }
     }
 }
