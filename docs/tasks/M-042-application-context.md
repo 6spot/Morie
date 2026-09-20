@@ -21,7 +21,7 @@ Implement only the capture foundation:
 
 - capture the frontmost application identity at voice-input start;
 - read bounded selected/focused/nearby text through Apple Accessibility when available;
-- freeze that snapshot for the Capture lifetime;
+- pin the target application/PID at Capture Start, resolve bounded AX context asynchronously, and retain the resulting snapshot only for that active Capture;
 - keep all raw application text in process memory only;
 - log metadata/counts only, never raw application text;
 - use no app-specific adapters, screen recording or OCR.
@@ -45,9 +45,9 @@ Secure text fields contribute no selected/focused/nearby text.
 ## Acceptance criteria
 
 - [x] Dedicated Application Context value and collector exist.
-- [x] Collector uses only Apple Accessibility/AppKit APIs.
+- [x] Collector uses only Apple Accessibility/AppKit APIs and runs blocking AX IPC on its own actor with native message timeouts.
 - [x] Selected/focused/nearby reads have explicit character/node/depth bounds.
-- [x] A Capture freezes one snapshot at Start.
+- [x] Capture Start pins app/PID without blocking the main actor; the resulting snapshot is accepted only while that Capture remains active.
 - [x] Diagnostics contain only app identity and counts, never raw context.
 - [x] Snapshot is released when Capture session identity resets.
 - [ ] Xcode 27 product compile passes.
