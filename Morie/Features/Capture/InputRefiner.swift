@@ -259,23 +259,30 @@ enum InputRefiner {
         let promptText = try promptText(for: input)
         let prompt = Prompt { promptText }
         do {
+            Diagnostics.recordMemory("refinement-local-before-token-count")
             let promptTokens = try await model.tokenCount(for: prompt)
             let instructionTokens = try await model.tokenCount(for: instructions)
             let schemaTokens = try await model.tokenCount(for: GeneratedRefinement.generationSchema)
             let responseBudget = min(1_536, max(256, promptTokens + 64))
+            Diagnostics.recordMemory("refinement-local-after-token-count")
             guard promptTokens + instructionTokens + schemaTokens + responseBudget + 128 <= model.contextSize else {
                 throw RefinementReason.textTooLong
             }
             try Task.checkCancellation()
-            let session = LanguageModelSession(model: model, instructions: instructions)
-            let response = try await session.respond(
-                to: prompt, generating: GeneratedRefinement.self,
-                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: responseBudget)
+            let text = try await generateLocalResponse(
+                model: model,
+                instructions: instructions,
+                prompt: prompt,
+                responseBudget: responseBudget
             )
-            try Task.checkCancellation()
-            return response.content.text
+            Diagnostics.recordMemory("refinement-local-session-scope-exited")
+            return text
         } catch {
-            if Task.isCancelled || error is CancellationError { throw CancellationError() }
+            if Task.isCancelled || error is CancellationError {
+                Diagnostics.recordMemory("refinement-local-cancelled")
+                throw CancellationError()
+            }
+            Diagnostics.recordMemory("refinement-local-failed")
             if let reason = error as? RefinementReason { throw reason }
             // Framework errors can contain private input. Persist only fixed reasons.
             switch error {
@@ -285,6 +292,24 @@ enum InputRefiner {
             default: throw RefinementReason.generationFailed
             }
         }
+    }
+
+    private static func generateLocalResponse(
+        model: SystemLanguageModel,
+        instructions: Instructions,
+        prompt: Prompt,
+        responseBudget: Int
+    ) async throws -> String {
+        Diagnostics.recordMemory("refinement-local-before-session")
+        let session = LanguageModelSession(model: model, instructions: instructions)
+        Diagnostics.recordMemory("refinement-local-session-created")
+        let response = try await session.respond(
+            to: prompt, generating: GeneratedRefinement.self,
+            options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: responseBudget)
+        )
+        Diagnostics.recordMemory("refinement-local-respond-finished")
+        try Task.checkCancellation()
+        return response.content.text
     }
 
     private static func generateWithCloud(
@@ -310,18 +335,41 @@ enum InputRefiner {
 
         do {
             try Task.checkCancellation()
-            let session = LanguageModelSession(model: model, instructions: instructions)
-            let response = try await session.respond(
-                to: prompt,
-                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: responseBudget)
+            Diagnostics.recordMemory("refinement-cloud-before-session")
+            let content = try await generateCloudResponse(
+                model: model,
+                instructions: instructions,
+                prompt: prompt,
+                responseBudget: responseBudget
             )
-            try Task.checkCancellation()
-            return response.content
+            Diagnostics.recordMemory("refinement-cloud-session-scope-exited")
+            return content
         } catch {
-            if Task.isCancelled || error is CancellationError { throw CancellationError() }
+            if Task.isCancelled || error is CancellationError {
+                Diagnostics.recordMemory("refinement-cloud-cancelled")
+                throw CancellationError()
+            }
+            Diagnostics.recordMemory("refinement-cloud-failed")
             // Remote errors may include response bodies. Never persist them into Capture history.
             throw RefinementReason.generationFailed
         }
+    }
+
+    private static func generateCloudResponse(
+        model: ChatCompletionsLanguageModel,
+        instructions: Instructions,
+        prompt: Prompt,
+        responseBudget: Int
+    ) async throws -> String {
+        let session = LanguageModelSession(model: model, instructions: instructions)
+        Diagnostics.recordMemory("refinement-cloud-session-created")
+        let response = try await session.respond(
+            to: prompt,
+            options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: responseBudget)
+        )
+        Diagnostics.recordMemory("refinement-cloud-respond-finished")
+        try Task.checkCancellation()
+        return response.content
     }
 }
 
