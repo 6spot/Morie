@@ -210,44 +210,37 @@ struct PermissionManagementView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ControlCenterMetrics.sectionSpacing) {
+        VStack(
+            alignment: .leading,
+            spacing: ControlCenterMetrics.sectionSpacing
+        ) {
             if setup.checks.isEmpty {
-                ControlCenterSectionGroup("设备与权限") {
+                ControlCenterGroup("设备与权限") {
                     ProgressView("正在检查设备和权限…")
                 }
             } else {
-                ControlCenterSectionGroup("设备能力") {
-                    ForEach(
-                        setup.checks.filter { !$0.requirement.isPermission }
-                    ) { check in
-                        PermissionRequirementRow(
-                            check: check,
-                            activeRequest: setup.activeRequest,
-                            isBusy: isBusy,
-                            onAction: perform
-                        )
-                    }
+                ControlCenterGroup("设备能力") {
+                    capabilityRows(
+                        setup.checks.filter {
+                            !$0.requirement.isPermission
+                        }
+                    )
                 }
 
-                ControlCenterSectionGroup(
+                ControlCenterGroup(
                     "使用权限",
                     footer: "权限由 macOS 管理。从系统设置返回后，状态会自动更新。"
                 ) {
-                    ForEach(
-                        setup.checks.filter { $0.requirement.isPermission }
-                    ) { check in
-                        PermissionRequirementRow(
-                            check: check,
-                            activeRequest: setup.activeRequest,
-                            isBusy: isBusy,
-                            onAction: perform
-                        )
-                    }
+                    capabilityRows(
+                        setup.checks.filter {
+                            $0.requirement.isPermission
+                        }
+                    )
                 }
             }
 
             if let error = controller.setupError {
-                ControlCenterSectionGroup("状态") {
+                ControlCenterGroup("状态") {
                     Label(
                         error,
                         systemImage: "exclamationmark.triangle"
@@ -283,6 +276,27 @@ struct PermissionManagementView: View {
         .task {
             if setup.checks.isEmpty {
                 await setup.refresh()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func capabilityRows(
+        _ checks: [CapabilityCheck]
+    ) -> some View {
+        ForEach(Array(checks.enumerated()), id: \.element.id) {
+            index,
+            check in
+
+            PermissionRequirementRow(
+                check: check,
+                activeRequest: setup.activeRequest,
+                isBusy: isBusy,
+                onAction: perform
+            )
+
+            if index < checks.count - 1 {
+                Divider()
             }
         }
     }
