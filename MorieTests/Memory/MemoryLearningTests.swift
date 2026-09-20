@@ -246,7 +246,7 @@ final class MemoryLearningTests: XCTestCase {
 
     func testWorkingContextExpiresRefreshesAndCanPromote() throws {
         let fixture = try LearningFixture()
-        let base = Date(timeIntervalSince1970: 1_000)
+        let base = Date()
         let first = try fixture.capture(
             "I am debugging Morie memory this week.",
             date: base
