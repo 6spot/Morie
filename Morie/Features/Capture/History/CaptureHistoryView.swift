@@ -232,7 +232,7 @@ private struct CaptureHistoryDetailPane: View {
     ) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
-        self.history = history
+        _history = ObservedObject(wrappedValue: history)
         self.selectedCaptureID = selectedCaptureID
     }
 
