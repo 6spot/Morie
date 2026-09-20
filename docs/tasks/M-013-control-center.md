@@ -30,6 +30,16 @@ extra navigation level.
 - Dictionary uses sidebar + one content page. Selection-scoped edit/delete and
   add actions live with the word list; there is no third detail column and no
   source/time explanation.
+- The Control Center owns one stable root `NavigationSplitView`. Changing the
+  selected section replaces only the detail workspace; it must not swap the
+  entire split-view hierarchy or remount the sidebar.
+- The shell does not observe the whole `AppController`. Runtime state is
+  observed only by the currently visible page that needs it, so transcript and
+  capture-phase updates cannot invalidate the sidebar/navigation root.
+- Standard reading/form pages keep their scroll container full-width and use
+  shared scroll-content margins. This keeps scroll indicators at the same
+  right edge while aligning page content. Dense native workspaces such as
+  History lists and Diagnostics tables remain edge-to-edge by design.
 
 ## Implementation
 
@@ -50,6 +60,16 @@ extra navigation level.
 - Reworked Dictionary into a two-column Control Center section with native list
   selection, toolbar/context edit and delete actions, and the existing compact
   editor sheet.
+- Replaced the selection-dependent three-root Control Center implementation
+  with one stable two-column shell. History now owns its list/detail split
+  inside the detail workspace, so switching sections no longer reconstructs
+  the sidebar.
+- Removed `@ObservedObject AppController` from the Control Center shell. Views
+  such as Overview, History, Settings and Permissions keep their own scoped
+  observation only while visible.
+- Added shared Control Center scroll-content margins and applied them to
+  Overview, Personal Memory, Dictionary, Settings, Permissions, diagnostics
+  detail and reading-detail surfaces.
 
 ## Validation
 
