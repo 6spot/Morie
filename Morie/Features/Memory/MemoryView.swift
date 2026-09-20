@@ -42,12 +42,8 @@ struct MemoryView: View {
 
     var body: some View {
         ControlCenterScrollPage(spacing: 32) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Morie 了解你的这些内容")
-                        .font(.largeTitle)
-                        .fontWeight(.semibold)
-
-                    Text("这些内容来自你日常使用 Morie 时表达过的信息，并会随着新的输入持续更新。")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Morie 会在这里维护对你有用的长期信息和近期上下文，并随着新的输入持续更新。")
                         .font(.body)
                         .foregroundStyle(.secondary)
 
@@ -131,7 +127,7 @@ struct MemoryView: View {
         }
         .onAppear {
             do {
-                try store.load()
+                try store.loadIfNeeded()
                 errorMessage = nil
             } catch {
                 errorMessage = "无法加载个人记忆。"

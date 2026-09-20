@@ -141,7 +141,7 @@ struct DictionaryView: View {
         }
         .onAppear {
             do {
-                try store.load()
+                try store.loadIfNeeded()
                 errorMessage = nil
                 if selectedEntry?.isEditable != true {
                     selection = nil

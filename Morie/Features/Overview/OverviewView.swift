@@ -1,7 +1,8 @@
 import SwiftData
 import SwiftUI
 
-struct OverviewMetrics {
+struct OverviewMetrics: Equatable {
+    let totalCaptures: Int
     let recognizedCharacters: Int
     let successfulInputs: Int
     let currentAppAttempts: Int
@@ -10,6 +11,7 @@ struct OverviewMetrics {
     let refinementSamples: Int
 
     init(captures: [CaptureRecord]) {
+        totalCaptures = captures.count
         recognizedCharacters = captures.reduce(0) { $0 + $1.recognizedText.count }
 
         let currentApp = captures.filter {
@@ -22,7 +24,9 @@ struct OverviewMetrics {
             $0.lifecycle == .deliveryFailed || $0.lifecycle == .failed
         }.count
 
-        let durations = captures.compactMap(\.refinement?.durationSeconds).filter { $0 >= 0 }
+        let durations = captures
+            .compactMap(\.refinement?.durationSeconds)
+            .filter { $0 >= 0 }
         refinementSamples = durations.count
         averageRefinementSeconds = durations.isEmpty
             ? nil
@@ -35,24 +39,27 @@ struct OverviewMetrics {
     }
 }
 
+struct OverviewMetricsSnapshot: Equatable {
+    let metrics: OverviewMetrics
+    let recordCount: Int
+    let latestUpdatedAt: Date?
+}
+
 @MainActor
 struct OverviewView: View {
     @ObservedObject var controller: AppController
     @ObservedObject private var refinementModels: RefinementModelController
-    @Query private var captures: [CaptureRecord]
+    @Environment(\.modelContext) private var modelContext
+    @Binding private var metricsSnapshot: OverviewMetricsSnapshot?
+    @State private var metricsError: String?
 
-    init(controller: AppController) {
+    init(
+        controller: AppController,
+        metricsSnapshot: Binding<OverviewMetricsSnapshot?>
+    ) {
         self.controller = controller
         _refinementModels = ObservedObject(wrappedValue: controller.refinementModels)
-        let capturing = CaptureLifecycle.capturing.rawValue
-        _captures = Query(
-            filter: #Predicate<CaptureRecord> { $0.lifecycleRawValue != capturing },
-            sort: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-    }
-
-    private var metrics: OverviewMetrics {
-        OverviewMetrics(captures: captures)
+        _metricsSnapshot = metricsSnapshot
     }
 
     var body: some View {
@@ -60,15 +67,21 @@ struct OverviewView: View {
             Text("查看 Morie 的本地使用情况和当前实际使用的模型。")
                 .foregroundStyle(.secondary)
 
-            LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 190, maximum: 280), spacing: 12)],
+            if let metrics = metricsSnapshot?.metrics {
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .adaptive(minimum: 190, maximum: 280),
+                            spacing: 12
+                        )
+                    ],
                     alignment: .leading,
                     spacing: 12
                 ) {
                     metricCard(
                         title: "累计识别字符",
                         value: metrics.recognizedCharacters.formatted(),
-                        detail: "\(captures.count.formatted()) 条已完成记录",
+                        detail: "\(metrics.totalCaptures.formatted()) 条已完成记录",
                         systemImage: "textformat"
                     )
                     metricCard(
@@ -94,43 +107,97 @@ struct OverviewView: View {
                         systemImage: "wand.and.stars"
                     )
                 }
-
-                Text("“输入失败率”只统计 Morie 的输入流程是否成功，不等同于语音识别失误率。当前还没有足够的用户纠错真值样本，因此暂不计算可能误导的 ASR 错误率。")
-                    .font(.callout)
+            } else if let metricsError {
+                Label(metricsError, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.secondary)
+            } else {
+                ProgressView("正在读取使用统计…")
+            }
 
-                GroupBox {
-                    VStack(spacing: 0) {
-                        modelRow(
-                            title: "语音识别",
-                            name: controller.speechBackend?.displayName ?? "正在准备…",
-                            detail: speechDetail,
-                            status: speechStatus
+            Text("“输入失败率”只统计 Morie 的输入流程是否成功，不等同于语音识别失误率。当前还没有足够的用户纠错真值样本，因此暂不计算可能误导的 ASR 错误率。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            GroupBox {
+                VStack(spacing: 0) {
+                    modelRow(
+                        title: "语音识别",
+                        name: controller.speechBackend?.displayName ?? "正在准备…",
+                        detail: speechDetail,
+                        status: speechStatus
+                    )
+
+                    Divider()
+                        .padding(.vertical, 12)
+
+                    modelRow(
+                        title: "输入润色",
+                        name: refinementModels.modelName,
+                        detail: refinementModels.modelDetail,
+                        status: refinementModels.modelStatusTitle(
+                            inputRefinementEnabled: controller.inputRefinementEnabled
                         )
-
-                        Divider()
-                            .padding(.vertical, 12)
-
-                        modelRow(
-                            title: "输入润色",
-                            name: refinementModels.modelName,
-                            detail: refinementModels.modelDetail,
-                            status: refinementModels.modelStatusTitle(
-                                inputRefinementEnabled: controller.inputRefinementEnabled
-                            )
-                        )
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 4)
-                } label: {
-                    Label("当前模型", systemImage: "cpu")
+                    )
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
+            } label: {
+                Label("当前模型", systemImage: "cpu")
+            }
 
             Text("模型状态来自当前运行实例。语音识别发生回退时，这里会直接显示 DictationTranscriber 和“回退”，而不是仍然显示首选模型。")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
         .navigationTitle("总览")
+        .task {
+            await refreshMetricsIfNeeded()
+        }
+    }
+
+    private func refreshMetricsIfNeeded() async {
+        await Task.yield()
+
+        do {
+            let capturing = CaptureLifecycle.capturing.rawValue
+            let baseDescriptor = FetchDescriptor<CaptureRecord>(
+                predicate: #Predicate {
+                    $0.lifecycleRawValue != capturing
+                }
+            )
+            let recordCount = try modelContext.fetchCount(baseDescriptor)
+
+            var latestDescriptor = FetchDescriptor<CaptureRecord>(
+                predicate: #Predicate {
+                    $0.lifecycleRawValue != capturing
+                },
+                sortBy: [
+                    SortDescriptor(\.updatedAt, order: .reverse)
+                ]
+            )
+            latestDescriptor.fetchLimit = 1
+            let latestUpdatedAt = try modelContext
+                .fetch(latestDescriptor)
+                .first?
+                .updatedAt
+
+            if let cached = metricsSnapshot,
+               cached.recordCount == recordCount,
+               cached.latestUpdatedAt == latestUpdatedAt {
+                metricsError = nil
+                return
+            }
+
+            let captures = try modelContext.fetch(baseDescriptor)
+            metricsSnapshot = OverviewMetricsSnapshot(
+                metrics: OverviewMetrics(captures: captures),
+                recordCount: recordCount,
+                latestUpdatedAt: latestUpdatedAt
+            )
+            metricsError = nil
+        } catch {
+            metricsError = "无法读取使用统计。"
+        }
     }
 
     private var speechDetail: String {
@@ -156,14 +223,24 @@ struct OverviewView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
                 Text(value)
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .font(
+                        .system(
+                            size: 28,
+                            weight: .semibold,
+                            design: .rounded
+                        )
+                    )
                     .contentTransition(.numericText())
                 Text(detail)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
-            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 72,
+                alignment: .leading
+            )
         } label: {
             Label(title, systemImage: systemImage)
         }
@@ -199,7 +276,9 @@ struct OverviewView: View {
 
     private func percent(_ value: Double?) -> String {
         guard let value else { return "—" }
-        return value.formatted(.percent.precision(.fractionLength(1)))
+        return value.formatted(
+            .percent.precision(.fractionLength(1))
+        )
     }
 
     private func duration(_ value: Double?) -> String {

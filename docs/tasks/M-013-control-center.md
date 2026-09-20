@@ -61,15 +61,28 @@ extra navigation level.
   selection, toolbar/context edit and delete actions, and the existing compact
   editor sheet.
 - Replaced the selection-dependent three-root Control Center implementation
-  with one stable two-column shell. History now owns its list/detail split
-  inside the detail workspace, so switching sections no longer reconstructs
-  the sidebar.
+  with one stable outer shell. History owns a nested native
+  `NavigationSplitView` for its list/detail columns, preserving the original
+  macOS split-view behavior without reconstructing the outer sidebar. An
+  intermediate `HSplitView` experiment was rejected after owner testing
+  because it changed History behavior without delivering a visible UX gain.
 - Removed `@ObservedObject AppController` from the Control Center shell. Views
   such as Overview, History, Settings and Permissions keep their own scoped
   observation only while visible.
 - Added shared Control Center scroll-content margins and applied them to
   Overview, Personal Memory, Dictionary, Settings, Permissions, diagnostics
   detail and reading-detail surfaces.
+- Removed the extra large in-body Personal Memory title so top-level pages use
+  the native navigation title consistently.
+- Personal Memory and Dictionary now avoid repeated full store reloads when the
+  user merely switches away and back.
+- Overview no longer owns an always-recreated all-Capture `@Query`. The
+  Control Center retains one metrics snapshot for the window session; returning
+  to Overview first checks only completed-record count and the latest
+  `updatedAt`, and scans all completed records again only when that signature
+  changed.
+- Added lightweight Sidebar mount/unmount diagnostics so owner-device testing
+  can distinguish a normal selection redraw from an actual sidebar remount.
 
 ## Validation
 

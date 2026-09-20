@@ -88,6 +88,7 @@ struct MorieControlCenter: View {
     @State private var selection: ControlCenterSection? = .overview
     @State private var selectedCaptureID: UUID?
     @State private var selectedDictionaryEntry: UUID?
+    @State private var overviewMetricsSnapshot: OverviewMetricsSnapshot?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
@@ -107,7 +108,10 @@ struct MorieControlCenter: View {
     private var detail: some View {
         switch selection ?? .overview {
         case .overview:
-            OverviewView(controller: controller)
+            OverviewView(
+                controller: controller,
+                metricsSnapshot: $overviewMetricsSnapshot
+            )
         case .history:
             CaptureHistoryWorkspace(
                 controller: controller,
@@ -160,6 +164,12 @@ private struct ControlCenterSidebar: View {
         .listStyle(.sidebar)
         .navigationTitle("Morie")
         .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 240)
+        .onAppear {
+            Diagnostics.record("ControlCenter", "Sidebar mounted")
+        }
+        .onDisappear {
+            Diagnostics.record("ControlCenter", "Sidebar unmounted")
+        }
     }
 
     private func sidebarItem(_ section: ControlCenterSection) -> some View {
@@ -172,22 +182,25 @@ private struct ControlCenterSidebar: View {
 private struct CaptureHistoryWorkspace: View {
     @ObservedObject var controller: AppController
     @Binding var selection: UUID?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        HSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             CaptureHistoryListPane(
                 selection: $selection,
                 canStartCapture: controller.canStartCapture,
                 onRecord: controller.startCaptureOnly
             )
-            .frame(minWidth: 250, idealWidth: 300, maxWidth: 380)
-
+            .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 380)
+        } detail: {
             CaptureHistoryDetailPane(
                 controller: controller,
                 selectedCaptureID: selection
             )
-            .frame(minWidth: 420)
+            .id(selection)
+            .navigationSplitViewColumnWidth(min: 420, ideal: 600)
         }
+        .navigationSplitViewStyle(.balanced)
     }
 }
 
