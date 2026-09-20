@@ -360,8 +360,21 @@ final class InputRefinementRunner {
         configuration: RefinementConfiguration = .local
     ) async throws -> RefinementGeneration {
         try Task.checkCancellation()
-        guard !isBusy else { return .keptOriginal(.modelBusy) }
+        guard !isBusy else {
+            DevelopmentDiagnostics.record(
+                "RefinementRunner",
+                captureID: input.captureID,
+                level: .warning,
+                "busy; activeModelJob=\(modelID.map { String($0.uuidString.prefix(8)) } ?? "none")"
+            )
+            return .keptOriginal(.modelBusy)
+        }
         let id = UUID()
+        DevelopmentDiagnostics.record(
+            "RefinementRunner",
+            captureID: input.captureID,
+            "start; job=\(String(id.uuidString.prefix(8)))"
+        )
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 guard !Task.isCancelled else {
@@ -376,12 +389,29 @@ final class InputRefinementRunner {
                     do {
                         outcome = .text(try await generate(input, configuration))
                     } catch {
+                        DevelopmentDiagnostics.record(
+                            "RefinementRunner",
+                            captureID: input.captureID,
+                            level: .warning,
+                            "modelTaskFailed; job=\(String(id.uuidString.prefix(8))); errorType=\(DevelopmentDiagnostics.errorType(error))"
+                        )
                         outcome = .keptOriginal((error as? RefinementReason) ?? .generationFailed)
                     }
+                    DevelopmentDiagnostics.record(
+                        "RefinementRunner",
+                        captureID: input.captureID,
+                        "modelTaskFinished; job=\(String(id.uuidString.prefix(8)))"
+                    )
                     self?.modelFinished(id, outcome: outcome)
                 }
             }
         } onCancel: {
+            DevelopmentDiagnostics.record(
+                "RefinementRunner",
+                captureID: input.captureID,
+                level: .warning,
+                "waitingCancelled; job=\(String(id.uuidString.prefix(8)))"
+            )
             Task { @MainActor [weak self] in
                 self?.finishWaiting(id, result: .failure(CancellationError()), cancelModel: true)
             }
