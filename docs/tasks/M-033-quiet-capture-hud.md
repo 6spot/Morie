@@ -109,3 +109,10 @@ The corrected implementation now:
 - moves from fully outside the left edge to fully outside the right edge with a linear 2.4 s traversal;
 - uses a bright-neutral white highlight (peak ~0.26 opacity), never `Color.primary`, so light appearance cannot turn the shimmer black;
 - preserves the 0.6 s clear pause and indefinite activity loop until real completion interrupts it.
+
+
+### Validation
+
+- [x] macOS 27 CI #180 Release product compile passed.
+- [x] macOS 27 CI #180 full MorieTests gate passed.
+- [ ] Owner-device check confirms the first post-launch cue is clean and the bright-neutral shimmer crosses the full processing capsule.
