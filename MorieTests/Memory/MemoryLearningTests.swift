@@ -5,7 +5,7 @@ import XCTest
 @MainActor
 final class MemoryLearningTests: XCTestCase {
     func testSavedFinalTextCreatesTopicAndEvidenceAndSurvivesRestart() async throws {
-        let fixture = try LearningFixture()
+        let fixture = try LearningFixture(persistent: true)
         let source = try fixture.capture(
             "I work on Morie.",
             recognition: "I work on more e."
@@ -466,7 +466,7 @@ final class MemoryLearningTests: XCTestCase {
     }
 
     func testRestartDiscoversUnqueuedInputAndPreservesBackoff() throws {
-        let fixture = try LearningFixture()
+        let fixture = try LearningFixture(persistent: true)
         let id = try fixture.capture("I work on Morie.")
         let reopened = try CaptureStore(storageURL: fixture.url)
         let memory = MemoryStore(container: reopened.container)
@@ -647,24 +647,39 @@ private final class LearningFixture {
     let url: URL
     let captures: CaptureStore
     let memory: MemoryStore
+    private let persistent: Bool
 
-    init() throws {
+    init(persistent: Bool = false) throws {
+        self.persistent = persistent
         directory = FileManager.default.temporaryDirectory
             .appending(
-                path: "MorieLearning-\(UUID())",
+                path: "MorieLearning-" + UUID().uuidString,
                 directoryHint: .isDirectory
             )
-        try FileManager.default.createDirectory(
-            at: directory,
-            withIntermediateDirectories: true
-        )
         url = directory.appending(path: "store")
-        captures = try CaptureStore(storageURL: url)
+
+        if persistent {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+            captures = try CaptureStore(storageURL: url)
+        } else {
+            captures = try CaptureStore(inMemory: true)
+        }
         memory = MemoryStore(container: captures.container)
     }
 
     deinit {
-        try? FileManager.default.removeItem(at: directory)
+        // File-backed SwiftData may still be draining SQLite work after the
+        // test method releases its last ModelContext. Unlinking that database
+        // from deinit makes otherwise-correct tests race CoreData I/O. The OS
+        // owns cleanup for these two unique temporary persistence fixtures.
+        if !persistent {
+            try? FileManager.default.removeItem(
+                at: captures.audioDirectory
+            )
+        }
     }
 
     func capture(
