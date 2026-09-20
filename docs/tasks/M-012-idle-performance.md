@@ -3,6 +3,7 @@
 - **Status:** IN PROGRESS
 - **Owner:** macOS input foundation
 - **Depends on:** M-002 capture HUD
+- **Current PR:** [#68](https://github.com/6spot/Morie/pull/68)
 
 ## Goal
 
