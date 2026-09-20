@@ -63,7 +63,7 @@ struct OverviewView: View {
     }
 
     var body: some View {
-        ControlCenterContentPage {
+        VStack(alignment: .leading, spacing: ControlCenterMetrics.sectionSpacing) {
             Text("查看 Morie 的本地使用情况和当前实际使用的模型。")
                 .foregroundStyle(.secondary)
 
