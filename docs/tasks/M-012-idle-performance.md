@@ -73,7 +73,9 @@ No Type4Me source or external dependency is copied.
   treating every retained page as an application object leak.
 - Memory learning remains single-flight across input preemption: cancelling for
   a new Capture does not clear worker ownership until the in-flight model call
-  actually returns. A focused regression test now locks that behavior down.
+  actually returns. The existing uncooperative-analysis regression continues to
+  cover this cancellation path; this follow-up intentionally adds diagnostics
+  without changing worker ownership semantics.
 
 ## Validation
 
