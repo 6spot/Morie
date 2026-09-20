@@ -5,6 +5,7 @@ import SwiftUI
 struct MorieSetupView: View {
     let controller: AppController
     @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
@@ -12,6 +13,9 @@ struct MorieSetupView: View {
     init(controller: AppController) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
         _setup = ObservedObject(wrappedValue: controller.setup)
     }
 
@@ -20,10 +24,10 @@ struct MorieSetupView: View {
             checks: setup.checks,
             isRefreshing: setup.isRefreshing,
             activeRequest: setup.activeRequest,
-            isPreparing: runtime.isBootstrapping,
+            isPreparing: capabilities.isBootstrapping,
             isInputActive: controller.isCaptureActive,
             canFinish: setup.isReady && controller.canCompleteSetup,
-            preparationError: runtime.setupError,
+            preparationError: capabilities.setupError,
             onRefresh: { Task { await setup.refresh() } },
             onAction: { requirement in Task { await setup.performAction(for: requirement) } },
             onLater: { dismissWindow(id: "setup") },
@@ -199,18 +203,22 @@ private struct PermissionRequirementRow: View {
 struct PermissionManagementView: View {
     let controller: AppController
     @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
 
     init(controller: AppController) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _capabilities = ObservedObject(
+            wrappedValue: controller.capabilities
+        )
         _setup = ObservedObject(wrappedValue: controller.setup)
     }
 
     private var isBusy: Bool {
         setup.isRefreshing
             || setup.activeRequest != nil
-            || runtime.isBootstrapping
+            || capabilities.isBootstrapping
     }
 
     var body: some View {
@@ -243,7 +251,7 @@ struct PermissionManagementView: View {
                 }
             }
 
-            if let error = runtime.setupError {
+            if let error = capabilities.setupError {
                 ControlCenterGroup("状态") {
                     Label(
                         error,
