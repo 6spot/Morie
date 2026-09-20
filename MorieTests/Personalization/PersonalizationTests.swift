@@ -4,6 +4,56 @@ import XCTest
 
 @MainActor
 final class PersonalizationTests: XCTestCase {
+    func testRefinementModelControllerDoesNotReadKeychainUntilExternalCaptureNeedsIt() {
+        var credentialReads = 0
+        let controller = RefinementModelController(
+            load: {
+                RefinementModelConfiguration(
+                    mode: .cloud,
+                    cloudBaseURL: "https://example.com/v1",
+                    cloudModelName: "test-model",
+                    cloudAPIKey: "must-not-be-loaded"
+                )
+            },
+            credentialReader: {
+                credentialReads += 1
+                return "runtime-secret"
+            }
+        )
+
+        XCTAssertEqual(credentialReads, 0)
+        XCTAssertEqual(controller.configuration.cloudAPIKey, "")
+
+        let first = controller.runtimeConfiguration()
+        XCTAssertEqual(credentialReads, 1)
+        XCTAssertEqual(first.cloudAPIKey, "runtime-secret")
+
+        let second = controller.runtimeConfiguration()
+        XCTAssertEqual(credentialReads, 1)
+        XCTAssertEqual(second.cloudAPIKey, "runtime-secret")
+    }
+
+    func testLocalRefinementNeverReadsExternalCredential() {
+        var credentialReads = 0
+        let controller = RefinementModelController(
+            load: {
+                RefinementModelConfiguration(
+                    mode: .local,
+                    cloudBaseURL: "https://example.com/v1",
+                    cloudModelName: "test-model",
+                    cloudAPIKey: ""
+                )
+            },
+            credentialReader: {
+                credentialReads += 1
+                return "unused"
+            }
+        )
+
+        XCTAssertEqual(controller.runtimeConfiguration().mode, .local)
+        XCTAssertEqual(credentialReads, 0)
+    }
+
     func testBasicCleanupRemovesFillerAndFormatsExistingStructureWithoutMemory() throws {
         let cases = [
             ("嗯 我我今天想说的就是说先做设置", "我今天想说先做设置。"),
