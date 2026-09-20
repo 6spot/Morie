@@ -1,4 +1,5 @@
-import ApplicationServices
+@preconcurrency import ApplicationServices
+import Carbon
 import Foundation
 
 /// Captures a bounded, runtime-only snapshot of the user's current editing
@@ -23,7 +24,10 @@ actor ApplicationContextCollector {
     func capture(
         _ request: ApplicationContextCaptureRequest
     ) -> ApplicationContextSnapshot {
-        guard !Task.isCancelled, AXIsProcessTrusted() else {
+        guard !Task.isCancelled,
+              AXIsProcessTrusted(),
+              !IsSecureEventInputEnabled()
+        else {
             return emptySnapshot(for: request)
         }
 
