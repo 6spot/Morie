@@ -284,7 +284,10 @@ struct DiagnosticLogView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .controlCenterScrollMargins()
+                .contentMargins(
+                    ControlCenterMetrics.denseInset,
+                    for: .scrollContent
+                )
                 .frame(minHeight: 100, idealHeight: 160, maxHeight: 240)
             }
         }
