@@ -168,6 +168,8 @@ History's **个人记忆** section shows idle scheduling, learning progress, out
 
 Settings exposes **自动润色语音输入**, on by default. Its explanation describes filler/redundancy removal and appropriate punctuation, paragraphs and clear lists while preserving meaning and tone. The dictionary applies independently of the toggle; Memory is not a prerequisite for cleanup.
 
+M-035 adds a separate native **润色提示词** section using the system `TextEditor`. The editor shows the effective instructions, with ordinary system **保存提示词** and **恢复默认** buttons plus secondary status/help text. Saving affects only Captures started afterward and does not require an app rebuild or relaunch; an in-flight Capture keeps its start-time prompt snapshot. Restore removes the user override and reloads Morie's bundled default. Do not add a custom code editor, prompt marketplace or live-as-you-type model call to this surface. Apple-local and external refinement share the same edited instruction.
+
 History's **输入润色** inside **识别与润色** shows status, duration and a readable fallback reason. Standard disclosures show **修改内容**, **润色前的文字**, **本次使用的字典** (saved words only) and **本次参考的个人记忆**, retaining immutable snapshots. Recognition can change after a Speech retry while saved final output and its actual earlier provenance stay intact.
 
 The existing processing HUD remains visible during cleanup and the menu reports **正在润色…**. Running-source mutation/retry is disabled. Slow/failed AI processing retains saved dictionary-corrected/original text, and session cancellation prevents a late paste. Actual model fidelity, VoiceOver and latency require device checks.
