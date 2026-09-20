@@ -132,7 +132,8 @@ enum ApplicationContextVocabulary {
 
     static func inspect(
         from snapshot: ApplicationContextSnapshot,
-        limit: Int = maximumTerms
+        limit: Int = maximumTerms,
+        captureID: UUID? = nil
     ) -> [ApplicationContextVocabularyHint] {
         guard limit > 0 else { return [] }
 
@@ -162,7 +163,14 @@ enum ApplicationContextVocabulary {
             guard let text = source.text, !text.isEmpty else { continue }
             for candidate in candidates(in: text) {
                 defer { order += 1 }
-                guard let quality = qualityScore(candidate) else { continue }
+                guard let quality = qualityScore(candidate) else {
+                    DevelopmentDiagnostics.record(
+                        "Vocabulary",
+                        captureID: captureID,
+                        "candidate=\(candidate); source=\(source.source.rawValue); decision=rejectedQuality"
+                    )
+                    continue
+                }
 
                 let key = canonical(candidate)
                 let item = RankedTerm(
@@ -174,24 +182,50 @@ enum ApplicationContextVocabulary {
                 if let current = ranked[key],
                    current.score > item.score
                     || (current.score == item.score && current.order <= item.order) {
+                    DevelopmentDiagnostics.record(
+                        "Vocabulary",
+                        captureID: captureID,
+                        "candidate=\(candidate); source=\(source.source.rawValue); quality=\(quality); score=\(item.score); decision=deduplicated; kept=\(current.value); keptSource=\(current.source.rawValue); keptScore=\(current.score)"
+                    )
                     continue
                 }
+                DevelopmentDiagnostics.record(
+                    "Vocabulary",
+                    captureID: captureID,
+                    "candidate=\(candidate); source=\(source.source.rawValue); quality=\(quality); score=\(item.score); decision=ranked"
+                )
                 ranked[key] = item
             }
         }
 
-        return ranked.values
-            .sorted {
-                if $0.score != $1.score { return $0.score > $1.score }
-                return $0.order < $1.order
-            }
-            .prefix(min(limit, maximumTerms))
-            .map {
-                ApplicationContextVocabularyHint(
-                    value: $0.value,
-                    source: $0.source
-                )
-            }
+        let ordered = ranked.values.sorted {
+            if $0.score != $1.score { return $0.score > $1.score }
+            return $0.order < $1.order
+        }
+        let selected = Array(ordered.prefix(min(limit, maximumTerms)))
+        DevelopmentDiagnostics.list(
+            "Vocabulary",
+            captureID: captureID,
+            label: "selected",
+            selected.map { "\($0.value)@\($0.source.rawValue):\($0.score)" }
+        )
+        if ordered.count > selected.count {
+            DevelopmentDiagnostics.list(
+                "Vocabulary",
+                captureID: captureID,
+                label: "droppedByLimit",
+                ordered.dropFirst(selected.count).map {
+                    "\($0.value)@\($0.source.rawValue):\($0.score)"
+                }
+            )
+        }
+
+        return selected.map {
+            ApplicationContextVocabularyHint(
+                value: $0.value,
+                source: $0.source
+            )
+        }
     }
 
     static func extract(
