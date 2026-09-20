@@ -168,7 +168,7 @@ private struct ControlCenterSidebar: View {
             Diagnostics.record("ControlCenter", "Sidebar mounted")
         }
         .onDisappear {
-            Diagnostics.record("ControlCenter", "Sidebar unmounted", level: .warning)
+            Diagnostics.record("ControlCenter", "Sidebar unmounted")
         }
     }
 
