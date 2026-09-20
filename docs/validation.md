@@ -99,20 +99,22 @@ Automated AAC tests establish finalization and data preservation for controlled 
 
 ## M-004 Memory foundation
 
-Current acceptance follows [M-009](tasks/M-009-macos-input-memory.md), which supersedes mandatory candidate review. Use disposable records in the signed app when deferred evening validation resumes:
+Current acceptance follows [M-036](tasks/M-036-semantic-memory.md), which replaces the fragmented fact-list writer while preserving the durable idle-learning boundary. Use disposable records in the signed app:
 
-- [ ] Completed ordinary input creates selective personal Memory during idle time without a confirmation inbox. Empty Memory does not prevent useful input/cleanup.
-- [ ] History's **用于学习的文字** is the exact committed final text, including dictionary/cleanup output; recognized text remains separate.
+- [ ] **设置 → 使用个人记忆** defaults on. Turning it off stops new learning and Memory use during cleanup while retaining existing Memory/evidence.
+- [ ] Complete ordinary input while Memory is off, then turn it back on. The disabled-period Capture remains durably skipped and is not silently backfilled later.
+- [ ] Completed ordinary input can create useful semantic Memory during idle time without a confirmation inbox. Empty Memory does not prevent useful input/cleanup.
+- [ ] History's **用于学习的文字** and Memory evidence are the exact committed final text/supporting source. Recognized text remains separate.
 - [ ] Active, cancelled, capture-only, raw-only and running-refinement sources are excluded. Changed/deleted/unsaved sources cannot produce stale results.
-- [ ] Check actual Chinese/English personal projects, people, stable preferences, facts and decisions. Quoted, third-person, hypothetical, temporary and uncertain statements are not asserted as personal facts.
-- [ ] Repeat evidence and weaker recurring evidence across distinct inputs; sources merge without duplicate Memory or double-counting one Capture.
-- [ ] Express a clear later personal update; current automatic Memory is superseded with source history. Older/ambiguous information and user-edited records are not overwritten.
-- [ ] Edit, archive/restore, replace and delete Memory. Active context updates appropriately; the same normalized deleted topic is not immediately relearned. Evaluate differently phrased topic consistency too.
-- [ ] Delete a disposable source Capture; its analysis snapshots disappear while independent Memory shows the missing source. User Memory deletion preserves the intentional Capture.
-- [ ] New voice input promptly cancels optional analysis; no late result saves, and unfinished queue work resumes during idle time/relaunch. Exercise model unavailability/failure/backoff and optional retry.
-- [ ] Measure model selectivity, evidence correctness, idle energy, cancellation/draining and native keyboard/VoiceOver behavior.
+- [ ] Describe the same semantic topic/entity with meaningfully different wording. The model should identify the existing topic and merge/reinforce it rather than create a new record merely because the generated display title differs.
+- [ ] State a real change without relying on fixed phrases such as “现在 / 改成 / 不再”. When the model classifies it as an update to an existing automatic topic, the current topic body updates in place and evidence remains inspectable.
+- [ ] Exercise durable information and useful temporary work context. Temporary context should remain useful without being presented as a permanent fact; repeated evidence refreshes it, and clearly durable evidence may promote it. The user-facing UI must not expose internal long-term/working-context taxonomy.
+- [ ] Edit a Memory body, then provide conflicting automatic input. User-authored content must not be overwritten. Archive/restore/replace/delete continue to work; user-archived/deleted topics must not be automatically recreated under cosmetic relabelling.
+- [ ] Delete a disposable source Capture. Its analysis record disappears while independent Memory evidence/current topic remains inspectable; deleting Memory preserves the intentional source Capture.
+- [ ] New voice input promptly cancels optional analysis; no late result saves, and unfinished eligible queue work resumes during idle time/relaunch. Exercise model unavailability/failure/backoff and optional retry.
+- [ ] Measure real Foundation Models topic identity, scope classification, merge/update quality, evidence correctness, idle energy, cancellation/draining and native keyboard/VoiceOver behavior.
 
-Historical foundation/candidate build and fixture evidence remains in [M-004](tasks/M-004-memory.md#validation-evidence). Current injected-model tests establish persistence/control flow; they do not establish real-model accuracy.
+Deterministic M-036 tests inject semantic writer decisions and establish storage/lifecycle/control flow; they do not establish real-model semantic quality. Cleanup-side semantic retrieval is intentionally a follow-up after this Memory layer is accepted.
 
 ## M-005 input personalization
 

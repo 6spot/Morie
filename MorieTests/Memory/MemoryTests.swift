@@ -249,6 +249,16 @@ final class MemoryContextRetrieverTests: XCTestCase {
     }
 
     private func memory(_ name: String, notes: String = "personal information", status: MemoryStatus = .active, origin: MemoryOrigin = .automatic) -> MemorySnapshot {
-        MemorySnapshot(id: UUID(), kind: .project, status: status, name: name, notes: notes, origin: origin, updatedAt: Date(timeIntervalSince1970: 1))
+        MemorySnapshot(
+            id: UUID(),
+            kind: .project,
+            scope: .longTerm,
+            status: status,
+            name: name,
+            notes: notes,
+            origin: origin,
+            updatedAt: Date(timeIntervalSince1970: 1),
+            expiresAt: nil
+        )
     }
 }

@@ -51,6 +51,7 @@ final class CaptureStore {
             DictionaryEntry.self,
             DictionaryCorrectionRule.self,
             MemoryRecord.self,
+            MemoryEvidenceRecord.self,
             MemoryAnalysisRecord.self,
             MemoryLearningBlock.self,
             ExpressionProfileRecord.self,
