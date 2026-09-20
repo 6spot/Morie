@@ -46,7 +46,6 @@ final class CaptureSessionController {
     var onPresentFailure: ((String, String) -> Void)?
 
     var inputRefinementEnabled: Bool
-    var refinementModelConfiguration: RefinementModelConfiguration
     var correctionSuggestionsEnabled: Bool
     var expressionLearningEnabled: Bool
     var soundFeedbackEnabled: Bool
@@ -83,7 +82,6 @@ final class CaptureSessionController {
         postInsertionLearning: PostInsertionLearningController?,
         memoryLearning: MemoryLearningController?,
         inputRefinementEnabled: Bool,
-        refinementModelConfiguration: RefinementModelConfiguration = .local,
         correctionSuggestionsEnabled: Bool,
         expressionLearningEnabled: Bool,
         soundFeedbackEnabled: Bool
@@ -95,7 +93,6 @@ final class CaptureSessionController {
         self.postInsertionLearning = postInsertionLearning
         self.memoryLearning = memoryLearning
         self.inputRefinementEnabled = inputRefinementEnabled
-        self.refinementModelConfiguration = refinementModelConfiguration
         self.correctionSuggestionsEnabled = correctionSuggestionsEnabled
         self.expressionLearningEnabled = expressionLearningEnabled
         self.soundFeedbackEnabled = soundFeedbackEnabled
@@ -140,7 +137,10 @@ final class CaptureSessionController {
         hud.showFailure()
     }
 
-    func start(deliveryMode: CaptureDeliveryMode) {
+    func start(
+        deliveryMode: CaptureDeliveryMode,
+        refinementModelConfiguration: RefinementModelConfiguration
+    ) {
         guard !isActive, let captureStore else { return }
 
         let sessionID = UUID()
