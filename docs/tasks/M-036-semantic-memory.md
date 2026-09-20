@@ -89,14 +89,16 @@ The Memory page stays a flat natural reading surface. It does not display the in
 - [x] Working context expires deterministically, refreshes on evidence and can promote to long-term.
 - [x] User edits/archive/delete outrank automatic learning.
 - [x] Visible Memory UI does not expose long-term/working-context categories.
-- [ ] macOS 27 logic-test CI passes.
-- [ ] macOS 27 app compile CI passes.
+- [x] macOS 27 logic-test CI passes.
+- [x] macOS 27 app compile CI passes.
 - [ ] Owner-device Foundation Models testing confirms useful create/merge/update/scope decisions on real daily input.
 - [ ] Cleanup Memory retrieval/use is redesigned as the explicit follow-up.
 
 ## Validation notes
 
 Deterministic tests cover storage/restart, evidence survival, disabled-period skip semantics, stale-source rejection, semantic merge by existing UUID, keyword-free update admission, user edit precedence, working-context refresh/expiry/promotion, protected delete/archive context, atomic failure, retry/backoff and input preemption.
+
+Hosted macOS 27 CI run [35486727249](https://github.com/6spot/Morie/actions/runs/35486727249) passed both gates after the working-context fixture was corrected to use a current evidence date: the Release product compile succeeded and **143 logic tests passed with 0 failures / 0 unexpected failures**. The initial test run correctly exposed that a 1970-dated fixture had already expired under the new lifecycle policy; no product workaround was added.
 
 Model quality is not established by injected suggestions. Real Foundation Models behavior remains device acceptance.
 
