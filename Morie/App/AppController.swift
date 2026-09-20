@@ -73,6 +73,9 @@ final class AppController: ObservableObject {
             postInsertionLearning: postInsertionLearning,
             memoryLearning: memoryLearning,
             inputRefinementEnabled: inputRefinementEnabled,
+            resolveRefinementModelConfiguration: { [weak self] snapshot in
+                self?.refinementModels.runtimeConfiguration(for: snapshot) ?? snapshot
+            },
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
             expressionLearningEnabled: expressionLearningEnabled,
             soundFeedbackEnabled: soundFeedbackEnabled
@@ -508,7 +511,7 @@ final class AppController: ObservableObject {
         lastPresentedFailure = nil
         captureSession.start(
             deliveryMode: deliveryMode,
-            refinementModelConfiguration: refinementModels.runtimeConfiguration()
+            refinementModelConfiguration: refinementModels.configuration
         )
     }
 
