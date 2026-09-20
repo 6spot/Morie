@@ -86,7 +86,12 @@ final class CaptureHistoryController: ObservableObject {
         do {
             let context = store.container.mainContext
             let records = try context.fetch(CaptureHistoryQuery.descriptor(limit: limit))
-            let signature = try prefetchedSignature ?? CaptureHistoryQuery.signature(in: context)
+            let signature: CaptureHistorySignature
+            if let prefetchedSignature {
+                signature = prefetchedSignature
+            } else {
+                signature = try CaptureHistoryQuery.signature(in: context)
+            }
             captures = records
             listLimit = limit
             listSignature = signature
