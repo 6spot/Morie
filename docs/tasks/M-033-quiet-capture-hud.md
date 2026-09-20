@@ -116,3 +116,31 @@ The corrected implementation now:
 - [x] macOS 27 CI #180 Release product compile passed.
 - [x] macOS 27 CI #180 full MorieTests gate passed.
 - [ ] Owner-device check confirms the first post-launch cue is clean and the bright-neutral shimmer crosses the full processing capsule.
+
+
+## 2026-09-20 unified capsule lifecycle motion
+
+Owner-device review found that the HUD lifecycle still used visibly different motion paths:
+
+- normal processing completion faded in place;
+- cancel / no-speech / recognition-failure / general failure collapsed much more aggressively;
+- presentation and some dismissal paths visually appeared to originate from the lower-left rather than the capsule center.
+
+The implementation had two competing animation systems. The borderless `NSPanel` still used AppKit's `.utilityWindow` animation behavior while Morie separately scaled the glass view. Morie also animated the resizable `NSGlassEffectView` itself even though its frame changes between the 142 pt recording shape and the 94 pt processing shape.
+
+The corrected ownership is:
+
+- the panel has `.none` animation behavior; AppKit no longer adds a second window-level transition;
+- a fixed-size root container owns all enter/exit scale + opacity motion and keeps a stable center anchor;
+- the `NSGlassEffectView` owns only capsule width morphing;
+- all dismissal reasons use the same center fade/shrink path: current scale → 92%, opacity → 0 over ~180 ms;
+- presentation uses the inverse visual language: 82% → 100% with fade-in over ~200 ms;
+- Reduced Motion continues to skip scale motion and directly presents/releases the HUD.
+
+This deliberately removes the older 10% collapse for cancellation/failure and the separate 94% success-only fade. Recording, cancellation, no-speech, recognition failure, operational failure, and successful Thinking completion now share one spatial origin and one dismissal language.
+
+### Validation
+
+- [ ] macOS 27 Release product compile passes.
+- [ ] MorieTests pass.
+- [ ] Owner-device validation confirms the capsule appears from its center and every dismissal path leaves toward that same center without lower-left drift.
