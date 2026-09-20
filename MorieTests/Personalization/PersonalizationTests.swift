@@ -24,11 +24,14 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertEqual(credentialReads, 0)
         XCTAssertEqual(controller.configuration.cloudAPIKey, "")
 
-        let first = controller.runtimeConfiguration()
+        let frozen = controller.configuration
+        XCTAssertEqual(credentialReads, 0)
+
+        let first = controller.runtimeConfiguration(for: frozen)
         XCTAssertEqual(credentialReads, 1)
         XCTAssertEqual(first.cloudAPIKey, "runtime-secret")
 
-        let second = controller.runtimeConfiguration()
+        let second = controller.runtimeConfiguration(for: frozen)
         XCTAssertEqual(credentialReads, 1)
         XCTAssertEqual(second.cloudAPIKey, "runtime-secret")
     }
@@ -50,7 +53,8 @@ final class PersonalizationTests: XCTestCase {
             }
         )
 
-        XCTAssertEqual(controller.runtimeConfiguration().mode, .local)
+        let frozen = controller.configuration
+        XCTAssertEqual(controller.runtimeConfiguration(for: frozen).mode, .local)
         XCTAssertEqual(credentialReads, 0)
     }
 
