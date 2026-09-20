@@ -209,6 +209,17 @@ struct MorieSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("个人记忆") {
+                Toggle("使用个人记忆", isOn: Binding(
+                    get: { controller.personalMemoryEnabled },
+                    set: { controller.setPersonalMemoryEnabled($0) }
+                ))
+
+                Text("Morie 会在空闲时从完成的日常输入中维护少量有用上下文，并自动区分稳定信息和暂时的工作上下文。关闭后不再学习新输入，也不会在润色时使用已有个人记忆；已经保存的内容仍会保留。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("润色提示词") {
                 TextEditor(text: $refinementInstructions)
                     .frame(minHeight: 180)
