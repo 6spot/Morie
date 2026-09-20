@@ -197,13 +197,53 @@ struct OverviewView: View {
                     }
                 }
 
-                Text("这里只显示最近一次 Capture 的临时词汇决策；内容仅驻留内存，不写入历史、数据库或诊断日志。")
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("本次原始上下文预览")
+                        .font(.subheadline)
+                        .bold()
+
+                    contextPreviewRow(
+                        title: "selected",
+                        text: snapshot.selectedPreview
+                    )
+                    contextPreviewRow(
+                        title: "focused",
+                        text: snapshot.focusedPreview
+                    )
+                    contextPreviewRow(
+                        title: "nearby",
+                        text: snapshot.nearbyPreview
+                    )
+                }
+
+                Text("这里只显示最近一次 Capture 的临时词汇决策与原始上下文预览；内容仅驻留内存，不写入历史、数据库或诊断日志。")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
                 Text("完成一次语音输入后，这里会显示本次实际送给 Apple Speech 的 Application Context 临时词。")
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func contextPreviewRow(
+        title: String,
+        text: String?
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(title)
+                .frame(width: 64, alignment: .leading)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            Text(text ?? "—")
+                .font(.caption)
+                .textSelection(.enabled)
+                .foregroundStyle(text == nil ? .tertiary : .primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
