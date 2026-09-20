@@ -10,28 +10,46 @@ enum ControlCenterMetrics {
     static let denseInset: CGFloat = 16
 }
 
+private enum ControlCenterPageLayout {
+    case standard
+    case workspace
+}
+
 struct ControlCenterPageHost<Content: View>: View {
+    let layout: ControlCenterPageLayout
     private let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    init(
+        layout: ControlCenterPageLayout,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.layout = layout
         self.content = content()
     }
 
+    @ViewBuilder
     var body: some View {
-        ScrollView {
+        switch layout {
+        case .standard:
+            ScrollView {
+                content
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .contentMargins(
+                .horizontal,
+                ControlCenterMetrics.contentInset,
+                for: .scrollContent
+            )
+            .contentMargins(
+                .vertical,
+                ControlCenterMetrics.contentInset,
+                for: .scrollContent
+            )
+
+        case .workspace:
             content
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .contentMargins(
-            .horizontal,
-            ControlCenterMetrics.contentInset,
-            for: .scrollContent
-        )
-        .contentMargins(
-            .vertical,
-            ControlCenterMetrics.contentInset,
-            for: .scrollContent
-        )
     }
 }
 
@@ -134,6 +152,15 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         case .diagnostics: "ladybug"
         }
     }
+
+    var pageLayout: ControlCenterPageLayout {
+        switch self {
+        case .history, .diagnostics:
+            .workspace
+        case .overview, .dictionary, .memory, .settings, .permissions:
+            .standard
+        }
+    }
 }
 
 @MainActor
@@ -188,32 +215,25 @@ private struct ControlCenterRoute: View {
     @Binding var selectedDictionaryEntry: UUID?
     @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
 
-    @ViewBuilder
     var body: some View {
-        switch selection {
-        case .history:
-            CaptureHistoryWorkspace(
-                controller: controller,
-                selection: $selectedCaptureID
-            )
-
-        case .diagnostics:
-            DiagnosticLogView()
-
-        default:
-            ControlCenterPageHost {
-                standardPage
-            }
+        ControlCenterPageHost(layout: selection.pageLayout) {
+            routedPage
         }
     }
 
     @ViewBuilder
-    private var standardPage: some View {
+    private var routedPage: some View {
         switch selection {
         case .overview:
             OverviewView(
                 controller: controller,
                 metricsSnapshot: $overviewMetricsSnapshot
+            )
+
+        case .history:
+            CaptureHistoryWorkspace(
+                controller: controller,
+                selection: $selectedCaptureID
             )
 
         case .dictionary:
@@ -239,8 +259,8 @@ private struct ControlCenterRoute: View {
         case .permissions:
             PermissionManagementView(controller: controller)
 
-        case .history, .diagnostics:
-            EmptyView()
+        case .diagnostics:
+            DiagnosticLogView()
         }
     }
 
