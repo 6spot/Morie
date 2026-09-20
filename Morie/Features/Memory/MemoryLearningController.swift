@@ -52,12 +52,20 @@ final class MemoryLearningController: ObservableObject {
 
     func stop() {
         isRunning = false
+        if workerTask != nil {
+            Diagnostics.recordMemory("memory-learning-stop-cancel worker=\(workerLabel)")
+        }
         workerTask?.cancel()
     }
 
     func setInputActive(_ active: Bool) {
         isInputActive = active
         if active {
+            if workerTask != nil {
+                Diagnostics.recordMemory(
+                    "memory-learning-input-preempt worker=\(workerLabel) capture=\(captureLabel)"
+                )
+            }
             workerTask?.cancel()
         } else if workerTask == nil {
             schedule(minimumDelay: idleDelay)
@@ -123,16 +131,19 @@ final class MemoryLearningController: ObservableObject {
         let delay = max(minimumDelay, retryDelay)
         let id = UUID()
         workerID = id
+        Diagnostics.recordMemory("memory-learning-scheduled worker=\(String(id.uuidString.prefix(8)))")
         workerTask = Task { [weak self, delay] in
             do {
                 try await Task.sleep(for: delay)
                 try Task.checkCancellation()
             } catch {
+                self?.workerCancelledBeforeWake(id)
                 self?.workerFinished(id)
                 return
             }
 
             guard let self else { return }
+            Diagnostics.recordMemory("memory-learning-wake worker=\(String(id.uuidString.prefix(8)))")
             await self.processBatch()
             self.workerFinished(id)
         }
@@ -142,22 +153,29 @@ final class MemoryLearningController: ObservableObject {
         guard !Task.isCancelled, !isInputActive, canUseModel() else { return }
         do {
             let sources = try store.pendingSources(limit: batchSize)
+            Diagnostics.recordMemory("memory-learning-batch count=\(sources.count)")
             for source in sources {
                 try Task.checkCancellation()
                 guard !isInputActive, canUseModel() else { return }
+                let sourceLabel = String(source.captureID.uuidString.prefix(8))
                 do {
+                    Diagnostics.recordMemory("memory-learning-input-load \(sourceLabel)")
                     let input = try store.learningInput(for: source)
+                    Diagnostics.recordMemory("memory-learning-input-ready \(sourceLabel)")
                     analyzingCaptureID = source.captureID
-                    Diagnostics.recordMemory("memory-learning-start \(String(source.captureID.uuidString.prefix(8)))")
+                    Diagnostics.recordMemory("memory-learning-start \(sourceLabel)")
                     let suggestions = try await analyze(input)
-                    Diagnostics.recordMemory("memory-learning-model-finish \(String(source.captureID.uuidString.prefix(8)))")
+                    Diagnostics.recordMemory("memory-learning-model-finish \(sourceLabel)")
                     try Task.checkCancellation()
                     guard !isInputActive else { throw CancellationError() }
                     try store.apply(suggestions, from: input)
-                    Diagnostics.recordMemory("memory-learning-commit \(String(source.captureID.uuidString.prefix(8)))")
+                    Diagnostics.recordMemory("memory-learning-commit \(sourceLabel)")
                     message = nil
                 } catch {
-                    if Task.isCancelled || error is CancellationError { throw CancellationError() }
+                    if Task.isCancelled || error is CancellationError {
+                        Diagnostics.recordMemory("memory-learning-cancelled \(sourceLabel)")
+                        throw CancellationError()
+                    }
                     let failure: MemoryAnalysisFailure
                     switch error as? MemoryStore.StoreError {
                     case .sourceChanged, .sourceUnavailable, .sourceNotReady: failure = .sourceChanged
@@ -175,13 +193,29 @@ final class MemoryLearningController: ObservableObject {
         }
     }
 
+    private func workerCancelledBeforeWake(_ id: UUID) {
+        guard workerID == id else { return }
+        Diagnostics.recordMemory(
+            "memory-learning-cancelled-before-wake worker=\(String(id.uuidString.prefix(8)))"
+        )
+    }
+
     private func workerFinished(_ id: UUID) {
         guard workerID == id else { return }
         analyzingCaptureID = nil
         workerTask = nil
         workerID = nil
+        Diagnostics.recordMemory("memory-learning-worker-finished worker=\(String(id.uuidString.prefix(8)))")
         let minimumDelay = nextMinimumDelay
         nextMinimumDelay = .zero
         schedule(minimumDelay: minimumDelay)
+    }
+
+    private var workerLabel: String {
+        workerID.map { String($0.uuidString.prefix(8)) } ?? "none"
+    }
+
+    private var captureLabel: String {
+        analyzingCaptureID.map { String($0.uuidString.prefix(8)) } ?? "none"
     }
 }
