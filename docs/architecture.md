@@ -52,6 +52,8 @@ Morie/
 │   ├── App/
 │   │   ├── MorieApp.swift
 │   │   ├── AppController.swift
+│   │   ├── AppRuntimeController.swift
+│   │   ├── AppPreferencesController.swift
 │   │   └── MorieControlCenter.swift
 │   ├── Features/
 │   │   ├── Overview/
@@ -221,7 +223,7 @@ Two levels of state are intentional.
 
 ### Visible application state
 
-`AppController` owns the small UI-facing state machine:
+`AppRuntimeController` owns the small observable UI-facing state machine. `AppController` coordinates transitions into it but is not the observable source for every app concern:
 
 `checking → ready → recording → finalizing → refining → delivering → ready`
 
@@ -248,17 +250,45 @@ The primary bundle language and localized privacy descriptions are `zh-Hans`. Ap
 
 ### `AppController`
 
-Owns application-level orchestration and the UI-facing state surface:
+Owns application-level **orchestration and composition**, not a monolithic observable UI state surface.
+
+It coordinates:
 
 - bootstrap/capability flow;
-- global hotkey installation and shortcut preference changes;
+- global hotkey installation and shortcut changes;
 - setup/permission gating;
-- mapping live Capture phases into the existing visible state machine;
-- top-level Settings/iCloud state;
+- mapping live Capture callbacks into `AppRuntimeController`;
+- applying preference mutations from `AppPreferencesController` to active subsystems;
 - idle Memory learner startup outside an active capture;
 - application-level failure presentation and scheduled audio maintenance.
 
-It no longer owns the authoritative capture UUID/task bookkeeping, Speech lifecycle, HUD state or text delivery. Those belong to the Capture feature.
+`AppController` remains the action boundary for cross-feature operations such as starting a Capture, bootstrapping, changing the hotkey, and enabling iCloud. It deliberately does **not** republish child-controller `objectWillChange` events and no routed Control Center page observes it as a broad `ObservableObject`.
+
+It does not own the authoritative capture UUID/task bookkeeping, Speech lifecycle, HUD state or text delivery. Those belong to the Capture feature.
+
+### `AppRuntimeController`
+
+Owns only high-frequency application/runtime presentation state:
+
+- visible Capture/bootstrap state;
+- progressive transcript;
+- setup-required flag and setup/bootstrap error;
+- bootstrap-in-progress flag;
+- the Speech backend actually prepared for the current runtime.
+
+Views that render runtime status observe this controller directly. A transcript or Capture phase change therefore does not invalidate Settings, Dictionary, Personal Memory or permission data that do not depend on it.
+
+### `AppPreferencesController`
+
+Owns only user-configurable application preference values:
+
+- recording shortcut and audio retention;
+- input refinement and personal Memory switches;
+- correction/expression learning;
+- sound feedback;
+- iCloud enabled/status state.
+
+`AppController` still performs side effects and persistence when these values change. Settings observes the preferences controller directly, so runtime Capture/transcript/setup events cannot invalidate the Settings page.
 
 ### `DictionaryStore` / confirmed corrections
 
@@ -307,7 +337,7 @@ Owns the authoritative live Capture lifecycle:
 
 One shared shutdown task owns each interruption/discard. It cancels startup/finalization, closes native capture, preserves the latest text/audio, and awaits outstanding work before committing the disposition. User cancellation discards; shortcut failure, microphone interruption and Speech errors retain a failed Capture. A result that arrives during shutdown is saved without delivery; a paste already dispatched retains its actual delivery outcome.
 
-`AppController` receives phase/transcript/failure callbacks and keeps the app/setup state machine authoritative. Returning a Capture session to idle only returns the visible app state to Ready when the current state is capture-owned; a concurrent blocked/checking state is not overwritten.
+`AppController` receives phase/transcript/failure callbacks and writes the visible runtime state into `AppRuntimeController`. Returning a Capture session to idle only returns the visible app state to Ready when the current state is capture-owned; a concurrent blocked/checking state is not overwritten.
 
 Settings remain mutable application preferences, but they are sampled only when a new Capture is accepted. The active Capture never rereads those preference properties during asynchronous Speech startup, finalization, cleanup or post-insertion observation. Dictionary Speech hints and the effective cleanup instructions are likewise resolved once for that Capture. This keeps one interaction deterministic without introducing a generalized provider/session abstraction.
 
@@ -550,7 +580,7 @@ The Control Center landing page is a local-only summary, not an analytics subsys
 
 The operational failure rate is deliberately not labelled as ASR accuracy/WER. Morie does not yet have enough ground-truth user corrections to distinguish recognition errors from spoken restarts, cleanup changes or later user edits reliably.
 
-The same page exposes actual runtime model state. `AppController` publishes the backend that `SpeechPipeline.prepare` really prepared, so a `DictationTranscriber` fallback is shown as fallback rather than pretending the preferred `SpeechTranscriber` is active. Cleanup identifies Apple's public `SystemLanguageModel.default` / Foundation Models surface and its current availability; Morie does not invent an Apple model/version string that the API does not expose.
+The same page exposes actual runtime model state. `AppRuntimeController` publishes the backend that `SpeechPipeline.prepare` really prepared, so a `DictationTranscriber` fallback is shown as fallback rather than pretending the preferred `SpeechTranscriber` is active. Cleanup identifies Apple's public `SystemLanguageModel.default` / Foundation Models surface and its current availability; Morie does not invent an Apple model/version string that the API does not expose.
 
 ### `MorieControlCenter`
 
