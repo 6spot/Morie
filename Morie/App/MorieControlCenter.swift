@@ -10,24 +10,17 @@ enum ControlCenterMetrics {
     static let denseInset: CGFloat = 16
 }
 
-struct ControlCenterContentPage<Content: View>: View {
-    let spacing: CGFloat
+struct ControlCenterPageHost<Content: View>: View {
     private let content: Content
 
-    init(
-        spacing: CGFloat = ControlCenterMetrics.sectionSpacing,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.spacing = spacing
+    init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: spacing) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            content
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .contentMargins(
             .horizontal,
@@ -198,16 +191,29 @@ private struct ControlCenterRoute: View {
     @ViewBuilder
     var body: some View {
         switch selection {
-        case .overview:
-            OverviewView(
-                controller: controller,
-                metricsSnapshot: $overviewMetricsSnapshot
-            )
-
         case .history:
             CaptureHistoryWorkspace(
                 controller: controller,
                 selection: $selectedCaptureID
+            )
+
+        case .diagnostics:
+            DiagnosticLogView()
+
+        default:
+            ControlCenterPageHost {
+                standardPage
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var standardPage: some View {
+        switch selection {
+        case .overview:
+            OverviewView(
+                controller: controller,
+                metricsSnapshot: $overviewMetricsSnapshot
             )
 
         case .dictionary:
@@ -233,8 +239,8 @@ private struct ControlCenterRoute: View {
         case .permissions:
             PermissionManagementView(controller: controller)
 
-        case .diagnostics:
-            DiagnosticLogView()
+        case .history, .diagnostics:
+            EmptyView()
         }
     }
 
