@@ -262,11 +262,13 @@ final class PersonalizationTests: XCTestCase {
                     memory: MemorySnapshot(
                         id: memoryID,
                         kind: .project,
+                        scope: .longTerm,
                         status: .active,
                         name: "Morie",
                         notes: "Morie is a voice input project.",
                         origin: .automatic,
-                        updatedAt: updatedAt
+                        updatedAt: updatedAt,
+                        expiresAt: nil
                     ),
                     matchedTerm: "Morie"
                 )
@@ -387,7 +389,17 @@ final class PersonalizationTests: XCTestCase {
     }
 
     func testPersonalMemoryIsPromptContextAndCannotInjectUnspokenContent() throws {
-        let memory = MemorySnapshot(id: UUID(), kind: .fact, status: .active, name: "职业", notes: "我是开发者。", origin: .automatic, updatedAt: Date())
+        let memory = MemorySnapshot(
+            id: UUID(),
+            kind: .fact,
+            scope: .longTerm,
+            status: .active,
+            name: "职业",
+            notes: "我是开发者。",
+            origin: .automatic,
+            updatedAt: Date(),
+            expiresAt: nil
+        )
         let input = RefinementInput(captureID: UUID(), text: "开始吧", context: [MemoryContextMatch(memory: memory, matchedTerm: "职业")])
 
         XCTAssertThrowsError(try ValidatedRefinement.accepting("我是开发者，开始吧。", for: input)) { error in
