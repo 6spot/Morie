@@ -328,6 +328,12 @@ One normalized observed form owns one current canonical replacement. A later exp
 
 Cleanup context is narrower than Speech hints. `speechHints()` still returns the full bounded canonical set because ASR needs candidates before the correct spelling appears. `relevantEntries(for:)` is intentionally transcript-scoped for Foundation Models: exact terms plus a small set of close Latin spelling neighbors, capped at 16. Confirmed correction rules are loaded only when the observed form exists, applied deterministically before cleanup and retained as provenance/staleness data; they are not serialized into the model prompt. This prevents historical correction vocabulary from becoming generation material.
 
+### `ApplicationContextCollector`
+
+M-042 introduces an Apple-native, runtime-only Application Context boundary. At current-app Capture Start, Morie snapshots the frontmost application identity and bounded selected/focused/nearby Accessibility text. Nearby collection expands from the focused AX element through a small ancestor/sibling neighborhood with fixed depth, node and character budgets; secure text fields contribute no text. The collector has no app-specific adapters, screen capture or OCR.
+
+The snapshot is frozen inside the in-memory Capture session context and released with session identity reset. It is intentionally not `Codable` and is never attached to `CaptureRecord`, `CaptureRefinement`, History, Personal Memory or durable diagnostics. Diagnostics expose only app identity and character counts. This first slice does not yet feed Application Context into Speech or cleanup; those integrations follow only after real-device coverage is understood.
+
 ### `CaptureSessionController`
 
 Owns the authoritative live Capture lifecycle:
