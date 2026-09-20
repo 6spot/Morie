@@ -1,58 +1,47 @@
 import SwiftUI
 
-enum ControlCenterLayout {
-    static let contentMaxWidth: CGFloat = 920
+enum ControlCenterMetrics {
+    static let sidebarMinWidth: CGFloat = 180
+    static let sidebarIdealWidth: CGFloat = 220
+    static let sidebarMaxWidth: CGFloat = 260
     static let readingMaxWidth: CGFloat = 760
-    // Keep ordinary right-hand pages on one System Settings-like inset grid.
-    // Using one value for both axes keeps the title/content baseline visually
-    // aligned with the native sidebar instead of giving each page its own padding.
-    static let contentInset: CGFloat = 24
-    static let horizontalInset: CGFloat = contentInset
-    static let verticalInset: CGFloat = contentInset
+    static let readingInset: CGFloat = 28
+    static let denseInset: CGFloat = 16
 }
 
-extension View {
-    func controlCenterScrollMargins(
-        horizontal: CGFloat = ControlCenterLayout.horizontalInset,
-        vertical: CGFloat = ControlCenterLayout.verticalInset
-    ) -> some View {
-        contentMargins(.horizontal, horizontal, for: .scrollContent)
-            .contentMargins(.vertical, vertical, for: .scrollContent)
-    }
-}
-
-struct ControlCenterScrollPage<Content: View>: View {
-    let maxWidth: CGFloat
-    let spacing: CGFloat
+struct ControlCenterReadingPage<Content: View>: View {
     private let content: Content
 
-    init(
-        maxWidth: CGFloat = ControlCenterLayout.contentMaxWidth,
-        spacing: CGFloat = 24,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.maxWidth = maxWidth
-        self.spacing = spacing
+    init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: spacing) {
+            VStack(alignment: .leading, spacing: 24) {
                 content
             }
-            .frame(maxWidth: maxWidth, alignment: .leading)
+            .frame(maxWidth: ControlCenterMetrics.readingMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .controlCenterScrollMargins()
+        .contentMargins(
+            .horizontal,
+            ControlCenterMetrics.readingInset,
+            for: .scrollContent
+        )
+        .contentMargins(
+            .vertical,
+            ControlCenterMetrics.readingInset,
+            for: .scrollContent
+        )
     }
 }
 
 private enum ControlCenterSection: String, CaseIterable, Identifiable {
     case overview
     case history
-    case memory
     case dictionary
+    case memory
     case settings
     case permissions
     case diagnostics
@@ -63,8 +52,8 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         switch self {
         case .overview: "总览"
         case .history: "历史记录"
-        case .memory: "个人记忆"
         case .dictionary: "字典"
+        case .memory: "个人记忆"
         case .settings: "设置"
         case .permissions: "权限"
         case .diagnostics: "诊断"
@@ -75,8 +64,8 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         switch self {
         case .overview: "square.grid.2x2"
         case .history: "clock.arrow.circlepath"
-        case .memory: "person.text.rectangle"
         case .dictionary: "character.book.closed"
+        case .memory: "person.text.rectangle"
         case .settings: "gearshape"
         case .permissions: "lock.shield"
         case .diagnostics: "ladybug"
@@ -98,15 +87,16 @@ struct MorieControlCenter: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ControlCenterSidebar(selection: $selection)
         } detail: {
-            ControlCenterDetailHost(
-                controller: controller,
-                selection: $selection,
-                selectedCaptureID: $selectedCaptureID,
-                selectedDictionaryEntry: $selectedDictionaryEntry,
-                overviewMetricsSnapshot: $overviewMetricsSnapshot
-            )
+            NavigationStack {
+                ControlCenterRoute(
+                    controller: controller,
+                    selection: selection ?? .overview,
+                    selectedCaptureID: $selectedCaptureID,
+                    selectedDictionaryEntry: $selectedDictionaryEntry,
+                    overviewMetricsSnapshot: $overviewMetricsSnapshot
+                )
+            }
         }
-        .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
         .onReceive(NotificationCenter.default.publisher(for: .morieShowSettings)) { _ in
             selection = .settings
@@ -115,44 +105,27 @@ struct MorieControlCenter: View {
 }
 
 @MainActor
-private struct ControlCenterDetailHost: View {
+private struct ControlCenterRoute: View {
     let controller: AppController
-    @Binding var selection: ControlCenterSection?
+    let selection: ControlCenterSection
     @Binding var selectedCaptureID: UUID?
     @Binding var selectedDictionaryEntry: UUID?
     @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
 
-    var body: some View {
-        Group {
-            if (selection ?? .overview) == .history {
-                CaptureHistoryWorkspace(
-                    controller: controller,
-                    selection: $selectedCaptureID
-                )
-            } else {
-                NavigationStack {
-                    standardPage
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
     @ViewBuilder
-    private var standardPage: some View {
-        switch selection ?? .overview {
+    var body: some View {
+        switch selection {
         case .overview:
             OverviewView(
                 controller: controller,
                 metricsSnapshot: $overviewMetricsSnapshot
             )
 
-        case .memory:
-            if let memory = controller.memory {
-                MemoryView(store: memory)
-            } else {
-                unavailable("个人记忆不可用")
-            }
+        case .history:
+            CaptureHistoryWorkspace(
+                controller: controller,
+                selection: $selectedCaptureID
+            )
 
         case .dictionary:
             if let dictionary = controller.dictionary {
@@ -164,6 +137,13 @@ private struct ControlCenterDetailHost: View {
                 unavailable("字典不可用")
             }
 
+        case .memory:
+            if let memory = controller.memory {
+                MemoryView(store: memory)
+            } else {
+                unavailable("个人记忆不可用")
+            }
+
         case .settings:
             MorieSettingsView(controller: controller)
 
@@ -172,9 +152,6 @@ private struct ControlCenterDetailHost: View {
 
         case .diagnostics:
             DiagnosticLogView()
-
-        case .history:
-            EmptyView()
         }
     }
 
@@ -209,14 +186,11 @@ private struct ControlCenterSidebar: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("Morie")
-        .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 240)
-        .onAppear {
-            Diagnostics.record("ControlCenter", "Sidebar mounted")
-        }
-        .onDisappear {
-            Diagnostics.record("ControlCenter", "Sidebar unmounted")
-        }
+        .navigationSplitViewColumnWidth(
+            min: ControlCenterMetrics.sidebarMinWidth,
+            ideal: ControlCenterMetrics.sidebarIdealWidth,
+            max: ControlCenterMetrics.sidebarMaxWidth
+        )
     }
 
     private func sidebarItem(_ section: ControlCenterSection) -> some View {
@@ -230,17 +204,20 @@ private struct CaptureHistoryWorkspace: View {
     let controller: AppController
     @Binding var selection: UUID?
 
+    @State private var search = ""
+    @State private var filter: CaptureHistoryFilter = .all
+
     var body: some View {
         if let history = controller.history {
             HSplitView {
-                NavigationStack {
-                    CaptureHistoryListPane(
-                        controller: controller,
-                        history: history,
-                        selection: $selection
-                    )
-                }
-                .frame(minWidth: 240, idealWidth: 300, maxWidth: 340)
+                CaptureHistoryListPane(
+                    controller: controller,
+                    history: history,
+                    selection: $selection,
+                    search: $search,
+                    filter: $filter
+                )
+                .frame(minWidth: 260, idealWidth: 320, maxWidth: 360)
 
                 CaptureHistoryDetailPane(
                     controller: controller,
@@ -248,9 +225,29 @@ private struct CaptureHistoryWorkspace: View {
                     selectedCaptureID: selection
                 )
                 .id(selection)
-                .frame(minWidth: 320, maxWidth: .infinity)
+                .frame(minWidth: 360, maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle("历史记录")
+            .searchable(text: $search, prompt: "搜索历史记录")
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Picker("筛选记录", selection: $filter) {
+                        ForEach(CaptureHistoryFilter.allCases) { item in
+                            Text(item.title).tag(item)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Button(
+                        "开始录音",
+                        systemImage: "mic",
+                        action: controller.startCaptureOnly
+                    )
+                    .disabled(!controller.canStartCapture)
+                    .help("录音并保存到历史记录。")
+                }
+            }
             .onAppear {
                 history.setListVisible(true)
             }
@@ -263,6 +260,7 @@ private struct CaptureHistoryWorkspace: View {
                 systemImage: "exclamationmark.triangle",
                 description: Text("记录存储尚未初始化。")
             )
+            .navigationTitle("历史记录")
         }
     }
 }
@@ -272,18 +270,23 @@ private struct CaptureHistoryListPane: View {
     @ObservedObject var controller: AppController
     @ObservedObject var history: CaptureHistoryController
     @Binding var selection: UUID?
+    @Binding var search: String
+    @Binding var filter: CaptureHistoryFilter
 
     var body: some View {
         VStack(spacing: 0) {
             CaptureHistoryView(
                 captures: history.captures,
                 selection: $selection,
+                search: $search,
+                filter: $filter,
                 canStartCapture: controller.canStartCapture,
                 onRecord: controller.startCaptureOnly
             )
 
             if history.canLoadMoreCaptures {
                 Divider()
+
                 Button("加载更早记录") {
                     history.loadMoreCaptures()
                 }
@@ -315,23 +318,21 @@ private struct CaptureHistoryDetailPane: View {
     }
 
     var body: some View {
-        NavigationStack {
-            if let id = selectedCaptureID,
-               let capture {
-                CaptureDetailView(
-                    capture: capture,
-                    captureID: id,
-                    history: history,
-                    canRecognize: controller.canStartCapture,
-                    onRecognize: controller.recognizeHistoryCapture
-                )
-            } else {
-                ContentUnavailableView(
-                    "选择一条记录",
-                    systemImage: "waveform",
-                    description: Text("在这里查看保存的文字、识别结果和原始录音。")
-                )
-            }
+        if let id = selectedCaptureID,
+           let capture {
+            CaptureDetailView(
+                capture: capture,
+                captureID: id,
+                history: history,
+                canRecognize: controller.canStartCapture,
+                onRecognize: controller.recognizeHistoryCapture
+            )
+        } else {
+            ContentUnavailableView(
+                "选择一条记录",
+                systemImage: "waveform",
+                description: Text("在这里查看保存的文字、识别结果和原始录音。")
+            )
         }
     }
 }
@@ -344,9 +345,7 @@ struct ManagementDetailContent<Content: View>: View {
     }
 
     var body: some View {
-        ControlCenterScrollPage(
-            maxWidth: ControlCenterLayout.readingMaxWidth
-        ) {
+        ControlCenterReadingPage {
             content
         }
     }

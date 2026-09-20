@@ -3,7 +3,7 @@ import AVKit
 import SwiftData
 import SwiftUI
 
-private enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
+enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
     case all = "All Captures"
     case captureOnly = "History Only"
     case needsAttention = "Needs Attention"
@@ -20,9 +20,12 @@ private enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 
     func includes(_ capture: CaptureRecord) -> Bool {
         switch self {
-        case .all: true
-        case .captureOnly: capture.deliveryModeRawValue == CaptureDeliveryMode.captureOnly.rawValue
-        case .needsAttention: capture.lifecycle == .failed || capture.lifecycle == .deliveryFailed
+        case .all:
+            true
+        case .captureOnly:
+            capture.deliveryModeRawValue == CaptureDeliveryMode.captureOnly.rawValue
+        case .needsAttention:
+            capture.lifecycle == .failed || capture.lifecycle == .deliveryFailed
         }
     }
 }
@@ -30,23 +33,28 @@ private enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 struct CaptureHistoryView: View {
     let captures: [CaptureRecord]
     @Binding var selection: UUID?
+    @Binding var search: String
+    @Binding var filter: CaptureHistoryFilter
     let canStartCapture: Bool
     let onRecord: () -> Void
-    @State private var search = ""
-    @State private var filter: CaptureHistoryFilter = .all
 
     private var visibleCaptures: [CaptureRecord] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return captures.filter { capture in
-            filter.includes(capture) && (query.isEmpty || [
-                capture.finalText, capture.recognizedText, capture.sourceApplicationName ?? ""
-            ].contains { $0.localizedStandardContains(query) })
+            filter.includes(capture) && (
+                query.isEmpty
+                    || [
+                        capture.finalText,
+                        capture.recognizedText,
+                        capture.sourceApplicationName ?? ""
+                    ].contains { $0.localizedStandardContains(query) }
+            )
         }
     }
 
     var body: some View {
         List(visibleCaptures, selection: $selection) { capture in
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(capture.historySummary)
                     .lineLimit(2, reservesSpace: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -57,10 +65,14 @@ struct CaptureHistoryView: View {
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
+
                     if let status = capture.historyStatus {
-                        Text(status).lineLimit(1)
+                        Text(status)
+                            .lineLimit(1)
                     }
+
                     Spacer(minLength: 8)
+
                     Text(capture.historyListDate)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
@@ -68,7 +80,7 @@ struct CaptureHistoryView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .transaction { $0.animation = nil }
             .tag(capture.id)
         }
@@ -76,38 +88,37 @@ struct CaptureHistoryView: View {
         .overlay {
             if visibleCaptures.isEmpty {
                 ContentUnavailableView {
-                    Label(captures.isEmpty ? "还没有记录" : "没有匹配的记录", systemImage: "waveform")
+                    Label(
+                        captures.isEmpty ? "还没有记录" : "没有匹配的记录",
+                        systemImage: "waveform"
+                    )
                 } description: {
-                    Text(captures.isEmpty
-                         ? "开始录音，将你的表达保存在这里。"
-                         : "试试其他搜索词或筛选条件。")
+                    Text(
+                        captures.isEmpty
+                            ? "开始录音，将你的表达保存在这里。"
+                            : "试试其他搜索词或筛选条件。"
+                    )
                 } actions: {
                     if captures.isEmpty {
-                        Button("开始录音", systemImage: "mic", action: onRecord)
-                            .disabled(!canStartCapture)
+                        Button(
+                            "开始录音",
+                            systemImage: "mic",
+                            action: onRecord
+                        )
+                        .disabled(!canStartCapture)
                     } else {
-                        Button("显示全部记录") { search = ""; filter = .all }
+                        Button("显示全部记录") {
+                            search = ""
+                            filter = .all
+                        }
                     }
                 }
             }
         }
-        .navigationTitle("历史记录")
-        .navigationSubtitle("\(visibleCaptures.count) 条记录")
-        .searchable(text: $search, prompt: "搜索历史记录")
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Picker("筛选记录", selection: $filter) {
-                    ForEach(CaptureHistoryFilter.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.menu)
-                .help(filter.title)
-                Button("开始录音", systemImage: "mic", action: onRecord)
-                    .disabled(!canStartCapture)
-                    .help("录音并保存到历史记录。")
-            }
-        }
         .onChange(of: visibleCaptures.map(\.id), initial: true) { _, ids in
-            if let selection, !ids.contains(selection) { self.selection = nil }
+            if let selection, !ids.contains(selection) {
+                self.selection = nil
+            }
         }
     }
 }
@@ -127,53 +138,86 @@ struct CaptureDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(capture.finalText.isEmpty ? "识别文字" : "最终文字")
                     .font(.title)
+
                 HStack(spacing: 8) {
-                    if let app = capture.sourceApplicationName { Text(app) }
-                    Text(capture.createdAt.formatted(
-                        .dateTime.locale(Locale(identifier: "zh-Hans")).year().month().day().hour().minute()
-                    ))
+                    if let app = capture.sourceApplicationName {
+                        Text(app)
+                    }
+
+                    Text(
+                        capture.createdAt.formatted(
+                            .dateTime
+                                .locale(Locale(identifier: "zh-Hans"))
+                                .year()
+                                .month()
+                                .day()
+                                .hour()
+                                .minute()
+                        )
+                    )
+
                     if let status = capture.historyStatus {
                         Label(status, systemImage: "waveform")
                     }
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+
                 if let issue = capture.deliveryErrorDescription {
                     Label(issue, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.secondary)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                if capture.historyText.isEmpty {
-                    Text(capture.lifecycle == .capturing
-                         ? "正在录音… 使用录音控件或快捷键结束。"
-                         : "未识别到语音，可以播放录音后重新识别。")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(capture.historyText)
-                        .font(.body)
-                        .lineSpacing(5)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            if capture.historyText.isEmpty {
+                Text(
+                    capture.lifecycle == .capturing
+                        ? "正在录音… 使用录音控件或快捷键结束。"
+                        : "未识别到语音，可以播放录音后重新识别。"
+                )
+                .foregroundStyle(.secondary)
+            } else {
+                Text(capture.historyText)
+                    .font(.body)
+                    .lineSpacing(5)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-
 
             DisclosureGroup("识别与润色") {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("原始语音识别").font(.headline)
-                        Text(capture.recognizedText.isEmpty ? "暂无识别文字。" : capture.recognizedText)
-                            .textSelection(.enabled)
+                        Text("原始语音识别")
+                            .font(.headline)
+
+                        Text(
+                            capture.recognizedText.isEmpty
+                                ? "暂无识别文字。"
+                                : capture.recognizedText
+                        )
+                        .textSelection(.enabled)
+
                         if let date = capture.lastRecognitionAttemptAt {
-                            LabeledContent("上次识别", value: date.formatted(.dateTime.locale(Locale(identifier: "zh-Hans")).year().month().day().hour().minute()))
+                            LabeledContent(
+                                "上次识别",
+                                value: date.formatted(
+                                    .dateTime
+                                        .locale(Locale(identifier: "zh-Hans"))
+                                        .year()
+                                        .month()
+                                        .day()
+                                        .hour()
+                                        .minute()
+                                )
+                            )
                         }
+
                         if let error = capture.lastRecognitionErrorDescription {
                             Label(error, systemImage: "exclamationmark.triangle")
                                 .foregroundStyle(.secondary)
                         }
                     }
+
                     if let refinement = capture.refinement {
                         Divider()
                         CaptureRefinementSection(refinement: refinement)
@@ -188,78 +232,166 @@ struct CaptureDetailView: View {
                     .padding(.top, 12)
             }
         }
-        .navigationTitle("记录")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button("复制最终文字", systemImage: "doc.on.doc") { copy(capture.finalText) }
-                    .disabled(capture.finalText.isEmpty)
+                Button("复制最终文字", systemImage: "doc.on.doc") {
+                    copy(capture.finalText)
+                }
+                .disabled(capture.finalText.isEmpty)
+
                 Menu("记录操作", systemImage: "ellipsis") {
-                    Button("复制识别文字", systemImage: "doc.on.doc") { copy(capture.recognizedText) }
-                        .disabled(capture.recognizedText.isEmpty)
+                    Button("复制识别文字", systemImage: "doc.on.doc") {
+                        copy(capture.recognizedText)
+                    }
+                    .disabled(capture.recognizedText.isEmpty)
+
                     Divider()
-                    Button("删除记录…", systemImage: "trash", role: .destructive) {
+
+                    Button(
+                        "删除记录…",
+                        systemImage: "trash",
+                        role: .destructive
+                    ) {
                         confirmsDeletion = true
                     }
-                    .disabled(capture.lifecycle == .capturing || capture.refinement?.status == .running)
+                    .disabled(
+                        capture.lifecycle == .capturing
+                            || capture.refinement?.status == .running
+                    )
                 }
             }
         }
-        .confirmationDialog("删除这条记录？", isPresented: $confirmsDeletion, titleVisibility: .visible) {
+        .confirmationDialog(
+            "删除这条记录？",
+            isPresented: $confirmsDeletion,
+            titleVisibility: .visible
+        ) {
             Button("删除记录", role: .destructive) {
                 let id = captureID
                 Task {
-                    do { try await history.deleteCapture(id) }
-                    catch { deletionError = error.localizedDescription }
+                    do {
+                        try await history.deleteCapture(id)
+                    } catch {
+                        deletionError = error.localizedDescription
+                    }
                 }
             }
         } message: {
             Text("此记录的文字、识别与润色信息和原始录音将被永久删除。")
         }
-        .alert("无法删除记录", isPresented: Binding(
-            get: { deletionError != nil },
-            set: { if !$0 { deletionError = nil } }
-        )) {
-            Button("好", role: .cancel) { deletionError = nil }
+        .alert(
+            "无法删除记录",
+            isPresented: Binding(
+                get: { deletionError != nil },
+                set: {
+                    if !$0 {
+                        deletionError = nil
+                    }
+                }
+            )
+        ) {
+            Button("好", role: .cancel) {
+                deletionError = nil
+            }
         } message: {
             Text(deletionError ?? "")
         }
-        .onAppear { history.open(captureID) }
-        .onDisappear { history.close(captureID) }
-        .onChange(of: capture.sourceAudioRelativePath) { _, _ in history.refreshAudio(for: captureID) }
-        .onChange(of: capture.refinement?.status) { _, _ in history.refreshAudio(for: captureID) }
+        .onAppear {
+            history.open(captureID)
+        }
+        .onDisappear {
+            history.close(captureID)
+        }
+        .onChange(of: capture.sourceAudioRelativePath) { _, _ in
+            history.refreshAudio(for: captureID)
+        }
+        .onChange(of: capture.refinement?.status) { _, _ in
+            history.refreshAudio(for: captureID)
+        }
         .task(id: capture.sourceAudioExpiresAt) {
-            guard let expiresAt = capture.sourceAudioExpiresAt else { return }
+            guard let expiresAt = capture.sourceAudioExpiresAt else {
+                return
+            }
+
             do {
-                try await Task.sleep(for: .seconds(max(0, expiresAt.timeIntervalSinceNow)))
+                try await Task.sleep(
+                    for: .seconds(max(0, expiresAt.timeIntervalSinceNow))
+                )
                 try Task.checkCancellation()
                 history.refreshAudio(for: captureID)
-            } catch { }
+            } catch {
+            }
         }
     }
 
     private var recording: some View {
         VStack(alignment: .leading, spacing: 12) {
-            LabeledContent("保存位置", value: capture.deliveryModeRawValue == CaptureDeliveryMode.captureOnly.rawValue ? "历史记录" : "当前应用")
+            LabeledContent(
+                "保存位置",
+                value: capture.deliveryModeRawValue
+                    == CaptureDeliveryMode.captureOnly.rawValue
+                    ? "历史记录"
+                    : "当前应用"
+            )
+
             if let player = history.player {
-                CaptureAudioPlayer(player: player).frame(height: 64)
+                CaptureAudioPlayer(player: player)
+                    .frame(height: 64)
             }
-            if let message = history.audioMessage { Text(message).foregroundStyle(.secondary) }
+
+            if let message = history.audioMessage {
+                Text(message)
+                    .foregroundStyle(.secondary)
+            }
+
             if let duration = capture.sourceAudioDurationSeconds {
-                LabeledContent("录音时长", value: Duration.seconds(duration).formatted(.time(pattern: .minuteSecond)))
+                LabeledContent(
+                    "录音时长",
+                    value: Duration.seconds(duration)
+                        .formatted(.time(pattern: .minuteSecond))
+                )
             }
+
             if let expiresAt = capture.sourceAudioExpiresAt {
-                LabeledContent("录音到期时间", value: expiresAt.formatted(.dateTime.locale(Locale(identifier: "zh-Hans")).year().month().day().hour().minute()))
+                LabeledContent(
+                    "录音到期时间",
+                    value: expiresAt.formatted(
+                        .dateTime
+                            .locale(Locale(identifier: "zh-Hans"))
+                            .year()
+                            .month()
+                            .day()
+                            .hour()
+                            .minute()
+                    )
+                )
             }
+
             if history.recognizingCaptureID == captureID {
                 HStack {
-                    ProgressView("正在识别…").controlSize(.small)
-                    Button("取消", role: .cancel) { history.cancelRecognition() }
+                    ProgressView("正在识别…")
+                        .controlSize(.small)
+
+                    Button("取消", role: .cancel) {
+                        history.cancelRecognition()
+                    }
                 }
             } else {
-                Button("重新识别", systemImage: "arrow.clockwise") { onRecognize(captureID) }
-                    .disabled(!canRecognize || history.isInputActive || history.player == nil || history.recognizingCaptureID != nil)
+                Button("重新识别", systemImage: "arrow.clockwise") {
+                    onRecognize(captureID)
+                }
+                .disabled(
+                    !canRecognize
+                        || history.isInputActive
+                        || history.player == nil
+                        || history.recognizingCaptureID != nil
+                )
             }
-            if let message = history.recognitionMessage { Text(message).foregroundStyle(.secondary) }
+
+            if let message = history.recognitionMessage {
+                Text(message)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -315,37 +447,53 @@ private struct CaptureAudioPlayer: NSViewRepresentable {
         }
     }
 
-    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
+    static func dismantleNSView(
+        _ view: AVPlayerView,
+        coordinator: ()
+    ) {
         view.player?.pause()
         view.player = nil
     }
 }
 
 private extension CaptureRecord {
-    var historyText: String { finalText.isEmpty ? recognizedText : finalText }
+    var historyText: String {
+        finalText.isEmpty ? recognizedText : finalText
+    }
 
     var historySummary: String {
         if !historyText.isEmpty {
-            return historyText.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            return historyText
+                .split(whereSeparator: \.isWhitespace)
+                .joined(separator: " ")
         }
+
         return lifecycle == .capturing ? "正在录音…" : "未识别到语音"
     }
 
     var historyListDate: String {
         createdAt.formatted(
-            .dateTime.locale(Locale(identifier: "zh-Hans")).month().day().hour().minute()
+            .dateTime
+                .locale(Locale(identifier: "zh-Hans"))
+                .month()
+                .day()
+                .hour()
+                .minute()
         )
     }
 
-    /// Normal completed records do not need a redundant "已保存/已输入" badge.
-    /// Keep status text only when it communicates active work or a problem.
     var historyStatus: String? {
         switch lifecycle {
-        case .capturing: "录音中"
-        case .recognized, .delivered: nil
-        case .deliveryFailed: "未能输入"
-        case .cancelled: "已取消"
-        case .failed: historyText.isEmpty ? "未能识别" : "录音失败"
+        case .capturing:
+            "录音中"
+        case .recognized, .delivered:
+            nil
+        case .deliveryFailed:
+            "未能输入"
+        case .cancelled:
+            "已取消"
+        case .failed:
+            historyText.isEmpty ? "未能识别" : "录音失败"
         }
     }
 }
