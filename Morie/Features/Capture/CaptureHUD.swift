@@ -629,30 +629,44 @@ private struct ProcessingSweep: View {
             let offset = -bandWidth + travel * sweepProgress
 
             if !reduceMotion {
-                LinearGradient(
-                    colors: [
-                        .clear,
-                        Color.secondary.opacity(0.055),
-                        Color.primary.opacity(0.16),
-                        Color.secondary.opacity(0.055),
-                        .clear,
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                ZStack(alignment: .leading) {
+                    Color.clear
+
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            Color.white.opacity(0.08),
+                            Color.white.opacity(0.26),
+                            Color.white.opacity(0.08),
+                            .clear,
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: bandWidth, height: geometry.size.height)
+                    .offset(x: offset)
+                }
+                .frame(
+                    width: geometry.size.width,
+                    height: geometry.size.height,
+                    alignment: .leading
                 )
-                .frame(width: bandWidth, height: geometry.size.height)
-                .offset(x: offset)
                 .clipShape(Capsule())
                 .task {
                     while !Task.isCancelled {
-                        sweepProgress = 0
+                        var reset = Transaction()
+                        reset.disablesAnimations = true
+                        withTransaction(reset) {
+                            sweepProgress = 0
+                        }
+
                         await Task.yield()
                         guard !Task.isCancelled else { return }
 
-                        // A slow, repeating activity shimmer. It deliberately
-                        // leaves no filled track behind, so this communicates
-                        // "still working" rather than synthetic completion.
-                        withAnimation(.easeInOut(duration: sweepDuration)) {
+                        // The highlight crosses the entire visible capsule.
+                        // It is deliberately bright-neutral, not Color.primary,
+                        // so light appearance never turns the shimmer black.
+                        withAnimation(.linear(duration: sweepDuration)) {
                             sweepProgress = 1
                         }
 
