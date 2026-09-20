@@ -213,6 +213,31 @@ final class MemoryLearningTests: XCTestCase {
         XCTAssertEqual(fixture.memory.entries.count, 1)
     }
 
+    func testCancelledLearningDoesNotStartAnotherModelUntilTheFirstActuallyEnds() async throws {
+        let fixture = try LearningFixture()
+        _ = try fixture.capture("I work on Morie.")
+        let model = PendingLearning()
+        let controller = MemoryLearningController(
+            store: fixture.memory,
+            idleDelay: .milliseconds(1),
+            analyze: { try await model.run($0) }
+        )
+        controller.setInputActive(false)
+        controller.start()
+        await waitUntilStarted(model)
+
+        controller.setInputActive(true)
+        controller.setInputActive(false)
+        try? await Task.sleep(for: .milliseconds(20))
+
+        let invocationCount = await model.invocationCount
+        XCTAssertEqual(invocationCount, 1, "Cancelled model work must drain before a retry can start.")
+
+        await model.finish([LearningFixture.suggestion()])
+        await controller.waitForCurrentBatch()
+        controller.stop()
+    }
+
     func testSourceDeletedDuringAnalysisCannotBeRecreated() async throws {
         let fixture = try LearningFixture()
         let id = try fixture.capture("I work on Morie.")
@@ -323,9 +348,11 @@ private final class LearningFixture {
 
 private actor PendingLearning {
     private var continuation: CheckedContinuation<[MemorySuggestion], Error>?
+    private(set) var invocationCount = 0
     var isWaiting: Bool { continuation != nil }
     func run(_ input: MemoryLearningInput) async throws -> [MemorySuggestion] {
-        try await withCheckedThrowingContinuation { continuation = $0 }
+        invocationCount += 1
+        return try await withCheckedThrowingContinuation { continuation = $0 }
     }
     func finish(_ suggestions: [MemorySuggestion]) { continuation?.resume(returning: suggestions); continuation = nil }
 }
