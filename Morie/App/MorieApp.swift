@@ -143,17 +143,25 @@ private enum MorieApplicationActivation {
 
 @MainActor
 private struct MorieMenuBarLabel: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var setup: PermissionSetupController
     @Environment(\.openWindow) private var openWindow
     @State private var inspectedStartup = false
+
+    init(controller: AppController) {
+        self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _setup = ObservedObject(wrappedValue: controller.setup)
+    }
 
     var body: some View {
         Label("Morie", systemImage: "waveform")
             .task {
                 guard !inspectedStartup else { return }
                 inspectedStartup = true
-                await controller.setup.refresh()
-                guard controller.needsSetup || !controller.setup.isReady else { return }
+                await setup.refresh()
+                guard runtime.needsSetup || !setup.isReady else { return }
                 MorieApplicationActivation.prepareToOpenWindow()
                 openWindow(id: "setup")
                 NSApplication.shared.activate()
@@ -186,8 +194,18 @@ private struct MorieCommands: Commands {
 
 @MainActor
 private struct MorieMenuContent: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @ObservedObject private var runtime: AppRuntimeController
+    @ObservedObject private var preferences: AppPreferencesController
+    @ObservedObject private var setup: PermissionSetupController
     @Environment(\.openWindow) private var openWindow
+
+    init(controller: AppController) {
+        self.controller = controller
+        _runtime = ObservedObject(wrappedValue: controller.runtime)
+        _preferences = ObservedObject(wrappedValue: controller.preferences)
+        _setup = ObservedObject(wrappedValue: controller.setup)
+    }
 
     var body: some View {
         Text(controller.statusTitle)
@@ -196,17 +214,17 @@ private struct MorieMenuContent: View {
 
         Button("打开 Morie") {
             Task {
-                await controller.setup.refresh()
+                await setup.refresh()
                 MorieApplicationActivation.prepareToOpenWindow()
-                openWindow(id: controller.needsSetup || !controller.setup.isReady ? "setup" : "control-center")
+                openWindow(id: runtime.needsSetup || !setup.isReady ? "setup" : "control-center")
                 NSApplication.shared.activate()
             }
         }
-        .disabled(controller.isBootstrapping)
+        .disabled(runtime.isBootstrapping)
 
         Divider()
 
-        Text("录音快捷键：\(controller.captureShortcut.displayName)")
+        Text("录音快捷键：\(preferences.captureShortcut.displayName)")
         Text("录音中按 Esc 取消")
 
         Divider()
@@ -220,7 +238,8 @@ private struct MorieMenuContent: View {
 
 @MainActor
 struct MorieSettingsView: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
+    @ObservedObject private var preferences: AppPreferencesController
     @ObservedObject private var refinementModels: RefinementModelController
     @ObservedObject private var refinementPrompts: RefinementPromptController
 
@@ -232,6 +251,9 @@ struct MorieSettingsView: View {
 
     init(controller: AppController) {
         self.controller = controller
+        _preferences = ObservedObject(
+            wrappedValue: controller.preferences
+        )
         _refinementModels = ObservedObject(
             wrappedValue: controller.refinementModels
         )
@@ -259,7 +281,7 @@ struct MorieSettingsView: View {
                 Toggle(
                     "自动润色语音输入",
                     isOn: Binding(
-                        get: { controller.inputRefinementEnabled },
+                        get: { preferences.inputRefinementEnabled },
                         set: { controller.setInputRefinementEnabled($0) }
                     )
                 )
@@ -294,7 +316,7 @@ struct MorieSettingsView: View {
                 Toggle(
                     "使用个人记忆",
                     isOn: Binding(
-                        get: { controller.personalMemoryEnabled },
+                        get: { preferences.personalMemoryEnabled },
                         set: { controller.setPersonalMemoryEnabled($0) }
                     )
                 )
@@ -413,7 +435,7 @@ struct MorieSettingsView: View {
                 Toggle(
                     "修改输入后建议加入字典",
                     isOn: Binding(
-                        get: { controller.correctionSuggestionsEnabled },
+                        get: { preferences.correctionSuggestionsEnabled },
                         set: {
                             controller.setCorrectionSuggestionsEnabled($0)
                         }
@@ -431,7 +453,7 @@ struct MorieSettingsView: View {
                 Toggle(
                     "学习我的表达习惯",
                     isOn: Binding(
-                        get: { controller.expressionLearningEnabled },
+                        get: { preferences.expressionLearningEnabled },
                         set: { controller.setExpressionLearningEnabled($0) }
                     )
                 )
@@ -454,11 +476,11 @@ struct MorieSettingsView: View {
                 Toggle(
                     "使用 iCloud 同步与备份",
                     isOn: Binding(
-                        get: { controller.iCloudSyncEnabled },
+                        get: { preferences.iCloudSyncEnabled },
                         set: { controller.setICloudSyncEnabled($0) }
                     )
                 )
-                .disabled(controller.iCloudSyncState.isChecking)
+                .disabled(preferences.iCloudSyncState.isChecking)
 
                 Text(
                     "同步历史文字、字典、个人记忆和表达习惯到你的 iCloud 私有数据库。原始录音仍只保存在这台 Mac 上。"
@@ -468,14 +490,14 @@ struct MorieSettingsView: View {
 
                 LabeledContent(
                     "状态",
-                    value: controller.iCloudSyncState.detail
+                    value: preferences.iCloudSyncState.detail
                 )
 
-                if controller.iCloudSyncEnabled {
+                if preferences.iCloudSyncEnabled {
                     Button("重新检查 iCloud") {
                         controller.refreshICloudSyncState()
                     }
-                    .disabled(controller.iCloudSyncState.isChecking)
+                    .disabled(preferences.iCloudSyncState.isChecking)
                 }
             }
 
@@ -483,7 +505,7 @@ struct MorieSettingsView: View {
                 Toggle(
                     "录音开始和结束提示音",
                     isOn: Binding(
-                        get: { controller.soundFeedbackEnabled },
+                        get: { preferences.soundFeedbackEnabled },
                         set: { controller.setSoundFeedbackEnabled($0) }
                     )
                 )
@@ -499,7 +521,7 @@ struct MorieSettingsView: View {
                 Picker(
                     "开始或结束录音",
                     selection: Binding(
-                        get: { controller.captureShortcut },
+                        get: { preferences.captureShortcut },
                         set: { controller.setCaptureShortcut($0) }
                     )
                 ) {
@@ -519,9 +541,9 @@ struct MorieSettingsView: View {
 
             ControlCenterGroup("原始录音") {
                 Stepper(
-                    "录音保留 \(controller.audioRetentionDays) 天",
+                    "录音保留 \(preferences.audioRetentionDays) 天",
                     value: Binding(
-                        get: { controller.audioRetentionDays },
+                        get: { preferences.audioRetentionDays },
                         set: { controller.setAudioRetentionDays($0) }
                     ),
                     in: 1...365
