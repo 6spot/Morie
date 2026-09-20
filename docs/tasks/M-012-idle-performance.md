@@ -64,6 +64,15 @@ No Type4Me source or external dependency is copied.
   resident + physical footprint at bootstrap, capture start, Speech stop,
   refinement completion, capture completion, two-second settled state, and
   background Memory-model stages; audio source/stream deinits are also logged.
+- 2026-09-20 model-memory follow-up adds allocator heap metrics beside VM
+  resident/physical footprint and traces local/cloud refinement plus automatic
+  Memory learning at token-count, session-create, response-finish, cancellation,
+  lexical-scope-exit and worker schedule/wake/finish boundaries. This separates
+  Morie heap growth from Foundation Models/process-wide VM caching instead of
+  treating every retained page as an application object leak.
+- Memory learning remains single-flight across input preemption: cancelling for
+  a new Capture does not clear worker ownership until the in-flight model call
+  actually returns. A focused regression test now locks that behavior down.
 
 ## Validation
 
@@ -71,6 +80,9 @@ No Type4Me source or external dependency is copied.
   including the new HUD lifecycle regression (0 failures, 0 skipped).
 - 2026-09-19: isolated unsigned macOS 27 Debug app build succeeded.
 - `git diff --check` passed.
+- 2026-09-20 model-memory diagnostics branch: macOS/Xcode CI pending; owner-device
+  reproduction is still required to identify whether the retained ~200–250 MB
+  is malloc heap, model-session lifetime, or framework-level VM/cache.
 - Event-driven/data-query changes require the branch CI and updated logic tests
   before merge; real-device behavior remains a separate acceptance gate.
 - Real-device idle CPU, Energy Impact and RSS measurements: pending.
