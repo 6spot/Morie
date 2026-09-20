@@ -1,7 +1,6 @@
 import AppKit
 import Combine
 import Foundation
-import FoundationModels
 
 @MainActor
 final class AppController: ObservableObject {
@@ -33,11 +32,6 @@ final class AppController: ObservableObject {
     @Published private(set) var captureShortcut: CaptureShortcut
     @Published private(set) var audioRetentionDays: Int
     @Published private(set) var inputRefinementEnabled: Bool
-    @Published private(set) var refinementModelMode: RefinementModelMode
-    @Published private(set) var cloudRefinementBaseURL: String
-    @Published private(set) var cloudRefinementModelName: String
-    @Published private(set) var cloudRefinementAPIKey: String
-    @Published private(set) var cloudRefinementSettingsMessage: String?
     @Published private(set) var correctionSuggestionsEnabled: Bool
     @Published private(set) var expressionLearningEnabled: Bool
     @Published private(set) var soundFeedbackEnabled: Bool
@@ -55,6 +49,7 @@ final class AppController: ObservableObject {
     let memoryLearning: MemoryLearningController?
 
     let setup = PermissionSetupController(locale: Locale(identifier: "zh-CN"))
+    let refinementModels = RefinementModelController()
 
     private static let setupCompletedKey = "setup.completed"
     private var setupObservation: AnyCancellable?
@@ -78,7 +73,6 @@ final class AppController: ObservableObject {
             postInsertionLearning: postInsertionLearning,
             memoryLearning: memoryLearning,
             inputRefinementEnabled: inputRefinementEnabled,
-            refinementModelConfiguration: refinementModelConfiguration,
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
             expressionLearningEnabled: expressionLearningEnabled,
             soundFeedbackEnabled: soundFeedbackEnabled
@@ -138,12 +132,6 @@ final class AppController: ObservableObject {
         captureShortcut = savedShortcut ?? CaptureShortcut.defaultValue
         audioRetentionDays = CaptureStore.audioRetentionDays
         inputRefinementEnabled = UserDefaults.standard.object(forKey: CapturePersonalizer.enabledDefaultsKey) as? Bool ?? true
-        let refinementSettings = RefinementModelSettings.load()
-        refinementModelMode = refinementSettings.mode
-        cloudRefinementBaseURL = refinementSettings.cloudBaseURL
-        cloudRefinementModelName = refinementSettings.cloudModelName
-        cloudRefinementAPIKey = refinementSettings.cloudAPIKey
-        cloudRefinementSettingsMessage = nil
         correctionSuggestionsEnabled = UserDefaults.standard.bool(
             forKey: PostInsertionLearningController.dictionarySuggestionsDefaultsKey
         )
@@ -180,70 +168,6 @@ final class AppController: ObservableObject {
         refreshICloudSyncState()
     }
 
-    var refinementModelConfiguration: RefinementModelConfiguration {
-        RefinementModelConfiguration(
-            mode: refinementModelMode,
-            cloudBaseURL: cloudRefinementBaseURL,
-            cloudModelName: cloudRefinementModelName,
-            cloudAPIKey: cloudRefinementAPIKey
-        )
-    }
-
-    var cloudRefinementConfigurationStatusTitle: String {
-        refinementModelConfiguration.hasUsableCloudConfiguration ? "已配置" : "待配置"
-    }
-
-    var refinementModelName: String {
-        let externalName = refinementModelConfiguration.trimmedCloudModelName
-        switch refinementModelMode {
-        case .local:
-            return "Apple Foundation Models"
-        case .cloud:
-            return externalName.isEmpty ? "外部模型" : externalName
-        case .automatic:
-            return refinementModelConfiguration.hasUsableCloudConfiguration
-                ? "\(externalName) / Apple Foundation Models"
-                : "Apple Foundation Models"
-        }
-    }
-
-    var refinementModelDetail: String {
-        switch refinementModelMode {
-        case .local:
-            return "SystemLanguageModel.default · 本机"
-        case .cloud:
-            return refinementModelConfiguration.hasUsableCloudConfiguration
-                ? "OpenAI-compatible Chat Completions · 云端"
-                : "OpenAI-compatible API 尚未配置完整"
-        case .automatic:
-            return refinementModelConfiguration.hasUsableCloudConfiguration
-                ? "外部 API 优先 · 失败回退 Apple 本机"
-                : "外部 API 未配置 · 当前使用 Apple 本机"
-        }
-    }
-
-    var refinementModelStatusTitle: String {
-        guard inputRefinementEnabled else { return "已关闭" }
-        if refinementModelMode == .cloud {
-            return refinementModelConfiguration.hasUsableCloudConfiguration ? "已配置" : "待配置"
-        }
-        if refinementModelMode == .automatic, refinementModelConfiguration.hasUsableCloudConfiguration {
-            return "自动"
-        }
-        switch SystemLanguageModel.default.availability {
-        case .available:
-            return "可用"
-        case .unavailable(.modelNotReady):
-            return "模型准备中"
-        case .unavailable(.appleIntelligenceNotEnabled):
-            return "Apple 智能未开启"
-        case .unavailable(.deviceNotEligible):
-            return "设备不支持"
-        case .unavailable:
-            return "暂不可用"
-        }
-    }
-
     var statusTitle: String {
         switch state {
         case .checking: "正在准备 Morie"
@@ -272,33 +196,6 @@ final class AppController: ObservableObject {
         inputRefinementEnabled = enabled
         captureSession.inputRefinementEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: CapturePersonalizer.enabledDefaultsKey)
-    }
-
-    func setRefinementModelMode(_ mode: RefinementModelMode) {
-        refinementModelMode = mode
-        RefinementModelSettings.saveMode(mode)
-        captureSession.refinementModelConfiguration = refinementModelConfiguration
-    }
-
-    func saveCloudRefinementConfiguration(
-        baseURL: String,
-        modelName: String,
-        apiKey: String
-    ) {
-        do {
-            let saved = try RefinementModelSettings.saveCloudConfiguration(
-                baseURL: baseURL,
-                modelName: modelName,
-                apiKey: apiKey
-            )
-            cloudRefinementBaseURL = saved.cloudBaseURL
-            cloudRefinementModelName = saved.cloudModelName
-            cloudRefinementAPIKey = saved.cloudAPIKey
-            cloudRefinementSettingsMessage = "API 配置已保存。"
-            captureSession.refinementModelConfiguration = refinementModelConfiguration
-        } catch {
-            cloudRefinementSettingsMessage = error.localizedDescription
-        }
     }
 
     func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
@@ -609,7 +506,10 @@ final class AppController: ObservableObject {
     private func startNewCapture(deliveryMode: CaptureDeliveryMode) {
         guard canStartCapture else { return }
         lastPresentedFailure = nil
-        captureSession.start(deliveryMode: deliveryMode)
+        captureSession.start(
+            deliveryMode: deliveryMode,
+            refinementModelConfiguration: refinementModels.runtimeConfiguration()
+        )
     }
 
     private func handleHotkeyUnavailable(_ message: String) async {
