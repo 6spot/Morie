@@ -34,7 +34,7 @@ The current runtime shape is:
 5. **Schema-only guided generation:** local Apple refinement keeps `@Generable`, while the field `@Guide` only identifies the final cleaned body instead of repeating the cleanup rules.
 6. **Post-generation grounding:** empty/control-character payloads and clearly unsupported longer clauses are rejected before delivery.
 
-The shipped default lives in `Morie/Resources/DefaultRefinementInstructions.txt`; it is not embedded in `InputRefiner`. A saved Settings override lives in `UserDefaults`, so prompt experiments apply to later Captures without rebuilding or relaunching. **恢复默认** removes that override. Each Capture freezes the effective instructions together with its refinement-model selection at Start, so editing Settings cannot change an in-flight recording.
+The shipped default lives in `Morie/Resources/DefaultRefinementInstructions.txt`; it is not embedded in `InputRefiner`. On launch, `RefinementPromptController` reads the default or saved override once into process memory. Saving from Settings replaces that in-memory instruction immediately for later Captures and persists the same value only for the next launch; the model hot path does not reread storage. **恢复默认** replaces memory with the bundled baseline and removes the override. Each Capture freezes the effective instructions together with its refinement-model selection at Start, so editing Settings cannot change an in-flight recording.
 
 Apple-local and user-configured external refinement share the same instruction snapshot. Prompt editability does not bypass dictionary preparation, grounding validation or stale-context checks.
 
