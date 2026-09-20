@@ -21,20 +21,24 @@ Owner-approved on 2026-09-18. Applies to the current Mac input loop, independent
 
 ## Prompt organization
 
-The native Foundation Models prompt follows the same contract in a shorter **closed-world** structure designed for the on-device model:
+The Foundation Models implementation intentionally uses a **small closed-world instruction** rather than a growing collection of special cases.
 
-1. **Transcript is the only content source:** every output fact, request, judgment, question, attitude and topic must already be expressed in `transcript`.
-2. **Light polish only:** remove filler/stutter/abandoned restarts, repair punctuation and small word-order problems, and apply only high-confidence ASR spelling corrections. 润色，不是重写，更不是扩写。
+Apple's on-device prompting guidance favors concise, specific requests with one clear goal and warns that long/conditional instructions can reduce instruction following. M-035 therefore removed the deterministic `compact / semanticParagraphs / explicitList` routing and the duplicated behavioral policy that previously lived in both `Instructions` and `@Guide`.
+
+The current runtime shape is:
+
+1. **One three-paragraph instruction:** define the cleanup task/content boundary, allowed light edits/protected content, and natural formatting.
+2. **Transcript is the only content source:** every output fact, request, judgment, question, attitude and topic must already be expressed in `transcript`.
 3. **Helper fields are non-content:** `spellingCandidates`, related Memory and Expression Profile may only disambiguate or repair text already expressed. They can never create a new sentence/topic.
-4. **Formatting hint:** `compact`, `semanticParagraphs` and `explicitList` control layout only; they do not authorize new headings/items/content. When deterministic structure detection selects `semanticParagraphs` or `explicitList`, layout is a required output contract rather than an optional preference: real semantic blocks must stay separated, and explicit spoken items must be emitted one-per-line in original order.
-5. **Protected literals:** numbers, dates, negation, conditions, versions, code, commands, URLs, paths and uncertain proper nouns stay intact.
-6. **Output:** final cleaned text only.
+4. **Semantic paragraphing and logic, not a classifier:** paragraph boundaries follow topic/intent/stance/stage/object changes rather than character count. The model should make logical relations already present in speech—parallel, sequence, cause/effect, contrast, condition and whole-to-parts—read clearly through punctuation, paragraphs or lists, without inventing new reasoning. Explicit spoken enumeration may become a list, but any spoken lead-in, explanation, question, closing and item order remain content and must survive. No generated headings/items are authorized.
+5. **Schema-only guided generation:** local Apple refinement keeps `@Generable`, while the field `@Guide` only identifies the final cleaned body instead of repeating the cleanup rules.
+6. **Post-generation grounding:** empty/control-character payloads and clearly unsupported longer clauses are rejected before delivery.
 
-Production instructions intentionally contain **no vocabulary-bearing few-shot examples**. Owner samples showed that a long instruction/example document plus the full Dictionary could prime Apple Foundation Models to append an unrelated technical sentence.
+The shipped default lives in `Morie/Resources/DefaultRefinementInstructions.txt`; it is not embedded in `InputRefiner`. On launch, `RefinementPromptController` reads the default or saved override once into process memory. Saving from Settings replaces that in-memory instruction immediately for later Captures and persists the same value only for the next launch; the model hot path does not reread storage. **恢复默认** replaces memory with the bundled baseline and removes the override. Each Capture freezes the effective instructions together with its refinement-model selection at Start, so editing Settings cannot change an in-flight recording.
 
-After generation, a conservative grounding validator checks longer clauses against the prepared transcript. Clearly unsupported new sentences are rejected and Morie falls back to the deterministic dictionary-prepared text.
+Apple-local and user-configured external refinement share the same instruction snapshot. Prompt editability does not bypass dictionary preparation, grounding validation or stale-context checks.
 
-Morie intentionally does **not** copy Type4Me/OpenLess prompts wholesale. It borrows the useful light-polish boundary and structure lessons while keeping a smaller instruction surface appropriate for Apple Foundation Models.
+Morie intentionally does **not** copy Type4Me/OpenLess prompts wholesale. Their useful task-boundary and editability lessons are adapted to Morie's smaller Apple-native cleanup task; stronger rewrite/style-pack behavior remains out of scope.
 
 ## Acceptance examples
 
@@ -43,6 +47,7 @@ Morie intentionally does **not** copy Type4Me/OpenLess prompts wholesale. It bor
 - `周三，不，周四开会` may become `周四开会。`; `周三或者周四吧` retains both possibilities.
 - `帮我解释这个问题` remains a request in the final text, without an answer.
 - `先打开设置 然后选择字典 最后添加词条` may become an ordered list with the same actions/order.
+- `今天一共有三件事需要做第一件事好好上班，第二件事好好吃饭，第三件事好好睡觉` may become `今天一共有三件事需要做：\n1. 好好上班\n2. 好好吃饭\n3. 好好睡觉`; the spoken lead-in must not disappear merely because the items become a list.
 - Names, numbers, code, URLs, negation and mixed-language content must survive; uncertain changes keep the saved input.
 - Repeated words are not automatically filler. `这个按钮放左边这个按钮后面的时间保留` should keep both references and become something like `这个按钮放左边，这个按钮后面的时间保留。`; `这个这个问题` may collapse to `这个问题` when it is clearly a stutter.
 - Examples are behavioral illustrations only. Words or stance from an example must never leak into another utterance; e.g. `这个状态有必要保留吗` must not gain `我觉得`.
@@ -54,10 +59,3 @@ Morie intentionally does **not** copy Type4Me/OpenLess prompts wholesale. It bor
 ## Persistence and scope
 
 Save recognized text before processing, then save final text and actual processing/context snapshots before insertion. Background Memory learning reads that saved final text and retains its exact source. Failures keep usable saved input. Real-model meaning preservation, cleanup quality and latency require the deferred supported-Mac acceptance run.
-
-
-### Stronger semantic-structure detection — 2026-09-20
-
-Owner-device output exposed a remaining formatting weakness: cleanup semantics were good, but medium-length speech with an obvious turn from positive evaluation to “但是有一个问题…” could still classify as `compact`, and natural enumerations such as “有三个问题，一个是…另一个是…还有一个…” were not reliably promoted to `explicitList`.
-
-The heuristic now treats those patterns as real structural evidence while preserving conservative counterexamples. A short ordinary contrast such as “这个按钮颜色可以，但是大小不用改。” remains `compact`. Once `semanticParagraphs` or `explicitList` is selected, the model must execute that layout instead of flattening the content back into one paragraph. This strengthens presentation only; it does not authorize headings, new items, renamed items, summaries, or inferred content.

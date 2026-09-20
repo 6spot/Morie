@@ -8,6 +8,10 @@
 /* Begin PBXBuildFile section */
 		A50000000000000000000001 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
 		A50000000000000000000004 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
+		A60000000000000000000001 /* RefinementPromptSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000001 /* RefinementPromptSettings.swift */; };
+		A60000000000000000000002 /* RefinementPromptSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000001 /* RefinementPromptSettings.swift */; };
+		A60000000000000000000003 /* DefaultRefinementInstructions.txt in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000002 /* DefaultRefinementInstructions.txt */; };
+		A60000000000000000000004 /* DefaultRefinementInstructions.txt in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000002 /* DefaultRefinementInstructions.txt */; };
 		A50000000000000000000002 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000001 /* FoundationModelsUtilities */; };
 		A50000000000000000000003 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000002 /* FoundationModelsUtilities */; };
 		A10000000000000000000001 /* MorieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* MorieApp.swift */; };
@@ -92,6 +96,8 @@
 
 /* Begin PBXFileReference section */
 		B50000000000000000000001 /* RefinementModelSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementModelSettings.swift; sourceTree = "<group>"; };
+		B60000000000000000000001 /* RefinementPromptSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementPromptSettings.swift; sourceTree = "<group>"; };
+		B60000000000000000000002 /* DefaultRefinementInstructions.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = DefaultRefinementInstructions.txt; sourceTree = "<group>"; };
 		B10000000000000000000001 /* MorieApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieApp.swift; sourceTree = "<group>"; };
 		B10000000000000000000002 /* AppController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppController.swift; sourceTree = "<group>"; };
 		B10000000000000000000003 /* CapabilityGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilityGate.swift; sourceTree = "<group>"; };
@@ -235,6 +241,7 @@
 				B10000000000000000000004 /* SpeechPipeline.swift */,
 				B10000000000000000000027 /* CaptureRefinement.swift */,
 				B10000000000000000000028 /* InputRefiner.swift */,
+				B60000000000000000000001 /* RefinementPromptSettings.swift */,
 				B10000000000000000000009 /* CaptureHUD.swift */,
 				B10000000000000000000039 /* CaptureSessionController.swift */,
 				B10000000000000000000040 /* CapturePersistenceWriter.swift */,
@@ -355,6 +362,7 @@
 			isa = PBXGroup;
 			children = (
 				D10000000000000000000004 /* InfoPlist.strings */,
+				B60000000000000000000002 /* DefaultRefinementInstructions.txt */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -524,13 +532,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000022 /* InfoPlist.strings in Resources */,
+				A60000000000000000000003 /* DefaultRefinementInstructions.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C20000000000000000000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				A60000000000000000000004 /* DefaultRefinementInstructions.txt in Resources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -541,6 +552,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A50000000000000000000001 /* RefinementModelSettings.swift in Sources */,
+				A60000000000000000000001 /* RefinementPromptSettings.swift in Sources */,
 				A10000000000000000000020 /* PermissionSetupController.swift in Sources */,
 				A10000000000000000000021 /* MorieSetupView.swift in Sources */,
 				A10000000000000000000001 /* MorieApp.swift in Sources */,
@@ -590,6 +602,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A50000000000000000000004 /* RefinementModelSettings.swift in Sources */,
+				A60000000000000000000002 /* RefinementPromptSettings.swift in Sources */,
 				A2000000000000000000001D /* CaptureHUD.swift in Sources */,
 				A2000000000000000000001E /* CaptureHUDTests.swift in Sources */,
 				A2000000000000000000001A /* PermissionSetupController.swift in Sources */,

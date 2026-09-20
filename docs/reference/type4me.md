@@ -217,6 +217,19 @@ Inspected upstream `ProcessingMode.formalWritingPromptTemplate` and the archived
 
 No Type4Me code or external dependency is copied; this is a concept-level prompt-organization adaptation under Morie's existing M-005 contract.
 
+
+### M-035 prompt simplification follow-up, 2026-09-20
+
+Re-inspected current `ProcessingMode.formalWritingPromptTemplate`, `ModesSettingsTab` and the prompt benchmark script at upstream revision `412f2009765c13168b007d276f821dc4b8e8e3e6`.
+
+- **ADAPT:** keep the clear task boundary: ASR text is the object to edit, not an instruction to answer or execute; remove filler/restarts and repair obvious recognition/grammar issues without inventing content.
+- **ADAPT:** Type4Me exposes mode prompts as editable data in Settings rather than requiring a source-code change for every prompt experiment. Morie adopts the same product lesson in a smaller single-cleanup surface.
+- **DROP:** the current formal-writing template's mandatory number conversion, forced total-summary-plus-numbered-list rules, generated item titles/subitems and optional transition phrases. Those remain stronger than Morie's expression-preserving cleanup contract.
+- **ADAPT AS EVIDENCE, NOT CODE:** Type4Me's benchmark history explicitly compares large and smaller direct prompt variants. Together with Apple's on-device guidance, this supports removing accumulated Morie conditionals instead of adding another exception for the latest failure.
+- **VERIFY:** Type4Me targets different model/provider combinations, so its prompt results do not establish Apple Foundation Models quality. Morie's three-paragraph baseline still requires owner-device testing.
+
+No Type4Me source is copied; the setting/runtime behavior is reimplemented in Morie's Apple-native architecture.
+
 ### 7. Later-phase reusable lessons
 
 When later phases start, inspect Type4Me only after reading that phase's Morie design/task document. Potential reference areas include:

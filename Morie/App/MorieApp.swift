@@ -162,17 +162,21 @@ private struct MorieMenuContent: View {
 struct MorieSettingsView: View {
     @ObservedObject var controller: AppController
     @ObservedObject private var refinementModels: RefinementModelController
+    @ObservedObject private var refinementPrompts: RefinementPromptController
     @State private var confirmsExpressionReset = false
     @State private var cloudBaseURL: String
     @State private var cloudModelName: String
     @State private var cloudAPIKey: String
+    @State private var refinementInstructions: String
 
     init(controller: AppController) {
         self.controller = controller
         _refinementModels = ObservedObject(wrappedValue: controller.refinementModels)
+        _refinementPrompts = ObservedObject(wrappedValue: controller.refinementPrompts)
         _cloudBaseURL = State(initialValue: controller.refinementModels.cloudBaseURL)
         _cloudModelName = State(initialValue: controller.refinementModels.cloudModelName)
         _cloudAPIKey = State(initialValue: "")
+        _refinementInstructions = State(initialValue: controller.refinementPrompts.instructions)
     }
 
     var body: some View {
@@ -201,6 +205,40 @@ struct MorieSettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Text("保留原意和语气，删除口头语，整理标点、段落和结构明确的列表。关闭 AI 润色后，字典仍然生效。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("润色提示词") {
+                TextEditor(text: $refinementInstructions)
+                    .frame(minHeight: 180)
+
+                HStack {
+                    Button("恢复默认") {
+                        refinementPrompts.restoreDefault()
+                        refinementInstructions = refinementPrompts.instructions
+                    }
+                    .disabled(
+                        refinementPrompts.isDefault
+                            && refinementInstructions == refinementPrompts.instructions
+                    )
+
+                    Spacer()
+
+                    Button("保存提示词") {
+                        if refinementPrompts.save(refinementInstructions) {
+                            refinementInstructions = refinementPrompts.instructions
+                        }
+                    }
+                }
+
+                if let message = refinementPrompts.settingsMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("修改后从下一次开始录音时生效；正在进行的录音继续使用开始时冻结的版本。Apple 本机模型和外部 API 共用这份润色指令。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

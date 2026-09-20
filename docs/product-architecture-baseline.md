@@ -27,7 +27,7 @@ Operational failure must preserve available intentional audio/text. Explicit can
 
 Default recording uses a solo **Fn / Globe release** as one activation: the first starts, the next finishes; Escape cancels. Fn chords pass through. Ordinary current-app delivery resolves the external keyboard focus only when final text is ready, never restores the record-start app, and uses one generic clipboard/synthetic-paste path per [ADR 0001](decisions/0001-universal-text-delivery.md). The nonactivating native HUD follows [ADR 0002](decisions/0002-toggle-capture-hud.md).
 
-Cleanup follows the [owner's contract](input-cleanup.md). It works with empty Memory, preserves meaning, terminology, tone, emphasis and uncertainty, and never answers, summarizes, translates or executes the dictated content. Unavailable, slow or uncertain enrichment keeps usable saved input. New voice input takes priority over optional model work.
+Cleanup follows the [owner's contract](input-cleanup.md). It works with empty Memory, preserves meaning, terminology, tone, emphasis and uncertainty, and never answers, summarizes, translates or executes the dictated content. The shipped Apple-oriented instruction is a concise text resource rather than a growing hard-coded rule block; Settings may persist a nonempty user override for prompt testing, and each Capture freezes the effective instruction at Start. Unavailable, slow or uncertain enrichment keeps usable saved input. New voice input takes priority over optional model work.
 
 ## Dictionary and personal Memory
 

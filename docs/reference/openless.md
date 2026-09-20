@@ -20,6 +20,21 @@ Inspected paths:
 - **DROP:** a web/Tauri UI, whole-document observation, model/provider machinery and passive general keyboard tracking. Morie uses repository-owned Swift and native AppKit/SwiftUI.
 - **VERIFY:** native Accessibility range support, field identity, selection behavior, password/secure-input exclusion, focus preservation, pointer/keyboard/VoiceOver interaction and useful correction precision on the actual macOS 27 app matrix.
 
+
+## M-035 cleanup-prompt behavior audit — 2026-09-20
+
+For M-035, Morie also inspected OpenLess prompt composition/style-pack behavior at revision `a8ebcf6ffae7f179f09adf6f0afbc164cd791d21`.
+
+Useful mature-product lessons are behavioral only:
+
+- OpenLess clearly separates the raw transcription from the instruction and does not answer or execute questions/requests contained in dictated text.
+- It treats uncertain text conservatively and keeps a direct-output contract.
+- Its style-pack architecture treats prompts as editable product data rather than requiring a source edit for every iteration.
+
+Morie deliberately does **not** adopt OpenLess's larger multi-mode/persona/technical-term prompt surface. Morie's Apple on-device cleanup has one narrower job, and Apple's own Foundation Models guidance favors a concise, specific prompt. M-035 therefore keeps one three-paragraph default, removes the deterministic formatting classifier, and exposes only the effective cleanup instruction in native Settings.
+
+OpenLess remains AGPL-3.0. No prompt text, source implementation, component or dependency is copied.
+
 ## Current implementation
 
 M-009 adds a default-off **Suggest Words After I Correct Input** setting. Only a successfully dispatched current-app insertion can begin observation; the exact inserted text must then be verified at the caret. Unsupported/secure fields and selected terminal/password-manager apps are excluded. No clipboard fallback or capture-only recording starts a watcher.
