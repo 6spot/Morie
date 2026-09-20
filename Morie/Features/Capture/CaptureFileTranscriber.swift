@@ -22,7 +22,8 @@ enum CaptureFileTranscriber {
     static func recognize(
         _ url: URL,
         locale requestedLocale: Locale,
-        dictionaryWords: [String]
+        dictionaryWords: [String],
+        applicationContextWords: [String] = []
     ) async throws -> String {
         try Task.checkCancellation()
         let probe = try AVAudioFile(forReading: url)
@@ -32,9 +33,15 @@ enum CaptureFileTranscriber {
             throw TranscriptionError.unsupportedLocale
         }
 
+        let contextualWords = SpeechContextHints.merged(
+            contextualWords: contextualWords,
+                dictionaryHintCount: dictionaryWords.count,
+                applicationHintCount: applicationContextWords.count,
+            applicationContextWords: applicationContextWords
+        )
         Diagnostics.record(
             "Speech",
-            "Saved-audio recognition selected \(backend.logName) for \(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count)"
+            "Saved-audio recognition selected \(backend.logName) for \(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count); applicationHints=\(applicationContextWords.count); contextualHints=\(contextualWords.count)"
         )
 
         switch backend {
@@ -53,7 +60,9 @@ enum CaptureFileTranscriber {
                     return try await recognizeWithDictation(
                         url,
                         locale: fallbackLocale,
-                        dictionaryWords: dictionaryWords
+                        contextualWords: contextualWords,
+                dictionaryHintCount: dictionaryWords.count,
+                applicationHintCount: applicationContextWords.count
                     )
                 }
                 throw error
@@ -61,14 +70,18 @@ enum CaptureFileTranscriber {
             return try await recognizeWithSpeech(
                 url,
                 transcriber: transcriber,
-                dictionaryWords: dictionaryWords
+                contextualWords: contextualWords,
+                dictionaryHintCount: dictionaryWords.count,
+                applicationHintCount: applicationContextWords.count
             )
 
         case .dictationTranscriber(let locale):
             return try await recognizeWithDictation(
                 url,
                 locale: locale,
-                dictionaryWords: dictionaryWords
+                contextualWords: contextualWords,
+                dictionaryHintCount: dictionaryWords.count,
+                applicationHintCount: applicationContextWords.count
             )
         }
     }
@@ -76,13 +89,20 @@ enum CaptureFileTranscriber {
     private static func recognizeWithSpeech(
         _ url: URL,
         transcriber: SpeechTranscriber,
-        dictionaryWords: [String]
+        contextualWords: [String],
+        dictionaryHintCount: Int,
+        applicationHintCount: Int
     ) async throws -> String {
         let audioFile = try AVAudioFile(forReading: url)
         let detector = SpeechDetector()
         let modules: [any SpeechModule] = [detector, transcriber]
         let analyzer = SpeechAnalyzer(modules: modules)
-        await applyDictionaryContext(dictionaryWords, analyzer: analyzer)
+        await applyRecognitionContext(
+            contextualWords,
+            dictionaryHintCount: dictionaryHintCount,
+            applicationHintCount: applicationHintCount,
+            analyzer: analyzer
+        )
 
         return try await withTaskCancellationHandler {
             let results = Task {
@@ -130,14 +150,21 @@ enum CaptureFileTranscriber {
     private static func recognizeWithDictation(
         _ url: URL,
         locale: Locale,
-        dictionaryWords: [String]
+        contextualWords: [String],
+        dictionaryHintCount: Int,
+        applicationHintCount: Int
     ) async throws -> String {
         let audioFile = try AVAudioFile(forReading: url)
         let transcriber = DictationTranscriber(locale: locale, preset: .longDictation)
         let detector = SpeechDetector()
         let modules: [any SpeechModule] = [detector, transcriber]
         let analyzer = SpeechAnalyzer(modules: modules)
-        await applyDictionaryContext(dictionaryWords, analyzer: analyzer)
+        await applyRecognitionContext(
+            contextualWords,
+            dictionaryHintCount: dictionaryHintCount,
+            applicationHintCount: applicationHintCount,
+            analyzer: analyzer
+        )
 
         return try await withTaskCancellationHandler {
             let results = Task {
@@ -191,24 +218,26 @@ enum CaptureFileTranscriber {
         return accurate
     }
 
-    private static func applyDictionaryContext(
-        _ dictionaryWords: [String],
+    private static func applyRecognitionContext(
+        _ contextualWords: [String],
+        dictionaryHintCount: Int,
+        applicationHintCount: Int,
         analyzer: SpeechAnalyzer
     ) async {
-        guard !dictionaryWords.isEmpty else { return }
+        guard !contextualWords.isEmpty else { return }
 
         let context = AnalysisContext()
-        context.contextualStrings = [.general: dictionaryWords]
+        context.contextualStrings = [.general: contextualWords]
         do {
             try await analyzer.setContext(context)
             Diagnostics.record(
                 "SpeechQuality",
-                "Applied \(dictionaryWords.count) contextual dictionary strings to saved-audio recognition"
+                "Applied \(contextualWords.count) contextual strings to saved-audio recognition; dictionaryHints=\(dictionaryHintCount); applicationHints=\(applicationHintCount)"
             )
         } catch {
             Diagnostics.record(
                 "Speech",
-                "Saved-audio dictionary context was unavailable; continuing recognition: \(error.localizedDescription)",
+                "Saved-audio recognition context was unavailable; continuing recognition: \(error.localizedDescription)",
                 level: .warning
             )
         }
