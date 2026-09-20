@@ -330,9 +330,9 @@ Cleanup context is narrower than Speech hints. `speechHints()` still returns the
 
 ### `ApplicationContextCollector`
 
-M-042 introduces an Apple-native, runtime-only Application Context boundary. At current-app Capture Start, Morie snapshots the frontmost application identity and bounded selected/focused/nearby Accessibility text. Nearby collection expands from the focused AX element through a small ancestor/sibling neighborhood with fixed depth, node and character budgets; secure text fields contribute no text. The collector has no app-specific adapters, screen capture or OCR.
+M-042 introduces an Apple-native, runtime-only Application Context boundary. At current-app Capture Start, Morie synchronously pins only the frontmost application identity/PID, then a dedicated collector actor performs bounded selected/focused/nearby Accessibility reads without blocking recording UI or the main actor. Nearby collection expands from the focused AX element through a small ancestor/sibling neighborhood with fixed depth, node and character budgets; every AX element receives a short native messaging timeout, and secure text fields contribute no text. The collector has no app-specific adapters, screen capture or OCR.
 
-The snapshot is frozen inside the in-memory Capture session context and released with session identity reset. It is intentionally not `Codable` and is never attached to `CaptureRecord`, `CaptureRefinement`, History, Personal Memory or durable diagnostics. Diagnostics expose only app identity and character counts. This first slice does not yet feed Application Context into Speech or cleanup; those integrations follow only after real-device coverage is understood.
+The capture request is frozen at Start; the asynchronous result is accepted only if that Capture is still active, retained in runtime memory, and released with session identity reset. It is intentionally not `Codable` and is never attached to `CaptureRecord`, `CaptureRefinement`, History, Personal Memory or durable diagnostics. Diagnostics expose only app identity and character counts. This first slice does not yet feed Application Context into Speech or cleanup; those integrations follow only after real-device coverage is understood.
 
 ### `CaptureSessionController`
 
