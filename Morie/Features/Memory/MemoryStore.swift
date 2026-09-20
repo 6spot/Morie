@@ -817,11 +817,10 @@ final class MemoryStore: ObservableObject {
 
         guard !notes.isEmpty,
               notes.count <= 2_000,
-              !notes.unicodeScalars.contains(
-                where: CharacterSet.controlCharacters
-                    .subtracting(CharacterSet.newlines)
-                    .contains
-              )
+              !notes.unicodeScalars.contains(where: { scalar in
+                  CharacterSet.controlCharacters.contains(scalar)
+                      && !CharacterSet.newlines.contains(scalar)
+              })
         else { throw StoreError.invalidNotes }
 
         return MemoryDraft(
