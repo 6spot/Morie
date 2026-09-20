@@ -6,6 +6,11 @@ enum ControlCenterPageFamily {
     case workspace
 }
 
+private enum ControlCenterLayout {
+    static let contentInset: CGFloat = 24
+    static let readingMaxWidth: CGFloat = 760
+}
+
 struct ControlCenterReadingContent<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -15,11 +20,11 @@ struct ControlCenterReadingContent<Content: View>: View {
                 content
             }
             .frame(
-                maxWidth: 760,
+                maxWidth: ControlCenterLayout.readingMaxWidth,
                 alignment: .leading
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding()
+            .padding(ControlCenterLayout.contentInset)
         }
     }
 }
@@ -160,7 +165,7 @@ private struct ControlCenterRouteHost: View {
             ScrollView {
                 routedPage
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding()
+                    .padding(ControlCenterLayout.contentInset)
             }
 
         case .form:
