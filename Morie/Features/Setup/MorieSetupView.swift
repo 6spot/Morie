@@ -45,15 +45,6 @@ struct MorieSetupView: View {
                 await setup.refresh()
             }
         }
-        .onReceive(controller.$state) { state in
-            controllerState = state
-        }
-        .onReceive(controller.$isBootstrapping) { value in
-            isBootstrapping = value
-        }
-        .onReceive(controller.$setupError) { error in
-            setupError = error
-        }
     }
 }
 
@@ -225,6 +216,16 @@ struct PermissionManagementView: View {
             || isBootstrapping
     }
 
+    private var canStartCapture: Bool {
+        _ = controllerState
+        return controller.canStartCapture
+    }
+
+    private var isCaptureActive: Bool {
+        _ = controllerState
+        return controller.isCaptureActive
+    }
+
     var body: some View {
         VStack(
             alignment: .leading,
@@ -275,7 +276,7 @@ struct PermissionManagementView: View {
                 }
                 .disabled(isBusy)
 
-                if setup.isReady && !controller.canStartCapture {
+                if setup.isReady && !canStartCapture {
                     Button("重新启用 Morie") {
                         Task {
                             await controller.bootstrap(
@@ -284,7 +285,7 @@ struct PermissionManagementView: View {
                         }
                     }
                     .disabled(
-                        isBusy || controller.isCaptureActive
+                        isBusy || isCaptureActive
                     )
                 }
             }
@@ -293,6 +294,15 @@ struct PermissionManagementView: View {
             if setup.checks.isEmpty {
                 await setup.refresh()
             }
+        }
+        .onReceive(controller.$state) { state in
+            controllerState = state
+        }
+        .onReceive(controller.$isBootstrapping) { value in
+            isBootstrapping = value
+        }
+        .onReceive(controller.$setupError) { error in
+            setupError = error
         }
     }
 
