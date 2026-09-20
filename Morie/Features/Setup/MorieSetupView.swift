@@ -204,55 +204,94 @@ struct PermissionManagementView: View {
     }
 
     private var isBusy: Bool {
-        setup.isRefreshing || setup.activeRequest != nil || controller.isBootstrapping
+        setup.isRefreshing
+            || setup.activeRequest != nil
+            || controller.isBootstrapping
     }
 
     var body: some View {
         Form {
-            Section {
-                if setup.checks.isEmpty {
+            if setup.checks.isEmpty {
+                Section {
                     ProgressView("正在检查设备和权限…")
-                } else {
-                    ForEach(setup.checks) { check in
+                }
+            } else {
+                Section("设备能力") {
+                    ForEach(
+                        setup.checks.filter { !$0.requirement.isPermission }
+                    ) { check in
                         PermissionRequirementRow(
                             check: check,
                             activeRequest: setup.activeRequest,
                             isBusy: isBusy,
-                            onAction: { requirement in
-                                Task { await setup.performAction(for: requirement) }
-                            }
+                            onAction: perform
                         )
                     }
                 }
-            } footer: {
-                Text("权限由 macOS 管理。从系统设置返回后，状态会自动更新。")
+
+                Section {
+                    ForEach(
+                        setup.checks.filter { $0.requirement.isPermission }
+                    ) { check in
+                        PermissionRequirementRow(
+                            check: check,
+                            activeRequest: setup.activeRequest,
+                            isBusy: isBusy,
+                            onAction: perform
+                        )
+                    }
+                } header: {
+                    Text("使用权限")
+                } footer: {
+                    Text("权限由 macOS 管理。从系统设置返回后，状态会自动更新。")
+                }
             }
 
             if let error = controller.setupError {
-                Section {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
+                Section("状态") {
+                    Label(
+                        error,
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .foregroundStyle(.secondary)
                 }
             }
         }
         .formStyle(.grouped)
-        .controlCenterScrollMargins()
         .navigationTitle("权限")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("重新检查", systemImage: "arrow.clockwise") {
-                    Task { await setup.refresh() }
+                    Task {
+                        await setup.refresh()
+                    }
                 }
                 .disabled(isBusy)
 
                 if setup.isReady && !controller.canStartCapture {
                     Button("重新启用 Morie") {
-                        Task { await controller.bootstrap(completingSetup: true) }
+                        Task {
+                            await controller.bootstrap(
+                                completingSetup: true
+                            )
+                        }
                     }
-                    .disabled(isBusy || controller.isCaptureActive)
+                    .disabled(
+                        isBusy || controller.isCaptureActive
+                    )
                 }
             }
         }
-        .task { await setup.refresh() }
+        .task {
+            if setup.checks.isEmpty {
+                await setup.refresh()
+            }
+        }
+    }
+
+    private func perform(_ requirement: SetupRequirement) {
+        Task {
+            await setup.performAction(for: requirement)
+        }
     }
 }
