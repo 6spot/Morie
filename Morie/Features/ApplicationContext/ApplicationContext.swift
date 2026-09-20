@@ -75,6 +75,9 @@ final class ApplicationContextInspectionStore: ObservableObject {
         let selectedCharacterCount: Int
         let focusedCharacterCount: Int
         let nearbyCharacterCount: Int
+        let selectedPreview: String?
+        let focusedPreview: String?
+        let nearbyPreview: String?
         let dictionaryHintCount: Int
         let contextualHintCount: Int
         let hints: [ApplicationContextVocabularyHint]
@@ -96,10 +99,28 @@ final class ApplicationContextInspectionStore: ObservableObject {
             selectedCharacterCount: context.selectedCharacterCount,
             focusedCharacterCount: context.focusedCharacterCount,
             nearbyCharacterCount: context.nearbyCharacterCount,
+            selectedPreview: Self.preview(context.selectedText),
+            focusedPreview: Self.preview(context.focusedText),
+            nearbyPreview: Self.preview(context.nearbyText),
             dictionaryHintCount: dictionaryHintCount,
             contextualHintCount: contextualHintCount,
             hints: hints
         )
+    }
+
+    private static func preview(
+        _ text: String?,
+        limit: Int = 320
+    ) -> String? {
+        guard let text else { return nil }
+        let normalized = text
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        guard !normalized.isEmpty else { return nil }
+        if normalized.count <= limit {
+            return normalized
+        }
+        return String(normalized.prefix(limit)) + "…"
     }
 }
 
