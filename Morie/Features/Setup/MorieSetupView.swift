@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
@@ -43,6 +44,15 @@ struct MorieSetupView: View {
             if setup.checks.isEmpty {
                 await setup.refresh()
             }
+        }
+        .onReceive(controller.$state) { state in
+            controllerState = state
+        }
+        .onReceive(controller.$isBootstrapping) { value in
+            isBootstrapping = value
+        }
+        .onReceive(controller.$setupError) { error in
+            setupError = error
         }
     }
 }
@@ -195,18 +205,24 @@ private struct PermissionRequirementRow: View {
 
 @MainActor
 struct PermissionManagementView: View {
-    @ObservedObject var controller: AppController
+    let controller: AppController
     @ObservedObject private var setup: PermissionSetupController
+    @State private var controllerState: AppController.State
+    @State private var isBootstrapping: Bool
+    @State private var setupError: String?
 
     init(controller: AppController) {
         self.controller = controller
         _setup = ObservedObject(wrappedValue: controller.setup)
+        _controllerState = State(initialValue: controller.state)
+        _isBootstrapping = State(initialValue: controller.isBootstrapping)
+        _setupError = State(initialValue: controller.setupError)
     }
 
     private var isBusy: Bool {
         setup.isRefreshing
             || setup.activeRequest != nil
-            || controller.isBootstrapping
+            || isBootstrapping
     }
 
     var body: some View {
@@ -239,7 +255,7 @@ struct PermissionManagementView: View {
                 }
             }
 
-            if let error = controller.setupError {
+            if let error = setupError {
                 ControlCenterGroup("状态") {
                     Label(
                         error,
