@@ -285,7 +285,7 @@ struct MorieSettingsView: View {
     var body: some View {
         ControlCenterScrollableContent {
             VStack(alignment: .leading, spacing: 24) {
-                Section {
+                ControlCenterSectionBlock("输入与润色") {
                 Toggle(
                     "自动润色语音输入",
                     isOn: Binding(
@@ -315,8 +315,6 @@ struct MorieSettingsView: View {
                             preferences.inputRefinementEnabled
                     )
                 )
-            } header: {
-                Text("输入与润色")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(refinementModels.mode.detail)
@@ -326,7 +324,7 @@ struct MorieSettingsView: View {
                 }
             }
 
-            Section {
+            ControlCenterSectionBlock("个人化") {
                 Toggle(
                     "使用个人记忆",
                     isOn: Binding(
@@ -364,15 +362,13 @@ struct MorieSettingsView: View {
                 ) {
                     confirmsExpressionReset = true
                 }
-            } header: {
-                Text("个人化")
             } footer: {
                 Text(
                     "关闭个人记忆只会停止继续学习和润色引用，已有内容仍会保留。字典与表达习惯只从你确认或修改过的 Morie 输入中学习。"
                 )
             }
 
-            Section {
+            ControlCenterSectionBlock("模型与提示词") {
                 DisclosureGroup(
                     "润色提示词",
                     isExpanded: $promptExpanded
@@ -498,15 +494,13 @@ struct MorieSettingsView: View {
                     }
                     .padding(.top, 8)
                 }
-            } header: {
-                Text("模型与提示词")
             } footer: {
                 Text(
                     "外部 API 兼容 OpenAI Chat Completions。API Key 仅保存在 macOS 钥匙串；无需鉴权的本地服务可以留空。"
                 )
             }
 
-            Section {
+            ControlCenterSectionBlock("同步与存储") {
                 Toggle(
                     "使用 iCloud 同步与备份",
                     isOn: Binding(
@@ -541,15 +535,13 @@ struct MorieSettingsView: View {
                     ),
                     in: 1...365
                 )
-            } header: {
-                Text("同步与存储")
             } footer: {
                 Text(
                     "iCloud 同步历史文字、字典、个人记忆和表达习惯；原始录音始终只保存在这台 Mac 上。"
                 )
             }
 
-            Section {
+            ControlCenterSectionBlock("快捷键与反馈") {
                 Toggle(
                     "录音开始和结束提示音",
                     isOn: Binding(
@@ -574,8 +566,6 @@ struct MorieSettingsView: View {
 
                 LabeledContent("打开设置", value: "⌘,")
                 LabeledContent("取消录音", value: "Esc")
-            } header: {
-                Text("快捷键与反馈")
             } footer: {
                 Text(
                     "单独按下并松开 Fn / 地球仪键可切换录音状态；与其他按键组合时不会触发 Morie。"
