@@ -185,9 +185,7 @@ final class CapturePersonalizer {
                 do {
                     result = try ValidatedRefinement.accepting(
                         text,
-                        for: input,
-                        applicationSpellingCandidates:
-                            configuration.applicationSpellingCandidates
+                        for: input
                     )
                     DevelopmentDiagnostics.text(
                         "RefinementOutput",
@@ -207,11 +205,11 @@ final class CapturePersonalizer {
                         "RefinementDecision",
                         captureID: captureID,
                         level: .warning,
-                        "guardRejected; errorType=\(DevelopmentDiagnostics.errorType(error))"
+                        "boundaryRejected; errorType=\(DevelopmentDiagnostics.errorType(error))"
                     )
                     Diagnostics.record(
                         "Refinement",
-                        "Rejected cleanup output that crossed a protected fact or intent boundary",
+                        "Rejected cleanup output because the model returned an unusable payload",
                         level: .warning
                     )
                     return try keepOriginal(input, reason: .invalidEdits, started: started)
