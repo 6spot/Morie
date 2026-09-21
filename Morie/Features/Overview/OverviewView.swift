@@ -1,3 +1,4 @@
+import Observation
 import SwiftData
 import SwiftUI
 
@@ -62,6 +63,13 @@ struct OverviewMetricsSnapshot: Equatable {
 }
 
 @MainActor
+@Observable
+final class OverviewPageState {
+    var state.metricsSnapshot: OverviewMetricsSnapshot?
+}
+
+
+@MainActor
 struct OverviewView: View {
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var preferences: AppPreferencesController
@@ -71,12 +79,12 @@ struct OverviewView: View {
     private let buildIdentity = AppBuildIdentity.current
 
     @Environment(\.modelContext) private var modelContext
-    @Binding private var metricsSnapshot: OverviewMetricsSnapshot?
+    @Bindable var state: OverviewPageState
     @State private var metricsError: String?
 
     init(
         controller: AppController,
-        metricsSnapshot: Binding<OverviewMetricsSnapshot?>
+        state: OverviewPageState
     ) {
         _capabilities = ObservedObject(
             wrappedValue: controller.capabilities
@@ -88,7 +96,7 @@ struct OverviewView: View {
         _applicationContextInspector = ObservedObject(
             wrappedValue: controller.applicationContextInspector
         )
-        _metricsSnapshot = metricsSnapshot
+        self.state = state
     }
 
     var body: some View {
@@ -265,61 +273,76 @@ struct OverviewView: View {
         }
     }
 
-    @ViewBuilder
     private var usageSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("使用情况")
-                .font(.headline)
+        let metrics = state.metricsSnapshot?.metrics
+        let isLoading = state.metricsSnapshot == nil && metricsError == nil
 
-            if let metrics = metricsSnapshot?.metrics {
-                Grid(
-                    alignment: .leading,
-                    horizontalSpacing: 40,
-                    verticalSpacing: 16
-                ) {
-                    GridRow {
-                        metric(
-                            title: "累计识别字符",
-                            value: metrics.recognizedCharacters.formatted()
-                        )
-                        metric(
-                            title: "已完成记录",
-                            value: metrics.totalCaptures.formatted()
-                        )
-                    }
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text("使用情况")
+                    .font(.headline)
 
-                    GridRow {
-                        metric(
-                            title: "成功输入",
-                            value: metrics.successfulInputs.formatted()
-                        )
-                        metric(
-                            title: "输入失败率",
-                            value: percent(metrics.failureRate)
-                        )
-                    }
+                ProgressView()
+                    .controlSize(.small)
+                    .opacity(isLoading ? 1 : 0)
+                    .frame(width: 16, height: 16)
+            }
 
-                    GridRow {
-                        metric(
-                            title: "平均润色耗时",
-                            value: duration(metrics.averageRefinementSeconds)
-                        )
-                    }
+            Grid(
+                alignment: .leading,
+                horizontalSpacing: 40,
+                verticalSpacing: 16
+            ) {
+                GridRow {
+                    metric(
+                        title: "累计识别字符",
+                        value:
+                            metrics?.recognizedCharacters.formatted()
+                            ?? "—"
+                    )
+                    metric(
+                        title: "已完成记录",
+                        value:
+                            metrics?.totalCaptures.formatted()
+                            ?? "—"
+                    )
                 }
 
-                Text(
-                    "输入失败率只统计 Morie 是否成功将文字送入当前应用，不等同于语音识别错误率。"
-                )
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            } else if let metricsError {
+                GridRow {
+                    metric(
+                        title: "成功输入",
+                        value:
+                            metrics?.successfulInputs.formatted()
+                            ?? "—"
+                    )
+                    metric(
+                        title: "输入失败率",
+                        value: percent(metrics?.failureRate)
+                    )
+                }
+
+                GridRow {
+                    metric(
+                        title: "平均润色耗时",
+                        value: duration(
+                            metrics?.averageRefinementSeconds
+                        )
+                    )
+                }
+            }
+
+            if let metricsError {
                 Label(
                     metricsError,
                     systemImage: "exclamationmark.triangle"
                 )
                 .foregroundStyle(.secondary)
             } else {
-                ProgressView("正在读取使用统计…")
+                Text(
+                    "输入失败率只统计 Morie 是否成功将文字送入当前应用，不等同于语音识别错误率。"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
         }
     }
@@ -433,7 +456,7 @@ struct OverviewView: View {
                 .first?
                 .updatedAt
 
-            if let cached = metricsSnapshot,
+            if let cached = state.metricsSnapshot,
                cached.recordCount == recordCount,
                cached.latestUpdatedAt == latestUpdatedAt {
                 metricsError = nil
@@ -453,7 +476,7 @@ struct OverviewView: View {
                 metrics.accumulate(capture)
             }
 
-            metricsSnapshot = OverviewMetricsSnapshot(
+            state.metricsSnapshot = OverviewMetricsSnapshot(
                 metrics: metrics,
                 recordCount: recordCount,
                 latestUpdatedAt: latestUpdatedAt
