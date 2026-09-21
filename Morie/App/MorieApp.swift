@@ -283,8 +283,9 @@ struct MorieSettingsView: View {
     }
 
     var body: some View {
-        Group {
-            Section {
+        ControlCenterFormContent {
+            Group {
+                Section {
                 Toggle(
                     "自动润色语音输入",
                     isOn: Binding(
@@ -579,6 +580,7 @@ struct MorieSettingsView: View {
                 Text(
                     "单独按下并松开 Fn / 地球仪键可切换录音状态；与其他按键组合时不会触发 Morie。"
                 )
+                }
             }
         }
         .navigationTitle("设置")
