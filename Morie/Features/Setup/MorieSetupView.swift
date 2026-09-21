@@ -222,7 +222,8 @@ struct PermissionManagementView: View {
     }
 
     var body: some View {
-        Group {
+        ControlCenterFormContent {
+            Group {
             if setup.checks.isEmpty {
                 Section {
                     ProgressView("正在检查设备和权限…")
@@ -284,6 +285,7 @@ struct PermissionManagementView: View {
                         systemImage: "exclamationmark.triangle"
                     )
                     .foregroundStyle(.secondary)
+                }
                 }
             }
         }
