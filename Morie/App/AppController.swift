@@ -21,7 +21,6 @@ final class AppController {
     let capabilities = AppCapabilityController()
     let preferences: AppPreferencesController
 
-    let history: CaptureHistoryController?
     let memory: MemoryStore?
     let dictionary: DictionaryStore?
     let expressionProfile: ExpressionProfileStore?
@@ -50,7 +49,6 @@ final class AppController {
     private lazy var captureSession: CaptureSessionController = {
         let session = CaptureSessionController(
             captureStore: captureStore,
-            history: history,
             dictionary: dictionary,
             personalizer: personalizer,
             postInsertionLearning: postInsertionLearning,
@@ -99,12 +97,6 @@ final class AppController {
         self.persistenceError = persistenceError
         self.cloudSyncStartupError = cloudSyncStartupError
 
-        history = captureStore.map {
-            CaptureHistoryController(
-                store: $0,
-                locale: Locale(identifier: "zh-CN")
-            )
-        }
         memory = captureStore.map {
             MemoryStore(container: $0.container)
         }
@@ -395,7 +387,6 @@ final class AppController {
         postInsertionLearning?.stop()
         memoryLearning?.stop()
         await memoryLearning?.waitForCurrentBatch()
-        await history?.cancelRecognitionAndWait()
 
         iCloudStatusTask?.cancel()
         iCloudStatusTask = nil
@@ -550,13 +541,17 @@ final class AppController {
         }
     }
 
-    func recognizeHistoryCapture(_ id: UUID) {
-        guard canStartCapture else { return }
-        history?.recognizeAgain(id)
-    }
-
     func startCaptureOnly() {
         startNewCapture(deliveryMode: .captureOnly)
+    }
+
+    func makeControlCenterHistoryController() -> CaptureHistoryController? {
+        captureStore.map {
+            CaptureHistoryController(
+                store: $0,
+                locale: Locale(identifier: "zh-CN")
+            )
+        }
     }
 
     func controlCenterUsageMetrics() throws -> CaptureUsageMetricsSnapshot {
@@ -597,8 +592,6 @@ final class AppController {
         hotkey = nil
 
         captureSession.hideHUD()
-        history?.pausePlayback()
-        await history?.cancelRecognitionAndWait()
 
         do {
             await setup.refresh()
