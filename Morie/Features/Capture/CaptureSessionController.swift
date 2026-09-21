@@ -879,14 +879,14 @@ final class CaptureSessionController {
             "Session",
             "Stopping active capture \(label(sessionID)); disposition=\(disposition)"
         )
+        let startTask = captureStartTask
+        let finishTask = captureFinishTask
         DevelopmentDiagnostics.record(
             "Stage",
             captureID: sessionID,
             "stopActiveCapture; disposition=\(String(describing: disposition)); startTask=\(startTask != nil); finishTask=\(finishTask != nil)"
         )
 
-        let startTask = captureStartTask
-        let finishTask = captureFinishTask
         startTask?.cancel()
         finishTask?.cancel()
 
