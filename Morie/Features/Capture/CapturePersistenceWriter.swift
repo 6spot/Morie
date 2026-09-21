@@ -50,13 +50,20 @@ struct CapturePersistenceSnapshot: Sendable {
 actor CapturePersistenceWriter {
     private let context: ModelContext
     private var latestRevision: [UUID: Int] = [:]
+    private var acceptsWrites = true
 
     init(container: ModelContainer) {
         context = ModelContext(container)
         context.autosaveEnabled = false
     }
 
+    func beginFactoryReset() {
+        acceptsWrites = false
+        latestRevision.removeAll(keepingCapacity: false)
+    }
+
     func persist(_ snapshot: CapturePersistenceSnapshot) throws {
+        guard acceptsWrites else { return }
         let latest = latestRevision[snapshot.id] ?? -1
         guard snapshot.revision > latest else { return }
 
@@ -91,6 +98,7 @@ actor CapturePersistenceWriter {
     }
 
     func delete(_ id: UUID, revision: Int) throws {
+        guard acceptsWrites else { return }
         let latest = latestRevision[id] ?? -1
         guard revision > latest else { return }
 
