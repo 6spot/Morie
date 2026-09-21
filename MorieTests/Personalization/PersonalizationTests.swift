@@ -347,9 +347,22 @@ final class PersonalizationTests: XCTestCase {
             expressionStyle: ["倾向保留句末标点。"]
         )
 
-        let prompt = try InputRefiner.promptText(for: input)
+        let configuration = RefinementConfiguration(
+            model: .local,
+            instructions: RefinementPromptSettings.defaultInstructions,
+            applicationSpellingCandidates: ["Zevranta", "Qorvexia"]
+        )
+        let prompt = try InputRefiner.promptText(
+            for: input,
+            configuration: configuration
+        )
         XCTAssertFalse(prompt.contains("formattingHint"))
         XCTAssertTrue(prompt.contains(#""spellingCandidates":["GitHub"]"#))
+        XCTAssertTrue(
+            prompt.contains(
+                #""applicationSpellingCandidates":["Zevranta","Qorvexia"]"#
+            )
+        )
         XCTAssertFalse(prompt.contains("confirmedCorrections"))
         XCTAssertFalse(prompt.contains("Athers"))
         XCTAssertTrue(prompt.contains(#""topic":"Morie""#))
@@ -372,6 +385,9 @@ final class PersonalizationTests: XCTestCase {
             instructions.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count,
             3
         )
+        XCTAssertTrue(instructions.contains("applicationSpellingCandidates"))
+        XCTAssertTrue(instructions.contains("临时专有词候选"))
+        XCTAssertTrue(instructions.contains("不能仅因为候选词存在"))
         XCTAssertTrue(instructions.contains("按语义和原文已有的逻辑关系自然整理"))
         XCTAssertTrue(instructions.contains("不是按字数或固定模板排版"))
         XCTAssertTrue(instructions.contains("同一主题、同一件事尽量放在一起"))
@@ -448,6 +464,71 @@ final class PersonalizationTests: XCTestCase {
         let result = try ValidatedRefinement.accepting("嗯，今天不要发布 Morie 2.0。", for: input)
         XCTAssertEqual(result.edits.first?.dictionaryEntryID, input.dictionary.first?.id)
         XCTAssertEqual(result.text, "嗯，今天不要发布 Morie 2.0。")
+    }
+
+    func testApplicationSpellingCandidateCanRepairMixedLanguageASRTerm() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "把 Zhevata 这个同步模块接进去"
+        )
+
+        let result = try ValidatedRefinement.accepting(
+            "把 Zevranta 这个同步模块接进去。",
+            for: input,
+            applicationSpellingCandidates: ["Zevranta"]
+        )
+
+        XCTAssertEqual(result.text, "把 Zevranta 这个同步模块接进去。")
+    }
+
+    func testUnhintedMixedLanguageProperTermCannotBeInvented() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "把这个同步模块接进去"
+        )
+
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "把 Norvella 这个同步模块接进去。",
+                for: input
+            )
+        ) { error in
+            XCTAssertEqual(error as? RefinementReason, .invalidEdits)
+        }
+    }
+
+    func testApplicationSpellingCandidatesStayOutOfPersistedRefinementInput() async throws {
+        let fixture = try RefinementFixture()
+        let id = try fixture.capture("把 Zhevata 这个同步模块接进去")
+        let configuration = RefinementConfiguration(
+            model: .local,
+            instructions: RefinementPromptSettings.defaultInstructions,
+            applicationSpellingCandidates: ["Zevranta"]
+        )
+        let runner = InputRefinementRunner(generate: { _, received in
+            XCTAssertEqual(
+                received.applicationSpellingCandidates,
+                ["Zevranta"]
+            )
+            return "把 Zevranta 这个同步模块接进去。"
+        })
+
+        let result = try await fixture.personalizer(runner).refine(
+            id,
+            enabled: true,
+            configuration: configuration
+        )
+        XCTAssertEqual(result, "把 Zevranta 这个同步模块接进去。")
+
+        let saved = try await fixture.saved(id)
+        let refinement = try XCTUnwrap(saved.refinement)
+        let encoded = try JSONEncoder().encode(refinement.input)
+        let json = String(decoding: encoded, as: UTF8.self)
+        XCTAssertFalse(json.contains("Zevranta"))
+        XCTAssertEqual(
+            refinement.input.text,
+            "把 Zhevata 这个同步模块接进去"
+        )
     }
 
     func testPersonalMemoryIsPromptContextAndCannotInjectUnspokenContent() throws {
