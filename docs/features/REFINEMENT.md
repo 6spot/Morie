@@ -12,9 +12,11 @@ The result should feel like the user expressed the same thing more clearly in wr
 
 ## Source of truth
 
-The current user input is the source of the final expression.
+The current transcript is the sole source of user-authored semantic content for the final expression.
 
-Supporting context may help interpret that input. It must not become an independent source of content.
+Supporting context may help interpret or spell something the transcript already attempts to express. It must not become an independent source of content.
+
+A reference term that exists only in Dictionary, Application Context, Personal Memory or Expression Profile must not be copied into the result merely because it appears relevant.
 
 ## Allowed changes
 
@@ -99,6 +101,12 @@ Punctuation must reflect the expression already present and must not introduce n
 ## Recognition correction
 
 Refinement may correct recognition errors when the intended wording is clear from the current expression and available supporting context.
+
+Reference data may only repair or disambiguate an expression that the transcript already attempts to express. A completely omitted term must not be reconstructed solely because it appears in reference data; improving that case belongs to Speech contextual hints rather than post-recognition invention.
+
+Application Context terms come from text already present around the cursor. They may help choose the spelling of a spoken name or technical term, but they must never be copied, prepended, appended, continued or merged into the result as new content. An implicit reference such as “这里”, “这个” or “它” stays implicit unless the transcript itself attempts to name the referenced term.
+
+For example, with transcript “这里面的任务是不是完成了，也该标记一下了？” and Application Context candidate `tasks.md`, refinement must preserve the user's implicit reference rather than changing it to “tasks.md 里面的任务是不是完成了……”.
 
 Prefer local corrections. Do not broadly rewrite surrounding text merely to repair one recognition error.
 
