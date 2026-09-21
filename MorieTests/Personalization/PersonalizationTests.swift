@@ -73,8 +73,8 @@ final class PersonalizationTests: XCTestCase {
             budget: 10
         )
 
-        XCTAssertTrue(window.contains("😀"))
-        XCTAssertTrue(window.contains("Qelvatrix"))
+        XCTAssertEqual(window, "AA😀Qelvatr")
+        XCTAssertEqual(window.count, 10)
     }
 
     func testSpeechContextHintsKeepDictionaryPriorityAndDeduplicateContext() {
