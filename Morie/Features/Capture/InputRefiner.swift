@@ -2,6 +2,30 @@ import Foundation
 import FoundationModels
 import FoundationModelsUtilities
 
+private actor RefinementTokenCountCache {
+    static let shared = RefinementTokenCountCache()
+
+    private var instructionCounts: [String: Int] = [:]
+    private var schemaCount: Int?
+
+    func cachedCounts(for instructions: String) -> (instructions: Int, schema: Int)? {
+        guard let instructionCount = instructionCounts[instructions],
+              let schemaCount else {
+            return nil
+        }
+        return (instructionCount, schemaCount)
+    }
+
+    func store(
+        instructions: Int,
+        schema: Int,
+        for instructionsText: String
+    ) {
+        instructionCounts[instructionsText] = instructions
+        schemaCount = schema
+    }
+}
+
 enum RefinementModelMode: String, CaseIterable, Identifiable, Sendable {
     case automatic
     case local
@@ -195,13 +219,32 @@ enum InputRefiner {
         do {
             Diagnostics.recordMemory("refinement-local-before-token-count")
             let promptTokens = try await model.tokenCount(for: prompt)
-            let instructionTokens = try await model.tokenCount(for: instructions)
-            let schemaTokens = try await model.tokenCount(for: GeneratedRefinement.generationSchema)
+            let cachedStaticCounts = await RefinementTokenCountCache.shared
+                .cachedCounts(for: instructionsText)
+            let instructionTokens: Int
+            let schemaTokens: Int
+            let staticTokenCacheHit: Bool
+            if let cachedStaticCounts {
+                instructionTokens = cachedStaticCounts.instructions
+                schemaTokens = cachedStaticCounts.schema
+                staticTokenCacheHit = true
+            } else {
+                instructionTokens = try await model.tokenCount(for: instructions)
+                schemaTokens = try await model.tokenCount(
+                    for: GeneratedRefinement.generationSchema
+                )
+                await RefinementTokenCountCache.shared.store(
+                    instructions: instructionTokens,
+                    schema: schemaTokens,
+                    for: instructionsText
+                )
+                staticTokenCacheHit = false
+            }
             let responseBudget = min(1_536, max(256, promptTokens + 64))
             DevelopmentDiagnostics.record(
                 "RefinementModel",
                 captureID: input.captureID,
-                "backend=apple-local; promptTokens=\(promptTokens); instructionTokens=\(instructionTokens); schemaTokens=\(schemaTokens); responseBudget=\(responseBudget); contextSize=\(model.contextSize)"
+                "backend=apple-local; promptTokens=\(promptTokens); instructionTokens=\(instructionTokens); schemaTokens=\(schemaTokens); staticTokenCacheHit=\(staticTokenCacheHit); responseBudget=\(responseBudget); contextSize=\(model.contextSize)"
             )
             Diagnostics.recordMemory("refinement-local-after-token-count")
             guard promptTokens + instructionTokens + schemaTokens + responseBudget + 128 <= model.contextSize else {
