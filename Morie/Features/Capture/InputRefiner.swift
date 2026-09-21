@@ -1,6 +1,5 @@
 import Foundation
 import FoundationModels
-import FoundationModelsUtilities
 
 private actor RefinementTokenCountCache {
     static let shared = RefinementTokenCountCache()
@@ -106,205 +105,59 @@ struct CloudRefinementFailureSummary: Equatable, Sendable {
     }
 }
 
-enum CloudRefinementFailureInspector {
-    static func summarize(_ error: Error) -> CloudRefinementFailureSummary {
-        if let apiError = error as? ChatCompletionsLanguageModel.APIError {
-            return CloudRefinementFailureSummary(
-                category: "providerAPIError",
-                statusCode: nil,
-                providerType: bounded(apiError.type),
-                providerCode: bounded(apiError.code),
-                providerParam: bounded(apiError.param),
-                urlErrorCode: nil,
-                nsErrorDomain: nil,
-                nsErrorCode: nil
-            )
-        }
-
-        if let requestError = error as? ChatCompletionsLanguageModel.RequestError {
-            switch requestError {
-            case .invalidRequest(_):
-                return summary(category: "invalidRequest")
-            case .invalidStreamData:
-                return summary(category: "invalidStreamData")
-            case .httpError(let statusCode, let data):
-                let metadata = providerMetadata(from: data)
-                return CloudRefinementFailureSummary(
-                    category: "httpError",
-                    statusCode: statusCode,
-                    providerType: metadata.type,
-                    providerCode: metadata.code,
-                    providerParam: metadata.param,
-                    urlErrorCode: nil,
-                    nsErrorDomain: nil,
-                    nsErrorCode: nil
-                )
-            }
-        }
-
-        if let fallbackError = error as? MinimalChatCompletionsClient.Failure {
-            switch fallbackError {
-            case .invalidHTTPResponse:
-                return summary(category: "invalidHTTPResponse")
-            case .emptyResponse:
-                return summary(category: "emptyResponse")
-            case .httpError(let statusCode, let data):
-                let metadata = providerMetadata(from: data)
-                return CloudRefinementFailureSummary(
-                    category: "httpError",
-                    statusCode: statusCode,
-                    providerType: metadata.type,
-                    providerCode: metadata.code,
-                    providerParam: metadata.param,
-                    urlErrorCode: nil,
-                    nsErrorDomain: nil,
-                    nsErrorCode: nil
-                )
-            }
-        }
-
-        if let urlError = error as? URLError {
-            return CloudRefinementFailureSummary(
-                category: "urlError",
-                statusCode: nil,
-                providerType: nil,
-                providerCode: nil,
-                providerParam: nil,
-                urlErrorCode: urlError.errorCode,
-                nsErrorDomain: nil,
-                nsErrorCode: nil
-            )
-        }
-
-        let nsError = error as NSError
-        return CloudRefinementFailureSummary(
-            category: DevelopmentDiagnostics.errorType(error),
-            statusCode: nil,
-            providerType: nil,
-            providerCode: nil,
-            providerParam: nil,
-            urlErrorCode: nil,
-            nsErrorDomain: nsError.domain,
-            nsErrorCode: nsError.code
-        )
-    }
-
-    static func shouldTryMinimalFallback(after error: Error) -> Bool {
-        if let requestError = error as? ChatCompletionsLanguageModel.RequestError {
-            switch requestError {
-            case .invalidRequest(_), .invalidStreamData:
-                return true
-            case .httpError(let statusCode, _):
-                return [400, 415, 422].contains(statusCode)
-            }
-        }
-        if error is DecodingError {
-            return true
-        }
-        return error is ChatCompletionsLanguageModel.APIError
-    }
-
-    private static func summary(category: String) -> CloudRefinementFailureSummary {
-        CloudRefinementFailureSummary(
-            category: category,
-            statusCode: nil,
-            providerType: nil,
-            providerCode: nil,
-            providerParam: nil,
-            urlErrorCode: nil,
-            nsErrorDomain: nil,
-            nsErrorCode: nil
-        )
-    }
-
-    private static func providerMetadata(
-        from data: Data
-    ) -> (type: String?, code: String?, param: String?) {
-        guard let object = try? JSONSerialization.jsonObject(with: data),
-              let root = object as? [String: Any],
-              let error = root["error"] as? [String: Any]
-        else {
-            return (nil, nil, nil)
-        }
-
-        return (
-            bounded(stringValue(error["type"])),
-            bounded(stringValue(error["code"])),
-            bounded(stringValue(error["param"]))
-        )
-    }
-
-    private static func stringValue(_ value: Any?) -> String? {
-        if let value = value as? String { return value }
-        if let value = value as? NSNumber { return value.stringValue }
-        return nil
-    }
-
-    private static func bounded(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let singleLine = value
-            .replacingOccurrences(of: "\n", with: " ")
-            .replacingOccurrences(of: "\r", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !singleLine.isEmpty else { return nil }
-        return String(singleLine.prefix(128))
-    }
-}
-
-enum MinimalChatCompletionsClient {
+enum OpenAIChatCompletionsClient {
     enum Failure: Error {
         case invalidHTTPResponse
         case httpError(statusCode: Int, data: Data)
+        case invalidResponse
         case emptyResponse
     }
 
-    struct RequestBody: Encodable {
-        struct Message: Encodable {
-            let role: String
-            let content: String
-        }
+    struct Message: Encodable, Equatable, Sendable {
+        let role: String
+        let content: String
+    }
 
+    struct RequestBody: Encodable, Equatable, Sendable {
         let model: String
         let messages: [Message]
+        let stream: Bool
     }
 
     private struct ResponseBody: Decodable {
         struct Choice: Decodable {
-            struct Message: Decodable {
-                let content: String?
-            }
-
+            struct Message: Decodable { let content: String? }
             let message: Message
         }
-
         let choices: [Choice]
     }
 
     static func endpoint(for baseURL: URL) -> URL {
-        let containsVersion = baseURL.pathComponents.contains { component in
-            guard component.count >= 2,
-                  component.first?.lowercased() == "v"
-            else {
-                return false
-            }
-            return component.dropFirst().allSatisfy(\.isNumber)
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            return baseURL.appendingPathComponent("chat/completions")
         }
-        return baseURL.appendingPathComponent(
-            containsVersion ? "chat/completions" : "v1/chat/completions"
-        )
+        var path = components.percentEncodedPath
+        while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        let lower = path.lowercased()
+        for suffix in ["/chat/completions", "/responses", "/messages", "/models"] {
+            if lower.hasSuffix(suffix) {
+                path.removeLast(suffix.count)
+                break
+            }
+        }
+        if path == "/" { path = "" }
+        components.percentEncodedPath = path + "/chat/completions"
+        return components.url ?? baseURL.appendingPathComponent("chat/completions")
     }
 
-    static func requestBody(
-        model: String,
-        instructions: String,
-        prompt: String
-    ) -> RequestBody {
+    static func requestBody(model: String, instructions: String, prompt: String) -> RequestBody {
         RequestBody(
             model: model,
             messages: [
-                .init(role: "system", content: instructions),
-                .init(role: "user", content: prompt),
-            ]
+                Message(role: "system", content: instructions),
+                Message(role: "user", content: prompt),
+            ],
+            stream: false
         )
     }
 
@@ -319,40 +172,66 @@ enum MinimalChatCompletionsClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(
-            Bundle.main.bundleIdentifier ?? "me.morie.mac",
-            forHTTPHeaderField: "User-Agent"
-        )
         if !apiKey.isEmpty {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
-        request.httpBody = try JSONEncoder().encode(
-            requestBody(
-                model: model,
-                instructions: instructions,
-                prompt: prompt
-            )
-        )
-
+        request.httpBody = try JSONEncoder().encode(requestBody(model: model, instructions: instructions, prompt: prompt))
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let response = response as? HTTPURLResponse else {
-            throw Failure.invalidHTTPResponse
-        }
+        guard let response = response as? HTTPURLResponse else { throw Failure.invalidHTTPResponse }
         guard (200..<300).contains(response.statusCode) else {
-            throw Failure.httpError(
-                statusCode: response.statusCode,
-                data: data
-            )
+            throw Failure.httpError(statusCode: response.statusCode, data: data)
         }
-
-        let decoded = try JSONDecoder().decode(ResponseBody.self, from: data)
-        guard let content = decoded.choices.first?.message.content?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-              !content.isEmpty
-        else {
+        let decoded: ResponseBody
+        do { decoded = try JSONDecoder().decode(ResponseBody.self, from: data) }
+        catch { throw Failure.invalidResponse }
+        guard let content = decoded.choices.first?.message.content?.trimmingCharacters(in: .whitespacesAndNewlines), !content.isEmpty else {
             throw Failure.emptyResponse
         }
         return content
+    }
+}
+
+enum CloudRefinementFailureInspector {
+    static func summarize(_ error: Error) -> CloudRefinementFailureSummary {
+        if let requestError = error as? OpenAIChatCompletionsClient.Failure {
+            switch requestError {
+            case .invalidHTTPResponse: return summary(category: "invalidHTTPResponse")
+            case .invalidResponse: return summary(category: "invalidResponse")
+            case .emptyResponse: return summary(category: "emptyResponse")
+            case .httpError(let statusCode, let data):
+                let metadata = providerMetadata(from: data)
+                return CloudRefinementFailureSummary(category: "httpError", statusCode: statusCode, providerType: metadata.type, providerCode: metadata.code, providerParam: metadata.param, urlErrorCode: nil, nsErrorDomain: nil, nsErrorCode: nil)
+            }
+        }
+        if let urlError = error as? URLError {
+            return CloudRefinementFailureSummary(category: "urlError", statusCode: nil, providerType: nil, providerCode: nil, providerParam: nil, urlErrorCode: urlError.errorCode, nsErrorDomain: nil, nsErrorCode: nil)
+        }
+        let nsError = error as NSError
+        return CloudRefinementFailureSummary(category: DevelopmentDiagnostics.errorType(error), statusCode: nil, providerType: nil, providerCode: nil, providerParam: nil, urlErrorCode: nil, nsErrorDomain: nsError.domain, nsErrorCode: nsError.code)
+    }
+
+    private static func summary(category: String) -> CloudRefinementFailureSummary {
+        CloudRefinementFailureSummary(category: category, statusCode: nil, providerType: nil, providerCode: nil, providerParam: nil, urlErrorCode: nil, nsErrorDomain: nil, nsErrorCode: nil)
+    }
+
+    private static func providerMetadata(from data: Data) -> (type: String?, code: String?, param: String?) {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let root = object as? [String: Any],
+              let error = root["error"] as? [String: Any] else { return (nil, nil, nil) }
+        return (bounded(stringValue(error["type"])), bounded(stringValue(error["code"])), bounded(stringValue(error["param"])))
+    }
+
+    private static func stringValue(_ value: Any?) -> String? {
+        if let value = value as? String { return value }
+        if let value = value as? NSNumber { return value.stringValue }
+        return nil
+    }
+
+    private static func bounded(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let singleLine = value.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "\r", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !singleLine.isEmpty else { return nil }
+        return String(singleLine.prefix(128))
     }
 }
 
@@ -600,122 +479,46 @@ enum InputRefiner {
         instructionsText: String,
         promptText: String
     ) async throws -> String {
-        guard let url = configuration.cloudURL,
-              !configuration.trimmedCloudModelName.isEmpty
-        else { throw RefinementReason.unavailable }
+        guard let baseURL = configuration.cloudURL,
+              !configuration.trimmedCloudModelName.isEmpty else {
+            throw RefinementReason.unavailable
+        }
 
-        let key = configuration.cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let headers = key.isEmpty ? [:] : ["Authorization": "Bearer \(key)"]
-        let model = ChatCompletionsLanguageModel(
-            name: configuration.trimmedCloudModelName,
-            url: url,
-            additionalHeaders: headers,
-            supportsGuidedGeneration: false
-        )
-        let instructions = Instructions { instructionsText }
-        let prompt = Prompt { promptText }
+        let apiKey = configuration.cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let endpoint = OpenAIChatCompletionsClient.endpoint(for: baseURL)
         DevelopmentDiagnostics.record(
             "RefinementModel",
             captureID: input.captureID,
-            "backend=cloud; host=\(url.host ?? "unknown"); path=\(url.path); model=\(configuration.trimmedCloudModelName); requestProfile=foundationModelsUtilities-minimal; apiKeyConfigured=\(!key.isEmpty)"
+            "backend=cloud-openai-chat-completions; host=\(endpoint.host ?? "unknown"); path=\(endpoint.path); model=\(configuration.trimmedCloudModelName); stream=false; apiKeyConfigured=\(!apiKey.isEmpty); providerPrivateParameters=false"
         )
 
         do {
             try Task.checkCancellation()
-            Diagnostics.recordMemory("refinement-cloud-before-session")
-            let content = try await generateCloudResponse(
-                model: model,
-                instructions: instructions,
-                prompt: prompt
+            Diagnostics.recordMemory("refinement-cloud-before-request")
+            let content = try await OpenAIChatCompletionsClient.generate(
+                baseURL: baseURL,
+                model: configuration.trimmedCloudModelName,
+                apiKey: apiKey,
+                instructions: instructionsText,
+                prompt: promptText
             )
-            Diagnostics.recordMemory("refinement-cloud-session-scope-exited")
+            Diagnostics.recordMemory("refinement-cloud-request-finished")
+            try Task.checkCancellation()
+            DevelopmentDiagnostics.record("RefinementModel", captureID: input.captureID, "cloudSucceeded; protocol=openai-chat-completions")
             return content
         } catch {
             if Task.isCancelled || error is CancellationError {
                 Diagnostics.recordMemory("refinement-cloud-cancelled")
                 throw CancellationError()
             }
-
-            let primaryFailure = CloudRefinementFailureInspector.summarize(error)
-            let tryFallback = CloudRefinementFailureInspector
-                .shouldTryMinimalFallback(after: error)
-            DevelopmentDiagnostics.record(
-                "RefinementModel",
-                captureID: input.captureID,
-                level: .warning,
-                "cloudPrimaryFailed; \(primaryFailure.logValue); responseBodyLogged=false; credentialsLogged=false; retryMinimal=\(tryFallback)"
-            )
-            Diagnostics.record(
-                "RefinementModel",
-                "Capture \(String(input.captureID.uuidString.prefix(8))); cloudPrimaryFailed; \(primaryFailure.logValue); retryMinimal=\(tryFallback); responseBodyLogged=false; credentialsLogged=false",
-                level: .warning
-            )
-
-            guard tryFallback else {
-                Diagnostics.recordMemory("refinement-cloud-failed")
-                throw RefinementReason.generationFailed
-            }
-
-            do {
-                try Task.checkCancellation()
-                Diagnostics.recordMemory("refinement-cloud-minimal-before-request")
-                let content = try await MinimalChatCompletionsClient.generate(
-                    baseURL: url,
-                    model: configuration.trimmedCloudModelName,
-                    apiKey: key,
-                    instructions: instructionsText,
-                    prompt: promptText
-                )
-                Diagnostics.recordMemory("refinement-cloud-minimal-finished")
-                DevelopmentDiagnostics.record(
-                    "RefinementModel",
-                    captureID: input.captureID,
-                    "cloudMinimalFallbackSucceeded; host=\(url.host ?? "unknown"); model=\(configuration.trimmedCloudModelName)"
-                )
-                Diagnostics.record(
-                    "RefinementModel",
-                    "Capture \(String(input.captureID.uuidString.prefix(8))); cloudMinimalFallbackSucceeded"
-                )
-                return content
-            } catch {
-                if Task.isCancelled || error is CancellationError {
-                    Diagnostics.recordMemory("refinement-cloud-cancelled")
-                    throw CancellationError()
-                }
-
-                let fallbackFailure = CloudRefinementFailureInspector.summarize(error)
-                DevelopmentDiagnostics.record(
-                    "RefinementModel",
-                    captureID: input.captureID,
-                    level: .warning,
-                    "cloudMinimalFallbackFailed; \(fallbackFailure.logValue); responseBodyLogged=false; credentialsLogged=false"
-                )
-                Diagnostics.record(
-                    "RefinementModel",
-                    "Capture \(String(input.captureID.uuidString.prefix(8))); cloudMinimalFallbackFailed; \(fallbackFailure.logValue); responseBodyLogged=false; credentialsLogged=false",
-                    level: .warning
-                )
-                Diagnostics.recordMemory("refinement-cloud-failed")
-                throw RefinementReason.generationFailed
-            }
+            let failure = CloudRefinementFailureInspector.summarize(error)
+            DevelopmentDiagnostics.record("RefinementModel", captureID: input.captureID, level: .warning, "cloudFailed; \(failure.logValue); protocol=openai-chat-completions; responseBodyLogged=false; credentialsLogged=false")
+            Diagnostics.record("RefinementModel", "Capture \(String(input.captureID.uuidString.prefix(8))); cloudFailed; \(failure.logValue); protocol=openai-chat-completions; responseBodyLogged=false; credentialsLogged=false", level: .warning)
+            Diagnostics.recordMemory("refinement-cloud-failed")
+            throw RefinementReason.generationFailed
         }
     }
 
-    private static func generateCloudResponse(
-        model: ChatCompletionsLanguageModel,
-        instructions: Instructions,
-        prompt: Prompt
-    ) async throws -> String {
-        let session = LanguageModelSession(model: model, instructions: instructions)
-        Diagnostics.recordMemory("refinement-cloud-session-created")
-        // Cloud requests intentionally avoid the Apple-local greedy and
-        // response-budget options. FoundationModelsUtilities translates them
-        // into provider parameters that some compatible APIs reject.
-        let response = try await session.respond(to: prompt)
-        Diagnostics.recordMemory("refinement-cloud-respond-finished")
-        try Task.checkCancellation()
-        return response.content
-    }
 }
 
 @Generable
