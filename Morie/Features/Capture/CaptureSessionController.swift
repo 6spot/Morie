@@ -686,8 +686,21 @@ final class CaptureSessionController {
             let deliveryMode = try captureStore.completeRecognition(finalText, for: sessionID)
             if let personalizer {
                 setPhase(.refining)
-                let refinementConfiguration = resolveRefinementConfiguration(
-                    sessionContext.refinementConfiguration
+                let resolvedRefinementConfiguration =
+                    resolveRefinementConfiguration(
+                        sessionContext.refinementConfiguration
+                    )
+                let refinementConfiguration = RefinementConfiguration(
+                    model: resolvedRefinementConfiguration.model,
+                    instructions: resolvedRefinementConfiguration.instructions,
+                    applicationSpellingCandidates:
+                        activeApplicationContextWords
+                )
+                DevelopmentDiagnostics.list(
+                    "RefinementInput",
+                    captureID: sessionID,
+                    label: "applicationSpellingCandidates",
+                    activeApplicationContextWords
                 )
                 finalText = try await personalizer.refine(
                     sessionID,
