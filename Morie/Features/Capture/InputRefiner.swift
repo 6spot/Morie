@@ -105,6 +105,103 @@ struct CloudRefinementFailureSummary: Equatable, Sendable {
     }
 }
 
+private struct CloudNetworkTiming: Sendable {
+    let transactionCount: Int
+    let taskMs: Int
+    let dnsMs: Int?
+    let connectMs: Int?
+    let tlsMs: Int?
+    let requestWriteMs: Int?
+    let serverWaitMs: Int?
+    let responseReadMs: Int?
+    let protocolName: String?
+    let reusedConnection: Bool?
+    let proxyConnection: Bool?
+
+    var logValue: String {
+        var parts = [
+            "transactions=\(transactionCount)",
+            "taskMs=\(taskMs)",
+        ]
+        if let dnsMs { parts.append("dnsMs=\(dnsMs)") }
+        if let connectMs { parts.append("connectMs=\(connectMs)") }
+        if let tlsMs { parts.append("tlsMs=\(tlsMs)") }
+        if let requestWriteMs { parts.append("requestWriteMs=\(requestWriteMs)") }
+        if let serverWaitMs { parts.append("serverWaitMs=\(serverWaitMs)") }
+        if let responseReadMs { parts.append("responseReadMs=\(responseReadMs)") }
+        if let protocolName { parts.append("protocol=\(protocolName)") }
+        if let reusedConnection { parts.append("reusedConnection=\(reusedConnection)") }
+        if let proxyConnection { parts.append("proxyConnection=\(proxyConnection)") }
+        return parts.joined(separator: "; ")
+    }
+
+    init(metrics: URLSessionTaskMetrics) {
+        let transactions = metrics.transactionMetrics
+        let final = transactions.last
+        transactionCount = transactions.count
+        taskMs = max(0, Int((metrics.taskInterval.duration * 1_000).rounded()))
+        dnsMs = Self.sumMilliseconds(
+            transactions.map { ($0.domainLookupStartDate, $0.domainLookupEndDate) }
+        )
+        connectMs = Self.sumMilliseconds(
+            transactions.map { ($0.connectStartDate, $0.connectEndDate) }
+        )
+        tlsMs = Self.sumMilliseconds(
+            transactions.map { ($0.secureConnectionStartDate, $0.secureConnectionEndDate) }
+        )
+        requestWriteMs = Self.milliseconds(
+            from: final?.requestStartDate,
+            to: final?.requestEndDate
+        )
+        serverWaitMs = Self.milliseconds(
+            from: final?.requestEndDate ?? final?.requestStartDate,
+            to: final?.responseStartDate
+        )
+        responseReadMs = Self.milliseconds(
+            from: final?.responseStartDate,
+            to: final?.responseEndDate
+        )
+        protocolName = final?.networkProtocolName
+        reusedConnection = final?.isReusedConnection
+        proxyConnection = final?.isProxyConnection
+    }
+
+    private static func milliseconds(from start: Date?, to end: Date?) -> Int? {
+        guard let start, let end else { return nil }
+        return max(0, Int((end.timeIntervalSince(start) * 1_000).rounded()))
+    }
+
+    private static func sumMilliseconds(
+        _ intervals: [(Date?, Date?)]
+    ) -> Int? {
+        let values = intervals.compactMap { milliseconds(from: $0.0, to: $0.1) }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +)
+    }
+}
+
+private final class CloudTaskMetricsDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var timing: CloudNetworkTiming?
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didFinishCollecting metrics: URLSessionTaskMetrics
+    ) {
+        let timing = CloudNetworkTiming(metrics: metrics)
+        lock.lock()
+        self.timing = timing
+        lock.unlock()
+    }
+
+    func snapshot() -> CloudNetworkTiming? {
+        lock.lock()
+        defer { lock.unlock() }
+        return timing
+    }
+}
+
 enum OpenAIChatCompletionsClient {
     enum Failure: Error {
         case invalidHTTPResponse
@@ -162,12 +259,15 @@ enum OpenAIChatCompletionsClient {
     }
 
     static func generate(
+        captureID: UUID,
         baseURL: URL,
         model: String,
         apiKey: String,
         instructions: String,
         prompt: String
     ) async throws -> String {
+        let totalStarted = ContinuousClock.now
+        let buildStarted = ContinuousClock.now
         var request = URLRequest(url: endpoint(for: baseURL))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -175,19 +275,108 @@ enum OpenAIChatCompletionsClient {
         if !apiKey.isEmpty {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
-        request.httpBody = try JSONEncoder().encode(requestBody(model: model, instructions: instructions, prompt: prompt))
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let response = response as? HTTPURLResponse else { throw Failure.invalidHTTPResponse }
+        request.httpBody = try JSONEncoder().encode(
+            requestBody(
+                model: model,
+                instructions: instructions,
+                prompt: prompt
+            )
+        )
+        let buildMs = milliseconds(buildStarted.duration(to: .now))
+        let requestBytes = request.httpBody?.count ?? 0
+
+        DevelopmentDiagnostics.record(
+            "CloudTiming",
+            captureID: captureID,
+            "phase=requestReady; buildMs=\(buildMs); requestBytes=\(requestBytes)"
+        )
+
+        let metricsDelegate = CloudTaskMetricsDelegate()
+        let transportStarted = ContinuousClock.now
+        let data: Data
+        let urlResponse: URLResponse
+        do {
+            (data, urlResponse) = try await URLSession.shared.data(
+                for: request,
+                delegate: metricsDelegate
+            )
+        } catch {
+            let transportMs = milliseconds(transportStarted.duration(to: .now))
+            let timing = metricsDelegate.snapshot()?.logValue ?? "taskMetrics=unavailable"
+            DevelopmentDiagnostics.record(
+                "CloudTiming",
+                captureID: captureID,
+                level: .warning,
+                "phase=transportFailed; transportMs=\(transportMs); \(timing); errorType=\(DevelopmentDiagnostics.errorType(error))"
+            )
+            throw error
+        }
+        let transportMs = milliseconds(transportStarted.duration(to: .now))
+        let timing = metricsDelegate.snapshot()?.logValue ?? "taskMetrics=unavailable"
+
+        guard let response = urlResponse as? HTTPURLResponse else {
+            DevelopmentDiagnostics.record(
+                "CloudTiming",
+                captureID: captureID,
+                level: .warning,
+                "phase=responseInvalid; transportMs=\(transportMs); responseBytes=\(data.count); \(timing)"
+            )
+            throw Failure.invalidHTTPResponse
+        }
+
+        DevelopmentDiagnostics.record(
+            "CloudTiming",
+            captureID: captureID,
+            "phase=responseReceived; httpStatus=\(response.statusCode); transportMs=\(transportMs); requestBytes=\(requestBytes); responseBytes=\(data.count); \(timing)"
+        )
+
         guard (200..<300).contains(response.statusCode) else {
             throw Failure.httpError(statusCode: response.statusCode, data: data)
         }
+
+        let decodeStarted = ContinuousClock.now
         let decoded: ResponseBody
-        do { decoded = try JSONDecoder().decode(ResponseBody.self, from: data) }
-        catch { throw Failure.invalidResponse }
-        guard let content = decoded.choices.first?.message.content?.trimmingCharacters(in: .whitespacesAndNewlines), !content.isEmpty else {
+        do {
+            decoded = try JSONDecoder().decode(ResponseBody.self, from: data)
+        } catch {
+            let decodeMs = milliseconds(decodeStarted.duration(to: .now))
+            DevelopmentDiagnostics.record(
+                "CloudTiming",
+                captureID: captureID,
+                level: .warning,
+                "phase=decodeFailed; decodeMs=\(decodeMs); responseBytes=\(data.count)"
+            )
+            throw Failure.invalidResponse
+        }
+        let decodeMs = milliseconds(decodeStarted.duration(to: .now))
+
+        guard let content = decoded.choices.first?.message.content?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !content.isEmpty
+        else {
+            DevelopmentDiagnostics.record(
+                "CloudTiming",
+                captureID: captureID,
+                level: .warning,
+                "phase=emptyResponse; decodeMs=\(decodeMs); responseBytes=\(data.count)"
+            )
             throw Failure.emptyResponse
         }
+
+        let totalMs = milliseconds(totalStarted.duration(to: .now))
+        DevelopmentDiagnostics.record(
+            "CloudTiming",
+            captureID: captureID,
+            "phase=complete; buildMs=\(buildMs); transportMs=\(transportMs); decodeMs=\(decodeMs); totalMs=\(totalMs); outputCharacters=\(content.count)"
+        )
         return content
+    }
+
+    private static func milliseconds(_ duration: Duration) -> Int {
+        let components = duration.components
+        let millisecondsFromSeconds = components.seconds * 1_000
+        let millisecondsFromAttoseconds = components.attoseconds / 1_000_000_000_000_000
+        return Int(millisecondsFromSeconds + millisecondsFromAttoseconds)
     }
 }
 
@@ -496,6 +685,7 @@ enum InputRefiner {
             try Task.checkCancellation()
             Diagnostics.recordMemory("refinement-cloud-before-request")
             let content = try await OpenAIChatCompletionsClient.generate(
+                captureID: input.captureID,
                 baseURL: baseURL,
                 model: configuration.trimmedCloudModelName,
                 apiKey: apiKey,
