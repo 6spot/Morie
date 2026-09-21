@@ -376,13 +376,13 @@ private struct ControlCenterRouteHost: View {
             titleVisibility: .visible
         ) {
             Button("恢复出厂设置", role: .destructive) {
-                factoryResetInProgress = true
+                presentation.factoryResetInProgress = true
                 Task {
                     do {
                         try await controller.factoryReset()
                     } catch {
-                        factoryResetInProgress = false
-                        factoryResetError = error.localizedDescription
+                        presentation.factoryResetInProgress = false
+                        presentation.factoryResetError = error.localizedDescription
                     }
                 }
             }
@@ -399,13 +399,13 @@ private struct ControlCenterRouteHost: View {
                 get: { presentation.factoryResetError != nil },
                 set: {
                     if !$0 {
-                        factoryResetError = nil
+                        presentation.factoryResetError = nil
                     }
                 }
             )
         ) {
             Button("好", role: .cancel) {
-                factoryResetError = nil
+                presentation.factoryResetError = nil
             }
         } message: {
             Text(presentation.factoryResetError ?? "")
