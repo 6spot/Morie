@@ -62,6 +62,7 @@ enum InputRefiner {
     private struct PromptInputData: Encodable {
         let transcript: String
         let spellingCandidates: [String]
+        let applicationSpellingCandidates: [String]
         let personalContext: [PromptMemoryHint]
         let expressionStyle: [String]
     }
@@ -76,10 +77,14 @@ enum InputRefiner {
         let scope: String
     }
 
-    static func promptText(for input: RefinementInput) throws -> String {
+    static func promptText(
+        for input: RefinementInput,
+        configuration: RefinementConfiguration = .local
+    ) throws -> String {
         let data = try JSONEncoder().encode(PromptInputData(
             transcript: input.prepared.text,
             spellingCandidates: input.dictionary.map(\.name),
+            applicationSpellingCandidates: configuration.applicationSpellingCandidates,
             personalContext: input.context.map {
                 PromptMemoryHint(
                     topic: $0.memory.name,
@@ -112,7 +117,7 @@ enum InputRefiner {
             configuration.instructions,
             limit: 16_000
         )
-        if let payload = try? promptText(for: input) {
+        if let payload = try? promptText(for: input, configuration: configuration) {
             DevelopmentDiagnostics.text(
                 "RefinementPrompt",
                 captureID: input.captureID,
@@ -121,30 +126,38 @@ enum InputRefiner {
                 limit: 16_000
             )
         }
+        let runtimePromptText = try promptText(
+            for: input,
+            configuration: configuration
+        )
         switch modelConfiguration.mode {
         case .local:
             return try await generateLocally(
                 input,
-                instructionsText: configuration.instructions
+                instructionsText: configuration.instructions,
+                promptText: runtimePromptText
             )
         case .cloud:
             return try await generateWithCloud(
                 input,
                 configuration: modelConfiguration,
-                instructionsText: configuration.instructions
+                instructionsText: configuration.instructions,
+                promptText: runtimePromptText
             )
         case .automatic:
             guard modelConfiguration.hasUsableCloudConfiguration else {
                 return try await generateLocally(
                     input,
-                    instructionsText: configuration.instructions
+                    instructionsText: configuration.instructions,
+                    promptText: runtimePromptText
                 )
             }
             do {
                 return try await generateWithCloud(
                     input,
                     configuration: modelConfiguration,
-                    instructionsText: configuration.instructions
+                    instructionsText: configuration.instructions,
+                    promptText: runtimePromptText
                 )
             } catch {
                 if Task.isCancelled || error is CancellationError { throw CancellationError() }
@@ -161,7 +174,8 @@ enum InputRefiner {
                 )
                 return try await generateLocally(
                     input,
-                    instructionsText: configuration.instructions
+                    instructionsText: configuration.instructions,
+                    promptText: runtimePromptText
                 )
             }
         }
@@ -169,12 +183,12 @@ enum InputRefiner {
 
     private static func generateLocally(
         _ input: RefinementInput,
-        instructionsText: String
+        instructionsText: String,
+        promptText: String
     ) async throws -> String {
         let model = SystemLanguageModel.default
         guard model.availability == .available else { throw RefinementReason.unavailable }
         let instructions = Instructions { instructionsText }
-        let promptText = try promptText(for: input)
         let prompt = Prompt { promptText }
         do {
             Diagnostics.recordMemory("refinement-local-before-token-count")
@@ -244,7 +258,8 @@ enum InputRefiner {
     private static func generateWithCloud(
         _ input: RefinementInput,
         configuration: RefinementModelConfiguration,
-        instructionsText: String
+        instructionsText: String,
+        promptText: String
     ) async throws -> String {
         guard let url = configuration.cloudURL,
               !configuration.trimmedCloudModelName.isEmpty
@@ -259,7 +274,13 @@ enum InputRefiner {
             supportsGuidedGeneration: false
         )
         let instructions = Instructions { instructionsText }
-        let promptText = try promptText(for: input)
+        let promptText = try promptText(
+            for: input,
+            configuration: RefinementConfiguration(
+                model: .local,
+                instructions: instructionsText
+            )
+        )
         let prompt = Prompt { promptText }
         let responseBudget = min(1_536, max(256, input.prepared.text.count * 2))
         DevelopmentDiagnostics.record(
