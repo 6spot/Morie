@@ -379,6 +379,11 @@ final class CaptureSessionController {
 
         finishRequestedCaptureID = sessionID
         finishRequestedAt = ContinuousClock.now
+        DevelopmentDiagnostics.record(
+            "Stage",
+            captureID: sessionID,
+            "finishRequested; source=\(source); speechReady=\(speechReadyCaptureID == sessionID); phase=\(String(describing: phase))"
+        )
         if sessionContext.soundFeedbackEnabled {
             soundFeedback.playStop()
         }
@@ -417,6 +422,12 @@ final class CaptureSessionController {
             "Session",
             "Capture \(label(sessionID)) cancelled by \(source)",
             level: .warning
+        )
+        DevelopmentDiagnostics.record(
+            "Stage",
+            captureID: sessionID,
+            level: .warning,
+            "cancelRequested; source=\(source); phase=\(String(describing: phase))"
         )
         setPhase(.stopping)
         onCancellationEnabledChange?(false)
@@ -676,6 +687,11 @@ final class CaptureSessionController {
                 onCancellationEnabledChange?(false)
                 resetSessionIdentity()
                 setPhase(.idle)
+                DevelopmentDiagnostics.record(
+                    "Stage",
+                    captureID: sessionID,
+                    "emptyRecognitionSettled; disposition=\(String(describing: disposition)); hud=\(disposition == .retainedForRetry ? "recognitionFailure" : "noSpeech")"
+                )
                 if disposition == .retainedForRetry {
                     hud.showRecognitionFailure()
                 } else {
@@ -740,6 +756,11 @@ final class CaptureSessionController {
             }
 
             setPhase(.delivering)
+            DevelopmentDiagnostics.record(
+                "Stage",
+                captureID: sessionID,
+                "deliveryStarted; characters=\(finalText.count)"
+            )
             hud.showProcessing()
 
             Diagnostics.record(
@@ -857,6 +878,11 @@ final class CaptureSessionController {
         Diagnostics.record(
             "Session",
             "Stopping active capture \(label(sessionID)); disposition=\(disposition)"
+        )
+        DevelopmentDiagnostics.record(
+            "Stage",
+            captureID: sessionID,
+            "stopActiveCapture; disposition=\(String(describing: disposition)); startTask=\(startTask != nil); finishTask=\(finishTask != nil)"
         )
 
         let startTask = captureStartTask
@@ -996,6 +1022,11 @@ final class CaptureSessionController {
         guard activeCaptureID == sessionID, stoppingCaptureID == nil else { return }
 
         Diagnostics.record("Session", "Capture \(label(sessionID)) completed successfully")
+        DevelopmentDiagnostics.record(
+            "Stage",
+            captureID: sessionID,
+            "completed; deliveryMode=\(deliveryMode.rawValue); hud=success"
+        )
         history?.captureListDidChange()
         onCancellationEnabledChange?(false)
         resetSessionIdentity()
@@ -1057,6 +1088,12 @@ final class CaptureSessionController {
             "Session",
             "Capture \(label(sessionID)) failed: \(message)",
             level: .error
+        )
+        DevelopmentDiagnostics.record(
+            "Stage",
+            captureID: sessionID,
+            level: .error,
+            "failed; errorType=\(DevelopmentDiagnostics.errorType(error)); clipboardFallback=\(preservedOnClipboard)"
         )
         onCancellationEnabledChange?(false)
         resetSessionIdentity()
