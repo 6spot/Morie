@@ -81,7 +81,7 @@ final class CapturePersonalizer {
         DevelopmentDiagnostics.list(
             "RefinementInput",
             captureID: captureID,
-            label: "applicationSpellingCandidatesRuntimeOnly",
+            label: "applicationReferenceTermsRuntimeOnly",
             configuration.applicationSpellingCandidates
         )
         DevelopmentDiagnostics.list(
