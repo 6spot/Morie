@@ -141,7 +141,7 @@ The primary path uses Apple's FoundationModelsUtilities Chat Completions adapter
 
 If an otherwise OpenAI-compatible provider rejects the primary streaming request shape, Morie may retry once with a minimal non-streaming Chat Completions request containing only the model plus system/user messages. This fallback is only for protocol-shape incompatibility; authentication, authorization, rate limiting and ordinary network failures are not blindly retried.
 
-Development diagnostics may record the endpoint host/path, model name, HTTP status and bounded provider error type/code/parameter. They must never log API keys, authorization headers, raw provider response bodies or provider error messages that may echo user input. A failed remote refinement still preserves and delivers the already-saved recognized text.
+Privacy-safe Cloud failure metadata (HTTP status plus bounded provider error type/code/parameter) is written to the normal diagnostic log so remote failures remain diagnosable even when verbose development tracing is unavailable. Debug builds may additionally record endpoint host/path and model name. Neither path may log API keys, authorization headers, raw provider response bodies or provider error messages that may echo user input. A failed remote refinement still preserves and delivers the already-saved recognized text.
 
 ## Output
 
