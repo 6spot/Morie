@@ -1,8 +1,9 @@
+import Combine
 import Foundation
 import SwiftData
 
 @MainActor
-final class CaptureStore {
+final class CaptureStore: ObservableObject {
     enum StoreError: LocalizedError {
         case captureNotFound
         case captureInProgress
@@ -31,6 +32,8 @@ final class CaptureStore {
     let container: ModelContainer
     let audioDirectory: URL
     let cloudSyncEnabled: Bool
+
+    @Published private(set) var historyRevision: UInt64 = 0
 
     private var records: [UUID: CaptureRecord] = [:]
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
@@ -356,6 +359,7 @@ final class CaptureStore {
             container.mainContext.rollback()
             throw error
         }
+        markHistoryChanged()
         Diagnostics.record("History", "Recognition updated for \(label(id)); characters=\(text.count)")
     }
 
@@ -371,6 +375,7 @@ final class CaptureStore {
             container.mainContext.rollback()
             throw error
         }
+        markHistoryChanged()
     }
 
     func deleteCapture(_ id: UUID) throws {
@@ -386,6 +391,7 @@ final class CaptureStore {
         for extraction in extractions { container.mainContext.delete(extraction) }
         container.mainContext.delete(record)
         try container.mainContext.save()
+        markHistoryChanged()
         Diagnostics.record("History", "Deleted Capture \(label(id))")
     }
 
@@ -493,6 +499,9 @@ final class CaptureStore {
         )
         do {
             try await persistenceWriter.persist(snapshot)
+            if snapshot.usageMetricsFinalized {
+                markHistoryChanged()
+            }
             DevelopmentDiagnostics.record(
                 "Persistence",
                 captureID: id,
@@ -522,6 +531,9 @@ final class CaptureStore {
         Task(priority: .utility) { [persistenceWriter] in
             do {
                 try await persistenceWriter.persist(snapshot)
+                if snapshot.usageMetricsFinalized {
+                    await self?.markHistoryChanged()
+                }
                 DevelopmentDiagnostics.record(
                     "Persistence",
                     captureID: id,
@@ -660,6 +672,7 @@ final class CaptureStore {
             record.sourceAudioRelativePath = nil
         }
         try container.mainContext.save()
+        markHistoryChanged()
         Diagnostics.record("CaptureStore", "Expired source audio for \(expired.count) Capture(s)")
     }
 
@@ -671,6 +684,7 @@ final class CaptureStore {
             record.sourceAudioExpiresAt = Calendar.current.date(byAdding: .day, value: value, to: record.createdAt)
         }
         try container.mainContext.save()
+        markHistoryChanged()
         try pruneExpiredAudio()
     }
 
@@ -730,6 +744,10 @@ final class CaptureStore {
         }
         try container.mainContext.save()
         Diagnostics.record("CaptureStore", "Recovered \(interrupted.count) interrupted Capture(s)")
+    }
+
+    private func markHistoryChanged() {
+        historyRevision &+= 1
     }
 
     private func label(_ id: UUID) -> String {
