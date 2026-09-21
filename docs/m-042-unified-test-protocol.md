@@ -115,9 +115,10 @@ Expected:
 Start and stop without speaking, then repeat with ordinary room noise.
 
 Expected:
-- AudioEvidence explains the no-speech decision;
-- unnecessary accurate recognition/refinement is skipped;
-- no junk Capture is retained when audio is confidently empty.
+- AudioEvidence may decide whether saved-audio recognition gets a chance;
+- refinement is skipped when both recognition passes produce no usable text;
+- if live + saved-audio recognition are both empty, the Capture and source audio are discarded regardless of whether AudioEvidence saw silence, room noise or voice-like sound;
+- History receives no "未识别到语音" item for that attempt.
 
 ### H. Cancellation
 

@@ -655,6 +655,25 @@ final class CaptureSessionController {
                 throw SessionError.persistenceUnavailable("记录存储尚未初始化。")
             }
 
+            guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                try captureStore.finishEmptyRecognition(for: sessionID)
+                history?.captureListDidChange()
+                onCancellationEnabledChange?(false)
+                resetSessionIdentity()
+                setPhase(.idle)
+                DevelopmentDiagnostics.record(
+                    "Stage",
+                    captureID: sessionID,
+                    "emptyRecognitionDiscarded; liveCharacters=\(result.transcript.count); accurateCharacters=\(accurateTranscript?.count ?? 0); sourceAudioMeaningful=\(String(describing: result.sourceAudio.hasMeaningfulAudio)); historyRetained=false; hud=noSpeech"
+                )
+                Diagnostics.record(
+                    "SpeechQuality",
+                    "Discarded empty Capture \(label(sessionID)) after live and saved-audio recognition produced no usable text"
+                )
+                hud.showNoSpeech()
+                return
+            }
+
             try captureStore.updateRecognizedText(finalText, for: sessionID)
             try captureStore.attachSourceAudio(result.sourceAudio, for: sessionID)
             guard activeCaptureID == sessionID, stoppingCaptureID == nil,
@@ -668,28 +687,6 @@ final class CaptureSessionController {
                 label: "preferredFinal",
                 finalText
             )
-
-            guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                let disposition = try captureStore.finishEmptyRecognition(
-                    for: sessionID,
-                    sourceAudio: result.sourceAudio
-                )
-                history?.captureListDidChange()
-                onCancellationEnabledChange?(false)
-                resetSessionIdentity()
-                setPhase(.idle)
-                DevelopmentDiagnostics.record(
-                    "Stage",
-                    captureID: sessionID,
-                    "emptyRecognitionSettled; disposition=\(String(describing: disposition)); hud=\(disposition == .retainedForRetry ? "recognitionFailure" : "noSpeech")"
-                )
-                if disposition == .retainedForRetry {
-                    hud.showRecognitionFailure()
-                } else {
-                    hud.showNoSpeech()
-                }
-                return
-            }
 
             let deliveryMode = try captureStore.completeRecognition(finalText, for: sessionID)
             if let personalizer {

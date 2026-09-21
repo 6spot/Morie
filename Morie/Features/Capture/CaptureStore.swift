@@ -25,11 +25,6 @@ final class CaptureStore {
         }
     }
 
-    enum EmptyRecognitionDisposition {
-        case discarded
-        case retainedForRetry
-    }
-
     static let audioRetentionDaysDefaultsKey = "captureAudioRetentionDays"
     static let defaultAudioRetentionDays = 7
 
@@ -283,19 +278,16 @@ final class CaptureStore {
         try finish(id, lifecycle: .failed, error: error)
     }
 
-    func finishEmptyRecognition(
-        for id: UUID,
-        sourceAudio: CapturedSourceAudio
-    ) throws -> EmptyRecognitionDisposition {
+    /// Empty final recognition is never a History item.
+    ///
+    /// Audio evidence decides whether saved-audio recognition gets a chance,
+    /// not whether a Capture with no usable transcript should survive. By the
+    /// time this method is called, both live and saved-audio recognition have
+    /// produced no usable text, so the unfinished Capture and its source audio
+    /// are discarded together.
+    func finishEmptyRecognition(for id: UUID) throws {
         guard records[id] != nil else { throw StoreError.captureNotFound }
-        if sourceAudio.hasMeaningfulAudio == false
-            || (sourceAudio.duration == 0 && sourceAudio.hasMeaningfulAudio != true) {
-            try cancel(id)
-            return .discarded
-        }
-
-        try markFailed(id, error: "未识别到语音，可以在历史记录中播放录音或重新识别。")
-        return .retainedForRetry
+        try cancel(id)
     }
 
     func capture(_ id: UUID) throws -> CaptureRecord {
