@@ -45,94 +45,99 @@ struct MemoryView: View {
     }
 
     var body: some View {
-        ControlCenterScrollableContent(maxWidth: 840) {
-            VStack(alignment: .leading, spacing: 28) {
-            Text(
-                "Morie 会把稳定事实沉淀为长期记忆，把近期但仍可能变化的信息保留在“最近”里。"
-            )
-            .foregroundStyle(.secondary)
+        ControlCenterScrollableContent {
+            VStack(alignment: .leading, spacing: 24) {
+                ControlCenterCommandBar {
+                    TextField(
+                        "搜索 Morie 记住的内容",
+                        text: $search
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 320)
 
-            if !memoryEnabled {
-                Label(
-                    "个人记忆已关闭。已有内容会保留，但 Morie 暂时不会继续学习，也不会在润色时使用这些内容。",
-                    systemImage: "pause.circle"
+                    Text(
+                        "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
+                    )
+                    .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 12)
+
+                    Button(
+                        "告诉 Morie 一件事",
+                        systemImage: "plus",
+                        action: addMemory
+                    )
+                }
+
+                Text(
+                    "Morie 会把稳定事实沉淀为长期记忆，把近期但仍可能变化的信息保留在“最近”里。"
                 )
                 .foregroundStyle(.secondary)
-            }
 
-            if let errorMessage {
-                Label(
-                    errorMessage,
-                    systemImage: "exclamationmark.triangle"
-                )
-                .foregroundStyle(.secondary)
-            }
+                if !memoryEnabled {
+                    Label(
+                        "个人记忆已关闭。已有内容会保留，但 Morie 暂时不会继续学习，也不会在润色时使用这些内容。",
+                        systemImage: "pause.circle"
+                    )
+                    .foregroundStyle(.secondary)
+                }
 
-            if !activeLongTerm.isEmpty {
-                memorySection(
-                    title: "长期记忆",
-                    entries: activeLongTerm
-                )
-            }
+                if let errorMessage {
+                    Label(
+                        errorMessage,
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .foregroundStyle(.secondary)
+                }
 
-            if !recentContext.isEmpty {
-                memorySection(
-                    title: "最近",
-                    entries: recentContext,
-                    showsDate: true
-                )
-            }
+                if !activeLongTerm.isEmpty {
+                    memorySection(
+                        title: "长期记忆",
+                        entries: activeLongTerm
+                    )
+                }
 
-            if !history.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("已归档与历史")
-                        .font(.headline)
+                if !recentContext.isEmpty {
+                    memorySection(
+                        title: "最近",
+                        entries: recentContext,
+                        showsDate: true
+                    )
+                }
 
-                    DisclosureGroup("查看历史内容") {
-                        MemoryTopicRows(
-                            entries: history,
-                            store: store,
-                            showsStatus: true
-                        )
-                        .padding(.top, 8)
+                if !history.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("已归档与历史")
+                            .font(.headline)
+
+                        DisclosureGroup("查看历史内容") {
+                            MemoryTopicRows(
+                                entries: history,
+                                store: store,
+                                showsStatus: true
+                            )
+                            .padding(.top, 8)
+                        }
                     }
                 }
-            }
 
-            if !hasVisibleMemory && errorMessage == nil {
-                ContentUnavailableView {
-                    Label(
-                        query.isEmpty
-                            ? "Morie 还不了解你"
-                            : "没有匹配的内容",
-                        systemImage: "person.text.rectangle"
-                    )
-                } description: {
-                    Text(
-                        query.isEmpty
-                            ? "继续正常使用即可。Morie 会逐渐形成有用的长期理解和近期上下文。"
-                            : "试试其他搜索词。"
-                    )
+                if !hasVisibleMemory && errorMessage == nil {
+                    ContentUnavailableView {
+                        Label(
+                            query.isEmpty
+                                ? "Morie 还不了解你"
+                                : "没有匹配的内容",
+                            systemImage: "person.text.rectangle"
+                        )
+                    } description: {
+                        Text(
+                            query.isEmpty
+                                ? "继续正常使用即可。Morie 会逐渐形成有用的长期理解和近期上下文。"
+                                : "试试其他搜索词。"
+                        )
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
-            }
-            }
-        }
-        .navigationTitle("个人记忆")
-        .navigationSubtitle(
-            "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
-        )
-        .searchable(
-            text: $search,
-            prompt: "搜索 Morie 记住的内容"
-        )
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(
-                    "告诉 Morie 一件事",
-                    systemImage: "plus",
-                    action: addMemory
-                )
             }
         }
         .sheet(item: $editor) {
