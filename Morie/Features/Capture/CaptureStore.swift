@@ -378,6 +378,62 @@ final class CaptureStore {
         Diagnostics.record("History", "Deleted Capture \(label(id))")
     }
 
+    func eraseAllDataForFactoryReset() async throws {
+        guard records.isEmpty else {
+            throw StoreError.captureInProgress
+        }
+
+        await persistenceWriter.beginFactoryReset()
+
+        let context = container.mainContext
+        do {
+            for record in try context.fetch(FetchDescriptor<MemoryEvidenceRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<MemoryAnalysisRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<MemoryLearningBlock>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<MemoryRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<DictionaryCorrectionRule>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<DictionaryEntry>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<ExpressionProfileRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<CaptureRecord>()) {
+                context.delete(record)
+            }
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: audioDirectory.path) {
+            for url in try fileManager.contentsOfDirectory(
+                at: audioDirectory,
+                includingPropertiesForKeys: nil
+            ) {
+                try fileManager.removeItem(at: url)
+            }
+        }
+
+        records.removeAll(keepingCapacity: false)
+        lastProgressiveSave.removeAll(keepingCapacity: false)
+        persistenceRevision.removeAll(keepingCapacity: false)
+
+        Diagnostics.record("FactoryReset", "Cleared SwiftData records and CaptureAudio files")
+    }
+
     func cancel(_ id: UUID) throws {
         guard let record = records[id] else { return }
         try deleteAudio(for: record)
