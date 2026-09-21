@@ -66,6 +66,8 @@ struct CaptureHistoryWorkspace: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Divider()
+
             Group {
                 if let history = controller.history {
                     HSplitView {
@@ -188,6 +190,7 @@ struct CaptureHistoryView: View {
             .tag(capture.id)
         }
         .listStyle(.inset)
+        .contentMargins(.top, 12, for: .scrollContent)
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,
