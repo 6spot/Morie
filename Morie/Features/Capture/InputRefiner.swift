@@ -645,6 +645,11 @@ enum InputRefiner {
                 level: .warning,
                 "cloudPrimaryFailed; \(primaryFailure.logValue); responseBodyLogged=false; credentialsLogged=false; retryMinimal=\(tryFallback)"
             )
+            Diagnostics.record(
+                "RefinementModel",
+                "Capture \(String(input.captureID.uuidString.prefix(8))); cloudPrimaryFailed; \(primaryFailure.logValue); retryMinimal=\(tryFallback); responseBodyLogged=false; credentialsLogged=false",
+                level: .warning
+            )
 
             guard tryFallback else {
                 Diagnostics.recordMemory("refinement-cloud-failed")
@@ -667,6 +672,10 @@ enum InputRefiner {
                     captureID: input.captureID,
                     "cloudMinimalFallbackSucceeded; host=\(url.host ?? "unknown"); model=\(configuration.trimmedCloudModelName)"
                 )
+                Diagnostics.record(
+                    "RefinementModel",
+                    "Capture \(String(input.captureID.uuidString.prefix(8))); cloudMinimalFallbackSucceeded"
+                )
                 return content
             } catch {
                 if Task.isCancelled || error is CancellationError {
@@ -680,6 +689,11 @@ enum InputRefiner {
                     captureID: input.captureID,
                     level: .warning,
                     "cloudMinimalFallbackFailed; \(fallbackFailure.logValue); responseBodyLogged=false; credentialsLogged=false"
+                )
+                Diagnostics.record(
+                    "RefinementModel",
+                    "Capture \(String(input.captureID.uuidString.prefix(8))); cloudMinimalFallbackFailed; \(fallbackFailure.logValue); responseBodyLogged=false; credentialsLogged=false",
+                    level: .warning
                 )
                 Diagnostics.recordMemory("refinement-cloud-failed")
                 throw RefinementReason.generationFailed
