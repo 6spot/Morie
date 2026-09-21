@@ -230,23 +230,9 @@ private struct ControlCenterSidebar: View {
     }
 }
 
-private struct ControlCenterDetailHost<
-    Content: View,
-    ToolbarContent: View
->: View {
+private struct ControlCenterDetailHost<Content: View>: View {
     let section: ControlCenterSection
     @ViewBuilder let content: Content
-    @ViewBuilder let toolbarContent: ToolbarContent
-
-    init(
-        section: ControlCenterSection,
-        @ViewBuilder content: () -> Content,
-        @ViewBuilder toolbar: () -> ToolbarContent
-    ) {
-        self.section = section
-        self.content = content()
-        toolbarContent = toolbar()
-    }
 
     var body: some View {
         content
@@ -256,22 +242,6 @@ private struct ControlCenterDetailHost<
                 alignment: .topLeading
             )
             .navigationTitle(section.title)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 8) {
-                        // Keep one AppKit toolbar item and one stable geometry
-                        // for every top-level route. Route changes only replace
-                        // controls inside this reserved slot.
-                        Color.clear
-                            .frame(width: 1, height: 1)
-                            .accessibilityHidden(true)
-
-                        Spacer(minLength: 0)
-                        toolbarContent
-                    }
-                    .frame(width: 480, alignment: .trailing)
-                }
-            }
     }
 }
 
@@ -304,8 +274,27 @@ private struct ControlCenterRouteHost: View {
     var body: some View {
         ControlCenterDetailHost(section: session.currentSection) {
             routedPage
-        } toolbar: {
-            toolbarContent
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                toolbarSearchSlot
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                toolbarFilterSlot
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                toolbarActionOne
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                toolbarActionTwo
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                toolbarActionThree
+            }
         }
         .confirmationDialog(
             "恢复出厂设置？",
@@ -407,24 +396,77 @@ private struct ControlCenterRouteHost: View {
     }
 
     @ViewBuilder
-    private var toolbarContent: some View {
+    private var toolbarSearchSlot: some View {
         switch session.currentSection {
-        case .overview:
-            EmptyView()
-
         case .history:
             toolbarSearchField(
                 "搜索历史记录",
                 text: $historySearch
             )
 
+        case .dictionary:
+            toolbarSearchField(
+                "搜索词语",
+                text: $dictionarySearch
+            )
+
+        case .memory:
+            toolbarSearchField(
+                "搜索个人记忆",
+                text: $memorySearch
+            )
+
+        case .diagnostics:
+            toolbarSearchField(
+                "搜索诊断日志",
+                text: $diagnosticSearch
+            )
+
+        case .overview, .settings, .permissions:
+            toolbarPlaceholder(width: 220)
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarFilterSlot: some View {
+        switch session.currentSection {
+        case .history:
             Picker("筛选记录", selection: $historyFilter) {
                 ForEach(CaptureHistoryFilter.allCases) { item in
                     Text(item.title).tag(item)
                 }
             }
             .pickerStyle(.menu)
+            .frame(width: 110)
 
+        case .diagnostics:
+            Picker("筛选日志", selection: $diagnosticLevel) {
+                Text("全部日志")
+                    .tag(nil as DiagnosticLevel?)
+
+                ForEach(
+                    [
+                        DiagnosticLevel.info,
+                        .warning,
+                        .error,
+                    ],
+                    id: \.self
+                ) {
+                    Text($0.title).tag(Optional($0))
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 110)
+
+        case .overview, .dictionary, .memory, .settings, .permissions:
+            toolbarPlaceholder(width: 110)
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarActionOne: some View {
+        switch session.currentSection {
+        case .history:
             Button(
                 "开始录音",
                 systemImage: "mic",
@@ -433,11 +475,6 @@ private struct ControlCenterRouteHost: View {
             .disabled(!controller.canStartCapture)
 
         case .dictionary:
-            toolbarSearchField(
-                "搜索词语",
-                text: $dictionarySearch
-            )
-
             Button("编辑词语", systemImage: "pencil") {
                 guard let id = selectedDictionaryUserEntryID else {
                     return
@@ -447,27 +484,7 @@ private struct ControlCenterRouteHost: View {
             }
             .disabled(selectedDictionaryUserEntryID == nil)
 
-            Button(
-                "删除词语…",
-                systemImage: "trash",
-                role: .destructive
-            ) {
-                dictionaryConfirmsDeletion = true
-            }
-            .disabled(selectedDictionaryUserEntryID == nil)
-
-            Button("添加词语", systemImage: "plus") {
-                dictionaryEditingEntryID = nil
-                dictionaryShowingEditor = true
-            }
-
         case .memory:
-            toolbarSearchField(
-                "搜索个人记忆",
-                text: $memorySearch,
-                width: 240
-            )
-
             Button("告诉 Morie 一件事", systemImage: "plus") {
                 memoryEditor = .create
             }
@@ -491,28 +508,6 @@ private struct ControlCenterRouteHost: View {
             .disabled(permissionRefreshDisabled)
 
         case .diagnostics:
-            toolbarSearchField(
-                "搜索诊断日志",
-                text: $diagnosticSearch
-            )
-
-            Picker("筛选日志", selection: $diagnosticLevel) {
-                Text("全部日志")
-                    .tag(nil as DiagnosticLevel?)
-
-                ForEach(
-                    [
-                        DiagnosticLevel.info,
-                        .warning,
-                        .error,
-                    ],
-                    id: \.self
-                ) {
-                    Text($0.title).tag(Optional($0))
-                }
-            }
-            .pickerStyle(.menu)
-
             Button(
                 "复制当前筛选",
                 systemImage: "line.3.horizontal.decrease.circle"
@@ -520,10 +515,44 @@ private struct ControlCenterRouteHost: View {
                 copyDiagnostics(filteredDiagnosticEntries)
             }
 
+        case .overview:
+            toolbarPlaceholder()
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarActionTwo: some View {
+        switch session.currentSection {
+        case .dictionary:
+            Button(
+                "删除词语…",
+                systemImage: "trash",
+                role: .destructive
+            ) {
+                dictionaryConfirmsDeletion = true
+            }
+            .disabled(selectedDictionaryUserEntryID == nil)
+
+        case .diagnostics:
             Button("复制全部日志", systemImage: "doc.on.doc") {
                 copyDiagnostics(DiagnosticLogStore.shared.entries)
             }
 
+        case .overview, .history, .memory, .settings, .permissions:
+            toolbarPlaceholder()
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarActionThree: some View {
+        switch session.currentSection {
+        case .dictionary:
+            Button("添加词语", systemImage: "plus") {
+                dictionaryEditingEntryID = nil
+                dictionaryShowingEditor = true
+            }
+
+        case .diagnostics:
             Menu("诊断操作", systemImage: "ellipsis") {
                 Button(
                     "在访达中显示日志文件",
@@ -544,24 +573,29 @@ private struct ControlCenterRouteHost: View {
                     diagnosticConfirmsClear = true
                 }
             }
+
+        case .overview, .history, .memory, .settings, .permissions:
+            toolbarPlaceholder()
         }
     }
 
     private func toolbarSearchField(
         _ prompt: String,
-        text: Binding<String>,
-        width: CGFloat = 220
+        text: Binding<String>
     ) -> some View {
         TextField(prompt, text: text)
             .textFieldStyle(.roundedBorder)
-            .frame(width: width)
+            .frame(width: 220)
     }
 
-    private var permissionRefreshDisabled: Bool {
-        controller.setup.isRefreshing
-            || controller.setup.activeRequest != nil
-            || controller.capabilities.isBootstrapping
+    private func toolbarPlaceholder(
+        width: CGFloat = 1
+    ) -> some View {
+        Color.clear
+            .frame(width: width, height: 1)
+            .accessibilityHidden(true)
     }
+
 
     private var selectedDictionaryUserEntryID: UUID? {
         guard let dictionary = controller.dictionary,
