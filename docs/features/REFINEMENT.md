@@ -132,6 +132,17 @@ Take extra care with content whose exact form may matter, including names, numbe
 
 Do not normalize these merely because another form looks more natural.
 
+
+## External model transport
+
+Cloud refinement uses the same trusted instructions and runtime reference payload as local refinement. Provider transport must not change the semantic contract.
+
+The primary path uses Apple's FoundationModelsUtilities Chat Completions adapter without Apple-local sampling or response-budget options. Cloud requests therefore do not deliberately add local-only parameters such as a greedy sampling translation.
+
+If an otherwise OpenAI-compatible provider rejects the primary streaming request shape, Morie may retry once with a minimal non-streaming Chat Completions request containing only the model plus system/user messages. This fallback is only for protocol-shape incompatibility; authentication, authorization, rate limiting and ordinary network failures are not blindly retried.
+
+Development diagnostics may record the endpoint host/path, model name, HTTP status and bounded provider error type/code/parameter. They must never log API keys, authorization headers, raw provider response bodies or provider error messages that may echo user input. A failed remote refinement still preserves and delivers the already-saved recognized text.
+
 ## Output
 
 Return only the refined final text.

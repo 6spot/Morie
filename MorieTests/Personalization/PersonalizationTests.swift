@@ -1,4 +1,5 @@
 import Foundation
+import FoundationModelsUtilities
 import SwiftData
 import XCTest
 
@@ -130,6 +131,110 @@ final class PersonalizationTests: XCTestCase {
         let frozen = controller.configuration
         XCTAssertEqual(controller.runtimeConfiguration(for: frozen).mode, .local)
         XCTAssertEqual(credentialReads, 0)
+    }
+
+
+    func testMinimalCloudEndpointMatchesChatCompletionsBaseURLRules() throws {
+        XCTAssertEqual(
+            MinimalChatCompletionsClient.endpoint(
+                for: try XCTUnwrap(URL(string: "https://api.example.com"))
+            ).absoluteString,
+            "https://api.example.com/v1/chat/completions"
+        )
+        XCTAssertEqual(
+            MinimalChatCompletionsClient.endpoint(
+                for: try XCTUnwrap(URL(string: "https://api.example.com/v1"))
+            ).absoluteString,
+            "https://api.example.com/v1/chat/completions"
+        )
+        XCTAssertEqual(
+            MinimalChatCompletionsClient.endpoint(
+                for: try XCTUnwrap(URL(string: "https://api.example.com/api/v3"))
+            ).absoluteString,
+            "https://api.example.com/api/v3/chat/completions"
+        )
+    }
+
+    func testMinimalCloudFallbackSendsOnlyBaselineChatCompletionFields() throws {
+        let body = MinimalChatCompletionsClient.requestBody(
+            model: "test-model",
+            instructions: "trusted instructions",
+            prompt: "{\"transcript\":\"hello\"}"
+        )
+        let data = try JSONEncoder().encode(body)
+        let json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        XCTAssertEqual(json["model"] as? String, "test-model")
+        XCTAssertNotNil(json["messages"])
+        XCTAssertNil(json["stream"])
+        XCTAssertNil(json["stream_options"])
+        XCTAssertNil(json["top_p"])
+        XCTAssertNil(json["temperature"])
+        XCTAssertNil(json["max_tokens"])
+        XCTAssertNil(json["max_completion_tokens"])
+        XCTAssertNil(json["response_format"])
+        XCTAssertNil(json["tools"])
+        XCTAssertNil(json["tool_choice"])
+    }
+
+    func testCloudFailureDiagnosticsExposeSafeMetadataWithoutResponseBody() throws {
+        let body = """
+        {
+          "error": {
+            "message": "request contained secret-user-text",
+            "type": "invalid_request_error",
+            "code": "unsupported_parameter",
+            "param": "stream_options"
+          }
+        }
+        """
+        let error = MinimalChatCompletionsClient.Failure.httpError(
+            statusCode: 400,
+            data: try XCTUnwrap(body.data(using: .utf8))
+        )
+        let summary = CloudRefinementFailureInspector.summarize(error)
+
+        XCTAssertEqual(summary.category, "httpError")
+        XCTAssertEqual(summary.statusCode, 400)
+        XCTAssertEqual(summary.providerType, "invalid_request_error")
+        XCTAssertEqual(summary.providerCode, "unsupported_parameter")
+        XCTAssertEqual(summary.providerParam, "stream_options")
+        XCTAssertFalse(summary.logValue.contains("secret-user-text"))
+        XCTAssertFalse(summary.logValue.contains("message"))
+    }
+
+    func testCloudCompatibilityFallbackOnlyRetriesProtocolShapeFailures() {
+        XCTAssertTrue(
+            CloudRefinementFailureInspector.shouldTryMinimalFallback(
+                after: ChatCompletionsLanguageModel.RequestError.invalidStreamData
+            )
+        )
+        XCTAssertTrue(
+            CloudRefinementFailureInspector.shouldTryMinimalFallback(
+                after: ChatCompletionsLanguageModel.RequestError.httpError(
+                    statusCode: 400,
+                    data: Data()
+                )
+            )
+        )
+        XCTAssertFalse(
+            CloudRefinementFailureInspector.shouldTryMinimalFallback(
+                after: ChatCompletionsLanguageModel.RequestError.httpError(
+                    statusCode: 401,
+                    data: Data()
+                )
+            )
+        )
+        XCTAssertFalse(
+            CloudRefinementFailureInspector.shouldTryMinimalFallback(
+                after: ChatCompletionsLanguageModel.RequestError.httpError(
+                    statusCode: 429,
+                    data: Data()
+                )
+            )
+        )
     }
 
     func testBasicCleanupRemovesFillerAndFormatsExistingStructureWithoutMemory() throws {
