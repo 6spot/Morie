@@ -625,7 +625,7 @@ final class CaptureStore: ObservableObject {
         try context.save()
     }
 
-    static func accumulateUsage(
+    nonisolated static func accumulateUsage(
         _ capture: CaptureRecord,
         into metrics: CaptureUsageMetricsRecord
     ) {
