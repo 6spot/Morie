@@ -2,7 +2,7 @@
 
 This directory contains the detailed execution record for Morie development tasks.
 
-The master plan and overall progress live in [`../tasks.md`](../tasks.md). Do not turn the master file into an implementation diary.
+The task index lives in [`../tasks.md`](../tasks.md). Do not turn the index into an implementation diary or project specification.
 
 ## Naming
 
@@ -40,9 +40,9 @@ Every active task document should contain:
 
 Whenever code materially changes a task:
 
-- update its detail document;
-- update `docs/tasks.md` if task-level status/progress changed;
-- update architecture/development/deployment/validation docs when behavior or procedure changed;
-- keep the GitHub Issue/PR linked.
+- update its task record with the implementation and evidence that actually occurred;
+- update `docs/tasks.md` if task-level status changed;
+- update the relevant current documentation only when the current product, architecture, development, design, testing or deployment contract changed;
+- keep the GitHub Issue/PR linked when one exists.
 
-A PR that changes implementation but leaves its task documentation stale is incomplete.
+Historical task records may describe superseded designs. Current documentation takes precedence.
