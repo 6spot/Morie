@@ -1,76 +1,16 @@
 import Observation
-import SwiftData
 import SwiftUI
-
-struct OverviewMetrics: Equatable {
-    private(set) var totalCaptures = 0
-    private(set) var recognizedCharacters = 0
-    private(set) var successfulInputs = 0
-    private(set) var currentAppAttempts = 0
-    private(set) var failedInputs = 0
-    private(set) var refinementSamples = 0
-    private var refinementDurationTotal = 0.0
-
-    init() {}
-
-    init(captures: [CaptureRecord]) {
-        for capture in captures {
-            accumulate(capture)
-        }
-    }
-
-    mutating func accumulate(_ capture: CaptureRecord) {
-        totalCaptures += 1
-        recognizedCharacters += capture.recognizedText.count
-
-        if capture.deliveryModeRawValue
-            == CaptureDeliveryMode.currentApp.rawValue,
-           [.delivered, .deliveryFailed, .failed].contains(capture.lifecycle) {
-            currentAppAttempts += 1
-
-            switch capture.lifecycle {
-            case .delivered:
-                successfulInputs += 1
-            case .deliveryFailed, .failed:
-                failedInputs += 1
-            default:
-                break
-            }
-        }
-
-        if let duration = capture.refinement?.durationSeconds,
-           duration >= 0 {
-            refinementSamples += 1
-            refinementDurationTotal += duration
-        }
-    }
-
-    var averageRefinementSeconds: Double? {
-        guard refinementSamples > 0 else { return nil }
-        return refinementDurationTotal / Double(refinementSamples)
-    }
-
-    var failureRate: Double? {
-        guard currentAppAttempts > 0 else { return nil }
-        return Double(failedInputs) / Double(currentAppAttempts)
-    }
-}
-
-struct OverviewMetricsSnapshot: Equatable {
-    let metrics: OverviewMetrics
-    let recordCount: Int
-    let latestUpdatedAt: Date?
-}
 
 @MainActor
 @Observable
 final class OverviewPageState {
-    var metricsSnapshot: OverviewMetricsSnapshot?
+    var metricsSnapshot: CaptureUsageMetricsSnapshot?
 }
 
 
 @MainActor
 struct OverviewView: View {
+    private let controller: AppController
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var preferences: AppPreferencesController
     @ObservedObject private var refinementModels: RefinementModelController
@@ -79,7 +19,6 @@ struct OverviewView: View {
 
     private let buildIdentity = AppBuildIdentity.current
 
-    @Environment(\.modelContext) private var modelContext
     @Bindable var state: OverviewPageState
     @State private var metricsError: String?
 
@@ -87,6 +26,7 @@ struct OverviewView: View {
         controller: AppController,
         state: OverviewPageState
     ) {
+        self.controller = controller
         _capabilities = ObservedObject(
             wrappedValue: controller.capabilities
         )
@@ -115,7 +55,7 @@ struct OverviewView: View {
             }
         }
         .task {
-            await refreshMetricsIfNeeded()
+            loadUsageMetrics()
         }
     }
 
@@ -248,7 +188,7 @@ struct OverviewView: View {
     }
 
     private var usageSection: some View {
-        let metrics = state.metricsSnapshot?.metrics
+        let metrics = state.metricsSnapshot
         let isLoading = state.metricsSnapshot == nil && metricsError == nil
 
         return ControlCenterSectionBlock(
@@ -261,7 +201,7 @@ struct OverviewView: View {
                     value: metrics?.recognizedCharacters.formatted() ?? "—"
                 )
                 metric(
-                    title: "已完成记录",
+                    title: "累计记录",
                     value: metrics?.totalCaptures.formatted() ?? "—"
                 )
                 metric(
@@ -313,74 +253,12 @@ struct OverviewView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func refreshMetricsIfNeeded() async {
-        await Task.yield()
-
+    private func loadUsageMetrics() {
         do {
-            let capturing = CaptureLifecycle.capturing.rawValue
-            var descriptor = FetchDescriptor<CaptureRecord>(
-                predicate: #Predicate {
-                    $0.lifecycleRawValue != capturing
-                }
-            )
-            descriptor.propertiesToFetch = [
-                \CaptureRecord.lifecycleRawValue,
-                \CaptureRecord.deliveryModeRawValue,
-                \CaptureRecord.recognizedText,
-                \CaptureRecord.refinement
-            ]
-
-            let recordCount = try modelContext.fetchCount(descriptor)
-
-            var latestDescriptor = FetchDescriptor<CaptureRecord>(
-                predicate: #Predicate {
-                    $0.lifecycleRawValue != capturing
-                },
-                sortBy: [
-                    SortDescriptor(\.updatedAt, order: .reverse)
-                ]
-            )
-            latestDescriptor.fetchLimit = 1
-            latestDescriptor.propertiesToFetch = [
-                \CaptureRecord.updatedAt
-            ]
-
-            let latestUpdatedAt = try modelContext
-                .fetch(latestDescriptor)
-                .first?
-                .updatedAt
-
-            if let cached = state.metricsSnapshot,
-               cached.recordCount == recordCount,
-               cached.latestUpdatedAt == latestUpdatedAt {
-                metricsError = nil
-                return
-            }
-
-            if DevelopmentDiagnostics.isEnabled {
-                Diagnostics.recordMemory("overview-metrics-before")
-            }
-
-            var metrics = OverviewMetrics()
-            try modelContext.enumerate(
-                descriptor,
-                batchSize: 128,
-                allowEscapingMutations: false
-            ) { capture in
-                metrics.accumulate(capture)
-            }
-
-            state.metricsSnapshot = OverviewMetricsSnapshot(
-                metrics: metrics,
-                recordCount: recordCount,
-                latestUpdatedAt: latestUpdatedAt
-            )
+            state.metricsSnapshot = try controller.controlCenterUsageMetrics()
             metricsError = nil
-
-            if DevelopmentDiagnostics.isEnabled {
-                Diagnostics.recordMemory("overview-metrics-after")
-            }
         } catch {
+            state.metricsSnapshot = nil
             metricsError = "无法读取使用统计。"
         }
     }
