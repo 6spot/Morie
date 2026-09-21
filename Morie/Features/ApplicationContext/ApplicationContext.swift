@@ -36,6 +36,77 @@ struct ApplicationContextSnapshot: Equatable, Sendable {
 }
 
 
+/// Pure cursor-window planner shared by the AX collector and logic tests.
+///
+/// The budget follows OpenLess' host-document split: prefer roughly 80% before
+/// the caret and 20% after it, then let either side consume unused capacity.
+enum ApplicationContextCursorWindow {
+    struct Span: Equatable {
+        let start: Int
+        let length: Int
+        let cursorInWindow: Int
+    }
+
+    static func plan(
+        length: Int,
+        cursor: Int,
+        budget: Int
+    ) -> Span {
+        let safeLength = max(0, length)
+        let safeCursor = min(max(0, cursor), safeLength)
+        guard budget > 0 else {
+            return Span(
+                start: safeCursor,
+                length: 0,
+                cursorInWindow: 0
+            )
+        }
+
+        let before = min(safeCursor, budget * 4 / 5)
+        let after = min(safeLength - safeCursor, budget - before)
+        let refilledBefore = min(safeCursor, budget - after)
+        return Span(
+            start: safeCursor - refilledBefore,
+            length: refilledBefore + after,
+            cursorInWindow: refilledBefore
+        )
+    }
+
+    static func window(
+        in text: String,
+        cursorUTF16: Int,
+        budget: Int
+    ) -> String {
+        let cursor = characterOffset(
+            in: text,
+            utf16Offset: cursorUTF16
+        )
+        let span = plan(
+            length: text.count,
+            cursor: cursor,
+            budget: budget
+        )
+        return String(
+            text.dropFirst(span.start).prefix(span.length)
+        )
+    }
+
+    static func characterOffset(
+        in text: String,
+        utf16Offset: Int
+    ) -> Int {
+        let target = max(0, utf16Offset)
+        var units = 0
+        for (index, character) in text.enumerated() {
+            if units >= target {
+                return index
+            }
+            units += character.utf16.count
+        }
+        return text.count
+    }
+}
+
 /// The source of a transient Speech hint within the captured application context.
 enum ApplicationContextHintSource: String, CaseIterable, Hashable, Sendable {
     case selected
