@@ -66,16 +66,6 @@ struct CaptureHistoryWorkspace: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ControlCenterCommandBar {
-                TextField("搜索历史记录", text: $search)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 280)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-
-            Divider()
-
             Group {
                 if let history = controller.history {
                     HSplitView {
