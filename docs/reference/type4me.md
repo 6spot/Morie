@@ -29,10 +29,11 @@ Type4Me must never drive Morie's architecture in the opposite direction.
 
 Primary Morie sources of truth:
 
-- `docs/design/apple-native-first-v0-baseline-v2.md`
-- `docs/product-architecture-baseline.md`
-- `docs/architecture.md`
-- `docs/ui-design.md`
+- `docs/PRODUCT.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT.md`
+- `docs/DESIGN.md`
+- `docs/features/REFINEMENT.md`
 - active `docs/tasks/M-xxx-*.md`
 
 ## Migration principle
@@ -359,7 +360,7 @@ Morie requirement: use confirmed relevant Vocabulary/Project context to improve 
 
 ## M-009 dictionary and automatic Memory amendment — 2026-09-18
 
-The earlier M-004/M-005 audits record the design at that time. The owner's current requirement separates user-maintained words from automatically learned personal information and removes required Memory candidate confirmation. [M-009](../tasks/M-009-macos-input-memory.md) and [the cleanup contract](../input-cleanup.md) supersede those earlier product rules.
+The earlier M-004/M-005 audits record the design at that time. The owner's current requirement separates user-maintained words from automatically learned personal information and removes required Memory candidate confirmation. [M-009](../tasks/M-009-macos-input-memory.md) and [the cleanup contract](../features/REFINEMENT.md) supersede those earlier product rules.
 
 - **ADAPT:** existing prompt/data isolation, technical-content protection, provenance, save-error and duplicate-handling lessons; native Speech contextual strings supply bounded dictionary hints. Meaningful short replies and uncertainty remain content.
 - **DROP:** vocabulary stored as personal Memory, a required daily-input review inbox, narrow punctuation-only cleanup, provider-specific hotwords and any old-schema compatibility layer. Personal Memory analyzes committed final text in durable idle batches.

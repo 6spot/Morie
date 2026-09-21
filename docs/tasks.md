@@ -1,8 +1,12 @@
-# Morie Task Overview
+# Morie Tasks
 
-`docs/tasks.md` is the **master task plan and progress index** for Morie.
+This file is an index of current and historical Morie development tasks.
 
-It intentionally stays concise. Detailed background, scope, acceptance criteria, implementation notes, validation evidence, blockers, and follow-up items live in one file per task under [`docs/tasks/`](./tasks/README.md).
+Task records document implementation history, investigation and validation evidence. They are not the current product, architecture or development specification.
+
+If a task record conflicts with the current documentation in `docs/`, the current documentation takes precedence.
+
+Detailed task records live under [`docs/tasks/`](./tasks/README.md).
 
 ## Status
 
@@ -56,26 +60,3 @@ It intentionally stays concise. Detailed background, scope, acceptance criteria,
 | M-043 | Control Center | Rebuild routed page families with SwiftUI best-practice containers and full workspaces | IN PROGRESS | [#99](https://github.com/6spot/Morie/issues/99) | [`M-043`](./tasks/M-043-control-center-page-families.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |
-
-## Current milestone
-
-The owner's amended priority is **one Mac's input → dictionary/cleanup → useful personal Memory loop**, tracked in M-009. M-036 replaces the fragmented fact-list writer with semantic topics plus independent evidence, a bounded long-term/working-context lifecycle, and an explicit Personal Memory switch. M-002/M-003 preserve input and recovery; M-004/M-005 now supply personal Memory and independent cleanup; M-008 supplies native management; M-010 supplies Chinese/native setup usability, M-011 simplifies dictionary entry to a single word, M-014 replaces original-app restoration with current-keyboard-focus delivery, M-015 moves the Speech layer to Apple's punctuated dictation preset, and M-016 tightens personal-Memory context so cleanup sees only a few directly relevant items. Required real-device checks remain open. iCloud/CloudKit is outside this milestone, and iOS/inspiration follow-up are not scheduled. The historical phase numbers below are reference IDs, not the execution order.
-
-### Implementation and remaining acceptance
-
-M-009 connects custom dictionary/Speech hints, independent cleanup, automatic personal-Memory learning and opt-in correction suggestions. It replaces the old mandatory-review design directly. M-002/M-003 continue to own reliable capture, delivery and recovery; ambient-noise classification and device interactions remain open.
-
-Current management follows the native M-008 structure with separate History, Dictionary and Personal Memory sections. M-010 adds Simplified Chinese, a system menu, shared Command-comma Settings, native sidebar controls and explicit permission setup. M-011 removes dictionary alias configuration and keeps one word per entry. Its task record holds the latest dictionary build/test/layout evidence; earlier counts remain historical evidence for their respective implementations.
-
-M-010 also fixes the owner-observed Speech authorization callback crash and simplifies the setup window's title, permission state and footer actions. Signed-app permission and interaction retesting remains open; regression/build/layout evidence is in its task record.
-
-M-025 additionally treats finish-to-paste latency as a first-class input metric: after the initial recovery shell, History persistence must not gate normal current-app delivery. The owner deferred interactive validation until the evening of 2026-09-18. Actual model fidelity/latency, correction prompts across supported fields, keyboard/VoiceOver, microphone/recovery and the delivery matrix must be tested before completion. The current execution order is input routing → native dictation punctuation → Dictionary/Cleanup/Memory quality → Expression Profile → optional iCloud/CloudKit sync/backup. M-018 starts the Expression Profile stage with bounded local style learning. M-019 follows with explicit opt-in iCloud/CloudKit sync and backup; no local automatic-backup subsystem is planned, and development schema changes may discard old local development data.
-
-## Maintenance rules
-
-1. Every formal task gets a stable task ID (`M-xxx`), a row in this file, and a corresponding `docs/tasks/M-xxx-*.md` detail document.
-2. `docs/tasks.md` stores only task-level scope and overall progress; detailed execution history belongs in the task document.
-3. Update the task detail document in the same PR as meaningful implementation progress.
-4. If task-level status changes, update the master row in the same PR.
-5. A GitHub Issue/PR does not replace repository task documentation; link them together.
-6. Do not mark hardware/runtime-dependent work `DONE` until the required validation has actually been performed.
