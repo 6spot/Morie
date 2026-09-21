@@ -143,7 +143,6 @@ private final class ControlCenterSession {
     var selection: ControlCenterSection? = .overview
     var selectedCaptureID: UUID?
     var selectedDictionaryEntry: UUID?
-    var overviewMetricsSnapshot: OverviewMetricsSnapshot?
     var columnVisibility: NavigationSplitViewVisibility = .all
 
     var currentSection: ControlCenterSection {
@@ -258,8 +257,16 @@ private struct ControlCenterDetailHost<
             )
             .navigationTitle(section.title)
             .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    toolbarContent
+                ToolbarItem(placement: .primaryAction) {
+                    HStack(spacing: 8) {
+                        // Keep one AppKit toolbar item alive for every route.
+                        // Route changes only replace this item's inner content.
+                        Color.clear
+                            .frame(width: 1, height: 1)
+                            .accessibilityHidden(true)
+
+                        toolbarContent
+                    }
                 }
             }
     }
@@ -269,6 +276,8 @@ private struct ControlCenterDetailHost<
 private struct ControlCenterRouteHost: View {
     let controller: AppController
     @Bindable var session: ControlCenterSession
+
+    @State private var overviewState = OverviewPageState()
 
     @State private var dictionarySearch = ""
     @State private var dictionaryShowingEditor = false
@@ -343,7 +352,7 @@ private struct ControlCenterRouteHost: View {
         case .overview:
             OverviewView(
                 controller: controller,
-                metricsSnapshot: $session.overviewMetricsSnapshot
+                state: overviewState
             )
 
         case .history:
@@ -401,6 +410,11 @@ private struct ControlCenterRouteHost: View {
             EmptyView()
 
         case .history:
+            toolbarSearchField(
+                "搜索历史记录",
+                text: $historySearch
+            )
+
             Picker("筛选记录", selection: $historyFilter) {
                 ForEach(CaptureHistoryFilter.allCases) { item in
                     Text(item.title).tag(item)
@@ -416,6 +430,11 @@ private struct ControlCenterRouteHost: View {
             .disabled(!controller.canStartCapture)
 
         case .dictionary:
+            toolbarSearchField(
+                "搜索词语",
+                text: $dictionarySearch
+            )
+
             Button("编辑词语", systemImage: "pencil") {
                 guard let id = selectedDictionaryUserEntryID else {
                     return
@@ -440,6 +459,12 @@ private struct ControlCenterRouteHost: View {
             }
 
         case .memory:
+            toolbarSearchField(
+                "搜索个人记忆",
+                text: $memorySearch,
+                width: 240
+            )
+
             Button("告诉 Morie 一件事", systemImage: "plus") {
                 memoryEditor = .create
             }
@@ -460,8 +485,14 @@ private struct ControlCenterRouteHost: View {
                     await controller.setup.refresh()
                 }
             }
+            .disabled(permissionRefreshDisabled)
 
         case .diagnostics:
+            toolbarSearchField(
+                "搜索诊断日志",
+                text: $diagnosticSearch
+            )
+
             Picker("筛选日志", selection: $diagnosticLevel) {
                 Text("全部日志")
                     .tag(nil as DiagnosticLevel?)
@@ -511,6 +542,22 @@ private struct ControlCenterRouteHost: View {
                 }
             }
         }
+    }
+
+    private func toolbarSearchField(
+        _ prompt: String,
+        text: Binding<String>,
+        width: CGFloat = 220
+    ) -> some View {
+        TextField(prompt, text: text)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: width)
+    }
+
+    private var permissionRefreshDisabled: Bool {
+        controller.setup.isRefreshing
+            || controller.setup.activeRequest != nil
+            || controller.capabilities.isBootstrapping
     }
 
     private var selectedDictionaryUserEntryID: UUID? {
