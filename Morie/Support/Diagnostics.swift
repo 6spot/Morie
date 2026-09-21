@@ -269,9 +269,9 @@ struct AppBuildIdentity: Equatable {
 
 /// Verbose local diagnostics for development builds.
 ///
-/// The runtime debug-assert configuration follows the actual optimization mode
-/// and avoids requiring a project-level DEBUG define. Release builds therefore
-/// keep only the existing privacy-preserving summary logs.
+/// A build stamped as Debug is a development build even when a local build
+/// setting changes Swift optimization. Release builds keep only the existing
+/// privacy-preserving summary logs.
 ///
 /// Development diagnostics may contain user-authored text and current-app text.
 /// They must never contain credentials, API keys, authorization headers, or
@@ -279,6 +279,8 @@ struct AppBuildIdentity: Equatable {
 enum DevelopmentDiagnostics {
     static var isEnabled: Bool {
         _isDebugAssertConfiguration()
+            || AppBuildIdentity.current.configuration
+                .caseInsensitiveCompare("Debug") == .orderedSame
     }
 
     static func record(
