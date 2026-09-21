@@ -288,26 +288,6 @@ actor SpeechPipeline {
         do {
             if let error = completion.error { throw error }
 
-            if !hasTranscriptEvidence, completion.sourceAudio.hasMeaningfulAudio == false {
-                Diagnostics.record(
-                    "SpeechQuality",
-                    "No speech evidence for \(session); skipping analyzer finalization and accurate retry"
-                )
-                analysisTask.cancel()
-                resultTask?.cancel()
-                await analyzer.cancelAndFinishNow()
-                _ = await analysisTask.result
-                _ = await resultTask?.result
-
-                let result = snapshot(sourceAudio: completion.sourceAudio)
-                Diagnostics.record(
-                    "Speech",
-                    "Fast no-speech stop completed for \(session)"
-                )
-                reset(sessionID: sessionID)
-                return result
-            }
-
             let lastSampleTime = try await analysisTask.value
             try requireActiveSession(sessionID)
 
@@ -398,8 +378,7 @@ actor SpeechPipeline {
         switch backend {
         case .speechTranscriber(let locale):
             let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
-            let detector = SpeechDetector()
-            let modules: [any SpeechModule] = [detector, transcriber]
+            let modules: [any SpeechModule] = [transcriber]
             let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
             try requireActiveSession(sessionID)
 
@@ -444,8 +423,7 @@ actor SpeechPipeline {
 
         case .dictationTranscriber(let locale):
             let transcriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
-            let detector = SpeechDetector()
-            let modules: [any SpeechModule] = [detector, transcriber]
+            let modules: [any SpeechModule] = [transcriber]
             let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
             try requireActiveSession(sessionID)
 
@@ -565,8 +543,7 @@ actor SpeechPipeline {
         case .speechTranscriber(let locale):
             let liveTranscriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
             let finalTranscriber = SpeechTranscriber(locale: locale, preset: .transcription)
-            let detector = SpeechDetector()
-            let modules: [any SpeechModule] = [detector, liveTranscriber, finalTranscriber]
+            let modules: [any SpeechModule] = [liveTranscriber, finalTranscriber]
             if let installation = try await AssetInventory.assetInstallationRequest(
                 supporting: modules
             ) {
@@ -580,8 +557,7 @@ actor SpeechPipeline {
         case .dictationTranscriber(let locale):
             let liveTranscriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
             let finalTranscriber = DictationTranscriber(locale: locale, preset: .longDictation)
-            let detector = SpeechDetector()
-            let modules: [any SpeechModule] = [detector, liveTranscriber, finalTranscriber]
+            let modules: [any SpeechModule] = [liveTranscriber, finalTranscriber]
             if let installation = try await AssetInventory.assetInstallationRequest(
                 supporting: modules
             ) {
