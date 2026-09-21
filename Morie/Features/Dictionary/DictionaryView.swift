@@ -3,11 +3,11 @@ import SwiftUI
 struct DictionaryView: View {
     @ObservedObject var store: DictionaryStore
     @Binding var selection: UUID?
+    @Binding var search: String
+    @Binding var showingEditor: Bool
+    @Binding var editingEntryID: UUID?
+    @Binding var confirmsDeletion: Bool
 
-    @State private var search = ""
-    @State private var showingEditor = false
-    @State private var editingEntryID: UUID?
-    @State private var confirmsDeletion = false
     @State private var errorMessage: String?
 
     private let columns = [
@@ -58,26 +58,6 @@ struct DictionaryView: View {
 
                     Text("\(visibleCount) 个词语")
                         .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 12)
-
-                    Button("编辑", systemImage: "pencil") {
-                        if let selectedUserEntryID {
-                            edit(selectedUserEntryID)
-                        }
-                    }
-                    .disabled(selectedUserEntryID == nil)
-
-                    Button(
-                        "删除",
-                        systemImage: "trash",
-                        role: .destructive
-                    ) {
-                        confirmsDeletion = true
-                    }
-                    .disabled(selectedUserEntryID == nil)
-
-                    Button("添加", systemImage: "plus", action: add)
                 }
 
                 if let errorMessage {
