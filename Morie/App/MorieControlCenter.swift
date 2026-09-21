@@ -1,3 +1,4 @@
+import AppKit
 import Observation
 import SwiftUI
 
@@ -230,9 +231,23 @@ private struct ControlCenterSidebar: View {
     }
 }
 
-private struct ControlCenterDetailHost<Content: View>: View {
+private struct ControlCenterDetailHost<
+    Content: View,
+    ToolbarContent: View
+>: View {
     let section: ControlCenterSection
     @ViewBuilder let content: Content
+    @ViewBuilder let toolbarContent: ToolbarContent
+
+    init(
+        section: ControlCenterSection,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder toolbar: () -> ToolbarContent
+    ) {
+        self.section = section
+        self.content = content()
+        toolbarContent = toolbar()
+    }
 
     var body: some View {
         content
@@ -242,6 +257,11 @@ private struct ControlCenterDetailHost<Content: View>: View {
                 alignment: .topLeading
             )
             .navigationTitle(section.title)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    toolbarContent
+                }
+            }
     }
 }
 
@@ -250,9 +270,70 @@ private struct ControlCenterRouteHost: View {
     let controller: AppController
     @Bindable var session: ControlCenterSession
 
+    @State private var dictionarySearch = ""
+    @State private var dictionaryShowingEditor = false
+    @State private var dictionaryEditingEntryID: UUID?
+    @State private var dictionaryConfirmsDeletion = false
+
+    @State private var memorySearch = ""
+    @State private var memoryEditor: MemoryEditorMode?
+
+    @State private var historySearch = ""
+    @State private var historyFilter: CaptureHistoryFilter = .all
+
+    @State private var diagnosticSearch = ""
+    @State private var diagnosticLevel: DiagnosticLevel?
+    @State private var diagnosticConfirmsClear = false
+
+    @State private var confirmsFactoryReset = false
+    @State private var factoryResetInProgress = false
+    @State private var factoryResetError: String?
+
     var body: some View {
         ControlCenterDetailHost(section: session.currentSection) {
             routedPage
+        } toolbar: {
+            toolbarContent
+        }
+        .confirmationDialog(
+            "恢复出厂设置？",
+            isPresented: $confirmsFactoryReset,
+            titleVisibility: .visible
+        ) {
+            Button("恢复出厂设置", role: .destructive) {
+                factoryResetInProgress = true
+                Task {
+                    do {
+                        try await controller.factoryReset()
+                    } catch {
+                        factoryResetInProgress = false
+                        factoryResetError = error.localizedDescription
+                    }
+                }
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(
+                "将永久删除历史记录、原始录音、字典、个人记忆、学习数据、诊断日志和外部 API 配置，并把所有 Morie 设置恢复默认。Morie 随后会退出。macOS 已授予的系统权限不会被撤销。"
+            )
+        }
+        .alert(
+            "恢复出厂设置失败",
+            isPresented: Binding(
+                get: { factoryResetError != nil },
+                set: {
+                    if !$0 {
+                        factoryResetError = nil
+                    }
+                }
+            )
+        ) {
+            Button("好", role: .cancel) {
+                factoryResetError = nil
+            }
+        } message: {
+            Text(factoryResetError ?? "")
         }
     }
 
@@ -268,14 +349,20 @@ private struct ControlCenterRouteHost: View {
         case .history:
             CaptureHistoryWorkspace(
                 controller: controller,
-                selection: $session.selectedCaptureID
+                selection: $session.selectedCaptureID,
+                search: $historySearch,
+                filter: $historyFilter
             )
 
         case .dictionary:
             if let dictionary = controller.dictionary {
                 DictionaryView(
                     store: dictionary,
-                    selection: $session.selectedDictionaryEntry
+                    selection: $session.selectedDictionaryEntry,
+                    search: $dictionarySearch,
+                    showingEditor: $dictionaryShowingEditor,
+                    editingEntryID: $dictionaryEditingEntryID,
+                    confirmsDeletion: $dictionaryConfirmsDeletion
                 )
             } else {
                 unavailable("字典不可用")
@@ -283,7 +370,11 @@ private struct ControlCenterRouteHost: View {
 
         case .memory:
             if let memory = controller.memory {
-                MemoryView(store: memory)
+                MemoryView(
+                    store: memory,
+                    search: $memorySearch,
+                    editor: $memoryEditor
+                )
             } else {
                 unavailable("个人记忆不可用")
             }
@@ -295,8 +386,168 @@ private struct ControlCenterRouteHost: View {
             PermissionManagementView(controller: controller)
 
         case .diagnostics:
-            DiagnosticLogView()
+            DiagnosticLogView(
+                search: $diagnosticSearch,
+                level: $diagnosticLevel,
+                confirmsClear: $diagnosticConfirmsClear
+            )
         }
+    }
+
+    @ViewBuilder
+    private var toolbarContent: some View {
+        switch session.currentSection {
+        case .overview:
+            EmptyView()
+
+        case .history:
+            Picker("筛选记录", selection: $historyFilter) {
+                ForEach(CaptureHistoryFilter.allCases) { item in
+                    Text(item.title).tag(item)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Button(
+                "开始录音",
+                systemImage: "mic",
+                action: controller.startCaptureOnly
+            )
+            .disabled(!controller.canStartCapture)
+
+        case .dictionary:
+            Button("编辑词语", systemImage: "pencil") {
+                guard let id = selectedDictionaryUserEntryID else {
+                    return
+                }
+                dictionaryEditingEntryID = id
+                dictionaryShowingEditor = true
+            }
+            .disabled(selectedDictionaryUserEntryID == nil)
+
+            Button(
+                "删除词语…",
+                systemImage: "trash",
+                role: .destructive
+            ) {
+                dictionaryConfirmsDeletion = true
+            }
+            .disabled(selectedDictionaryUserEntryID == nil)
+
+            Button("添加词语", systemImage: "plus") {
+                dictionaryEditingEntryID = nil
+                dictionaryShowingEditor = true
+            }
+
+        case .memory:
+            Button("告诉 Morie 一件事", systemImage: "plus") {
+                memoryEditor = .create
+            }
+
+        case .settings:
+            Button(
+                "恢复出厂设置…",
+                systemImage: "arrow.counterclockwise",
+                role: .destructive
+            ) {
+                confirmsFactoryReset = true
+            }
+            .disabled(factoryResetInProgress || controller.isCaptureActive)
+
+        case .permissions:
+            Button("重新检查", systemImage: "arrow.clockwise") {
+                Task {
+                    await controller.setup.refresh()
+                }
+            }
+
+        case .diagnostics:
+            Picker("筛选日志", selection: $diagnosticLevel) {
+                Text("全部日志")
+                    .tag(nil as DiagnosticLevel?)
+
+                ForEach(
+                    [
+                        DiagnosticLevel.info,
+                        .warning,
+                        .error,
+                    ],
+                    id: \.self
+                ) {
+                    Text($0.title).tag(Optional($0))
+                }
+            }
+            .pickerStyle(.menu)
+
+            Button(
+                "复制当前筛选",
+                systemImage: "line.3.horizontal.decrease.circle"
+            ) {
+                copyDiagnostics(filteredDiagnosticEntries)
+            }
+
+            Button("复制全部日志", systemImage: "doc.on.doc") {
+                copyDiagnostics(DiagnosticLogStore.shared.entries)
+            }
+
+            Menu("诊断操作", systemImage: "ellipsis") {
+                Button(
+                    "在访达中显示日志文件",
+                    systemImage: "doc.text.magnifyingglass"
+                ) {
+                    NSWorkspace.shared.activateFileViewerSelecting(
+                        [DiagnosticLogStore.shared.logFileURL]
+                    )
+                }
+
+                Divider()
+
+                Button(
+                    "清空诊断日志…",
+                    systemImage: "trash",
+                    role: .destructive
+                ) {
+                    diagnosticConfirmsClear = true
+                }
+            }
+        }
+    }
+
+    private var selectedDictionaryUserEntryID: UUID? {
+        guard let dictionary = controller.dictionary,
+              let selectedID = session.selectedDictionaryEntry,
+              dictionary.displayEntries.first(
+                  where: { $0.id == selectedID }
+              )?.isEditable == true
+        else {
+            return nil
+        }
+        return selectedID
+    }
+
+    private var filteredDiagnosticEntries: [DiagnosticLogStore.Entry] {
+        let query = diagnosticSearch
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return DiagnosticLogStore.shared.entries.filter { entry in
+            (diagnosticLevel == nil || entry.level == diagnosticLevel)
+                && (
+                    query.isEmpty
+                        || entry.category.localizedStandardContains(query)
+                        || entry.message.localizedStandardContains(query)
+                )
+        }
+    }
+
+    private func copyDiagnostics(
+        _ entries: [DiagnosticLogStore.Entry]
+    ) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(
+            DiagnosticLogStore.shared.text(for: entries),
+            forType: .string
+        )
     }
 
     private func unavailable(_ title: String) -> some View {
