@@ -229,7 +229,7 @@ private struct ControlCenterSidebar: View {
                 sidebarItem(.memory)
             }
 
-            Section("应用") {
+            Section("系统") {
                 sidebarItem(.settings)
                 sidebarItem(.permissions)
                 sidebarItem(.diagnostics)
