@@ -259,14 +259,17 @@ private struct ControlCenterDetailHost<
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 8) {
-                        // Keep one AppKit toolbar item alive for every route.
-                        // Route changes only replace this item's inner content.
+                        // Keep one AppKit toolbar item and one stable geometry
+                        // for every top-level route. Route changes only replace
+                        // controls inside this reserved slot.
                         Color.clear
                             .frame(width: 1, height: 1)
                             .accessibilityHidden(true)
 
+                        Spacer(minLength: 0)
                         toolbarContent
                     }
+                    .frame(width: 480, alignment: .trailing)
                 }
             }
     }
