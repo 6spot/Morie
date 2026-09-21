@@ -1,8 +1,8 @@
 # M-042 — Ephemeral Application Context
 
-Status: **COMPLETED** — 2026-09-21
+Status: **DONE** — 2026-09-21
 
-GitHub: [#97](https://github.com/6spot/Morie/issues/97)
+GitHub: [#97](https://github.com/6spot/Morie/issues/97) / [PR #98](https://github.com/6spot/Morie/pull/98)
 
 ## Why
 
@@ -125,6 +125,8 @@ This avoids rebuilding a weaker multilingual NLP engine in `CaptureRefinement` w
 ## Validation result
 
 Owner-device validation completed on 2026-09-21.
+
+The temporary M-042 unified test protocol was consolidated into this task record after completion and removed from the top-level `docs/` directory.
 
 - TextEdit returned the exact focused document window and extracted `Zevranta` / `Norvella` without menu/UI noise.
 - WeChat with an empty focused input returned no cursor context, confirming the collector fails closed instead of traversing surrounding UI.
