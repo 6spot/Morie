@@ -80,6 +80,12 @@ final class CapturePersonalizer {
         DevelopmentDiagnostics.list(
             "RefinementInput",
             captureID: captureID,
+            label: "applicationSpellingCandidatesRuntimeOnly",
+            configuration.applicationSpellingCandidates
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
             label: "confirmedCorrections",
             input.confirmedCorrections.map { "\($0.original) → \($0.replacement)" }
         )
@@ -109,7 +115,7 @@ final class CapturePersonalizer {
 
         Diagnostics.record(
             "RefinementContext",
-            "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); memoryMatches=\(input.context.count); dictionaryCandidates=\(input.dictionary.count); confirmedCorrections=\(input.confirmedCorrections.count); expressionDirectives=\(input.expressionStyle.count); applicationContextIncluded=false; memoryNotesIncluded=false"
+            "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); memoryMatches=\(input.context.count); dictionaryCandidates=\(input.dictionary.count); confirmedCorrections=\(input.confirmedCorrections.count); expressionDirectives=\(input.expressionStyle.count); applicationSpellingCandidates=\(configuration.applicationSpellingCandidates.count); applicationRawContextIncluded=false; memoryNotesIncluded=false"
         )
 
         do {
@@ -176,7 +182,12 @@ final class CapturePersonalizer {
                 }
                 let result: ValidatedRefinement
                 do {
-                    result = try ValidatedRefinement.accepting(text, for: input)
+                    result = try ValidatedRefinement.accepting(
+                        text,
+                        for: input,
+                        applicationSpellingCandidates:
+                            configuration.applicationSpellingCandidates
+                    )
                     DevelopmentDiagnostics.text(
                         "RefinementOutput",
                         captureID: captureID,
