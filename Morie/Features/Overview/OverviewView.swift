@@ -92,7 +92,7 @@ struct OverviewView: View {
     }
 
     var body: some View {
-        ControlCenterScrollableContent(maxWidth: 820) {
+        ControlCenterScrollableContent {
             VStack(alignment: .leading, spacing: 28) {
                 buildSection
                 Divider()
@@ -103,8 +103,6 @@ struct OverviewView: View {
                 modelSection
             }
         }
-        .navigationTitle("总览")
-        .navigationSubtitle("本地使用情况与当前运行状态")
         .task {
             await refreshMetricsIfNeeded()
         }
