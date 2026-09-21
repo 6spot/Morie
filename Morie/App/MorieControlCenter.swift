@@ -25,6 +25,19 @@ struct ControlCenterScrollableContent<Content: View>: View {
     }
 }
 
+struct ControlCenterPage<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ControlCenterScrollableContent {
+            VStack(alignment: .leading, spacing: 28) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+}
+
 struct ControlCenterReadingContent<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -46,23 +59,34 @@ struct ControlCenterReadingContent<Content: View>: View {
 
 struct ControlCenterSectionBlock<Content: View, Footer: View>: View {
     let title: String
+    let subtitle: String?
     @ViewBuilder let content: Content
     @ViewBuilder let footer: Footer
 
     init(
         _ title: String,
+        subtitle: String? = nil,
         @ViewBuilder content: () -> Content,
         @ViewBuilder footer: () -> Footer
     ) {
         self.title = title
+        self.subtitle = subtitle
         self.content = content()
         self.footer = footer()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             VStack(alignment: .leading, spacing: 12) {
                 content
@@ -80,9 +104,10 @@ struct ControlCenterSectionBlock<Content: View, Footer: View>: View {
 extension ControlCenterSectionBlock where Footer == EmptyView {
     init(
         _ title: String,
+        subtitle: String? = nil,
         @ViewBuilder content: () -> Content
     ) {
-        self.init(title, content: content) {
+        self.init(title, subtitle: subtitle, content: content) {
             EmptyView()
         }
     }
@@ -596,6 +621,12 @@ private struct ControlCenterRouteHost: View {
             .accessibilityHidden(true)
     }
 
+
+    private var permissionRefreshDisabled: Bool {
+        controller.setup.isRefreshing
+            || controller.setup.activeRequest != nil
+            || controller.capabilities.isBootstrapping
+    }
 
     private var selectedDictionaryUserEntryID: UUID? {
         guard let dictionary = controller.dictionary,
