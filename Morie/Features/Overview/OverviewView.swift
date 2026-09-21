@@ -92,16 +92,17 @@ struct OverviewView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            buildSection
-            Divider()
-            applicationContextSection
-            Divider()
-            usageSection
-            Divider()
-            modelSection
+        ControlCenterScrollableContent(maxWidth: 820) {
+            VStack(alignment: .leading, spacing: 28) {
+                buildSection
+                Divider()
+                applicationContextSection
+                Divider()
+                usageSection
+                Divider()
+                modelSection
+            }
         }
-        .frame(maxWidth: 820, alignment: .topLeading)
         .navigationTitle("总览")
         .navigationSubtitle("本地使用情况与当前运行状态")
         .task {
