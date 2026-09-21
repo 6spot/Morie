@@ -30,6 +30,7 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         autoreleaseFrequency: .workItem
     )
     private let stream: CaptureAudioStream
+    private let captureID: UUID?
     private var notificationObservers: [NSObjectProtocol] = []
     private var stopped = false
 
@@ -37,10 +38,13 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
         device: AVCaptureDevice,
         converter: AnalyzerInputConverter,
         destinationURL: URL,
+        captureID: UUID? = nil,
         onAudioLevel: @escaping @Sendable (Double) -> Void
     ) throws {
+        self.captureID = captureID
         stream = try CaptureAudioStream(
             destinationURL: destinationURL,
+            captureID: captureID,
             convert: { try converter.convert($0, at: nil) },
             flush: { try converter.flush() },
             onAudioLevel: onAudioLevel
@@ -80,15 +84,36 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
     }
 
     func start() {
+        DevelopmentDiagnostics.record(
+            "AudioSource",
+            captureID: captureID,
+            "startRunning"
+        )
         session.startRunning()
+        DevelopmentDiagnostics.record(
+            "AudioSource",
+            captureID: captureID,
+            "started; sessionRunning=\(session.isRunning)"
+        )
     }
 
     func finish() -> CaptureAudioStream.Completion {
+        DevelopmentDiagnostics.record(
+            "AudioSource",
+            captureID: captureID,
+            "finishRequested"
+        )
         stopCaptureSession()
         return outputQueue.sync { stream.finish() }
     }
 
     func stopImmediately() -> CapturedSourceAudio {
+        DevelopmentDiagnostics.record(
+            "AudioSource",
+            captureID: captureID,
+            level: .warning,
+            "stopImmediately"
+        )
         stopCaptureSession()
         return outputQueue.sync { stream.stopImmediately() }
     }
@@ -126,6 +151,12 @@ final class CaptureAudioSource: NSObject, AVCaptureAudioDataOutputSampleBufferDe
     }
 
     private func reportFailure(_ error: Error) {
+        DevelopmentDiagnostics.record(
+            "AudioSource",
+            captureID: captureID,
+            level: .error,
+            "runtimeFailure; errorType=\(DevelopmentDiagnostics.errorType(error))"
+        )
         outputQueue.async { [weak self] in self?.stream.fail(error) }
     }
 
