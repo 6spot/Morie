@@ -222,8 +222,8 @@ struct PermissionManagementView: View {
     }
 
     var body: some View {
-        ControlCenterFormContent {
-            Group {
+        ControlCenterScrollableContent {
+            VStack(alignment: .leading, spacing: 24) {
             if setup.checks.isEmpty {
                 Section {
                     ProgressView("正在检查设备和权限…")
@@ -289,10 +289,6 @@ struct PermissionManagementView: View {
                 }
             }
         }
-        .navigationTitle("权限")
-        .navigationSubtitle(
-            setup.isReady ? "设备与权限已就绪" : "检查 Morie 所需的系统能力"
-        )
         .task {
             if setup.checks.isEmpty {
                 await setup.refresh()
