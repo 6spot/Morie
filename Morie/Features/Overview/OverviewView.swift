@@ -74,6 +74,7 @@ struct OverviewView: View {
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var preferences: AppPreferencesController
     @ObservedObject private var refinementModels: RefinementModelController
+    @ObservedObject private var setup: PermissionSetupController
     @ObservedObject private var applicationContextInspector: ApplicationContextInspectionStore
 
     private let buildIdentity = AppBuildIdentity.current
@@ -93,6 +94,7 @@ struct OverviewView: View {
         _refinementModels = ObservedObject(
             wrappedValue: controller.refinementModels
         )
+        _setup = ObservedObject(wrappedValue: controller.setup)
         _applicationContextInspector = ObservedObject(
             wrappedValue: controller.applicationContextInspector
         )
@@ -100,15 +102,16 @@ struct OverviewView: View {
     }
 
     var body: some View {
-        ControlCenterScrollableContent {
-            VStack(alignment: .leading, spacing: 28) {
-                buildSection
+        ControlCenterPage {
+            statusSection
+
+            Divider()
+
+            usageSection
+
+            if DevelopmentDiagnostics.isEnabled {
                 Divider()
-                applicationContextSection
-                Divider()
-                usageSection
-                Divider()
-                modelSection
+                developmentSection
             }
         }
         .task {
@@ -116,145 +119,117 @@ struct OverviewView: View {
         }
     }
 
-    private var buildSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("运行版本")
-                .font(.headline)
+    private var statusSection: some View {
+        ControlCenterSectionBlock(
+            "当前状态",
+            subtitle: "这里显示 Morie 当前真正使用的能力和模型，而不是配置中预期使用的值。"
+        ) {
+            LabeledContent("设备与权限") {
+                Text(setup.isReady ? "已就绪" : "需要处理")
+                    .foregroundStyle(setup.isReady ? .secondary : .primary)
+            }
 
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                Text("Morie \(buildIdentity.version)")
-                    .font(.title3)
-                    .bold()
-
-                Text("Build \(buildIdentity.build)")
-                    .foregroundStyle(.secondary)
-
-                Text(buildIdentity.commitDisplay)
-                    .font(.system(.body, design: .monospaced))
-                    .textSelection(.enabled)
-
-                Spacer(minLength: 16)
-
-                if let branch = buildIdentity.branch {
-                    Text(branch)
+            LabeledContent("语音识别") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(
+                        capabilities.speechBackend?.displayName
+                            ?? "正在准备…"
+                    )
+                    Text("\(speechDetail) · \(speechStatus)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
 
-                Text(buildIdentity.configuration)
-                    .font(.caption)
-                    .foregroundStyle(
-                        DevelopmentDiagnostics.isEnabled
-                            ? .orange
-                            : .secondary
+            LabeledContent("输入润色") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(refinementModels.modelName)
+                    Text(
+                        refinementModels.modelStatusTitle(
+                            inputRefinementEnabled:
+                                preferences.inputRefinementEnabled
+                        )
                     )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var developmentSection: some View {
+        ControlCenterSectionBlock(
+            "开发信息",
+            subtitle: "仅开发构建显示。用于确认当前构建与最近一次 Application Context。"
+        ) {
+            LabeledContent(
+                "版本",
+                value: "Morie \(buildIdentity.version) (\(buildIdentity.build))"
+            )
+
+            LabeledContent("Commit") {
+                Text(buildIdentity.commitDisplay)
+                    .font(.body.monospaced())
+                    .textSelection(.enabled)
+            }
+
+            if let branch = buildIdentity.branch {
+                LabeledContent("Branch", value: branch)
+            }
+
+            LabeledContent(
+                "构建配置",
+                value: buildIdentity.configuration
+            )
+
+            if let snapshot = applicationContextInspector.latest {
+                Divider()
+
+                LabeledContent(
+                    "最近应用",
+                    value: snapshot.application.name ?? "未知应用"
+                )
+
+                LabeledContent(
+                    "上下文字符",
+                    value:
+                        "selected \(snapshot.selectedCharacterCount) · cursor \(snapshot.cursorCharacterCount)"
+                )
+
+                LabeledContent(
+                    "Speech hints",
+                    value:
+                        "Dictionary \(snapshot.dictionaryHintCount) + Application \(snapshot.hints.count) → \(snapshot.contextualHintCount)"
+                )
+
+                if let selected = snapshot.selectedPreview,
+                   !selected.isEmpty {
+                    contextPreviewRow(
+                        title: "selected",
+                        text: selected
+                    )
+                }
+
+                if let cursor = snapshot.cursorPreview,
+                   !cursor.isEmpty {
+                    contextPreviewRow(
+                        title: "cursor",
+                        text: cursor
+                    )
+                }
+            } else {
+                Text("完成一次语音输入后，这里会显示最近一次 Application Context 摘要。")
+                    .foregroundStyle(.secondary)
             }
 
             Text(
-                DevelopmentDiagnostics.isEnabled
-                    ? "Git Commit 会在每次构建时写入 App；带 * 表示构建时工作区存在未提交改动。当前为开发构建，诊断日志可能包含语音正文、页面上下文和模型输入输出，请勿把日志公开上传。"
-                    : "Git Commit 会在每次构建时写入 App；带 * 表示构建时工作区存在未提交改动。"
+                "开发诊断可能包含语音正文、页面上下文和模型输入输出，请勿公开上传。"
             )
             .font(.callout)
             .foregroundStyle(.secondary)
         }
     }
 
-    @ViewBuilder
-    private var applicationContextSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Application Context 调试")
-                .font(.headline)
-
-            if let snapshot = applicationContextInspector.latest {
-                HStack(spacing: 16) {
-                    Text(snapshot.application.name ?? "未知应用")
-                        .bold()
-                    Text(snapshot.captureLabel)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Text(
-                        snapshot.capturedAt.formatted(
-                            .dateTime
-                                .locale(Locale(identifier: "zh-Hans"))
-                                .hour()
-                                .minute()
-                                .second()
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    Spacer(minLength: 16)
-                }
-
-                Grid(
-                    alignment: .leading,
-                    horizontalSpacing: 24,
-                    verticalSpacing: 8
-                ) {
-                    GridRow {
-                        Text("上下文字符")
-                            .foregroundStyle(.secondary)
-                        Text(
-                            "selected \(snapshot.selectedCharacterCount) · cursor \(snapshot.cursorCharacterCount)"
-                        )
-                        .monospacedDigit()
-                    }
-
-                    GridRow {
-                        Text("Speech hints")
-                            .foregroundStyle(.secondary)
-                        Text(
-                            "Dictionary \(snapshot.dictionaryHintCount) + Application \(snapshot.hints.count) → \(snapshot.contextualHintCount)"
-                        )
-                        .monospacedDigit()
-                    }
-
-                    ForEach(ApplicationContextHintSource.allCases, id: \.self) { source in
-                        let values = snapshot.hints
-                            .filter { $0.source == source }
-                            .map(\.value)
-
-                        if !values.isEmpty {
-                            GridRow {
-                                Text(source.title)
-                                    .foregroundStyle(.secondary)
-                                Text(values.joined(separator: " · "))
-                                    .font(.system(.body, design: .monospaced))
-                                    .textSelection(.enabled)
-                            }
-                        }
-                    }
-                }
-
-                Divider()
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("本次原始上下文预览")
-                        .font(.subheadline)
-                        .bold()
-
-                    contextPreviewRow(
-                        title: "selected",
-                        text: snapshot.selectedPreview
-                    )
-                    contextPreviewRow(
-                        title: "cursor",
-                        text: snapshot.cursorPreview
-                    )
-                }
-
-                Text("这里只显示最近一次 Capture 的临时词汇决策与原始上下文预览；不会写入历史、Capture 数据库或个人记忆。开发诊断开启时，原始上下文也会写入本机 Dev 诊断日志用于排查。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("完成一次语音输入后，这里会显示本次 Application Context、提取出的临时词，以及实际送给 Apple Speech 的 hints。")
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    @ViewBuilder
     private func contextPreviewRow(
         title: String,
         text: String?
@@ -262,13 +237,12 @@ struct OverviewView: View {
         HStack(alignment: .top, spacing: 12) {
             Text(title)
                 .frame(width: 64, alignment: .leading)
-                .font(.system(.caption, design: .monospaced))
+                .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
 
             Text(text ?? "—")
                 .font(.caption)
                 .textSelection(.enabled)
-                .foregroundStyle(text == nil ? .tertiary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -277,58 +251,36 @@ struct OverviewView: View {
         let metrics = state.metricsSnapshot?.metrics
         let isLoading = state.metricsSnapshot == nil && metricsError == nil
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Text("使用情况")
-                    .font(.headline)
-
+        return ControlCenterSectionBlock(
+            "使用情况",
+            subtitle: "这些统计只描述 Morie 的本地输入与处理情况。"
+        ) {
+            HStack(spacing: 24) {
+                metric(
+                    title: "累计识别字符",
+                    value: metrics?.recognizedCharacters.formatted() ?? "—"
+                )
+                metric(
+                    title: "已完成记录",
+                    value: metrics?.totalCaptures.formatted() ?? "—"
+                )
+                metric(
+                    title: "成功输入",
+                    value: metrics?.successfulInputs.formatted() ?? "—"
+                )
+                metric(
+                    title: "输入失败率",
+                    value: percent(metrics?.failureRate)
+                )
+                metric(
+                    title: "平均润色耗时",
+                    value: duration(metrics?.averageRefinementSeconds)
+                )
+            }
+            .overlay(alignment: .topTrailing) {
                 ProgressView()
                     .controlSize(.small)
                     .opacity(isLoading ? 1 : 0)
-                    .frame(width: 16, height: 16)
-            }
-
-            Grid(
-                alignment: .leading,
-                horizontalSpacing: 40,
-                verticalSpacing: 16
-            ) {
-                GridRow {
-                    metric(
-                        title: "累计识别字符",
-                        value:
-                            metrics?.recognizedCharacters.formatted()
-                            ?? "—"
-                    )
-                    metric(
-                        title: "已完成记录",
-                        value:
-                            metrics?.totalCaptures.formatted()
-                            ?? "—"
-                    )
-                }
-
-                GridRow {
-                    metric(
-                        title: "成功输入",
-                        value:
-                            metrics?.successfulInputs.formatted()
-                            ?? "—"
-                    )
-                    metric(
-                        title: "输入失败率",
-                        value: percent(metrics?.failureRate)
-                    )
-                }
-
-                GridRow {
-                    metric(
-                        title: "平均润色耗时",
-                        value: duration(
-                            metrics?.averageRefinementSeconds
-                        )
-                    )
-                }
             }
 
             if let metricsError {
@@ -347,41 +299,6 @@ struct OverviewView: View {
         }
     }
 
-    private var modelSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("当前模型")
-                .font(.headline)
-
-            modelRow(
-                title: "语音识别",
-                name:
-                    capabilities.speechBackend?.displayName
-                    ?? "正在准备…",
-                detail: speechDetail,
-                status: speechStatus
-            )
-
-            Divider()
-
-            modelRow(
-                title: "输入润色",
-                name: refinementModels.modelName,
-                detail: refinementModels.modelDetail,
-                status:
-                    refinementModels.modelStatusTitle(
-                        inputRefinementEnabled:
-                            preferences.inputRefinementEnabled
-                    )
-            )
-
-            Text(
-                "这里显示当前运行实例实际使用的后端；发生回退时会直接显示回退后的模型。"
-            )
-            .font(.callout)
-            .foregroundStyle(.secondary)
-        }
-    }
-
     private func metric(
         title: String,
         value: String
@@ -394,29 +311,6 @@ struct OverviewView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func modelRow(
-        title: String,
-        name: String,
-        detail: String,
-        status: String
-    ) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                Text(name)
-                    .bold()
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 16)
-
-            Text(status)
-                .foregroundStyle(.secondary)
-        }
     }
 
     private func refreshMetricsIfNeeded() async {
