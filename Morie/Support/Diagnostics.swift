@@ -96,6 +96,8 @@ final class DiagnosticLogStore: ObservableObject {
         pendingFileText.removeAll(keepingCapacity: false)
         fileFlushTask?.cancel()
         fileFlushTask = nil
+        presentationLoadTask?.cancel()
+        presentationLoadTask = nil
         DiagnosticFileWriter.clear(logFileURL)
     }
 
@@ -163,7 +165,7 @@ final class DiagnosticLogStore: ObservableObject {
         fileFlushTask = nil
         guard !pendingFileText.isEmpty else { return }
         let text = pendingFileText
-        pendingFileText.removeAll(keepingCapacity: true)
+        pendingFileText.removeAll(keepingCapacity: false)
         DiagnosticFileWriter.append(text, to: logFileURL)
     }
 
@@ -256,11 +258,13 @@ private enum DiagnosticFileReader {
             return nil
         }
 
-        remainder = remainder
-            .dropFirst(remainder.distance(
+        let afterLevel = remainder.dropFirst(
+            remainder.distance(
                 from: remainder.startIndex,
                 to: remainder.index(after: levelEnd)
-            ))
+            )
+        )
+        remainder = String(afterLevel)
             .trimmingCharacters(in: .whitespaces)
 
         guard remainder.first == "[",
