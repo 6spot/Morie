@@ -4,29 +4,19 @@ import SwiftUI
 private enum ControlCenterLayout {
     static let contentInset: CGFloat = 24
     static let readingMaxWidth: CGFloat = 760
+    static let sidebarMinWidth: CGFloat = 190
+    static let sidebarIdealWidth: CGFloat = 220
+    static let sidebarMaxWidth: CGFloat = 260
 }
 
 struct ControlCenterScrollableContent<Content: View>: View {
-    let maxWidth: CGFloat?
     @ViewBuilder let content: Content
-
-    init(
-        maxWidth: CGFloat? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.maxWidth = maxWidth
-        self.content = content()
-    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 content
             }
-            .frame(
-                maxWidth: maxWidth ?? .infinity,
-                alignment: .topLeading
-            )
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(ControlCenterLayout.contentInset)
         }
@@ -38,23 +28,74 @@ struct ControlCenterReadingContent<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        ControlCenterScrollableContent(
-            maxWidth: ControlCenterLayout.readingMaxWidth
-        ) {
-            content
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                content
+            }
+            .frame(
+                maxWidth: ControlCenterLayout.readingMaxWidth,
+                alignment: .topLeading
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(ControlCenterLayout.contentInset)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct ControlCenterSectionBlock<Content: View, Footer: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+    @ViewBuilder let footer: Footer
+
+    init(
+        _ title: String,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
+    ) {
+        self.title = title
+        self.content = content()
+        self.footer = footer()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            footer
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension ControlCenterSectionBlock where Footer == EmptyView {
+    init(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(title, content: content) {
+            EmptyView()
         }
     }
 }
 
-struct ControlCenterFormContent<Content: View>: View {
+struct ControlCenterCommandBar<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        Form {
+        HStack(spacing: 10) {
             content
         }
-        .formStyle(.grouped)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .controlSize(.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -170,6 +211,11 @@ private struct ControlCenterSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .navigationSplitViewColumnWidth(
+            min: ControlCenterLayout.sidebarMinWidth,
+            ideal: ControlCenterLayout.sidebarIdealWidth,
+            max: ControlCenterLayout.sidebarMaxWidth
+        )
         .onAppear {
             Diagnostics.record("ControlCenter", "Sidebar mounted")
         }
@@ -185,6 +231,7 @@ private struct ControlCenterSidebar: View {
 }
 
 private struct ControlCenterDetailHost<Content: View>: View {
+    let section: ControlCenterSection
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -194,6 +241,7 @@ private struct ControlCenterDetailHost<Content: View>: View {
                 maxHeight: .infinity,
                 alignment: .topLeading
             )
+            .navigationTitle(section.title)
     }
 }
 
@@ -203,7 +251,7 @@ private struct ControlCenterRouteHost: View {
     @Bindable var session: ControlCenterSession
 
     var body: some View {
-        ControlCenterDetailHost {
+        ControlCenterDetailHost(section: session.currentSection) {
             routedPage
         }
     }
