@@ -731,6 +731,7 @@ final class CaptureSessionController {
             }
 
             if deliveryMode == .captureOnly {
+                try captureStore.finalizeCaptureOnlyUsage(sessionID)
                 try await captureStore.flushPersistence(for: sessionID)
                 captureStore.releaseCaptureOwnership(sessionID)
                 Diagnostics.record(
