@@ -35,6 +35,7 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 @MainActor
 struct CaptureHistoryWorkspace: View {
     let controller: AppController
+    @ObservedObject var history: CaptureHistoryController
     @ObservedObject private var runtime: AppRuntimeController
     @Binding var selection: UUID?
     @Binding var search: String
@@ -42,11 +43,13 @@ struct CaptureHistoryWorkspace: View {
 
     init(
         controller: AppController,
+        history: CaptureHistoryController,
         selection: Binding<UUID?>,
         search: Binding<String>,
         filter: Binding<CaptureHistoryFilter>
     ) {
         self.controller = controller
+        _history = ObservedObject(wrappedValue: history)
         _runtime = ObservedObject(wrappedValue: controller.runtime)
         _selection = selection
         _search = search
@@ -59,62 +62,34 @@ struct CaptureHistoryWorkspace: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Group {
-                if let history = controller.history {
-                    HSplitView {
-                        CaptureHistoryView(
-                            captures: history.captures,
-                            selection: $selection,
-                            search: $search,
-                            filter: $filter,
-                            canStartCapture: canStartCapture,
-                            canLoadMore: history.canLoadMoreCaptures,
-                            onRecord: controller.startCaptureOnly,
-                            onLoadMore: history.loadMoreCaptures
-                        )
-                        .frame(
-                            minWidth: 250,
-                            idealWidth: 320,
-                            maxWidth: 360,
-                            maxHeight: .infinity,
-                            alignment: .topLeading
-                        )
-
-                        CaptureHistoryDetailPane(
-                            controller: controller,
-                            history: history,
-                            selectedCaptureID: selection
-                        )
-                        .frame(
-                            minWidth: 0,
-                            maxWidth: .infinity,
-                            maxHeight: .infinity
-                        )
-                    }
-                    .frame(
-                        maxWidth: .infinity,
-                        maxHeight: .infinity,
-                        alignment: .topLeading
-                    )
-                    .onAppear {
-                        history.setListVisible(true)
-                    }
-                    .onDisappear {
-                        history.setListVisible(false)
-                    }
-                } else {
-                    ContentUnavailableView(
-                        "历史记录不可用",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text("记录存储尚未初始化。")
-                    )
-                }
-            }
+        HSplitView {
+            CaptureHistoryView(
+                captures: history.captures,
+                selection: $selection,
+                search: $search,
+                filter: $filter,
+                canStartCapture: canStartCapture,
+                canLoadMore: history.canLoadMoreCaptures,
+                onRecord: controller.startCaptureOnly,
+                onLoadMore: history.loadMoreCaptures
+            )
             .frame(
-                maxWidth: .infinity,
+                minWidth: 250,
+                idealWidth: 320,
+                maxWidth: 360,
                 maxHeight: .infinity,
                 alignment: .topLeading
+            )
+
+            CaptureHistoryDetailPane(
+                controller: controller,
+                history: history,
+                selectedCaptureID: selection
+            )
+            .frame(
+                minWidth: 0,
+                maxWidth: .infinity,
+                maxHeight: .infinity
             )
         }
         .frame(
@@ -122,6 +97,16 @@ struct CaptureHistoryWorkspace: View {
             maxHeight: .infinity,
             alignment: .topLeading
         )
+        .onAppear {
+            history.setInputActive(controller.isCaptureActive)
+            history.setListVisible(true)
+        }
+        .onDisappear {
+            history.setListVisible(false)
+        }
+        .onChange(of: runtime.state) { _, _ in
+            history.setInputActive(controller.isCaptureActive)
+        }
     }
 }
 
@@ -294,7 +279,7 @@ private struct CaptureHistoryDetailPane: View {
                 captureID: selectedCaptureID,
                 history: history,
                 canRecognize: canStartCapture,
-                onRecognize: controller.recognizeHistoryCapture
+                onRecognize: history.recognizeAgain
             )
         } else {
             ContentUnavailableView(
