@@ -3,11 +3,11 @@ import SwiftUI
 
 struct MemoryView: View {
     @ObservedObject var store: MemoryStore
+    @Binding var search: String
+    @Binding var editor: MemoryEditorMode?
     @AppStorage(PersonalMemorySettings.enabledDefaultsKey)
     private var memoryEnabled = true
 
-    @State private var search = ""
-    @State private var editor: MemoryEditorMode?
     @State private var errorMessage: String?
 
     private var query: String {
@@ -59,14 +59,6 @@ struct MemoryView: View {
                         "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
                     )
                     .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 12)
-
-                    Button(
-                        "告诉 Morie 一件事",
-                        systemImage: "plus",
-                        action: addMemory
-                    )
                 }
 
                 Text(
