@@ -244,16 +244,6 @@ struct PermissionManagementView: View {
                         }
                     )
 
-                    Button(
-                        "重新检查",
-                        systemImage: "arrow.clockwise"
-                    ) {
-                        Task {
-                            await setup.refresh()
-                        }
-                    }
-                    .disabled(isBusy)
-
                     if setup.isReady
                         && !controller.canStartCapture {
                         Button("重新启用 Morie") {
