@@ -265,12 +265,17 @@ enum ApplicationContextVocabulary {
         let identifierPunctuation = term.contains("_")
             || term.contains("-")
             || term.contains("+")
-        let dottedIdentifier = term.contains(".") && (hasUpper || hasDigit)
+        let dottedIdentifier =
+            term.contains(".")
+            && term.split(separator: ".").count >= 2
+            && term.unicodeScalars.allSatisfy {
+                CharacterSet.alphanumerics.contains($0) || $0 == "."
+            }
 
         if identifierPunctuation { return 80 + min(term.count, 16) }
         if mixedCase { return 70 + min(term.count, 16) }
         if allUpper { return 60 + min(term.count, 12) }
-        if hasDigit && hasUpper { return 55 + min(term.count, 12) }
+        if hasDigit { return 55 + min(term.count, 12) }
         if dottedIdentifier { return 50 + min(term.count, 12) }
 
         guard let first = term.unicodeScalars.first,
