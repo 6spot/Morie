@@ -1,5 +1,4 @@
 import Foundation
-import FoundationModelsUtilities
 import SwiftData
 import XCTest
 
@@ -134,41 +133,54 @@ final class PersonalizationTests: XCTestCase {
     }
 
 
-    func testMinimalCloudEndpointMatchesChatCompletionsBaseURLRules() throws {
+    func testOpenAIChatCompletionsEndpointPreservesConfiguredPrefix() throws {
         XCTAssertEqual(
-            MinimalChatCompletionsClient.endpoint(
+            OpenAIChatCompletionsClient.endpoint(
                 for: try XCTUnwrap(URL(string: "https://api.example.com"))
             ).absoluteString,
-            "https://api.example.com/v1/chat/completions"
+            "https://api.example.com/chat/completions"
         )
         XCTAssertEqual(
-            MinimalChatCompletionsClient.endpoint(
+            OpenAIChatCompletionsClient.endpoint(
                 for: try XCTUnwrap(URL(string: "https://api.example.com/v1"))
             ).absoluteString,
             "https://api.example.com/v1/chat/completions"
         )
         XCTAssertEqual(
-            MinimalChatCompletionsClient.endpoint(
+            OpenAIChatCompletionsClient.endpoint(
                 for: try XCTUnwrap(URL(string: "https://api.example.com/api/v3"))
             ).absoluteString,
             "https://api.example.com/api/v3/chat/completions"
         )
     }
 
-    func testMinimalCloudFallbackSendsOnlyBaselineChatCompletionFields() throws {
-        let body = MinimalChatCompletionsClient.requestBody(
+    func testOpenAIChatCompletionsEndpointAcceptsFullEndpointAndPreservesQuery() throws {
+        XCTAssertEqual(
+            OpenAIChatCompletionsClient.endpoint(
+                for: try XCTUnwrap(URL(string: "https://gateway.example.com/custom/v1/chat/completions?tenant=demo"))
+            ).absoluteString,
+            "https://gateway.example.com/custom/v1/chat/completions?tenant=demo"
+        )
+        XCTAssertEqual(
+            OpenAIChatCompletionsClient.endpoint(
+                for: try XCTUnwrap(URL(string: "https://gateway.example.com/custom/v1/models?tenant=demo"))
+            ).absoluteString,
+            "https://gateway.example.com/custom/v1/chat/completions?tenant=demo"
+        )
+    }
+
+    func testOpenAIChatCompletionsRequestUsesProviderNeutralBaseline() throws {
+        let body = OpenAIChatCompletionsClient.requestBody(
             model: "test-model",
             instructions: "trusted instructions",
             prompt: "{\"transcript\":\"hello\"}"
         )
         let data = try JSONEncoder().encode(body)
-        let json = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: data) as? [String: Any]
-        )
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         XCTAssertEqual(json["model"] as? String, "test-model")
+        XCTAssertEqual(json["stream"] as? Bool, false)
         XCTAssertNotNil(json["messages"])
-        XCTAssertNil(json["stream"])
         XCTAssertNil(json["stream_options"])
         XCTAssertNil(json["top_p"])
         XCTAssertNil(json["temperature"])
@@ -177,6 +189,8 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertNil(json["response_format"])
         XCTAssertNil(json["tools"])
         XCTAssertNil(json["tool_choice"])
+        XCTAssertNil(json["session_id"])
+        XCTAssertNil(json["sessionId"])
     }
 
     func testCloudFailureDiagnosticsExposeSafeMetadataWithoutResponseBody() throws {
@@ -190,7 +204,7 @@ final class PersonalizationTests: XCTestCase {
           }
         }
         """
-        let error = MinimalChatCompletionsClient.Failure.httpError(
+        let error = OpenAIChatCompletionsClient.Failure.httpError(
             statusCode: 400,
             data: try XCTUnwrap(body.data(using: .utf8))
         )
@@ -205,36 +219,22 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertFalse(summary.logValue.contains("message"))
     }
 
-    func testCloudCompatibilityFallbackOnlyRetriesProtocolShapeFailures() {
-        XCTAssertTrue(
-            CloudRefinementFailureInspector.shouldTryMinimalFallback(
-                after: ChatCompletionsLanguageModel.RequestError.invalidStreamData
-            )
+    func testProviderPrivateSessionRequirementRemainsVisibleButIsNotImplemented() throws {
+        let body = """
+        {
+          "error": {
+            "type": "MissingSessionID"
+          }
+        }
+        """
+        let error = OpenAIChatCompletionsClient.Failure.httpError(
+            statusCode: 400,
+            data: try XCTUnwrap(body.data(using: .utf8))
         )
-        XCTAssertTrue(
-            CloudRefinementFailureInspector.shouldTryMinimalFallback(
-                after: ChatCompletionsLanguageModel.RequestError.httpError(
-                    statusCode: 400,
-                    data: Data()
-                )
-            )
-        )
-        XCTAssertFalse(
-            CloudRefinementFailureInspector.shouldTryMinimalFallback(
-                after: ChatCompletionsLanguageModel.RequestError.httpError(
-                    statusCode: 401,
-                    data: Data()
-                )
-            )
-        )
-        XCTAssertFalse(
-            CloudRefinementFailureInspector.shouldTryMinimalFallback(
-                after: ChatCompletionsLanguageModel.RequestError.httpError(
-                    statusCode: 429,
-                    data: Data()
-                )
-            )
-        )
+        let summary = CloudRefinementFailureInspector.summarize(error)
+
+        XCTAssertEqual(summary.statusCode, 400)
+        XCTAssertEqual(summary.providerType, "MissingSessionID")
     }
 
     func testBasicCleanupRemovesFillerAndFormatsExistingStructureWithoutMemory() throws {
