@@ -142,6 +142,9 @@ private enum RefinementOutputGuard {
         guard !claimsExecution(output, source: source) else {
             try reject("claimsExecution", input: input, source: source, output: output)
         }
+        if isFormattingOnlyRewrite(output, source: source) {
+            return
+        }
         guard preservesSemanticRelations(
             output,
             source: source,
@@ -187,6 +190,22 @@ private enum RefinementOutputGuard {
         ) else {
             try reject("extremeExpansion", input: input, source: source, output: output)
         }
+        guard !isExtremeContraction(
+            output,
+            source: source,
+            captureID: input.captureID
+        ) else {
+            try reject("extremeContraction", input: input, source: source, output: output)
+        }
+    }
+
+    private static func isFormattingOnlyRewrite(
+        _ output: String,
+        source: String
+    ) -> Bool {
+        let lhs = semanticText(output)
+        let rhs = semanticText(source)
+        return !lhs.isEmpty && lhs == rhs
     }
 
     private static func reject(
@@ -248,8 +267,9 @@ private enum RefinementOutputGuard {
         source: String,
         captureID: UUID
     ) -> Bool {
-        // Explicit self-corrections intentionally remove earlier negations/facts.
-        guard !hasExplicitCorrectionSignal(source) else { return true }
+        // Explicit self-corrections may supersede earlier material, but negation
+        // and condition markers inside the final correction remain authoritative.
+        let relationSource = finalCorrectionSegment(source) ?? source
 
         let relationGroups = [
             [
@@ -265,7 +285,7 @@ private enum RefinementOutputGuard {
         ]
 
         for group in relationGroups {
-            let sourceHasRelation = group.contains { containsPhrase(source, $0) }
+            let sourceHasRelation = group.contains { containsPhrase(relationSource, $0) }
             let outputHasRelation = group.contains { containsPhrase(output, $0) }
             if sourceHasRelation != outputHasRelation {
                 DevelopmentDiagnostics.record(
@@ -352,7 +372,9 @@ private enum RefinementOutputGuard {
             #"https?://[^\s<>"']+"#,
             #"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b"#,
             #"(?:/[A-Za-z0-9._-]+){2,}"#,
-            #"(?<![A-Za-z0-9_])\d+(?:\.\d+)?(?![A-Za-z0-9_])"#,
+            #"(?<!\d)\d{1,2}[:：][0-5]\d(?!\d)"#,
+            #"(?<!\d)\d{1,2}\s*(?:点|时)(?:\s*[0-5]?\d\s*分?)?(?!\d)"#,
+            #"(?<![A-Za-z0-9_:：])\d+(?:\.\d+)?(?![A-Za-z0-9_:：])"#,
             #"(?:周|星期|礼拜)[一二三四五六日天]"#,
         ]
         for pattern in patterns {
@@ -411,7 +433,7 @@ private enum RefinementOutputGuard {
             + applicationSpellingCandidates
         let allowedKeys = Set(allowedTerms.map(canonicalLatinTerm))
         let sourceKeys = Set(
-            simpleTitleCaseLatinTerms(in: source).map(canonicalLatinTerm)
+            allLatinTerms(in: source).map(canonicalLatinTerm)
         )
 
         for term in simpleTitleCaseLatinTerms(in: output) {
@@ -432,6 +454,13 @@ private enum RefinementOutputGuard {
     private static func simpleTitleCaseLatinTerms(in text: String) -> [String] {
         regexMatches(
             #"(?<![A-Za-z0-9_])[A-Z][a-z]{3,}(?![A-Za-z0-9_])"#,
+            in: text
+        )
+    }
+
+    private static func allLatinTerms(in text: String) -> [String] {
+        regexMatches(
+            #"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9._+-]{2,}(?![A-Za-z0-9_])"#,
             in: text
         )
     }
@@ -549,6 +578,27 @@ private enum RefinementOutputGuard {
         return outputCount > limit
     }
 
+    private static func isExtremeContraction(
+        _ output: String,
+        source: String,
+        captureID: UUID
+    ) -> Bool {
+        let reference = finalCorrectionSegment(source) ?? source
+        let sourceCount = semanticText(reference).count
+        guard sourceCount >= 40 else { return false }
+
+        let outputCount = semanticText(output).count
+        let minimum = max(24, sourceCount * 45 / 100)
+        if outputCount < minimum {
+            DevelopmentDiagnostics.record(
+                "RefinementGuardDetail",
+                captureID: captureID,
+                "extremeContraction; referenceSemantic=\(sourceCount); outputSemantic=\(outputCount); minimum=\(minimum)"
+            )
+        }
+        return outputCount < minimum
+    }
+
     private static func hasExplicitCorrectionSignal(_ text: String) -> Bool {
         finalCorrectionSegment(text) != nil
     }
@@ -622,7 +672,9 @@ private enum RefinementOutputGuard {
     }
 
     private static func removingListMarkers(from text: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: #"(?m)^\s*\d+[.)、]\s+"#) else {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"(?m)^\s*\d{1,3}[.)、](?=\s*[^0-9])\s*"#
+        ) else {
             return text
         }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -630,9 +682,52 @@ private enum RefinementOutputGuard {
     }
 
     private static func canonicalFact(_ value: String) -> String {
-        value
+        if let time = canonicalTimeFact(value) {
+            return time
+        }
+        return value
             .trimmingCharacters(in: CharacterSet(charactersIn: ".,，。;；!?！？)]}"))
             .lowercased()
+    }
+
+    private static func canonicalTimeFact(_ value: String) -> String? {
+        let compact = value.replacingOccurrences(
+            of: #"\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        if let regex = try? NSRegularExpression(
+            pattern: #"^(\d{1,2})[:：]([0-5]\d)$"#
+        ) {
+            let full = NSRange(compact.startIndex..<compact.endIndex, in: compact)
+            if let match = regex.firstMatch(in: compact, range: full),
+               let hourRange = Range(match.range(at: 1), in: compact),
+               let minuteRange = Range(match.range(at: 2), in: compact),
+               let hour = Int(compact[hourRange]),
+               let minute = Int(compact[minuteRange]) {
+                return String(format: "time:%d:%02d", hour, minute)
+            }
+        }
+
+        if let regex = try? NSRegularExpression(
+            pattern: #"^(\d{1,2})(?:点|时)(?:([0-5]?\d)分?)?$"#
+        ) {
+            let full = NSRange(compact.startIndex..<compact.endIndex, in: compact)
+            if let match = regex.firstMatch(in: compact, range: full),
+               let hourRange = Range(match.range(at: 1), in: compact),
+               let hour = Int(compact[hourRange]) {
+                var minute = 0
+                if match.range(at: 2).location != NSNotFound,
+                   let minuteRange = Range(match.range(at: 2), in: compact),
+                   let parsedMinute = Int(compact[minuteRange]) {
+                    minute = parsedMinute
+                }
+                return String(format: "time:%d:%02d", hour, minute)
+            }
+        }
+
+        return nil
     }
 
     private static func regexMatches(
