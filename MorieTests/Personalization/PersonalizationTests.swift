@@ -64,6 +64,31 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertLessThanOrEqual(merged.count, SpeechContextHints.maximumCount)
     }
 
+    func testSpeechContextHintsReserveRoomForApplicationContext() {
+        let dictionary = (0..<80).map { "Dictionary\($0)" }
+        let application = (0..<20).map { "Application\($0)" }
+        let merged = SpeechContextHints.merged(
+            dictionaryWords: dictionary,
+            applicationContextWords: application
+        )
+
+        XCTAssertEqual(merged.count, SpeechContextHints.maximumCount)
+        XCTAssertTrue(merged.contains("Application0"))
+        XCTAssertTrue(merged.contains("Application15"))
+        XCTAssertFalse(merged.contains("Application16"))
+    }
+
+    func testApplicationContextCleanupCandidatesRequireTranscriptEvidence() {
+        let relevant = ApplicationContextVocabulary.refinementCandidates(
+            from: ["Vercova", "Tenenaras", "Qorvexia", "UnrelatedPageTerm"],
+            transcript: "把 Vercowa 这个同步模块接进去，然后处理 Tenenara 的缓存"
+        )
+
+        XCTAssertEqual(relevant, ["Vercova", "Tenenaras"])
+        XCTAssertFalse(relevant.contains("Qorvexia"))
+        XCTAssertFalse(relevant.contains("UnrelatedPageTerm"))
+    }
+
     func testRefinementModelControllerDoesNotReadKeychainUntilExternalRefinementNeedsIt() {
         var credentialReads = 0
         let controller = RefinementModelController(
@@ -251,6 +276,70 @@ final class PersonalizationTests: XCTestCase {
         )
     }
 
+    func testCleanupGuardAllowsEquivalentTimeListAndCaseFormatting() throws {
+        let time = RefinementInput(captureID: UUID(), text: "会议改到9:00开始")
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting("会议改到9点开始。", for: time).text,
+            "会议改到9点开始。"
+        )
+
+        let list = RefinementInput(
+            captureID: UUID(),
+            text: "1、好好上班\n2、按时吃饭"
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "1. 好好上班。\n2. 按时吃饭。",
+                for: list
+            ).text,
+            "1. 好好上班。\n2. 按时吃饭。"
+        )
+
+        let capitalization = RefinementInput(
+            captureID: UUID(),
+            text: "这个 python 脚本先保留"
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "这个 Python 脚本先保留。",
+                for: capitalization
+            ).text,
+            "这个 Python 脚本先保留。"
+        )
+    }
+
+    func testCleanupGuardStillProtectsNegationInsideCorrectionTail() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "把超时改成30秒，不要用60秒"
+        )
+        XCTAssertEqual(
+            try ValidatedRefinement.accepting(
+                "把超时改成 30 秒，不要用 60 秒。",
+                for: input
+            ).text,
+            "把超时改成 30 秒，不要用 60 秒。"
+        )
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting(
+                "把超时改成 30 秒，用 60 秒。",
+                for: input
+            )
+        )
+    }
+
+    func testCleanupGuardRejectsGrossContraction() throws {
+        let source = """
+        第一件事先把登录流程改好，第二件事处理设置页面，第三件事检查历史记录，
+        另外不要删除现有数据，如果测试失败就保留当前版本，最后把文档和测试一起更新。
+        """
+        let input = RefinementInput(captureID: UUID(), text: source)
+
+        XCTAssertThrowsError(
+            try ValidatedRefinement.accepting("先处理登录和设置。", for: input)
+        )
+    }
+
     func testContextualChineseRecognitionCorrectionUsesContextInsteadOfACharacterLimit() throws {
         let input = RefinementInput(captureID: UUID(), text: "我再次尝试常文字效果怎么样？")
         XCTAssertEqual(
@@ -381,6 +470,17 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertFalse(prompt.contains("updatedAt"))
         XCTAssertFalse(prompt.contains("origin"))
         XCTAssertFalse(prompt.contains("status"))
+    }
+
+    func testPromptJSONDoesNotEscapeURLSlashes() throws {
+        let input = RefinementInput(
+            captureID: UUID(),
+            text: "接口是 https://example.com/v1"
+        )
+        let prompt = try InputRefiner.promptText(for: input)
+
+        XCTAssertTrue(prompt.contains("https://example.com/v1"))
+        XCTAssertFalse(prompt.contains(#"https:\/\/"#))
     }
 
     func testDefaultPromptUsesSemanticParagraphingAndLogicWithoutHeuristicRouting() {
@@ -794,21 +894,46 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertEqual(saved.refinement?.reason, .memoryChanged)
     }
 
-    func testRefinementWaitsForModelWithoutAnArbitraryDeadline() async throws {
+    func testRefinementCompletesBeforeForegroundDeadline() async throws {
         let fixture = try RefinementFixture()
         let id = try fixture.capture("saved input")
         let model = PendingCleanup()
-        let runner = InputRefinementRunner(generate: { try await model.run($0) })
-        let work = Task { try await fixture.personalizer(runner).refine(id, enabled: true) }
+        let runner = InputRefinementRunner(
+            generate: { try await model.run($0) },
+            maximumWait: .seconds(1)
+        )
+        let work = Task {
+            try await fixture.personalizer(runner).refine(id, enabled: true)
+        }
         await waitUntilStarted(model)
-        try await Task.sleep(for: .milliseconds(80))
-        XCTAssertTrue(runner.isBusy)
         await model.finish("Saved input.")
         let result = try await work.value
         XCTAssertEqual(result, "Saved input.")
         XCTAssertFalse(runner.isBusy)
         let saved = try await fixture.saved(id)
         XCTAssertEqual(saved.finalText, "Saved input.")
+    }
+
+    func testRefinementDeadlineReleasesForegroundWithoutWaitingForModelDrain() async throws {
+        let input = RefinementInput(captureID: UUID(), text: "saved input")
+        let model = PendingCleanup()
+        let runner = InputRefinementRunner(
+            generate: { try await model.run($0) },
+            maximumWait: .milliseconds(40)
+        )
+
+        let work = Task { try await runner.run(input) }
+        await waitUntilStarted(model)
+        let generation = try await work.value
+        guard case .keptOriginal(let reason) = generation else {
+            return XCTFail("Expected deadline fallback")
+        }
+        XCTAssertEqual(reason, .timeLimit)
+        XCTAssertTrue(runner.isBusy)
+
+        await model.finish("Saved input.")
+        await runner.waitForModelToFinish()
+        XCTAssertFalse(runner.isBusy)
     }
 
     func testCallerCancellationDoesNotWaitForModelOrReturnDeliverableText() async throws {
