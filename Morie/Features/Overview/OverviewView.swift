@@ -2,40 +2,51 @@ import SwiftData
 import SwiftUI
 
 struct OverviewMetrics: Equatable {
-    let totalCaptures: Int
-    let recognizedCharacters: Int
-    let successfulInputs: Int
-    let currentAppAttempts: Int
-    let failedInputs: Int
-    let averageRefinementSeconds: Double?
-    let refinementSamples: Int
+    private(set) var totalCaptures = 0
+    private(set) var recognizedCharacters = 0
+    private(set) var successfulInputs = 0
+    private(set) var currentAppAttempts = 0
+    private(set) var failedInputs = 0
+    private(set) var refinementSamples = 0
+    private var refinementDurationTotal = 0.0
+
+    init() {}
 
     init(captures: [CaptureRecord]) {
-        totalCaptures = captures.count
-        recognizedCharacters = captures.reduce(0) {
-            $0 + $1.recognizedText.count
+        for capture in captures {
+            accumulate(capture)
+        }
+    }
+
+    mutating func accumulate(_ capture: CaptureRecord) {
+        totalCaptures += 1
+        recognizedCharacters += capture.recognizedText.count
+
+        if capture.deliveryModeRawValue
+            == CaptureDeliveryMode.currentApp.rawValue,
+           [.delivered, .deliveryFailed, .failed].contains(capture.lifecycle) {
+            currentAppAttempts += 1
+
+            switch capture.lifecycle {
+            case .delivered:
+                successfulInputs += 1
+            case .deliveryFailed, .failed:
+                failedInputs += 1
+            default:
+                break
+            }
         }
 
-        let currentApp = captures.filter {
-            $0.deliveryModeRawValue == CaptureDeliveryMode.currentApp.rawValue
-                && [.delivered, .deliveryFailed, .failed].contains($0.lifecycle)
+        if let duration = capture.refinement?.durationSeconds,
+           duration >= 0 {
+            refinementSamples += 1
+            refinementDurationTotal += duration
         }
-        currentAppAttempts = currentApp.count
-        successfulInputs = currentApp.filter {
-            $0.lifecycle == .delivered
-        }.count
-        failedInputs = currentApp.filter {
-            $0.lifecycle == .deliveryFailed || $0.lifecycle == .failed
-        }.count
+    }
 
-        let durations = captures
-            .compactMap(\.refinement?.durationSeconds)
-            .filter { $0 >= 0 }
-
-        refinementSamples = durations.count
-        averageRefinementSeconds = durations.isEmpty
-            ? nil
-            : durations.reduce(0, +) / Double(durations.count)
+    var averageRefinementSeconds: Double? {
+        guard refinementSamples > 0 else { return nil }
+        return refinementDurationTotal / Double(refinementSamples)
     }
 
     var failureRate: Double? {
@@ -391,11 +402,18 @@ struct OverviewView: View {
 
         do {
             let capturing = CaptureLifecycle.capturing.rawValue
-            let descriptor = FetchDescriptor<CaptureRecord>(
+            var descriptor = FetchDescriptor<CaptureRecord>(
                 predicate: #Predicate {
                     $0.lifecycleRawValue != capturing
                 }
             )
+            descriptor.propertiesToFetch = [
+                \CaptureRecord.lifecycleRawValue,
+                \CaptureRecord.deliveryModeRawValue,
+                \CaptureRecord.recognizedText,
+                \CaptureRecord.refinement
+            ]
+
             let recordCount = try modelContext.fetchCount(descriptor)
 
             var latestDescriptor = FetchDescriptor<CaptureRecord>(
@@ -407,6 +425,9 @@ struct OverviewView: View {
                 ]
             )
             latestDescriptor.fetchLimit = 1
+            latestDescriptor.propertiesToFetch = [
+                \CaptureRecord.updatedAt
+            ]
 
             let latestUpdatedAt = try modelContext
                 .fetch(latestDescriptor)
@@ -420,13 +441,29 @@ struct OverviewView: View {
                 return
             }
 
-            let captures = try modelContext.fetch(descriptor)
+            if DevelopmentDiagnostics.isEnabled {
+                Diagnostics.recordMemory("overview-metrics-before")
+            }
+
+            var metrics = OverviewMetrics()
+            try modelContext.enumerate(
+                descriptor,
+                batchSize: 128,
+                allowEscapingMutations: false
+            ) { capture in
+                metrics.accumulate(capture)
+            }
+
             metricsSnapshot = OverviewMetricsSnapshot(
-                metrics: OverviewMetrics(captures: captures),
+                metrics: metrics,
                 recordCount: recordCount,
                 latestUpdatedAt: latestUpdatedAt
             )
             metricsError = nil
+
+            if DevelopmentDiagnostics.isEnabled {
+                Diagnostics.recordMemory("overview-metrics-after")
+            }
         } catch {
             metricsError = "无法读取使用统计。"
         }
