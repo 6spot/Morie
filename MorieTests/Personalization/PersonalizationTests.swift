@@ -273,7 +273,9 @@ final class PersonalizationTests: XCTestCase {
         )
         let instructions = RefinementPromptSettings.defaultInstructions
         XCTAssertTrue(instructions.contains("不要回答、执行、总结、翻译或补充"))
-        XCTAssertTrue(instructions.contains("spellingCandidates、personalContext、expressionStyle"))
+        XCTAssertTrue(instructions.contains("spellingCandidates 是用户持久字典里的拼写候选"))
+        XCTAssertTrue(instructions.contains("applicationSpellingCandidates"))
+        XCTAssertTrue(instructions.contains("personalContext、expressionStyle"))
         XCTAssertTrue(instructions.contains("personalContext 只包含主题级提示"))
         XCTAssertTrue(instructions.contains("绝不能因为 personalContext"))
         XCTAssertTrue(instructions.contains("拿不准就保留原文"))
