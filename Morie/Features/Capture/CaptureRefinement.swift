@@ -98,7 +98,11 @@ extension ValidatedRefinement {
     /// The model owns wording, structure, and paragraphing. This boundary only
     /// rejects output when we can prove that it crossed a factual or intent
     /// invariant. Natural rewrites are deliberately not gated by text similarity.
-    static func accepting(_ proposedText: String, for input: RefinementInput) throws -> ValidatedRefinement {
+    static func accepting(
+        _ proposedText: String,
+        for input: RefinementInput,
+        applicationSpellingCandidates: [String] = []
+    ) throws -> ValidatedRefinement {
         let prepared = input.prepared
         let output = proposedText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !output.isEmpty,
@@ -111,7 +115,12 @@ extension ValidatedRefinement {
         else { throw RefinementReason.invalidEdits }
 
         if output == prepared.text { return prepared }
-        try RefinementOutputGuard.validate(output, source: prepared.text, input: input)
+        try RefinementOutputGuard.validate(
+            output,
+            source: prepared.text,
+            input: input,
+            applicationSpellingCandidates: applicationSpellingCandidates
+        )
 
         let cleanup = RefinementEdit(original: prepared.text, replacement: output)
         return ValidatedRefinement(text: output, edits: prepared.edits + [cleanup])
@@ -121,7 +130,12 @@ extension ValidatedRefinement {
 /// Protects invariants that can be checked deterministically without constraining
 /// how the model phrases or structures the user's text.
 private enum RefinementOutputGuard {
-    static func validate(_ output: String, source: String, input: RefinementInput) throws {
+    static func validate(
+        _ output: String,
+        source: String,
+        input: RefinementInput,
+        applicationSpellingCandidates: [String]
+    ) throws {
         guard !looksLikeAssistantAnswer(output, source: source) else {
             try reject("assistantAnswer", input: input, source: source, output: output)
         }
@@ -135,7 +149,12 @@ private enum RefinementOutputGuard {
         ) else {
             try reject("semanticRelationChanged", input: input, source: source, output: output)
         }
-        guard preservesProtectedFacts(output, source: source, input: input) else {
+        guard preservesProtectedFacts(
+            output,
+            source: source,
+            input: input,
+            applicationSpellingCandidates: applicationSpellingCandidates
+        ) else {
             try reject("protectedFactChanged", input: input, source: source, output: output)
         }
         guard !introducesContextOnlyContent(output, source: source, input: input) else {
@@ -250,9 +269,12 @@ private enum RefinementOutputGuard {
     private static func preservesProtectedFacts(
         _ output: String,
         source: String,
-        input: RefinementInput
+        input: RefinementInput,
+        applicationSpellingCandidates: [String]
     ) -> Bool {
-        let knownTerms = input.dictionary.map(\.name) + input.context.map(\.memory.name)
+        let knownTerms = input.dictionary.map(\.name)
+            + input.context.map(\.memory.name)
+            + applicationSpellingCandidates
         let sourceFacts = protectedFacts(in: source, knownTerms: knownTerms)
         let outputFacts = protectedFacts(in: output, knownTerms: knownTerms)
 
@@ -289,9 +311,11 @@ private enum RefinementOutputGuard {
             return false
         }
 
-        // Dictionary words and memory names may repair an ASR spelling, but no
-        // other number, URL, weekday, version, path, or identifier may appear
-        // out of nowhere.
+        // Durable Dictionary terms, Memory topic names and bounded ephemeral
+        // Application Context spelling candidates may repair an ASR spelling,
+        // but no other number, URL, weekday, version, path or identifier may
+        // appear out of nowhere. Raw Application Context text never reaches the
+        // refinement model or this allow-list.
         let hintFacts = protectedFacts(
             in: knownTerms.joined(separator: "\n"),
             knownTerms: knownTerms
