@@ -74,11 +74,12 @@ enum RefinementModelSettings {
     }
 
     static func resetToDefaults() throws {
+        try RefinementCredentialStore.writeAPIKey("")
+
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: modeDefaultsKey)
         defaults.removeObject(forKey: cloudBaseURLDefaultsKey)
         defaults.removeObject(forKey: cloudModelNameDefaultsKey)
-        try RefinementCredentialStore.writeAPIKey("")
     }
 }
 
