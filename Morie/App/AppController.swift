@@ -559,6 +559,16 @@ final class AppController {
         startNewCapture(deliveryMode: .captureOnly)
     }
 
+    func controlCenterUsageMetrics() throws -> CaptureUsageMetricsSnapshot {
+        guard let captureStore else {
+            throw ControllerError.persistenceUnavailable(
+                persistenceError?.localizedDescription
+                    ?? "记录存储尚未初始化。"
+            )
+        }
+        return try captureStore.usageMetricsSnapshot()
+    }
+
     func bootstrap(
         completingSetup: Bool = false
     ) async {
