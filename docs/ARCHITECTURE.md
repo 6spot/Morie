@@ -190,7 +190,13 @@ The macOS Control Center has one window-level presentation owner.
 
 `MorieControlCenter` owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. A Control Center session owns only state that must survive route changes, such as the selected destination, sidebar visibility and cross-route selections.
 
-`ControlCenterRouteHost` only resolves the selected route into page content. Every route is rendered inside the same persistent `ControlCenterDetailHost`; the router must not replace the right-side root with different ScrollView/Form/workspace containers. A feature page may use a native Form, ScrollView, List, Table or split view internally when its content requires it, but those are page contents rather than alternate Control Center shells. Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center navigation shells or move unrelated feature state into `AppController`.
+`ControlCenterRouteHost` only resolves the selected route into page content. Every route is rendered inside the same persistent `ControlCenterDetailHost`; the router must not replace the right-side root with different ScrollView/Form/workspace containers.
+
+The persistent detail host owns the primary navigation title. Top-level routed pages must not install their own `.toolbar`, `.searchable`, `.navigationTitle` or other NavigationStack chrome because changing those preferences during sidebar routing causes the window toolbar and sidebar toggle to be recomputed. Route-specific search, filtering and actions belong inside the detail content. Secondary navigation destinations may own their own title/actions after an explicit push.
+
+Overview, Dictionary, Personal Memory, Settings and Permissions share the same `ControlCenterScrollableContent` geometry and the same 24-point outer content inset. They must not introduce route-specific outer widths or an alternate top-level Form margin model. History and Diagnostics are full-size internal workspaces, but their split-view minimum widths must remain subordinate to the outer NavigationSplitView and must never squeeze the sidebar below its supported width range.
+
+Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center navigation shells or move unrelated feature state into `AppController`.
 
 Control Center summary views must not hydrate an entire persistent collection into the UI's main `ModelContext` merely to calculate aggregates. Use bounded SwiftData traversal and narrow fetched properties for summary work, and keep large feature collections behind the feature controller/store that owns their lifecycle.
 
