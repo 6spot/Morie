@@ -72,8 +72,10 @@ Interpretation:
 - present in AX but rejected by Vocabulary => extraction/ranking problem;
 - selected but absent from SpeechContext => pipeline propagation problem;
 - present in SpeechContext but ASR still wrong => Apple Speech bias limitation;
-- ASR wrong but refinement repairs it from allowed spelling candidates => spelling
-  resolution path is working;
+- ASR wrong but refinement repairs it from a transcript-relevant Application Context
+  spelling candidate => spelling resolution path is working;
+- a page term that is not exact/close to the preferred transcript must be absent from
+  `applicationSpellingCandidatesRelevant`;
 - final output introduces page-only facts => refinement safety defect.
 
 ### C. Focused-editor term
@@ -124,12 +126,12 @@ Expected:
 
 ### H. Cancellation
 
-Start speaking, press Escape, then repeat and cancel during startup if practical.
+Start speaking, press Escape; then repeat and press Escape (or the capture shortcut) while the HUD is processing/refining.
 
 Expected:
 - HotkeyEvent records Escape ownership;
-- Stage shows cancellation/stop path;
-- no delivery occurs;
+- Stage shows cancellation/stop path from both recording and processing;
+- no delivery occurs after processing cancellation;
 - persistence either discards or preserves according to the explicit stop
   disposition.
 
