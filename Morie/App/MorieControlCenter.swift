@@ -191,46 +191,46 @@ private final class ControlCenterSession {
 private final class ControlCenterPresentationState {
     var overview = OverviewPageState()
 
-    var presentation.dictionarySearch = ""
-    var presentation.dictionaryShowingEditor = false
-    var presentation.dictionaryEditingEntryID: UUID?
-    var presentation.dictionaryConfirmsDeletion = false
+    var dictionarySearch = ""
+    var dictionaryShowingEditor = false
+    var dictionaryEditingEntryID: UUID?
+    var dictionaryConfirmsDeletion = false
 
-    var presentation.memorySearch = ""
-    var presentation.memoryEditor: MemoryEditorMode?
+    var memorySearch = ""
+    var memoryEditor: MemoryEditorMode?
 
-    var presentation.historySearch = ""
-    var presentation.historyFilter: CaptureHistoryFilter = .all
+    var historySearch = ""
+    var historyFilter: CaptureHistoryFilter = .all
 
-    var presentation.diagnosticSearch = ""
-    var presentation.diagnosticLevel: DiagnosticLevel?
-    var presentation.diagnosticConfirmsClear = false
+    var diagnosticSearch = ""
+    var diagnosticLevel: DiagnosticLevel?
+    var diagnosticConfirmsClear = false
 
     var confirmsFactoryReset = false
-    var presentation.factoryResetInProgress = false
-    var presentation.factoryResetError: String?
+    var factoryResetInProgress = false
+    var factoryResetError: String?
 
     func reset() {
         overview.metricsSnapshot = nil
 
-        presentation.dictionarySearch = ""
-        presentation.dictionaryShowingEditor = false
-        presentation.dictionaryEditingEntryID = nil
-        presentation.dictionaryConfirmsDeletion = false
+        dictionarySearch = ""
+        dictionaryShowingEditor = false
+        dictionaryEditingEntryID = nil
+        dictionaryConfirmsDeletion = false
 
-        presentation.memorySearch = ""
-        presentation.memoryEditor = nil
+        memorySearch = ""
+        memoryEditor = nil
 
-        presentation.historySearch = ""
-        presentation.historyFilter = .all
+        historySearch = ""
+        historyFilter = .all
 
-        presentation.diagnosticSearch = ""
-        presentation.diagnosticLevel = nil
-        presentation.diagnosticConfirmsClear = false
+        diagnosticSearch = ""
+        diagnosticLevel = nil
+        diagnosticConfirmsClear = false
 
         confirmsFactoryReset = false
-        presentation.factoryResetInProgress = false
-        presentation.factoryResetError = nil
+        factoryResetInProgress = false
+        factoryResetError = nil
     }
 }
 
@@ -376,13 +376,13 @@ private struct ControlCenterRouteHost: View {
             titleVisibility: .visible
         ) {
             Button("恢复出厂设置", role: .destructive) {
-                presentation.factoryResetInProgress = true
+                factoryResetInProgress = true
                 Task {
                     do {
                         try await controller.factoryReset()
                     } catch {
-                        presentation.factoryResetInProgress = false
-                        presentation.factoryResetError = error.localizedDescription
+                        factoryResetInProgress = false
+                        factoryResetError = error.localizedDescription
                     }
                 }
             }
@@ -399,13 +399,13 @@ private struct ControlCenterRouteHost: View {
                 get: { presentation.factoryResetError != nil },
                 set: {
                     if !$0 {
-                        presentation.factoryResetError = nil
+                        factoryResetError = nil
                     }
                 }
             )
         ) {
             Button("好", role: .cancel) {
-                presentation.factoryResetError = nil
+                factoryResetError = nil
             }
         } message: {
             Text(presentation.factoryResetError ?? "")
@@ -553,14 +553,14 @@ private struct ControlCenterRouteHost: View {
                 guard let id = selectedDictionaryUserEntryID else {
                     return
                 }
-                presentation.dictionaryEditingEntryID = id
-                presentation.dictionaryShowingEditor = true
+                dictionaryEditingEntryID = id
+                dictionaryShowingEditor = true
             }
             .disabled(selectedDictionaryUserEntryID == nil)
 
         case .memory:
             Button("告诉 Morie 一件事", systemImage: "plus") {
-                presentation.memoryEditor = .create
+                memoryEditor = .create
             }
 
         case .settings:
@@ -569,7 +569,7 @@ private struct ControlCenterRouteHost: View {
                 systemImage: "arrow.counterclockwise",
                 role: .destructive
             ) {
-                confirmsFactoryReset = true
+                presentation.confirmsFactoryReset = true
             }
             .disabled(presentation.factoryResetInProgress || controller.isCaptureActive)
 
@@ -603,7 +603,7 @@ private struct ControlCenterRouteHost: View {
                 systemImage: "trash",
                 role: .destructive
             ) {
-                presentation.dictionaryConfirmsDeletion = true
+                dictionaryConfirmsDeletion = true
             }
             .disabled(selectedDictionaryUserEntryID == nil)
 
@@ -622,8 +622,8 @@ private struct ControlCenterRouteHost: View {
         switch session.currentSection {
         case .dictionary:
             Button("添加词语", systemImage: "plus") {
-                presentation.dictionaryEditingEntryID = nil
-                presentation.dictionaryShowingEditor = true
+                dictionaryEditingEntryID = nil
+                dictionaryShowingEditor = true
             }
 
         case .diagnostics:
@@ -644,7 +644,7 @@ private struct ControlCenterRouteHost: View {
                     systemImage: "trash",
                     role: .destructive
                 ) {
-                    presentation.diagnosticConfirmsClear = true
+                    diagnosticConfirmsClear = true
                 }
             }
 
@@ -694,7 +694,7 @@ private struct ControlCenterRouteHost: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return DiagnosticLogStore.shared.entries.filter { entry in
-            (presentation.diagnosticLevel == nil || entry.level == presentation.diagnosticLevel)
+            (diagnosticLevel == nil || entry.level == presentation.diagnosticLevel)
                 && (
                     query.isEmpty
                         || entry.category.localizedStandardContains(query)
