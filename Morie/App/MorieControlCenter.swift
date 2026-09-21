@@ -189,7 +189,12 @@ private final class ControlCenterSession {
 @MainActor
 @Observable
 private final class ControlCenterPresentationState {
+    let history: CaptureHistoryController?
     var overview = OverviewPageState()
+
+    init(history: CaptureHistoryController?) {
+        self.history = history
+    }
 
     var dictionarySearch = ""
     var dictionaryShowingEditor = false
@@ -211,6 +216,7 @@ private final class ControlCenterPresentationState {
     var factoryResetError: String?
 
     func reset() {
+        history?.releasePresentationResources()
         overview.metricsSnapshot = nil
 
         dictionarySearch = ""
@@ -238,8 +244,18 @@ private final class ControlCenterPresentationState {
 struct MorieControlCenter: View {
     let controller: AppController
 
-    @State private var session = ControlCenterSession()
-    @State private var presentation = ControlCenterPresentationState()
+    @State private var session: ControlCenterSession
+    @State private var presentation: ControlCenterPresentationState
+
+    init(controller: AppController) {
+        self.controller = controller
+        _session = State(initialValue: ControlCenterSession())
+        _presentation = State(
+            initialValue: ControlCenterPresentationState(
+                history: controller.makeControlCenterHistoryController()
+            )
+        )
+    }
 
     var body: some View {
         @Bindable var session = session
@@ -262,7 +278,6 @@ struct MorieControlCenter: View {
             Diagnostics.recordMemory("control-center-mounted")
         }
         .onDisappear {
-            controller.history?.releasePresentationResources()
             DiagnosticLogStore.shared.setPresentationVisible(false)
             presentation.reset()
             session.resetPresentation()
@@ -379,6 +394,7 @@ private struct ControlCenterRouteHost: View {
                 presentation.factoryResetInProgress = true
                 Task {
                     do {
+                        await presentation.history?.cancelRecognitionAndWait()
                         try await controller.factoryReset()
                     } catch {
                         presentation.factoryResetInProgress = false
@@ -422,12 +438,17 @@ private struct ControlCenterRouteHost: View {
             )
 
         case .history:
-            CaptureHistoryWorkspace(
-                controller: controller,
-                selection: $session.selectedCaptureID,
-                search: $presentation.historySearch,
-                filter: $presentation.historyFilter
-            )
+            if let history = presentation.history {
+                CaptureHistoryWorkspace(
+                    controller: controller,
+                    history: history,
+                    selection: $session.selectedCaptureID,
+                    search: $presentation.historySearch,
+                    filter: $presentation.historyFilter
+                )
+            } else {
+                unavailable("历史记录不可用")
+            }
 
         case .dictionary:
             if let dictionary = controller.dictionary {
