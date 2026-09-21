@@ -36,8 +36,6 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 struct CaptureHistoryWorkspace: View {
     let controller: AppController
     @ObservedObject private var runtime: AppRuntimeController
-    @ObservedObject private var capabilities: AppCapabilityController
-    @ObservedObject private var setup: PermissionSetupController
     @Binding var selection: UUID?
     @Binding var search: String
     @Binding var filter: CaptureHistoryFilter
@@ -50,10 +48,6 @@ struct CaptureHistoryWorkspace: View {
     ) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
-        _capabilities = ObservedObject(
-            wrappedValue: controller.capabilities
-        )
-        _setup = ObservedObject(wrappedValue: controller.setup)
         _selection = selection
         _search = search
         _filter = filter
@@ -158,39 +152,51 @@ struct CaptureHistoryView: View {
     }
 
     var body: some View {
-        List(visibleCaptures, selection: $selection) { capture in
-            VStack(alignment: .leading, spacing: 5) {
-                Text(capture.historySummary)
-                    .lineLimit(2, reservesSpace: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        List(selection: $selection) {
+            Section {
+                ForEach(visibleCaptures) { capture in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(capture.historySummary)
+                            .lineLimit(2, reservesSpace: true)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
 
-                HStack(spacing: 8) {
-                    if let applicationName = capture.sourceApplicationName {
-                        Text(applicationName)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                        HStack(spacing: 8) {
+                            if let applicationName =
+                                capture.sourceApplicationName {
+                                Text(applicationName)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+
+                            if let status = capture.historyStatus {
+                                Text(status)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Text(capture.historyListDate)
+                                .lineLimit(1)
+                                .fixedSize(
+                                    horizontal: true,
+                                    vertical: false
+                                )
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
-
-                    if let status = capture.historyStatus {
-                        Text(status)
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 8)
-
-                    Text(capture.historyListDate)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
+                    .padding(.vertical, 4)
+                    .transaction { $0.animation = nil }
+                    .tag(capture.id)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            } header: {
+                Text("\(visibleCaptures.count) 条记录")
             }
-            .padding(.vertical, 4)
-            .transaction { $0.animation = nil }
-            .tag(capture.id)
         }
         .listStyle(.inset)
-        .contentMargins(.top, 12, for: .scrollContent)
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,
@@ -243,8 +249,6 @@ struct CaptureHistoryView: View {
 private struct CaptureHistoryDetailPane: View {
     let controller: AppController
     @ObservedObject private var runtime: AppRuntimeController
-    @ObservedObject private var capabilities: AppCapabilityController
-    @ObservedObject private var setup: PermissionSetupController
     @ObservedObject var history: CaptureHistoryController
     let selectedCaptureID: UUID?
 
@@ -255,10 +259,6 @@ private struct CaptureHistoryDetailPane: View {
     ) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
-        _capabilities = ObservedObject(
-            wrappedValue: controller.capabilities
-        )
-        _setup = ObservedObject(wrappedValue: controller.setup)
         _history = ObservedObject(wrappedValue: history)
         self.selectedCaptureID = selectedCaptureID
     }
@@ -311,90 +311,95 @@ struct CaptureDetailView: View {
 
     var body: some View {
         ControlCenterReadingContent {
-            ControlCenterCommandBar {
-                Button("复制最终文字", systemImage: "doc.on.doc") {
-                    copy(capture.finalText)
-                }
-                .disabled(capture.finalText.isEmpty)
+            VStack(alignment: .leading, spacing: 20) {
+                ControlCenterCommandBar {
+                    Button("复制最终文字", systemImage: "doc.on.doc") {
+                        copy(capture.finalText)
+                    }
+                    .disabled(capture.finalText.isEmpty)
 
-                Button("复制识别文字", systemImage: "doc.on.doc") {
-                    copy(capture.recognizedText)
-                }
-                .disabled(capture.recognizedText.isEmpty)
+                    Button("复制识别文字", systemImage: "doc.on.doc") {
+                        copy(capture.recognizedText)
+                    }
+                    .disabled(capture.recognizedText.isEmpty)
 
-                Button(
-                    "删除记录…",
-                    systemImage: "trash",
-                    role: .destructive
+                    Button(
+                        "删除记录…",
+                        systemImage: "trash",
+                        role: .destructive
+                    ) {
+                        confirmsDeletion = true
+                    }
+                    .disabled(
+                        capture.lifecycle == .capturing
+                            || capture.refinement?.status == .running
+                    )
+
+                    Spacer(minLength: 0)
+                }
+
+                ControlCenterSectionBlock(
+                    capture.finalText.isEmpty ? "识别文字" : "最终文字"
                 ) {
-                    confirmsDeletion = true
-                }
-                .disabled(
-                    capture.lifecycle == .capturing
-                        || capture.refinement?.status == .running
-                )
+                    HStack(spacing: 8) {
+                        if let app = capture.sourceApplicationName {
+                            Text(app)
+                        }
 
-                Spacer(minLength: 0)
-            }
-            .padding(.bottom, 16)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(capture.finalText.isEmpty ? "识别文字" : "最终文字")
-                    .font(.title)
-
-                HStack(spacing: 8) {
-                    if let app = capture.sourceApplicationName {
-                        Text(app)
-                    }
-
-                    Text(
-                        capture.createdAt.formatted(
-                            .dateTime
-                                .locale(Locale(identifier: "zh-Hans"))
-                                .year()
-                                .month()
-                                .day()
-                                .hour()
-                                .minute()
+                        Text(
+                            capture.createdAt.formatted(
+                                .dateTime
+                                    .locale(Locale(identifier: "zh-Hans"))
+                                    .year()
+                                    .month()
+                                    .day()
+                                    .hour()
+                                    .minute()
+                            )
                         )
-                    )
 
-                    if let status = capture.historyStatus {
-                        Label(status, systemImage: "waveform")
+                        if let status = capture.historyStatus {
+                            Label(status, systemImage: "waveform")
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                    if let issue = capture.deliveryErrorDescription {
+                        Label(
+                            issue,
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .foregroundStyle(.secondary)
+                    }
+
+                    if capture.historyText.isEmpty {
+                        Text(
+                            capture.lifecycle == .capturing
+                                ? "正在录音… 使用录音控件或快捷键结束。"
+                                : "未识别到语音，可以播放录音后重新识别。"
+                        )
+                        .foregroundStyle(.secondary)
+                    } else {
+                        Text(capture.historyText)
+                            .lineSpacing(5)
+                            .textSelection(.enabled)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
                     }
                 }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
 
-                if let issue = capture.deliveryErrorDescription {
-                    Label(
-                        issue,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.secondary)
-                }
-            }
+                Divider()
 
-            if capture.historyText.isEmpty {
-                Text(
-                    capture.lifecycle == .capturing
-                        ? "正在录音… 使用录音控件或快捷键结束。"
-                        : "未识别到语音，可以播放录音后重新识别。"
-                )
-                .foregroundStyle(.secondary)
-            } else {
-                Text(capture.historyText)
-                    .lineSpacing(5)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            Divider()
-
-            ControlCenterSectionBlock("识别与润色") {
-                VStack(alignment: .leading, spacing: 16) {
+                ControlCenterSectionBlock(
+                    "识别与润色",
+                    subtitle: "保留原始识别结果和本次润色处理信息，便于核对最终文字。"
+                ) {
                     Text("原始语音识别")
-                        .font(.headline)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
 
                     Text(
                         capture.recognizedText.isEmpty
@@ -418,7 +423,8 @@ struct CaptureDetailView: View {
                         )
                     }
 
-                    if let error = capture.lastRecognitionErrorDescription {
+                    if let error =
+                        capture.lastRecognitionErrorDescription {
                         Label(
                             error,
                             systemImage: "exclamationmark.triangle"
@@ -428,16 +434,20 @@ struct CaptureDetailView: View {
 
                     if let refinement = capture.refinement {
                         Divider()
-                        CaptureRefinementSection(refinement: refinement)
+                        CaptureRefinementSection(
+                            refinement: refinement
+                        )
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
 
-            Divider()
+                Divider()
 
-            ControlCenterSectionBlock("原始录音") {
-                recording
+                ControlCenterSectionBlock(
+                    "原始录音",
+                    subtitle: "原始录音只保存在当前 Mac，并按设置中的保留周期自动清理。"
+                ) {
+                    recording
+                }
             }
         }
         .confirmationDialog(
