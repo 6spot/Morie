@@ -361,20 +361,51 @@ private enum RefinementOutputGuard {
     }
 
     private static func protectedIdentifierTokens(in text: String) -> [String] {
-        regexMatches(#"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9_.+-]{1,}(?![A-Za-z0-9_])"#, in: text)
-            .filter { token in
-                let scalars = token.unicodeScalars
-                let hasUpper = scalars.contains { CharacterSet.uppercaseLetters.contains($0) }
-                let hasLower = scalars.contains { CharacterSet.lowercaseLetters.contains($0) }
-                let tailHasUpper = token.dropFirst().unicodeScalars.contains {
-                    CharacterSet.uppercaseLetters.contains($0)
-                }
-                let hasDigit = scalars.contains { CharacterSet.decimalDigits.contains($0) }
-                let allCaps = hasUpper && !hasLower && token.count >= 2
-                let mixedCase = hasUpper && hasLower && tailHasUpper
-                let identifierPunctuation = token.contains("_") || token.contains("-")
-                return allCaps || mixedCase || hasDigit || identifierPunctuation
+        let mixedWithCJK = text.unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
+                true
+            default:
+                false
             }
+        }
+
+        return regexMatches(
+            #"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9_.+-]{1,}(?![A-Za-z0-9_])"#,
+            in: text
+        )
+        .filter { token in
+            let scalars = token.unicodeScalars
+            let hasUpper = scalars.contains {
+                CharacterSet.uppercaseLetters.contains($0)
+            }
+            let hasLower = scalars.contains {
+                CharacterSet.lowercaseLetters.contains($0)
+            }
+            let tailHasUpper = token.dropFirst().unicodeScalars.contains {
+                CharacterSet.uppercaseLetters.contains($0)
+            }
+            let hasDigit = scalars.contains {
+                CharacterSet.decimalDigits.contains($0)
+            }
+            let firstIsUpper = token.unicodeScalars.first.map {
+                CharacterSet.uppercaseLetters.contains($0)
+            } ?? false
+            let titleCaseInCJK =
+                mixedWithCJK
+                && firstIsUpper
+                && hasLower
+                && !tailHasUpper
+                && token.count >= 4
+            let allCaps = hasUpper && !hasLower && token.count >= 2
+            let mixedCase = hasUpper && hasLower && tailHasUpper
+            let identifierPunctuation = token.contains("_") || token.contains("-")
+            return allCaps
+                || mixedCase
+                || hasDigit
+                || identifierPunctuation
+                || titleCaseInCJK
+        }
     }
 
     private static func introducesContextOnlyContent(
