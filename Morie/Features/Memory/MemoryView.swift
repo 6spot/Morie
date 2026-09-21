@@ -411,20 +411,28 @@ struct MemoryDetailView: View {
                     }
                 }
                 .toolbar {
-                    ToolbarItemGroup(placement: .primaryAction) {
+                    ToolbarItem(placement: .primaryAction) {
                         Button("编辑个人记忆", systemImage: "pencil") {
                             editor = .edit(memoryID)
                         }
                         .disabled(memory.status == .superseded)
+                    }
 
-                        if memory.status == .active {
+                    ToolbarSpacer(.fixed, placement: .primaryAction)
+
+                    if memory.status == .active {
+                        ToolbarItem(placement: .primaryAction) {
                             Button(
                                 "归档个人记忆",
                                 systemImage: "archivebox"
                             ) {
                                 perform { try store.archive(memoryID) }
                             }
-                        } else if memory.status == .archived {
+                        }
+
+                        ToolbarSpacer(.fixed, placement: .primaryAction)
+                    } else if memory.status == .archived {
+                        ToolbarItem(placement: .primaryAction) {
                             Button(
                                 "恢复个人记忆",
                                 systemImage: "arrow.uturn.backward"
@@ -433,6 +441,10 @@ struct MemoryDetailView: View {
                             }
                         }
 
+                        ToolbarSpacer(.fixed, placement: .primaryAction)
+                    }
+
+                    ToolbarItem(placement: .primaryAction) {
                         Menu("更多操作", systemImage: "ellipsis") {
                             if memory.status != .superseded {
                                 Button(
