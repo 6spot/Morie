@@ -23,7 +23,8 @@ enum CaptureFileTranscriber {
         _ url: URL,
         locale requestedLocale: Locale,
         dictionaryWords: [String],
-        applicationContextWords: [String] = []
+        applicationContextWords: [String] = [],
+        captureID: UUID? = nil
     ) async throws -> String {
         try Task.checkCancellation()
         let probe = try AVAudioFile(forReading: url)
@@ -40,6 +41,17 @@ enum CaptureFileTranscriber {
         Diagnostics.record(
             "Speech",
             "Saved-audio recognition selected \(backend.logName) for \(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count); applicationHints=\(applicationContextWords.count); contextualHints=\(contextualWords.count)"
+        )
+        DevelopmentDiagnostics.record(
+            "AccurateSpeech",
+            captureID: captureID,
+            "start; backend=\(backend.logName); locale=\(backend.locale.identifier); file=\(url.lastPathComponent); frames=\(probe.length); sampleRate=\(probe.processingFormat.sampleRate)"
+        )
+        DevelopmentDiagnostics.list(
+            "AccurateSpeech",
+            captureID: captureID,
+            label: "contextualHints",
+            contextualWords
         )
 
         switch backend {
@@ -60,7 +72,8 @@ enum CaptureFileTranscriber {
                         locale: fallbackLocale,
                         contextualWords: contextualWords,
                         dictionaryHintCount: dictionaryWords.count,
-                        applicationHintCount: applicationContextWords.count
+                        applicationHintCount: applicationContextWords.count,
+                        captureID: captureID
                     )
                 }
                 throw error
@@ -70,7 +83,8 @@ enum CaptureFileTranscriber {
                 transcriber: transcriber,
                 contextualWords: contextualWords,
                 dictionaryHintCount: dictionaryWords.count,
-                applicationHintCount: applicationContextWords.count
+                applicationHintCount: applicationContextWords.count,
+                captureID: captureID
             )
 
         case .dictationTranscriber(let locale):
@@ -79,7 +93,8 @@ enum CaptureFileTranscriber {
                 locale: locale,
                 contextualWords: contextualWords,
                 dictionaryHintCount: dictionaryWords.count,
-                applicationHintCount: applicationContextWords.count
+                applicationHintCount: applicationContextWords.count,
+                captureID: captureID
             )
         }
     }
@@ -89,7 +104,8 @@ enum CaptureFileTranscriber {
         transcriber: SpeechTranscriber,
         contextualWords: [String],
         dictionaryHintCount: Int,
-        applicationHintCount: Int
+        applicationHintCount: Int,
+        captureID: UUID?
     ) async throws -> String {
         let audioFile = try AVAudioFile(forReading: url)
         let detector = SpeechDetector()
@@ -99,7 +115,8 @@ enum CaptureFileTranscriber {
             contextualWords,
             dictionaryHintCount: dictionaryHintCount,
             applicationHintCount: applicationHintCount,
-            analyzer: analyzer
+            analyzer: analyzer,
+            captureID: captureID
         )
 
         return try await withTaskCancellationHandler {
@@ -127,17 +144,36 @@ enum CaptureFileTranscriber {
                 let text = try await results.value
                 try Task.checkCancellation()
                 guard !text.isEmpty else { throw TranscriptionError.emptyRecognition }
+                DevelopmentDiagnostics.text(
+                    "AccurateSpeech",
+                    captureID: captureID,
+                    label: "speechTranscriberFinal",
+                    text,
+                    limit: 8_000
+                )
                 return text
             } catch {
                 results.cancel()
                 await analyzer.cancelAndFinishNow()
                 if SpeechRecognitionFailureClassifier.isRejection(error) {
+                    DevelopmentDiagnostics.record(
+                        "AccurateSpeech",
+                        captureID: captureID,
+                        level: .warning,
+                        "recognitionRejected; errorType=\(DevelopmentDiagnostics.errorType(error))"
+                    )
                     Diagnostics.record(
                         "SpeechQuality",
                         "Saved-audio recognizer rejected the recording; treating it as empty recognition"
                     )
                     throw TranscriptionError.emptyRecognition
                 }
+                DevelopmentDiagnostics.record(
+                    "AccurateSpeech",
+                    captureID: captureID,
+                    level: .error,
+                    "recognitionFailed; errorType=\(DevelopmentDiagnostics.errorType(error))"
+                )
                 throw error
             }
         } onCancel: {
@@ -150,7 +186,8 @@ enum CaptureFileTranscriber {
         locale: Locale,
         contextualWords: [String],
         dictionaryHintCount: Int,
-        applicationHintCount: Int
+        applicationHintCount: Int,
+        captureID: UUID?
     ) async throws -> String {
         let audioFile = try AVAudioFile(forReading: url)
         let transcriber = DictationTranscriber(locale: locale, preset: .longDictation)
@@ -161,7 +198,8 @@ enum CaptureFileTranscriber {
             contextualWords,
             dictionaryHintCount: dictionaryHintCount,
             applicationHintCount: applicationHintCount,
-            analyzer: analyzer
+            analyzer: analyzer,
+            captureID: captureID
         )
 
         return try await withTaskCancellationHandler {
@@ -189,17 +227,36 @@ enum CaptureFileTranscriber {
                 let text = try await results.value
                 try Task.checkCancellation()
                 guard !text.isEmpty else { throw TranscriptionError.emptyRecognition }
+                DevelopmentDiagnostics.text(
+                    "AccurateSpeech",
+                    captureID: captureID,
+                    label: "dictationTranscriberFinal",
+                    text,
+                    limit: 8_000
+                )
                 return text
             } catch {
                 results.cancel()
                 await analyzer.cancelAndFinishNow()
                 if SpeechRecognitionFailureClassifier.isRejection(error) {
+                    DevelopmentDiagnostics.record(
+                        "AccurateSpeech",
+                        captureID: captureID,
+                        level: .warning,
+                        "recognitionRejected; errorType=\(DevelopmentDiagnostics.errorType(error))"
+                    )
                     Diagnostics.record(
                         "SpeechQuality",
                         "Saved-audio recognizer rejected the recording; treating it as empty recognition"
                     )
                     throw TranscriptionError.emptyRecognition
                 }
+                DevelopmentDiagnostics.record(
+                    "AccurateSpeech",
+                    captureID: captureID,
+                    level: .error,
+                    "recognitionFailed; errorType=\(DevelopmentDiagnostics.errorType(error))"
+                )
                 throw error
             }
         } onCancel: {
@@ -220,7 +277,8 @@ enum CaptureFileTranscriber {
         _ contextualWords: [String],
         dictionaryHintCount: Int,
         applicationHintCount: Int,
-        analyzer: SpeechAnalyzer
+        analyzer: SpeechAnalyzer,
+        captureID: UUID?
     ) async {
         guard !contextualWords.isEmpty else { return }
 
@@ -232,11 +290,22 @@ enum CaptureFileTranscriber {
                 "SpeechQuality",
                 "Applied \(contextualWords.count) contextual strings to saved-audio recognition; dictionaryHints=\(dictionaryHintCount); applicationHints=\(applicationHintCount)"
             )
+            DevelopmentDiagnostics.record(
+                "AccurateSpeech",
+                captureID: captureID,
+                "contextApplied; total=\(contextualWords.count); dictionary=\(dictionaryHintCount); application=\(applicationHintCount)"
+            )
         } catch {
             Diagnostics.record(
                 "Speech",
                 "Saved-audio recognition context was unavailable; continuing recognition: \(error.localizedDescription)",
                 level: .warning
+            )
+            DevelopmentDiagnostics.record(
+                "AccurateSpeech",
+                captureID: captureID,
+                level: .warning,
+                "contextApplyFailed; errorType=\(DevelopmentDiagnostics.errorType(error))"
             )
         }
     }
