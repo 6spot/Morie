@@ -42,7 +42,9 @@ final class CaptureHistoryController: ObservableObject {
         historyRevisionObservation = store.$historyRevision
             .dropFirst()
             .sink { [weak self] _ in
-                self?.captureListDidChange()
+                Task { @MainActor [weak self] in
+                    self?.captureListDidChange()
+                }
             }
     }
 
