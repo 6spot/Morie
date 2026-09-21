@@ -283,8 +283,8 @@ struct MorieSettingsView: View {
     }
 
     var body: some View {
-        ControlCenterFormContent {
-            Group {
+        ControlCenterScrollableContent {
+            VStack(alignment: .leading, spacing: 24) {
                 Section {
                 Toggle(
                     "自动润色语音输入",
@@ -583,7 +583,6 @@ struct MorieSettingsView: View {
                 }
             }
         }
-        .navigationTitle("设置")
         .confirmationDialog(
             "清除已学习的表达习惯？",
             isPresented: $confirmsExpressionReset,
