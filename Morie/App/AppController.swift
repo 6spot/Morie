@@ -752,9 +752,24 @@ final class AppController {
             "toggleReceived; shortcut=\(preferences.captureShortcut.logName); runtimeState=\(String(describing: runtime.state)); activeCapture=\(captureSession.hasActiveCapture)"
         )
         if captureSession.hasActiveCapture {
-            captureSession.requestFinish(
-                source: preferences.captureShortcut.logName
-            )
+            switch captureSession.phase {
+            case .recording:
+                captureSession.requestFinish(
+                    source: preferences.captureShortcut.logName
+                )
+            case .finalizing, .refining:
+                Task { @MainActor [weak self] in
+                    await self?.captureSession.cancel(
+                        source: "\(self?.preferences.captureShortcut.logName ?? "Shortcut") during processing"
+                    )
+                }
+            default:
+                Diagnostics.record(
+                    "Session",
+                    "Toggle ignored while capture phase=\(String(describing: captureSession.phase))",
+                    level: .warning
+                )
+            }
             return
         }
 
