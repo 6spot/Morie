@@ -75,68 +75,64 @@ struct DictionaryView: View {
                 .foregroundStyle(.secondary)
             }
 
-            ControlCenterSectionBlock(
-                "我的词语",
-                subtitle: "你添加或确认过的词语。选中后可在右上角编辑或删除。"
-            ) {
-                if visibleUserEntries.isEmpty {
-                    ContentUnavailableView {
-                        Label(
-                            search.isEmpty
-                                ? "还没有自定义词语"
-                                : "没有匹配的自定义词语",
-                            systemImage: "character.book.closed"
-                        )
-                    } description: {
-                        Text(
-                            search.isEmpty
-                                ? "添加人名、产品名或专业术语，帮助语音识别。"
-                                : "试试其他搜索词。"
-                        )
-                    } actions: {
-                        if search.isEmpty {
+            if search.isEmpty || !visibleUserEntries.isEmpty {
+                ControlCenterSectionBlock(
+                    "我的词语",
+                    subtitle: "你添加或确认过的词语。选中后可在右上角编辑或删除。"
+                ) {
+                    if visibleUserEntries.isEmpty {
+                        ContentUnavailableView {
+                            Label(
+                                "还没有自定义词语",
+                                systemImage: "character.book.closed"
+                            )
+                        } description: {
+                            Text(
+                                "添加人名、产品名或专业术语，帮助语音识别。"
+                            )
+                        } actions: {
                             Button(
                                 "添加词语",
                                 systemImage: "plus",
                                 action: add
                             )
                         }
-                    }
-                    .frame(maxWidth: .infinity)
-                } else {
-                    LazyVGrid(
-                        columns: columns,
-                        alignment: .leading,
-                        spacing: 8
-                    ) {
-                        ForEach(visibleUserEntries) { entry in
-                            userWord(entry)
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        LazyVGrid(
+                            columns: columns,
+                            alignment: .leading,
+                            spacing: 8
+                        ) {
+                            ForEach(visibleUserEntries) { entry in
+                                userWord(entry)
+                            }
                         }
                     }
                 }
             }
 
-            Divider()
+            if search.isEmpty || !visibleBuiltInEntries.isEmpty {
+                if search.isEmpty || !visibleUserEntries.isEmpty {
+                    Divider()
+                }
 
-            ControlCenterSectionBlock(
-                "系统词语",
-                subtitle: "由 Morie 维护，用于增强语音识别；这些词语只读。"
-            ) {
-                if visibleBuiltInEntries.isEmpty {
-                    Text(
-                        search.isEmpty
-                            ? "暂无系统词语。"
-                            : "没有匹配的系统词语。"
-                    )
-                    .foregroundStyle(.secondary)
-                } else {
-                    LazyVGrid(
-                        columns: columns,
-                        alignment: .leading,
-                        spacing: 8
-                    ) {
-                        ForEach(visibleBuiltInEntries) { entry in
-                            builtInWord(entry)
+                ControlCenterSectionBlock(
+                    "系统词语",
+                    subtitle: "由 Morie 维护，用于增强语音识别；这些词语只读。"
+                ) {
+                    if visibleBuiltInEntries.isEmpty {
+                        Text("暂无系统词语。")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        LazyVGrid(
+                            columns: columns,
+                            alignment: .leading,
+                            spacing: 8
+                        ) {
+                            ForEach(visibleBuiltInEntries) { entry in
+                                builtInWord(entry)
+                            }
                         }
                     }
                 }
