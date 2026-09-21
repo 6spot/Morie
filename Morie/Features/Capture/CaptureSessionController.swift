@@ -34,6 +34,7 @@ final class CaptureSessionController {
         let dictionaryWords: [String]
         let applicationContextRequest: ApplicationContextCaptureRequest?
         let inputRefinementEnabled: Bool
+        let personalMemoryEnabled: Bool
         let refinementConfiguration: RefinementConfiguration
         let correctionSuggestionsEnabled: Bool
         let expressionLearningEnabled: Bool
@@ -176,6 +177,7 @@ final class CaptureSessionController {
             dictionaryWords: (try? dictionary?.speechHints()) ?? [],
             applicationContextRequest: applicationContextRequest,
             inputRefinementEnabled: inputRefinementEnabled,
+            personalMemoryEnabled: PersonalMemorySettings.isEnabled,
             refinementConfiguration: refinementConfiguration,
             correctionSuggestionsEnabled: correctionSuggestionsEnabled,
             expressionLearningEnabled: expressionLearningEnabled,
@@ -226,7 +228,7 @@ final class CaptureSessionController {
         DevelopmentDiagnostics.record(
             "Capture",
             captureID: sessionID,
-            "start; mode=\(sessionContext.deliveryMode.rawValue); locale=\(sessionContext.locale.identifier); refinement=\(sessionContext.inputRefinementEnabled); correctionSuggestions=\(sessionContext.correctionSuggestionsEnabled); expressionLearning=\(sessionContext.expressionLearningEnabled); sound=\(sessionContext.soundFeedbackEnabled); targetApp=\(contextApplication?.localizedName ?? "none"); targetBundle=\(contextApplication?.bundleIdentifier ?? "none"); targetPID=\(contextApplication?.processIdentifier ?? 0); refinementMode=\(sessionContext.refinementConfiguration.model.mode.rawValue); cloudHost=\(sessionContext.refinementConfiguration.model.cloudURL?.host ?? "none"); cloudModel=\(sessionContext.refinementConfiguration.model.trimmedCloudModelName.isEmpty ? "none" : sessionContext.refinementConfiguration.model.trimmedCloudModelName); apiKeyConfigured=\(!sessionContext.refinementConfiguration.model.cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)"
+            "start; mode=\(sessionContext.deliveryMode.rawValue); locale=\(sessionContext.locale.identifier); refinement=\(sessionContext.inputRefinementEnabled); personalMemory=\(sessionContext.personalMemoryEnabled); correctionSuggestions=\(sessionContext.correctionSuggestionsEnabled); expressionLearning=\(sessionContext.expressionLearningEnabled); sound=\(sessionContext.soundFeedbackEnabled); targetApp=\(contextApplication?.localizedName ?? "none"); targetBundle=\(contextApplication?.bundleIdentifier ?? "none"); targetPID=\(contextApplication?.processIdentifier ?? 0); refinementMode=\(sessionContext.refinementConfiguration.model.mode.rawValue); cloudHost=\(sessionContext.refinementConfiguration.model.cloudURL?.host ?? "none"); cloudModel=\(sessionContext.refinementConfiguration.model.trimmedCloudModelName.isEmpty ? "none" : sessionContext.refinementConfiguration.model.trimmedCloudModelName); apiKeyConfigured=\(!sessionContext.refinementConfiguration.model.cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)"
         )
         DevelopmentDiagnostics.list(
             "Dictionary",
@@ -388,7 +390,8 @@ final class CaptureSessionController {
             soundFeedback.playStop()
         }
         setPhase(.finalizing)
-        onCancellationEnabledChange?(false)
+        // Processing remains user-cancellable until delivery begins.
+        onCancellationEnabledChange?(true)
         hud.showProcessing()
         Diagnostics.record("Session", "Finish requested for \(label(sessionID)) from \(source)")
 
@@ -409,7 +412,7 @@ final class CaptureSessionController {
             return
         }
 
-        guard phase == .recording else {
+        guard phase == .recording || phase == .finalizing || phase == .refining else {
             Diagnostics.record(
                 "Session",
                 "Cancel from \(source) ignored while phase=\(String(describing: phase))",
@@ -707,23 +710,37 @@ final class CaptureSessionController {
                     resolveRefinementConfiguration(
                         sessionContext.refinementConfiguration
                     )
+                let relevantApplicationCandidates =
+                    ApplicationContextVocabulary.refinementCandidates(
+                        from: activeApplicationContextWords,
+                        transcript: finalText
+                    )
                 let refinementConfiguration = RefinementConfiguration(
                     model: resolvedRefinementConfiguration.model,
                     instructions: resolvedRefinementConfiguration.instructions,
                     applicationSpellingCandidates:
-                        activeApplicationContextWords
+                        relevantApplicationCandidates
                 )
                 DevelopmentDiagnostics.list(
                     "RefinementInput",
                     captureID: sessionID,
-                    label: "applicationSpellingCandidates",
+                    label: "applicationSpellingCandidatesAll",
                     activeApplicationContextWords
+                )
+                DevelopmentDiagnostics.list(
+                    "RefinementInput",
+                    captureID: sessionID,
+                    label: "applicationSpellingCandidatesRelevant",
+                    relevantApplicationCandidates
                 )
                 finalText = try await personalizer.refine(
                     sessionID,
                     enabled: sessionContext.inputRefinementEnabled,
+                    personalMemoryEnabled: sessionContext.personalMemoryEnabled,
                     expressionStyleEnabled: sessionContext.expressionLearningEnabled,
-                    otherModelWorkActive: memoryLearning?.isModelBusy == true,
+                    // Background Memory learning is cancelled at Capture start and
+                    // must never make a foreground dictation silently skip cleanup.
+                    otherModelWorkActive: false,
                     configuration: refinementConfiguration
                 )
                 recordLatency("refinement-final", sessionID: sessionID)
@@ -756,6 +773,7 @@ final class CaptureSessionController {
             }
 
             setPhase(.delivering)
+            onCancellationEnabledChange?(false)
             DevelopmentDiagnostics.record(
                 "Stage",
                 captureID: sessionID,
