@@ -51,14 +51,9 @@ struct DictionaryView: View {
     var body: some View {
         ControlCenterScrollableContent {
             VStack(alignment: .leading, spacing: 24) {
-                ControlCenterCommandBar {
-                    TextField("搜索词语", text: $search)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 280)
-
-                    Text("\(visibleCount) 个词语")
-                        .foregroundStyle(.secondary)
-                }
+                Text("\(visibleCount) 个词语")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
 
                 if let errorMessage {
                     Label(
