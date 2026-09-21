@@ -1,3 +1,4 @@
+import Observation
 import SwiftUI
 
 enum ControlCenterPageFamily {
@@ -77,26 +78,39 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
 }
 
 @MainActor
+@Observable
+private final class ControlCenterSession {
+    var selection: ControlCenterSection? = .overview
+    var selectedCaptureID: UUID?
+    var selectedDictionaryEntry: UUID?
+    var overviewMetricsSnapshot: OverviewMetricsSnapshot?
+    var columnVisibility: NavigationSplitViewVisibility = .all
+
+    var currentSection: ControlCenterSection {
+        selection ?? .overview
+    }
+
+    func open(_ section: ControlCenterSection) {
+        selection = section
+    }
+}
+
+@MainActor
 struct MorieControlCenter: View {
     let controller: AppController
 
-    @State private var selection: ControlCenterSection? = .overview
-    @State private var selectedCaptureID: UUID?
-    @State private var selectedDictionaryEntry: UUID?
-    @State private var overviewMetricsSnapshot: OverviewMetricsSnapshot?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var session = ControlCenterSession()
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            ControlCenterSidebar(selection: $selection)
+        @Bindable var session = session
+
+        NavigationSplitView(columnVisibility: $session.columnVisibility) {
+            ControlCenterSidebar(selection: $session.selection)
         } detail: {
             NavigationStack {
                 ControlCenterRouteHost(
                     controller: controller,
-                    section: selection ?? .overview,
-                    selectedCaptureID: $selectedCaptureID,
-                    selectedDictionaryEntry: $selectedDictionaryEntry,
-                    overviewMetricsSnapshot: $overviewMetricsSnapshot
+                    session: session
                 )
             }
         }
@@ -104,14 +118,16 @@ struct MorieControlCenter: View {
         .frame(minWidth: 960, minHeight: 600)
         .onAppear {
             Diagnostics.record("ControlCenter", "Shell mounted")
+            Diagnostics.recordMemory("control-center-mounted")
         }
         .onDisappear {
             Diagnostics.record("ControlCenter", "Shell unmounted")
+            Diagnostics.recordMemory("control-center-unmounted")
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .morieShowSettings)
         ) { _ in
-            selection = .settings
+            session.open(.settings)
         }
     }
 }
@@ -153,14 +169,11 @@ private struct ControlCenterSidebar: View {
 @MainActor
 private struct ControlCenterRouteHost: View {
     let controller: AppController
-    let section: ControlCenterSection
-    @Binding var selectedCaptureID: UUID?
-    @Binding var selectedDictionaryEntry: UUID?
-    @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
+    @Bindable var session: ControlCenterSession
 
     @ViewBuilder
     var body: some View {
-        switch section.pageFamily {
+        switch session.currentSection.pageFamily {
         case .scrolling:
             ScrollView {
                 routedPage
@@ -186,24 +199,24 @@ private struct ControlCenterRouteHost: View {
 
     @ViewBuilder
     private var routedPage: some View {
-        switch section {
+        switch session.currentSection {
         case .overview:
             OverviewView(
                 controller: controller,
-                metricsSnapshot: $overviewMetricsSnapshot
+                metricsSnapshot: $session.overviewMetricsSnapshot
             )
 
         case .history:
             CaptureHistoryWorkspace(
                 controller: controller,
-                selection: $selectedCaptureID
+                selection: $session.selectedCaptureID
             )
 
         case .dictionary:
             if let dictionary = controller.dictionary {
                 DictionaryView(
                     store: dictionary,
-                    selection: $selectedDictionaryEntry
+                    selection: $session.selectedDictionaryEntry
                 )
             } else {
                 unavailable("字典不可用")
