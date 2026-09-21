@@ -5,11 +5,14 @@ import Foundation
 final class AppController {
     enum ControllerError: LocalizedError {
         case persistenceUnavailable(String)
+        case factoryResetUnavailable(String)
 
         var errorDescription: String? {
             switch self {
             case .persistenceUnavailable(let reason):
                 "记录存储不可用：\(reason)"
+            case .factoryResetUnavailable(let reason):
+                reason
             }
         }
     }
@@ -375,6 +378,55 @@ final class AppController {
                 level: .error
             )
         }
+    }
+
+    func factoryReset() async throws {
+        guard !isCaptureActive else {
+            throw ControllerError.factoryResetUnavailable(
+                "录音或润色进行中，暂时不能恢复出厂设置。"
+            )
+        }
+        guard let captureStore else {
+            throw ControllerError.persistenceUnavailable(
+                persistenceError?.localizedDescription ?? "记录存储尚未初始化。"
+            )
+        }
+
+        postInsertionLearning?.stop()
+        memoryLearning?.stop()
+        await memoryLearning?.waitForCurrentBatch()
+        await history?.cancelRecognitionAndWait()
+
+        iCloudStatusTask?.cancel()
+        iCloudStatusTask = nil
+        audioMaintenanceTask?.cancel()
+        audioMaintenanceTask = nil
+
+        hotkey?.invalidate()
+        hotkey = nil
+
+        try RefinementModelSettings.resetToDefaults()
+        RefinementPromptSettings.restoreDefault()
+
+        let defaults = UserDefaults.standard
+        [
+            Self.setupCompletedKey,
+            CaptureShortcut.defaultsKey,
+            CaptureStore.audioRetentionDaysDefaultsKey,
+            CapturePersonalizer.enabledDefaultsKey,
+            PersonalMemorySettings.enabledDefaultsKey,
+            PostInsertionLearningController.dictionarySuggestionsDefaultsKey,
+            ExpressionProfileStore.enabledDefaultsKey,
+            CaptureSoundFeedback.enabledDefaultsKey,
+            ICloudSyncSettings.enabledDefaultsKey,
+        ].forEach {
+            defaults.removeObject(forKey: $0)
+        }
+
+        try await captureStore.eraseAllDataForFactoryReset()
+        DiagnosticLogStore.shared.clear()
+
+        NSApplication.shared.terminate(nil)
     }
 
     func setICloudSyncEnabled(_ enabled: Bool) {
