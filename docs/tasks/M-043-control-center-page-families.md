@@ -109,6 +109,11 @@ The current design source of truth is `docs/DESIGN.md`.
 - [x] Redesign Memory detail and directly expose provenance/history.
 - [x] Redesign History list/detail workspace and directly expose record detail.
 - [x] Redesign Diagnostics workspace.
+- [x] Persist Overview usage metrics incrementally instead of scanning Capture history on page open.
+- [x] Make History presentation data lazy/bounded and release its ModelContext/list/player when hidden.
+- [x] Scope History controller to the Control Center rather than CaptureSession/AppController.
+- [x] Keep Diagnostics entries in memory only while the Diagnostics page is visible.
+- [x] Reset Control Center presentation state when the window closes.
 - [x] Xcode 27 compile passes on the final implementation.
 - [x] MorieTests pass on the final implementation.
 - [ ] Owner-device visual acceptance passes.
@@ -126,6 +131,9 @@ Check at the normal development window size and at the 960 × 600 minimum:
 - [ ] Settings remains understandable without hiding normal controls;
 - [ ] Permissions exposes current state and recovery actions clearly;
 - [ ] Diagnostics fills the detail workspace;
+- [ ] History loads the initial bounded page and additional rows only when scrolling reaches the end;
+- [ ] closing the Control Center releases History presentation records/player/context and Diagnostics in-memory entries;
+- [ ] memory diagnostics at close, +1s and +5s show `heapInUse` / physical footprint settling after presentation data is released;
 - [ ] light/dark appearance and resizing remain native.
 
-Validation: macOS 27 CI run #534 passed on code commit `7868fbbfae9eb250507118d0b5acdd005664f121`: Xcode 27 compile and MorieTests both succeeded.\n\nDo not mark this task DONE until owner-device visual acceptance passes.
+Validation: macOS 27 CI run #562 passed on code commit `0447c7ac44500b5f36a8b2214a50d1a0076a9322`: Xcode 27 compile and MorieTests both succeeded after the Control Center memory-lifecycle refactor.\n\nDo not mark this task DONE until owner-device visual acceptance passes.
