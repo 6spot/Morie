@@ -435,84 +435,12 @@ struct DiagnosticLogView: View {
     }
 
     var body: some View {
-        VSplitView {
-            Table(visibleEntries, selection: $selection) {
-                TableColumn("时间") { entry in
-                    Text(
-                        entry.timestamp.formatted(
-                            .dateTime
-                                .locale(Locale(identifier: "zh-Hans"))
-                                .hour()
-                                .minute()
-                                .second()
-                        )
-                    )
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                }
-                .width(min: 80, ideal: 94, max: 120)
+        VStack(spacing: 0) {
+            ControlCenterCommandBar {
+                TextField("搜索诊断日志", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 280)
 
-                TableColumn("级别") { entry in
-                    Label(
-                        entry.level.title,
-                        systemImage: entry.level.systemImage
-                    )
-                    .foregroundStyle(entry.level.color)
-                }
-                .width(min: 80, ideal: 94, max: 110)
-
-                TableColumn("类别") { entry in
-                    Text(entry.category)
-                }
-                .width(min: 90, ideal: 120, max: 200)
-
-                TableColumn("内容") { entry in
-                    Text(entry.message)
-                        .lineLimit(1)
-                }
-            }
-            .overlay {
-                if visibleEntries.isEmpty {
-                    ContentUnavailableView(
-                        store.entries.isEmpty
-                            ? "暂无诊断日志"
-                            : "没有匹配的日志",
-                        systemImage: "ladybug",
-                        description: Text(
-                            store.entries.isEmpty
-                                ? "录音和识别过程的诊断信息会显示在这里。"
-                                : "试试其他搜索词或日志级别。"
-                        )
-                    )
-                }
-            }
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity
-            )
-
-            diagnosticDetail
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 160,
-                    idealHeight: 220,
-                    maxHeight: 320
-                )
-        }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity,
-            alignment: .topLeading
-        )
-        .navigationTitle("诊断")
-        .navigationSubtitle(
-            DevelopmentDiagnostics.isEnabled
-                ? "\(visibleEntries.count) 条日志 · 开发追踪已启用"
-                : "\(visibleEntries.count) 条日志"
-        )
-        .searchable(text: $search, prompt: "搜索诊断日志")
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
                 Picker("筛选日志", selection: $level) {
                     Text("全部日志")
                         .tag(nil as DiagnosticLevel?)
@@ -529,6 +457,11 @@ struct DiagnosticLogView: View {
                     }
                 }
                 .pickerStyle(.menu)
+
+                Text("\(visibleEntries.count) 条")
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 12)
 
                 Button(
                     "复制当前筛选",
@@ -578,7 +511,86 @@ struct DiagnosticLogView: View {
                     .disabled(store.entries.isEmpty)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            VSplitView {
+                Table(visibleEntries, selection: $selection) {
+                    TableColumn("时间") { entry in
+                        Text(
+                            entry.timestamp.formatted(
+                                .dateTime
+                                    .locale(Locale(identifier: "zh-Hans"))
+                                    .hour()
+                                    .minute()
+                                    .second()
+                            )
+                        )
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    }
+                    .width(min: 80, ideal: 94, max: 120)
+
+                    TableColumn("级别") { entry in
+                        Label(
+                            entry.level.title,
+                            systemImage: entry.level.systemImage
+                        )
+                        .foregroundStyle(entry.level.color)
+                    }
+                    .width(min: 80, ideal: 94, max: 110)
+
+                    TableColumn("类别") { entry in
+                        Text(entry.category)
+                    }
+                    .width(min: 90, ideal: 120, max: 200)
+
+                    TableColumn("内容") { entry in
+                        Text(entry.message)
+                            .lineLimit(1)
+                    }
+                }
+                .overlay {
+                    if visibleEntries.isEmpty {
+                        ContentUnavailableView(
+                            store.entries.isEmpty
+                                ? "暂无诊断日志"
+                                : "没有匹配的日志",
+                            systemImage: "ladybug",
+                            description: Text(
+                                store.entries.isEmpty
+                                    ? "录音和识别过程的诊断信息会显示在这里。"
+                                    : "试试其他搜索词或日志级别。"
+                            )
+                        )
+                    }
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+
+                diagnosticDetail
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 160,
+                        idealHeight: 220,
+                        maxHeight: 320
+                    )
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
         .confirmationDialog(
             "清空诊断日志？",
             isPresented: $confirmsClear,
