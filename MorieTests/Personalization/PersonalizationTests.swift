@@ -194,6 +194,10 @@ final class PersonalizationTests: XCTestCase {
             (
                 "把旧路径删掉改成新的那个文件",
                 "/Users/me/b.swift"
+            ),
+            (
+                "这个问题怎么处理",
+                "答案是重启应用。"
             )
         ]
 
