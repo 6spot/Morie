@@ -184,6 +184,16 @@ Owns application preference values used by the UI.
 
 Side effects caused by preference changes are coordinated with the appropriate owning subsystem.
 
+## Control Center ownership
+
+The macOS Control Center has one window-level presentation owner.
+
+`MorieControlCenter` owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. A Control Center session owns only state that must survive route changes, such as the selected destination, sidebar visibility and cross-route selections.
+
+`ControlCenterRouteHost` chooses the page-family container. Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center shells or move unrelated feature state into `AppController`.
+
+Control Center summary views must not hydrate an entire persistent collection into the UI's main `ModelContext` merely to calculate aggregates. Use bounded SwiftData traversal and narrow fetched properties for summary work, and keep large feature collections behind the feature controller/store that owns their lifecycle.
+
 ## Core input flow
 
 The primary interactive flow is:
