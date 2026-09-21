@@ -751,7 +751,10 @@ final class CaptureSessionController {
                 label: "text",
                 finalText
             )
-            let deliveryApplication = try injector.deliver(finalText)
+            let deliveryApplication = try injector.deliver(
+                finalText,
+                captureID: sessionID
+            )
             let deliveredName = deliveryApplication.localizedName
             let deliveredBundle = deliveryApplication.bundleIdentifier
             recordLatency("paste-dispatched", sessionID: sessionID)
