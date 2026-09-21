@@ -222,14 +222,57 @@ struct PermissionManagementView: View {
     }
 
     var body: some View {
-        ControlCenterScrollableContent {
-            VStack(alignment: .leading, spacing: 24) {
+        ControlCenterPage {
+            ControlCenterSectionBlock(
+                "当前状态",
+                subtitle: "Morie 只检查运行语音输入所需的设备能力和 macOS 权限。"
+            ) {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName: setup.isReady
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.circle"
+                    )
+                    .foregroundStyle(setup.isReady ? .secondary : .primary)
+
+                    Text(
+                        setup.isReady
+                            ? "设备与权限已就绪"
+                            : "还有项目需要处理"
+                    )
+                    .font(.headline)
+
+                    Spacer()
+
+                    if isBusy {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+
+                if setup.isReady && !controller.canStartCapture {
+                    Button("重新启用 Morie") {
+                        Task {
+                            await controller.bootstrap(
+                                completingSetup: true
+                            )
+                        }
+                    }
+                    .disabled(isBusy || controller.isCaptureActive)
+                }
+            }
+
+            Divider()
+
             if setup.checks.isEmpty {
-                ControlCenterSectionBlock("设备与权限") {
+                ControlCenterSectionBlock("正在检查") {
                     ProgressView("正在检查设备和权限…")
                 }
             } else {
-                ControlCenterSectionBlock("设备能力") {
+                ControlCenterSectionBlock(
+                    "设备能力",
+                    subtitle: "这些能力由当前 Mac 和系统资源决定。"
+                ) {
                     capabilityRows(
                         setup.checks.filter {
                             !$0.requirement.isPermission
@@ -237,41 +280,29 @@ struct PermissionManagementView: View {
                     )
                 }
 
-                ControlCenterSectionBlock("使用权限") {
+                Divider()
+
+                ControlCenterSectionBlock(
+                    "使用权限",
+                    subtitle: "权限由 macOS 管理。完成授权后可使用右上角“重新检查”立即刷新状态。"
+                ) {
                     capabilityRows(
                         setup.checks.filter {
                             $0.requirement.isPermission
                         }
                     )
-
-                    if setup.isReady
-                        && !controller.canStartCapture {
-                        Button("重新启用 Morie") {
-                            Task {
-                                await controller.bootstrap(
-                                    completingSetup: true
-                                )
-                            }
-                        }
-                        .disabled(
-                            isBusy || controller.isCaptureActive
-                        )
-                    }
-                } footer: {
-                    Text(
-                        "权限由 macOS 管理。从系统设置返回后，状态会自动更新。"
-                    )
                 }
             }
 
             if let error = capabilities.setupError {
-                ControlCenterSectionBlock("状态") {
+                Divider()
+
+                ControlCenterSectionBlock("需要注意") {
                     Label(
                         error,
                         systemImage: "exclamationmark.triangle"
                     )
                     .foregroundStyle(.secondary)
-                }
                 }
             }
         }
@@ -286,13 +317,19 @@ struct PermissionManagementView: View {
     private func capabilityRows(
         _ checks: [CapabilityCheck]
     ) -> some View {
-        ForEach(checks) { check in
+        ForEach(Array(checks.enumerated()), id: \.element.id) {
+            index,
+            check in
             PermissionRequirementRow(
                 check: check,
                 activeRequest: setup.activeRequest,
                 isBusy: isBusy,
                 onAction: perform
             )
+
+            if index < checks.count - 1 {
+                Divider()
+            }
         }
     }
 
