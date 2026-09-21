@@ -514,7 +514,7 @@ private struct ControlCenterRouteHost: View {
 
             ToolbarSpacer(.fixed, placement: .primaryAction)
 
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button("编辑词语", systemImage: "pencil") {
                     guard let id = selectedDictionaryUserEntryID else {
                         return
@@ -523,11 +523,7 @@ private struct ControlCenterRouteHost: View {
                     presentation.dictionaryShowingEditor = true
                 }
                 .disabled(selectedDictionaryUserEntryID == nil)
-            }
 
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItem(placement: .primaryAction) {
                 Button(
                     "删除词语…",
                     systemImage: "trash",
@@ -536,11 +532,7 @@ private struct ControlCenterRouteHost: View {
                     presentation.dictionaryConfirmsDeletion = true
                 }
                 .disabled(selectedDictionaryUserEntryID == nil)
-            }
 
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItem(placement: .primaryAction) {
                 Button("添加词语", systemImage: "plus") {
                     presentation.dictionaryEditingEntryID = nil
                     presentation.dictionaryShowingEditor = true
@@ -626,26 +618,18 @@ private struct ControlCenterRouteHost: View {
 
             ToolbarSpacer(.fixed, placement: .primaryAction)
 
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button(
                     "复制当前筛选",
                     systemImage: "line.3.horizontal.decrease.circle"
                 ) {
                     copyDiagnostics(filteredDiagnosticEntries)
                 }
-            }
 
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItem(placement: .primaryAction) {
                 Button("复制全部日志", systemImage: "doc.on.doc") {
                     copyDiagnostics(DiagnosticLogStore.shared.entries)
                 }
-            }
 
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItem(placement: .primaryAction) {
                 Menu("诊断操作", systemImage: "ellipsis") {
                     Button(
                         "在访达中显示日志文件",
