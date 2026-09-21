@@ -48,89 +48,109 @@ struct DictionaryView: View {
         visibleUserEntries.count + visibleBuiltInEntries.count
     }
 
+    private var totalUserCount: Int {
+        store.displayEntries.filter(\.isEditable).count
+    }
+
+    private var totalBuiltInCount: Int {
+        store.displayEntries.filter { !$0.isEditable }.count
+    }
+
     var body: some View {
-        ControlCenterScrollableContent {
-            VStack(alignment: .leading, spacing: 24) {
-                Text("\(visibleCount) 个词语")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+        ControlCenterPage {
+            HStack(spacing: 8) {
+                Text("\(totalUserCount) 个自定义")
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Text("\(totalBuiltInCount) 个系统词语")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
 
-                if let errorMessage {
-                    Label(
-                        errorMessage,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.secondary)
-                }
+            if let errorMessage {
+                Label(
+                    errorMessage,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(.secondary)
+            }
 
-                if search.isEmpty || !visibleUserEntries.isEmpty {
-                    dictionarySection(
-                        title: "用户添加",
-                        description: "你添加或确认过的词语，可以编辑和删除。"
-                    ) {
-                        if visibleUserEntries.isEmpty {
-                            ContentUnavailableView {
-                                Label(
-                                    "还没有自定义词语",
-                                    systemImage: "character.book.closed"
-                                )
-                            } description: {
-                                Text(
-                                    "添加人名、产品名或专业术语，帮助语音识别。"
-                                )
-                            } actions: {
-                                Button(
-                                    "添加词语",
-                                    systemImage: "plus",
-                                    action: add
-                                )
-                            }
-                            .frame(maxWidth: .infinity)
-                        } else {
-                            LazyVGrid(
-                                columns: columns,
-                                alignment: .leading,
-                                spacing: 8
-                            ) {
-                                ForEach(visibleUserEntries) { entry in
-                                    userWord(entry)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if !visibleBuiltInEntries.isEmpty {
-                    Divider()
-
-                    dictionarySection(
-                        title: "系统内置",
-                        description:
-                            "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
-                    ) {
-                        LazyVGrid(
-                            columns: columns,
-                            alignment: .leading,
-                            spacing: 8
-                        ) {
-                            ForEach(visibleBuiltInEntries) { entry in
-                                builtInWord(entry)
-                            }
-                        }
-                    }
-                }
-
-                if visibleCount == 0 && errorMessage == nil {
+            ControlCenterSectionBlock(
+                "我的词语",
+                subtitle: "你添加或确认过的词语。选中后可在右上角编辑或删除。"
+            ) {
+                if visibleUserEntries.isEmpty {
                     ContentUnavailableView {
                         Label(
-                            "没有匹配的词语",
-                            systemImage: "magnifyingglass"
+                            search.isEmpty
+                                ? "还没有自定义词语"
+                                : "没有匹配的自定义词语",
+                            systemImage: "character.book.closed"
                         )
                     } description: {
-                        Text("试试其他搜索词。")
+                        Text(
+                            search.isEmpty
+                                ? "添加人名、产品名或专业术语，帮助语音识别。"
+                                : "试试其他搜索词。"
+                        )
+                    } actions: {
+                        if search.isEmpty {
+                            Button(
+                                "添加词语",
+                                systemImage: "plus",
+                                action: add
+                            )
+                        }
                     }
                     .frame(maxWidth: .infinity)
+                } else {
+                    LazyVGrid(
+                        columns: columns,
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+                        ForEach(visibleUserEntries) { entry in
+                            userWord(entry)
+                        }
+                    }
                 }
+            }
+
+            Divider()
+
+            ControlCenterSectionBlock(
+                "系统词语",
+                subtitle: "由 Morie 维护，用于增强语音识别；这些词语只读。"
+            ) {
+                if visibleBuiltInEntries.isEmpty {
+                    Text(
+                        search.isEmpty
+                            ? "暂无系统词语。"
+                            : "没有匹配的系统词语。"
+                    )
+                    .foregroundStyle(.secondary)
+                } else {
+                    LazyVGrid(
+                        columns: columns,
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+                        ForEach(visibleBuiltInEntries) { entry in
+                            builtInWord(entry)
+                        }
+                    }
+                }
+            }
+
+            if visibleCount == 0 && errorMessage == nil {
+                Divider()
+
+                ContentUnavailableView(
+                    "没有匹配的词语",
+                    systemImage: "magnifyingglass",
+                    description: Text("试试其他搜索词。")
+                )
+                .frame(maxWidth: .infinity)
             }
         }
         .sheet(isPresented: $showingEditor) {
@@ -159,24 +179,6 @@ struct DictionaryView: View {
                 self.selection = nil
             }
         }
-    }
-
-    private func dictionarySection<Content: View>(
-        title: String,
-        description: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-
-            content()
-
-            Text(description)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func load() {
@@ -223,7 +225,6 @@ struct DictionaryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
         .controlSize(.small)
         .help(entry.source.helpText)
         .contextMenu {
