@@ -83,10 +83,8 @@ struct OverviewView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             buildSection
-            if DevelopmentDiagnostics.isEnabled {
-                Divider()
-                applicationContextSection
-            }
+            Divider()
+            applicationContextSection
             Divider()
             usageSection
             Divider()
@@ -232,11 +230,11 @@ struct OverviewView: View {
                     )
                 }
 
-                Text("这里只显示最近一次 Capture 的临时词汇决策与原始上下文预览；不会写入历史、Capture 数据库或个人记忆。当前为开发构建，原始上下文也会写入本机 Dev 诊断日志用于排查。")
+                Text("这里只显示最近一次 Capture 的临时词汇决策与原始上下文预览；不会写入历史、Capture 数据库或个人记忆。开发诊断开启时，原始上下文也会写入本机 Dev 诊断日志用于排查。")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
-                Text("完成一次语音输入后，这里会显示本次实际送给 Apple Speech 的 Application Context 临时词。")
+                Text("完成一次语音输入后，这里会显示本次 Application Context、提取出的临时词，以及实际送给 Apple Speech 的 hints。")
                     .foregroundStyle(.secondary)
             }
         }
