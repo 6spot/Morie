@@ -415,11 +415,11 @@ enum Diagnostics {
 @MainActor
 struct DiagnosticLogView: View {
     @ObservedObject private var store = DiagnosticLogStore.shared
+    @Binding var search: String
+    @Binding var level: DiagnosticLevel?
+    @Binding var confirmsClear: Bool
 
-    @State private var search = ""
-    @State private var level: DiagnosticLevel?
     @State private var selection: UUID?
-    @State private var confirmsClear = false
 
     private var visibleEntries: [DiagnosticLogStore.Entry] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -441,65 +441,13 @@ struct DiagnosticLogView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 280)
 
-                Picker("筛选日志", selection: $level) {
-                    Text("全部日志")
-                        .tag(nil as DiagnosticLevel?)
-
-                    ForEach(
-                        [
-                            DiagnosticLevel.info,
-                            .warning,
-                            .error
-                        ],
-                        id: \.self
-                    ) {
-                        Text($0.title).tag(Optional($0))
-                    }
-                }
-                .pickerStyle(.menu)
-
                 Text("\(visibleEntries.count) 条")
                     .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
 
-                Spacer(minLength: 12)
-
-                Button(
-                    "复制当前筛选",
-                    systemImage: "line.3.horizontal.decrease.circle"
-                ) {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(
-                        store.text(for: visibleEntries),
-                        forType: .string
-                    )
-                }
-                .disabled(visibleEntries.isEmpty)
-
-                Button(
-                    "复制全部日志",
-                    systemImage: "doc.on.doc"
-                ) {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(
-                        store.plainText,
-                        forType: .string
-                    )
-                }
-                .disabled(store.entries.isEmpty)
-
-                Menu("诊断操作", systemImage: "ellipsis") {
-                    Button(
-                        "在访达中显示日志文件",
-                        systemImage: "doc.text.magnifyingglass"
-                    ) {
-                        NSWorkspace.shared.activateFileViewerSelecting(
-                            [store.logFileURL]
-                        )
-                    }
-
-                    Divider()
+            Divider()
 
                     Button(
                         "清空诊断日志…",
