@@ -60,8 +60,6 @@ struct CaptureHistoryWorkspace: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Divider()
-
             Group {
                 if let history = controller.history {
                     HSplitView {
@@ -71,7 +69,9 @@ struct CaptureHistoryWorkspace: View {
                             search: $search,
                             filter: $filter,
                             canStartCapture: canStartCapture,
-                            onRecord: controller.startCaptureOnly
+                            canLoadMore: history.canLoadMoreCaptures,
+                            onRecord: controller.startCaptureOnly,
+                            onLoadMore: history.loadMoreCaptures
                         )
                         .frame(
                             minWidth: 250,
@@ -131,7 +131,9 @@ struct CaptureHistoryView: View {
     @Binding var search: String
     @Binding var filter: CaptureHistoryFilter
     let canStartCapture: Bool
+    let canLoadMore: Bool
     let onRecord: () -> Void
+    let onLoadMore: () -> Void
 
     private var visibleCaptures: [CaptureRecord] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -191,6 +193,17 @@ struct CaptureHistoryView: View {
                     .padding(.vertical, 4)
                     .transaction { $0.animation = nil }
                     .tag(capture.id)
+                }
+
+                if canLoadMore {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .controlSize(.small)
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                    .onAppear(perform: onLoadMore)
                 }
             } header: {
                 Text("\(visibleCaptures.count) 条记录")
