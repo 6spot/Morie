@@ -470,11 +470,7 @@ private struct ControlCenterRouteHost: View {
 
     @ToolbarContentBuilder
     private var routeToolbar: some ToolbarContent {
-        switch session.currentSection {
-        case .overview:
-            EmptyToolbarContent()
-
-        case .history:
+        if session.currentSection == .history {
             ToolbarItem(placement: .primaryAction) {
                 toolbarSearchField(
                     "搜索历史记录",
@@ -506,8 +502,9 @@ private struct ControlCenterRouteHost: View {
                 )
                 .disabled(!controller.canStartCapture)
             }
+        }
 
-        case .dictionary:
+        if session.currentSection == .dictionary {
             ToolbarItem(placement: .primaryAction) {
                 toolbarSearchField(
                     "搜索词语",
@@ -549,8 +546,9 @@ private struct ControlCenterRouteHost: View {
                     presentation.dictionaryShowingEditor = true
                 }
             }
+        }
 
-        case .memory:
+        if session.currentSection == .memory {
             ToolbarItem(placement: .primaryAction) {
                 toolbarSearchField(
                     "搜索个人记忆",
@@ -565,8 +563,9 @@ private struct ControlCenterRouteHost: View {
                     presentation.memoryEditor = .create
                 }
             }
+        }
 
-        case .settings:
+        if session.currentSection == .settings {
             ToolbarItem(placement: .primaryAction) {
                 Button(
                     "恢复出厂设置…",
@@ -580,8 +579,9 @@ private struct ControlCenterRouteHost: View {
                         || controller.isCaptureActive
                 )
             }
+        }
 
-        case .permissions:
+        if session.currentSection == .permissions {
             ToolbarItem(placement: .primaryAction) {
                 Button("重新检查", systemImage: "arrow.clockwise") {
                     Task {
@@ -590,8 +590,9 @@ private struct ControlCenterRouteHost: View {
                 }
                 .disabled(permissionRefreshDisabled)
             }
+        }
 
-        case .diagnostics:
+        if session.currentSection == .diagnostics {
             ToolbarItem(placement: .primaryAction) {
                 toolbarSearchField(
                     "搜索诊断日志",
