@@ -62,70 +62,20 @@ struct CaptureHistoryWorkspace: View {
     }
 
     var body: some View {
-        Group {
-            if let history = controller.history {
-                HSplitView {
-                    CaptureHistoryView(
-                        captures: history.captures,
-                        selection: $selection,
-                        search: $search,
-                        filter: $filter,
-                        canStartCapture: canStartCapture,
-                        onRecord: controller.startCaptureOnly
-                    )
-                    .frame(
-                        minWidth: 280,
-                        idealWidth: 340,
-                        maxWidth: 420,
-                        maxHeight: .infinity,
-                        alignment: .topLeading
-                    )
+        VStack(spacing: 0) {
+            ControlCenterCommandBar {
+                TextField("搜索历史记录", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 280)
 
-                    CaptureHistoryDetailPane(
-                        controller: controller,
-                        history: history,
-                        selectedCaptureID: selection
-                    )
-                    .frame(
-                        minWidth: 420,
-                        maxWidth: .infinity,
-                        maxHeight: .infinity
-                    )
-                }
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: .topLeading
-                )
-                .onAppear {
-                    history.setListVisible(true)
-                }
-                .onDisappear {
-                    history.setListVisible(false)
-                }
-            } else {
-                ContentUnavailableView(
-                    "历史记录不可用",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("记录存储尚未初始化。")
-                )
-            }
-        }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity,
-            alignment: .topLeading
-        )
-        .navigationTitle("历史记录")
-        .searchable(text: $search, prompt: "搜索历史记录")
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
                 Picker("筛选记录", selection: $filter) {
                     ForEach(CaptureHistoryFilter.allCases) { item in
                         Text(item.title).tag(item)
                     }
                 }
                 .pickerStyle(.menu)
+
+                Spacer(minLength: 12)
 
                 Button(
                     "开始录音",
@@ -134,7 +84,71 @@ struct CaptureHistoryWorkspace: View {
                 )
                 .disabled(!canStartCapture)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            Group {
+                if let history = controller.history {
+                    HSplitView {
+                        CaptureHistoryView(
+                            captures: history.captures,
+                            selection: $selection,
+                            search: $search,
+                            filter: $filter,
+                            canStartCapture: canStartCapture,
+                            onRecord: controller.startCaptureOnly
+                        )
+                        .frame(
+                            minWidth: 250,
+                            idealWidth: 320,
+                            maxWidth: 360,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
+
+                        CaptureHistoryDetailPane(
+                            controller: controller,
+                            history: history,
+                            selectedCaptureID: selection
+                        )
+                        .frame(
+                            minWidth: 0,
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
+                    )
+                    .onAppear {
+                        history.setListVisible(true)
+                    }
+                    .onDisappear {
+                        history.setListVisible(false)
+                    }
+                } else {
+                    ContentUnavailableView(
+                        "历史记录不可用",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text("记录存储尚未初始化。")
+                    )
+                }
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
     }
 }
 
