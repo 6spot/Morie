@@ -24,18 +24,14 @@ struct ApplicationContextCaptureRequest: Equatable, Sendable {
 struct ApplicationContextSnapshot: Equatable, Sendable {
     let application: ApplicationIdentity
     let selectedText: String?
-    let focusedText: String?
-    let nearbyText: String?
+    let cursorText: String?
     let capturedAt: Date
 
     var selectedCharacterCount: Int { selectedText?.count ?? 0 }
-    var focusedCharacterCount: Int { focusedText?.count ?? 0 }
-    var nearbyCharacterCount: Int { nearbyText?.count ?? 0 }
+    var cursorCharacterCount: Int { cursorText?.count ?? 0 }
 
     var hasReadableText: Bool {
-        selectedCharacterCount > 0
-            || focusedCharacterCount > 0
-            || nearbyCharacterCount > 0
+        selectedCharacterCount > 0 || cursorCharacterCount > 0
     }
 }
 
@@ -43,14 +39,12 @@ struct ApplicationContextSnapshot: Equatable, Sendable {
 /// The source of a transient Speech hint within the captured application context.
 enum ApplicationContextHintSource: String, CaseIterable, Hashable, Sendable {
     case selected
-    case focused
-    case nearby
+    case cursor
 
     var title: String {
         switch self {
         case .selected: "选中文字"
-        case .focused: "当前输入"
-        case .nearby: "附近内容"
+        case .cursor: "光标上下文"
         }
     }
 }
@@ -74,11 +68,9 @@ final class ApplicationContextInspectionStore: ObservableObject {
         let application: ApplicationIdentity
         let capturedAt: Date
         let selectedCharacterCount: Int
-        let focusedCharacterCount: Int
-        let nearbyCharacterCount: Int
+        let cursorCharacterCount: Int
         let selectedPreview: String?
-        let focusedPreview: String?
-        let nearbyPreview: String?
+        let cursorPreview: String?
         let dictionaryHintCount: Int
         let contextualHintCount: Int
         let hints: [ApplicationContextVocabularyHint]
@@ -98,11 +90,9 @@ final class ApplicationContextInspectionStore: ObservableObject {
             application: context.application,
             capturedAt: context.capturedAt,
             selectedCharacterCount: context.selectedCharacterCount,
-            focusedCharacterCount: context.focusedCharacterCount,
-            nearbyCharacterCount: context.nearbyCharacterCount,
+            cursorCharacterCount: context.cursorCharacterCount,
             selectedPreview: Self.preview(context.selectedText),
-            focusedPreview: Self.preview(context.focusedText),
-            nearbyPreview: Self.preview(context.nearbyText),
+            cursorPreview: Self.preview(context.cursorText),
             dictionaryHintCount: dictionaryHintCount,
             contextualHintCount: contextualHintCount,
             hints: hints
@@ -146,8 +136,7 @@ enum ApplicationContextVocabulary {
             )
         ] = [
             (snapshot.selectedText, .selected, 300),
-            (snapshot.focusedText, .focused, 200),
-            (snapshot.nearbyText, .nearby, 100),
+            (snapshot.cursorText, .cursor, 200),
         ]
 
         struct RankedTerm {

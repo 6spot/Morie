@@ -2,30 +2,27 @@
 import Carbon
 import Foundation
 
-/// Captures a bounded, runtime-only snapshot of the user's current editing
-/// environment through macOS Accessibility.
+/// Captures a bounded, runtime-only snapshot of the text control that owns the
+/// insertion caret when a Capture starts.
 ///
-/// Accessibility calls are blocking cross-process IPC, so the collector owns a
-/// dedicated actor executor and applies a short native messaging timeout to
-/// every AX element it touches. The collector is deliberately generic: no
-/// application-specific adapters, no screen capture, and no OCR.
+/// The collector intentionally does not walk parents, siblings or descendant
+/// UI trees. Surrounding application chrome is not document context. If the
+/// focused element cannot expose a trustworthy caret/text range, Morie returns
+/// no cursor context rather than substituting unrelated UI text.
 actor ApplicationContextCollector {
     private enum Limit {
         static let selectedCharacters = 2_000
-        static let focusedCharacters = 3_000
-        static let nearbyCharacters = 6_000
-        static let ancestorDepth = 6
-        static let nearbyNodes = 96
-        static let siblingRadius = 4
-        static let childrenPerNode = 24
+        static let cursorCharacters = 600
+        static let fullTextMaxUTF16 = 20_000
         static let messagingTimeout: Float = 0.05
     }
 
-    private struct NearbyCollection {
+    private struct CursorRead {
         let text: String?
-        let ancestorsVisited: Int
-        let nodesVisited: Int
-        let chunks: Int
+        let source: String
+        let caretUTF16: Int?
+        let documentUTF16: Int?
+        let reason: String?
     }
 
     func capture(
@@ -85,10 +82,12 @@ actor ApplicationContextCollector {
             return emptySnapshot(for: request)
         }
 
+        let role = textAttribute(kAXRoleAttribute, from: focusedElement)
+        let subrole = textAttribute(kAXSubroleAttribute, from: focusedElement)
         DevelopmentDiagnostics.record(
             "AX",
             captureID: captureID,
-            "focusedRole=\(textAttribute(kAXRoleAttribute, from: focusedElement) ?? "unknown"); focusedSubrole=\(textAttribute(kAXSubroleAttribute, from: focusedElement) ?? "none"); title=\(textAttribute(kAXTitleAttribute, from: focusedElement) ?? "none")"
+            "focusedRole=\(role ?? "unknown"); focusedSubrole=\(subrole ?? "none"); title=\(textAttribute(kAXTitleAttribute, from: focusedElement) ?? "none")"
         )
 
         var actualPID: pid_t = 0
@@ -108,27 +107,18 @@ actor ApplicationContextCollector {
             textAttribute(kAXSelectedTextAttribute, from: focusedElement),
             limit: Limit.selectedCharacters
         )
-        let focusedText = boundedText(
-            textAttribute(kAXValueAttribute, from: focusedElement),
-            limit: Limit.focusedCharacters
-        )
-        let nearby = collectNearbyText(
-            around: focusedElement,
-            excluding: [selectedText, focusedText].compactMap { $0 }
-        )
-        let nearbyText = nearby.text
+        let cursor = readCursorContext(from: focusedElement)
 
         DevelopmentDiagnostics.record(
             "AX",
             captureID: captureID,
-            "complete; selectedCharacters=\(selectedText?.count ?? 0); focusedCharacters=\(focusedText?.count ?? 0); nearbyCharacters=\(nearbyText?.count ?? 0); ancestorsVisited=\(nearby.ancestorsVisited)/\(Limit.ancestorDepth); nodesVisited=\(nearby.nodesVisited)/\(Limit.nearbyNodes); chunks=\(nearby.chunks); nearbyCharacterBudget=\(Limit.nearbyCharacters)"
+            "complete; selectedCharacters=\(selectedText?.count ?? 0); cursorCharacters=\(cursor.text?.count ?? 0); cursorSource=\(cursor.source); caretUTF16=\(cursor.caretUTF16.map(String.init) ?? "none"); documentUTF16=\(cursor.documentUTF16.map(String.init) ?? "none"); cursorBudget=\(Limit.cursorCharacters); cursorReason=\(cursor.reason ?? "none"); treeTraversal=false"
         )
 
         return ApplicationContextSnapshot(
             application: request.application,
             selectedText: selectedText,
-            focusedText: focusedText,
-            nearbyText: nearbyText,
+            cursorText: cursor.text,
             capturedAt: request.capturedAt
         )
     }
@@ -139,205 +129,193 @@ actor ApplicationContextCollector {
         ApplicationContextSnapshot(
             application: request.application,
             selectedText: nil,
-            focusedText: nil,
-            nearbyText: nil,
+            cursorText: nil,
             capturedAt: request.capturedAt
         )
     }
 
-    private func collectNearbyText(
-        around focusedElement: AXUIElement,
-        excluding excludedText: [String]
-    ) -> NearbyCollection {
-        var chunks: [String] = []
-        var seen = Set(
-            excludedText
-                .map(normalizedText)
-                .filter { !$0.isEmpty }
-        )
-        var remainingNodes = Limit.nearbyNodes
-        var remainingCharacters = Limit.nearbyCharacters
-        var ancestorsVisited = 0
-        var current = focusedElement
-
-        for _ in 0..<Limit.ancestorDepth {
-            guard !Task.isCancelled,
-                  remainingNodes > 0,
-                  remainingCharacters > 0,
-                  let parent = copyElement(kAXParentAttribute, from: current)
-            else {
-                break
-            }
-
-            ancestorsVisited += 1
-            appendOwnText(
-                from: parent,
-                chunks: &chunks,
-                seen: &seen,
-                remainingCharacters: &remainingCharacters
+    /// OpenLess-style host-document boundary:
+    /// - require a real AXSelectedTextRange/caret;
+    /// - read only the focused element's own document text;
+    /// - cap the window around the caret;
+    /// - fail closed when the element cannot expose a trustworthy document.
+    private func readCursorContext(
+        from focusedElement: AXUIElement
+    ) -> CursorRead {
+        guard !Task.isCancelled else {
+            return CursorRead(
+                text: nil,
+                source: "none",
+                caretUTF16: nil,
+                documentUTF16: nil,
+                reason: "cancelled"
             )
-
-            let siblings = childElements(of: parent)
-            if let currentIndex = siblings.firstIndex(where: {
-                CFEqual($0, current)
-            }) {
-                for offset in proximityOffsets(radius: Limit.siblingRadius) {
-                    guard !Task.isCancelled else { break }
-                    let index = currentIndex + offset
-                    guard siblings.indices.contains(index) else { continue }
-                    collectSubtreeText(
-                        from: siblings[index],
-                        chunks: &chunks,
-                        seen: &seen,
-                        remainingNodes: &remainingNodes,
-                        remainingCharacters: &remainingCharacters
-                    )
-                    if remainingNodes == 0 || remainingCharacters == 0 {
-                        break
-                    }
-                }
-            }
-
-            current = parent
         }
-
-        return NearbyCollection(
-            text: chunks.isEmpty ? nil : chunks.joined(separator: "\n"),
-            ancestorsVisited: ancestorsVisited,
-            nodesVisited: Limit.nearbyNodes - remainingNodes,
-            chunks: chunks.count
-        )
-    }
-
-    private func collectSubtreeText(
-        from root: AXUIElement,
-        chunks: inout [String],
-        seen: inout Set<String>,
-        remainingNodes: inout Int,
-        remainingCharacters: inout Int
-    ) {
-        configureTimeout(root)
-        var queue: [AXUIElement] = [root]
-        var index = 0
-
-        while !Task.isCancelled,
-              index < queue.count,
-              remainingNodes > 0,
-              remainingCharacters > 0 {
-            let element = queue[index]
-            index += 1
-            remainingNodes -= 1
-
-            if isSecureTextElement(element) {
-                continue
-            }
-
-            appendOwnText(
-                from: element,
-                chunks: &chunks,
-                seen: &seen,
-                remainingCharacters: &remainingCharacters
+        guard let selectedRange = selectedTextRange(from: focusedElement) else {
+            return CursorRead(
+                text: nil,
+                source: "none",
+                caretUTF16: nil,
+                documentUTF16: nil,
+                reason: "selectedTextRangeUnavailable"
             )
-
-            let children = prioritizedChildElements(of: element)
-            if !children.isEmpty {
-                queue.append(contentsOf: children)
-            }
         }
-    }
-
-    private func appendOwnText(
-        from element: AXUIElement,
-        chunks: inout [String],
-        seen: inout Set<String>,
-        remainingCharacters: inout Int
-    ) {
-        guard !Task.isCancelled, remainingCharacters > 0 else { return }
-
-        let candidates = [
-            textAttribute(kAXTitleAttribute, from: element),
-            textAttribute(kAXDescriptionAttribute, from: element),
-            textAttribute(kAXValueAttribute, from: element),
-        ]
-
-        for candidate in candidates {
-            guard !Task.isCancelled,
-                  remainingCharacters > 0,
-                  let candidate,
-                  !candidate.isEmpty
-            else {
-                continue
-            }
-
-            let normalized = normalizedText(candidate)
-            guard !normalized.isEmpty, seen.insert(normalized).inserted else {
-                continue
-            }
-
-            let piece = String(candidate.prefix(remainingCharacters))
-            guard !piece.isEmpty else { continue }
-            chunks.append(piece)
-            remainingCharacters -= piece.count
+        guard selectedRange.location >= 0 else {
+            return CursorRead(
+                text: nil,
+                source: "none",
+                caretUTF16: nil,
+                documentUTF16: nil,
+                reason: "caretNotFound"
+            )
         }
-    }
+        guard let totalUTF16 = integerAttribute(
+            kAXNumberOfCharactersAttribute,
+            from: focusedElement
+        ) else {
+            return CursorRead(
+                text: nil,
+                source: "none",
+                caretUTF16: selectedRange.location,
+                documentUTF16: nil,
+                reason: "numberOfCharactersUnavailable"
+            )
+        }
 
-    private func proximityOffsets(radius: Int) -> [Int] {
-        guard radius > 0 else { return [] }
-        return (1...radius).flatMap { [-$0, $0] }
-    }
+        let caretUTF16 = min(selectedRange.location, totalUTF16)
 
-    private func childElements(of element: AXUIElement) -> [AXUIElement] {
-        guard !Task.isCancelled,
-              let value = copyAttribute(kAXChildrenAttribute, from: element),
-              let children = value as? [AXUIElement]
+        if totalUTF16 <= Limit.fullTextMaxUTF16,
+           let fullText = textAttribute(kAXValueAttribute, from: focusedElement) {
+            let text = ApplicationContextCursorWindow.window(
+                in: fullText,
+                cursorUTF16: caretUTF16,
+                budget: Limit.cursorCharacters
+            )
+            return CursorRead(
+                text: cleanedText(text),
+                source: "AXValue",
+                caretUTF16: caretUTF16,
+                documentUTF16: totalUTF16,
+                reason: nil
+            )
+        }
+
+        // For large documents, or controls that do not expose AXValue, ask the
+        // focused element for only a bounded UTF-16 range around the caret.
+        // Twice the character budget is a safe UTF-16 envelope for emoji and
+        // other surrogate pairs; the returned string is then cropped to the
+        // exact character budget.
+        let span = ApplicationContextCursorWindow.plan(
+            length: totalUTF16,
+            cursor: caretUTF16,
+            budget: Limit.cursorCharacters * 2
+        )
+        guard span.length > 0,
+              let rangeText = stringForRange(
+                from: focusedElement,
+                location: span.start,
+                length: span.length
+              )
         else {
-            return []
+            return CursorRead(
+                text: nil,
+                source: "none",
+                caretUTF16: caretUTF16,
+                documentUTF16: totalUTF16,
+                reason: "stringForRangeUnavailable"
+            )
         }
-        return children
+
+        let text = ApplicationContextCursorWindow.window(
+            in: rangeText,
+            cursorUTF16: span.cursorInWindow,
+            budget: Limit.cursorCharacters
+        )
+        return CursorRead(
+            text: cleanedText(text),
+            source: "AXStringForRange",
+            caretUTF16: caretUTF16,
+            documentUTF16: totalUTF16,
+            reason: nil
+        )
     }
 
-    /// Prefer currently visible descendants because they best approximate the
-    /// text the user can actually see near the focused editor. Some web apps do
-    /// not expose a useful AXVisibleChildren list; in that case, sample both the
-    /// tail and head of very large containers. The tail is intentionally first
-    /// because chat/document composers commonly sit after their recent content.
-    private func prioritizedChildElements(
-        of element: AXUIElement
-    ) -> [AXUIElement] {
-        guard !Task.isCancelled else { return [] }
-
-        if let value = copyAttribute(kAXVisibleChildrenAttribute, from: element),
-           let visibleChildren = value as? [AXUIElement],
-           !visibleChildren.isEmpty {
-            let bounded = Array(
-                visibleChildren.prefix(Limit.childrenPerNode)
-            )
-            for child in bounded {
-                configureTimeout(child)
-            }
-            return bounded
+    private func selectedTextRange(
+        from element: AXUIElement
+    ) -> CFRange? {
+        guard !Task.isCancelled,
+              let value = copyAttribute(
+                kAXSelectedTextRangeAttribute,
+                from: element
+              ),
+              CFGetTypeID(value) == AXValueGetTypeID()
+        else {
+            return nil
         }
 
-        let children = childElements(of: element)
-        guard children.count > Limit.childrenPerNode else {
-            return children
+        let axValue = value as! AXValue
+        guard AXValueGetType(axValue) == .cfRange else {
+            return nil
+        }
+        var range = CFRange()
+        guard AXValueGetValue(axValue, .cfRange, &range) else {
+            return nil
+        }
+        return range
+    }
+
+    private func integerAttribute(
+        _ attribute: String,
+        from element: AXUIElement
+    ) -> Int? {
+        guard !Task.isCancelled,
+              let value = copyAttribute(attribute, from: element)
+        else {
+            return nil
+        }
+        if let number = value as? NSNumber {
+            let integer = number.intValue
+            return integer >= 0 ? integer : nil
+        }
+        return nil
+    }
+
+    private func stringForRange(
+        from element: AXUIElement,
+        location: Int,
+        length: Int
+    ) -> String? {
+        guard !Task.isCancelled,
+              location >= 0,
+              length >= 0
+        else {
+            return nil
         }
 
-        let tailCount = (Limit.childrenPerNode * 2) / 3
-        let headCount = Limit.childrenPerNode - tailCount
-        var result: [AXUIElement] = []
-        result.reserveCapacity(Limit.childrenPerNode)
-
-        for child in children.suffix(tailCount) {
-            result.append(child)
-        }
-        for child in children.prefix(headCount) {
-            if !result.contains(where: { CFEqual($0, child) }) {
-                result.append(child)
-            }
+        var range = CFRange(location: location, length: length)
+        guard let parameter = AXValueCreate(.cfRange, &range) else {
+            return nil
         }
 
-        return result
+        var value: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            element,
+            kAXStringForRangeParameterizedAttribute as CFString,
+            parameter,
+            &value
+        ) == .success,
+              let value
+        else {
+            return nil
+        }
+
+        if let string = value as? String {
+            return cleanedText(string)
+        }
+        if let attributed = value as? NSAttributedString {
+            return cleanedText(attributed.string)
+        }
+        return nil
     }
 
     private func copyElement(
@@ -391,10 +369,10 @@ actor ApplicationContextCollector {
     }
 
     private func isSecureTextElement(_ element: AXUIElement) -> Bool {
-        guard let value = textAttribute(kAXSubroleAttribute, from: element) else {
-            return false
-        }
-        return value == kAXSecureTextFieldSubrole
+        let role = textAttribute(kAXRoleAttribute, from: element)
+        let subrole = textAttribute(kAXSubroleAttribute, from: element)
+        return role == kAXSecureTextFieldSubrole
+            || subrole == kAXSecureTextFieldSubrole
     }
 
     private func configureTimeout(_ element: AXUIElement) {
@@ -412,13 +390,76 @@ actor ApplicationContextCollector {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
     }
+}
 
-    private func normalizedText(_ text: String) -> String {
-        text
-            .folding(
-                options: [.caseInsensitive, .widthInsensitive],
-                locale: Locale(identifier: "en_US_POSIX")
+/// Pure cursor-window planner kept separate from AX so the most important
+/// boundary can be regression-tested without Accessibility permissions.
+///
+/// The budget follows OpenLess' host-document split: prefer roughly 80% before
+/// the caret and 20% after it, then let either side consume unused capacity.
+enum ApplicationContextCursorWindow {
+    struct Span: Equatable {
+        let start: Int
+        let length: Int
+        let cursorInWindow: Int
+    }
+
+    static func plan(
+        length: Int,
+        cursor: Int,
+        budget: Int
+    ) -> Span {
+        let safeLength = max(0, length)
+        let safeCursor = min(max(0, cursor), safeLength)
+        guard budget > 0 else {
+            return Span(
+                start: safeCursor,
+                length: 0,
+                cursorInWindow: 0
             )
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let before = min(safeCursor, budget * 4 / 5)
+        let after = min(safeLength - safeCursor, budget - before)
+        let refilledBefore = min(safeCursor, budget - after)
+        return Span(
+            start: safeCursor - refilledBefore,
+            length: refilledBefore + after,
+            cursorInWindow: refilledBefore
+        )
+    }
+
+    static func window(
+        in text: String,
+        cursorUTF16: Int,
+        budget: Int
+    ) -> String {
+        let cursor = characterOffset(
+            in: text,
+            utf16Offset: cursorUTF16
+        )
+        let span = plan(
+            length: text.count,
+            cursor: cursor,
+            budget: budget
+        )
+        return String(
+            text.dropFirst(span.start).prefix(span.length)
+        )
+    }
+
+    static func characterOffset(
+        in text: String,
+        utf16Offset: Int
+    ) -> Int {
+        let target = max(0, utf16Offset)
+        var units = 0
+        for (index, character) in text.enumerated() {
+            if units >= target {
+                return index
+            }
+            units += character.utf16.count
+        }
+        return text.count
     }
 }

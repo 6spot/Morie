@@ -54,36 +54,32 @@ Expected:
 - Refinement does not add unsupported content.
 - Delivery succeeds.
 
-### B. Visible invented proper nouns
+### B. Surrounding UI must not become context
 
-Place two unique Latin proper nouns in visible nearby page text, but not in the
-focused editor and not in Dictionary. Dictate one sentence containing both.
+Place unique Latin proper nouns in surrounding application chrome (chat list,
+sidebar, menu or unrelated page region), but not in the focused text control,
+selection or Dictionary. Dictate a sentence that does not contain those terms.
 
 Expected trace:
-- `Dev/ApplicationContext nearby` contains both spellings.
-- `Dev/Vocabulary` shows whether each candidate was ranked/rejected.
-- `Dev/SpeechContext applied` shows whether each selected term actually reached
-  Apple Speech.
-- `Dev/AccurateSpeech contextualHints` shows the same frozen terms for retry.
-- History shows live/accurate/preferred recognition outcome.
+- `Dev/ApplicationContext` does not contain those surrounding UI terms;
+- `Dev/Vocabulary` does not select them;
+- `Dev/SpeechContext applied` does not receive them;
+- final output cannot import them through Application Context.
 
 Interpretation:
-- absent from AX raw text => AX collection problem;
-- present in AX but rejected by Vocabulary => extraction/ranking problem;
-- selected but absent from SpeechContext => pipeline propagation problem;
-- present in SpeechContext but ASR still wrong => Apple Speech bias limitation;
-- ASR wrong but refinement repairs it using Application Context reference terms => contextual spelling resolution is working;
-- `Dev/RefinementInput applicationReferenceTerms` shows the bounded runtime reference set supplied to the model;
-- final output uses an unrelated page term incorrectly => model/prompt quality defect, not a deterministic Guard failure.
+- surrounding UI appears in cursor context => AX collection-boundary defect;
+- no cursor context because the focused control exposes no trustworthy caret/text
+  range => acceptable fail-closed behavior;
+- do not add word/app-specific filters. Fix only the focused-document boundary.
 
 ### C. Focused-editor term
 
 Type a unique term in the focused editor before recording, then dictate it.
 
 Expected:
-- focused context contains the term;
-- Vocabulary source is `focused`;
-- it outranks the same term if duplicated in nearby context.
+- cursor context contains the term when it falls inside the 600-character caret window;
+- Vocabulary source is `cursor`;
+- it is derived only from the focused text control, not surrounding UI.
 
 ### D. Selected-text term
 
@@ -92,12 +88,13 @@ Select text containing a unique term before recording, then dictate it.
 Expected:
 - selected context contains it;
 - Vocabulary source is `selected`;
-- selected priority outranks focused/nearby duplicates.
+- selected priority outranks a duplicate found in cursor context.
 
 ### E. Context must not become content
 
-Visible page text contains a unique fact that is not spoken. Dictate a sentence
-that mentions only a nearby proper noun.
+The focused document contains a nearby unique fact inside the bounded cursor
+window that is not spoken. Dictate a sentence that mentions only a proper noun
+from that same cursor window.
 
 Expected:
 - spelling may be repaired;

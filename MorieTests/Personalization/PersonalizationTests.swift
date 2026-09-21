@@ -4,15 +4,14 @@ import XCTest
 
 @MainActor
 final class PersonalizationTests: XCTestCase {
-    func testApplicationContextVocabularyPrefersNearbyTechnicalTermsWithoutPageText() throws {
+    func testApplicationContextVocabularyUsesOnlySelectedAndCursorDocumentText() throws {
         let snapshot = ApplicationContextSnapshot(
             application: ApplicationIdentity(
-                name: "Google Chrome",
-                bundleIdentifier: "com.google.Chrome"
+                name: "TextEdit",
+                bundleIdentifier: "com.apple.TextEdit"
             ),
             selectedText: "Use Qelvatrix with API",
-            focusedText: "Roventia works with AppController and Keychain",
-            nearbyText: "This page also mentions SwiftUI, OpenAI, pg17 and me.morie.mac in Google Chrome.",
+            cursorText: "Roventia works with AppController, OpenAI and pg17.",
             capturedAt: Date()
         )
 
@@ -25,30 +24,57 @@ final class PersonalizationTests: XCTestCase {
         )
         XCTAssertEqual(
             inspected.first(where: { $0.value == "Roventia" })?.source,
-            .focused
+            .cursor
         )
-        XCTAssertEqual(
-            inspected.first(where: { $0.value == "SwiftUI" })?.source,
-            .nearby
-        )
-
         XCTAssertTrue(terms.contains("Qelvatrix"))
         XCTAssertTrue(terms.contains("API"))
         XCTAssertTrue(terms.contains("Roventia"))
         XCTAssertTrue(terms.contains("AppController"))
-        XCTAssertTrue(terms.contains("Keychain"))
-        XCTAssertTrue(terms.contains("SwiftUI"))
         XCTAssertTrue(terms.contains("OpenAI"))
         XCTAssertTrue(terms.contains("pg17"))
-        XCTAssertTrue(terms.contains("me.morie.mac"))
-        XCTAssertFalse(terms.contains("This"))
+        XCTAssertLessThanOrEqual(
+            terms.count,
+            ApplicationContextVocabulary.maximumTerms
+        )
 
         let selectedIndex = try XCTUnwrap(terms.firstIndex(of: "Qelvatrix"))
-        let focusedIndex = try XCTUnwrap(terms.firstIndex(of: "Roventia"))
-        let nearbyIndex = try XCTUnwrap(terms.firstIndex(of: "SwiftUI"))
-        XCTAssertLessThan(selectedIndex, focusedIndex)
-        XCTAssertLessThan(focusedIndex, nearbyIndex)
-        XCTAssertLessThanOrEqual(terms.count, ApplicationContextVocabulary.maximumTerms)
+        let cursorIndex = try XCTUnwrap(terms.firstIndex(of: "Roventia"))
+        XCTAssertLessThan(selectedIndex, cursorIndex)
+    }
+
+    func testApplicationContextCursorWindowPrefersTextBeforeCaret() {
+        XCTAssertEqual(
+            ApplicationContextCursorWindow.plan(
+                length: 1_000,
+                cursor: 800,
+                budget: 600
+            ),
+            .init(start: 320, length: 600, cursorInWindow: 480)
+        )
+    }
+
+    func testApplicationContextCursorWindowRefillsUnusedSide() {
+        XCTAssertEqual(
+            ApplicationContextCursorWindow.plan(
+                length: 1_000,
+                cursor: 50,
+                budget: 600
+            ),
+            .init(start: 0, length: 600, cursorInWindow: 50)
+        )
+    }
+
+    func testApplicationContextCursorWindowUsesUTF16CaretWithoutSplittingEmoji() {
+        let text = "AA😀QelvatrixBB"
+        let cursorUTF16 = ("AA😀" as NSString).length
+        let window = ApplicationContextCursorWindow.window(
+            in: text,
+            cursorUTF16: cursorUTF16,
+            budget: 10
+        )
+
+        XCTAssertTrue(window.contains("😀"))
+        XCTAssertTrue(window.contains("Qelvatrix"))
     }
 
     func testSpeechContextHintsKeepDictionaryPriorityAndDeduplicateContext() {

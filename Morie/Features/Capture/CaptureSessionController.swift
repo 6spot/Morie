@@ -298,14 +298,8 @@ final class CaptureSessionController {
             DevelopmentDiagnostics.text(
                 "ApplicationContext",
                 captureID: sessionID,
-                label: "focused",
-                context.focusedText
-            )
-            DevelopmentDiagnostics.text(
-                "ApplicationContext",
-                captureID: sessionID,
-                label: "nearby",
-                context.nearbyText
+                label: "cursor",
+                context.cursorText
             )
             DevelopmentDiagnostics.list(
                 "ApplicationContext",
@@ -316,14 +310,8 @@ final class CaptureSessionController {
             DevelopmentDiagnostics.list(
                 "ApplicationContext",
                 captureID: sessionID,
-                label: "focusedHints",
-                inspectedHints.filter { $0.source == .focused }.map(\.value)
-            )
-            DevelopmentDiagnostics.list(
-                "ApplicationContext",
-                captureID: sessionID,
-                label: "nearbyHints",
-                inspectedHints.filter { $0.source == .nearby }.map(\.value)
+                label: "cursorHints",
+                inspectedHints.filter { $0.source == .cursor }.map(\.value)
             )
             DevelopmentDiagnostics.list(
                 "ApplicationContext",
@@ -341,7 +329,7 @@ final class CaptureSessionController {
             )
             Diagnostics.record(
                 "ApplicationContext",
-                "Capture \(self.label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); focusedCharacters=\(context.focusedCharacterCount); nearbyCharacters=\(context.nearbyCharacterCount); extractedHints=\(applicationContextWords.count); collectionMilliseconds=\(elapsedMilliseconds); capturePersistence=false; standardLogRawText=false; devTraceRawText=\(DevelopmentDiagnostics.isEnabled)"
+                "Capture \(self.label(sessionID)); app=\(context.application.name ?? "unknown") (\(context.application.bundleIdentifier ?? "unknown")); selectedCharacters=\(context.selectedCharacterCount); cursorCharacters=\(context.cursorCharacterCount); extractedHints=\(applicationContextWords.count); collectionMilliseconds=\(elapsedMilliseconds); capturePersistence=false; standardLogRawText=false; devTraceRawText=\(DevelopmentDiagnostics.isEnabled)"
             )
             await self.speech.updateApplicationContextWords(
                 applicationContextWords,

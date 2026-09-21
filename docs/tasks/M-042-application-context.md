@@ -20,15 +20,27 @@ Application Context must remain distinct from Dictionary, Personal Memory and Ex
 Implement the capture foundation plus bounded Speech vocabulary injection:
 
 - capture the frontmost application identity at voice-input start;
-- read bounded selected/focused/nearby text through Apple Accessibility when available;
+- read bounded selected text plus a focused-control cursor window through Apple Accessibility when available;
 - pin the target application/PID at Capture Start, resolve bounded AX context asynchronously, and retain the resulting snapshot only for that active Capture;
 - keep raw application text out of Capture/History/Memory and refinement input; only the bounded extracted term set may reach refinement as runtime-only reference data;
 - Release diagnostics log metadata/counts only; Debug development tracing may log bounded raw context locally for troubleshooting;
 - use no app-specific adapters, screen recording or OCR;
-- extract at most 32 high-signal transient terms, prioritizing selected → focused → nearby text;
+- extract at most 32 high-signal transient terms, prioritizing selected → cursor-window text;
 - merge transient terms after durable Dictionary hints, with a total Speech context cap of 48;
 - apply the same merged hints to live Speech and saved-audio high-accuracy re-recognition;
 - allow late Application Context to update the active Speech analyzer without delaying capture startup.
+
+## Host-document boundary
+
+Real-device validation showed that AX tree traversal collects application chrome rather than document context (for example chat lists, menus and sidebars). M-042 therefore follows the OpenLess host-document boundary:
+
+- trust only the focused AX text element that owns a real `AXSelectedTextRange`;
+- read only that element's own `AXValue`, or bounded `AXStringForRange` for large/non-value controls;
+- keep a 600-character cursor window, biased roughly 80% before / 20% after the caret;
+- treat negative/missing caret locations, unknown document length or unsupported range reads as no context;
+- never recover missing context by walking parents, siblings or descendant UI trees.
+
+Wrong context is worse than absent context. Vocabulary extraction still reduces this cursor window to the same bounded runtime-only reference terms before Speech/refinement.
 
 ## Explicit exclusions
 
@@ -44,13 +56,13 @@ This slice does **not**:
 
 `ApplicationContextSnapshot` is intentionally not `Codable`. It must never be attached to `RefinementInput`, `CaptureRefinement`, SwiftData records, History, or Memory evidence. Release diagnostics never include raw context. Debug builds may emit bounded raw context to the local `Dev/*` diagnostic trace as an explicit development-only exception.
 
-Secure Event Input and secure text fields contribute no selected/focused/nearby text and therefore cannot enter either standard or development diagnostics.
+Secure Event Input and secure text fields contribute no selected/cursor text and therefore cannot enter either standard or development diagnostics.
 
 ## Acceptance criteria
 
 - [x] Dedicated Application Context value and collector exist.
 - [x] Collector uses only Apple Accessibility/AppKit APIs and runs blocking AX IPC on its own actor with native message timeouts.
-- [x] Selected/focused/nearby reads have explicit character/node/depth bounds.
+- [x] Selected text and the focused-control cursor window have explicit character bounds; no ancestor/sibling/subtree traversal is performed.
 - [x] Capture Start pins app/PID without blocking the main actor; the resulting snapshot is accepted only while that Capture remains active.
 - [x] Release/standard diagnostics contain only app identity and counts; Debug-only `Dev/*` diagnostics can expose bounded raw context locally for troubleshooting.
 - [x] Snapshot is released when Capture session identity resets.
@@ -77,8 +89,8 @@ Debug builds provide a Capture-correlated `Dev/*` trace covering:
 
 - build/runtime identity and frozen Capture settings;
 - microphone and Speech backend selection;
-- Accessibility trust/secure-input/focused-element/traversal decisions;
-- bounded raw selected/focused/nearby context;
+- Accessibility trust/secure-input/focused-element/caret-window decisions;
+- bounded raw selected/cursor context;
 - every vocabulary candidate, ranking/rejection/de-duplication decision;
 - exact contextual strings applied to live and accurate Apple Speech;
 - throttled live recognition evolution plus live/accurate/preferred final text;
@@ -113,7 +125,7 @@ This avoids rebuilding a weaker multilingual NLP engine in `CaptureRefinement` w
 
 After the Speech-vocabulary slice is validated on device:
 
-1. tune extraction quality from real Chrome/Xcode/WeChat/TextEdit evidence;
+1. validate the focused-control cursor-window boundary in Chrome/Xcode/WeChat/TextEdit;
 2. evaluate whether the bounded term representation is sufficient before considering richer semantic context;
 3. keep any richer context explicitly bounded, runtime-only and separated as untrusted/reference data;
 4. validate model behavior with real-device cases instead of adding language-specific output guards.

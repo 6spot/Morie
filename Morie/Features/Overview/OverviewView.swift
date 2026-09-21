@@ -178,7 +178,7 @@ struct OverviewView: View {
                         Text("上下文字符")
                             .foregroundStyle(.secondary)
                         Text(
-                            "selected \(snapshot.selectedCharacterCount) · focused \(snapshot.focusedCharacterCount) · nearby \(snapshot.nearbyCharacterCount)"
+                            "selected \(snapshot.selectedCharacterCount) · cursor \(snapshot.cursorCharacterCount)"
                         )
                         .monospacedDigit()
                     }
@@ -221,12 +221,8 @@ struct OverviewView: View {
                         text: snapshot.selectedPreview
                     )
                     contextPreviewRow(
-                        title: "focused",
-                        text: snapshot.focusedPreview
-                    )
-                    contextPreviewRow(
-                        title: "nearby",
-                        text: snapshot.nearbyPreview
+                        title: "cursor",
+                        text: snapshot.cursorPreview
                     )
                 }
 
