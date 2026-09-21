@@ -361,25 +361,7 @@ private struct ControlCenterRouteHost: View {
             routedPage
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                toolbarSearchSlot
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                toolbarFilterSlot
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                toolbarActionOne
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                toolbarActionTwo
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                toolbarActionThree
-            }
+            routeToolbar
         }
         .confirmationDialog(
             "恢复出厂设置？",
@@ -486,187 +468,204 @@ private struct ControlCenterRouteHost: View {
         }
     }
 
-    @ViewBuilder
-    private var toolbarSearchSlot: some View {
+    @ToolbarContentBuilder
+    private var routeToolbar: some ToolbarContent {
         switch session.currentSection {
-        case .history:
-            toolbarSearchField(
-                "搜索历史记录",
-                text: $presentation.historySearch
-            )
-
-        case .dictionary:
-            toolbarSearchField(
-                "搜索词语",
-                text: $presentation.dictionarySearch
-            )
-
-        case .memory:
-            toolbarSearchField(
-                "搜索个人记忆",
-                text: $presentation.memorySearch
-            )
-
-        case .diagnostics:
-            toolbarSearchField(
-                "搜索诊断日志",
-                text: $presentation.diagnosticSearch
-            )
-
-        case .overview, .settings, .permissions:
-            toolbarPlaceholder(width: 220)
-        }
-    }
-
-    @ViewBuilder
-    private var toolbarFilterSlot: some View {
-        switch session.currentSection {
-        case .history:
-            Picker("筛选记录", selection: $presentation.historyFilter) {
-                ForEach(CaptureHistoryFilter.allCases) { item in
-                    Text(item.title).tag(item)
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(width: 110)
-
-        case .diagnostics:
-            Picker("筛选日志", selection: $presentation.diagnosticLevel) {
-                Text("全部日志")
-                    .tag(nil as DiagnosticLevel?)
-
-                ForEach(
-                    [
-                        DiagnosticLevel.info,
-                        .warning,
-                        .error,
-                    ],
-                    id: \.self
-                ) {
-                    Text($0.title).tag(Optional($0))
-                }
-            }
-            .pickerStyle(.menu)
-            .frame(width: 110)
-
-        case .overview, .dictionary, .memory, .settings, .permissions:
-            toolbarPlaceholder(width: 110)
-        }
-    }
-
-    @ViewBuilder
-    private var toolbarActionOne: some View {
-        switch session.currentSection {
-        case .history:
-            Button(
-                "开始录音",
-                systemImage: "mic",
-                action: controller.startCaptureOnly
-            )
-            .disabled(!controller.canStartCapture)
-
-        case .dictionary:
-            Button("编辑词语", systemImage: "pencil") {
-                guard let id = selectedDictionaryUserEntryID else {
-                    return
-                }
-                presentation.dictionaryEditingEntryID = id
-                presentation.dictionaryShowingEditor = true
-            }
-            .disabled(selectedDictionaryUserEntryID == nil)
-
-        case .memory:
-            Button("告诉 Morie 一件事", systemImage: "plus") {
-                presentation.memoryEditor = .create
-            }
-
-        case .settings:
-            Button(
-                "恢复出厂设置…",
-                systemImage: "arrow.counterclockwise",
-                role: .destructive
-            ) {
-                presentation.confirmsFactoryReset = true
-            }
-            .disabled(presentation.factoryResetInProgress || controller.isCaptureActive)
-
-        case .permissions:
-            Button("重新检查", systemImage: "arrow.clockwise") {
-                Task {
-                    await controller.setup.refresh()
-                }
-            }
-            .disabled(permissionRefreshDisabled)
-
-        case .diagnostics:
-            Button(
-                "复制当前筛选",
-                systemImage: "line.3.horizontal.decrease.circle"
-            ) {
-                copyDiagnostics(filteredDiagnosticEntries)
-            }
-
         case .overview:
-            toolbarPlaceholder()
-        }
-    }
+            EmptyToolbarContent()
 
-    @ViewBuilder
-    private var toolbarActionTwo: some View {
-        switch session.currentSection {
-        case .dictionary:
-            Button(
-                "删除词语…",
-                systemImage: "trash",
-                role: .destructive
-            ) {
-                presentation.dictionaryConfirmsDeletion = true
-            }
-            .disabled(selectedDictionaryUserEntryID == nil)
-
-        case .diagnostics:
-            Button("复制全部日志", systemImage: "doc.on.doc") {
-                copyDiagnostics(DiagnosticLogStore.shared.entries)
+        case .history:
+            ToolbarItem(placement: .primaryAction) {
+                toolbarSearchField(
+                    "搜索历史记录",
+                    text: $presentation.historySearch
+                )
             }
 
-        case .overview, .history, .memory, .settings, .permissions:
-            toolbarPlaceholder()
-        }
-    }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
 
-    @ViewBuilder
-    private var toolbarActionThree: some View {
-        switch session.currentSection {
-        case .dictionary:
-            Button("添加词语", systemImage: "plus") {
-                presentation.dictionaryEditingEntryID = nil
-                presentation.dictionaryShowingEditor = true
-            }
-
-        case .diagnostics:
-            Menu("诊断操作", systemImage: "ellipsis") {
-                Button(
-                    "在访达中显示日志文件",
-                    systemImage: "doc.text.magnifyingglass"
+            ToolbarItem(placement: .primaryAction) {
+                Picker(
+                    "筛选记录",
+                    selection: $presentation.historyFilter
                 ) {
-                    NSWorkspace.shared.activateFileViewerSelecting(
-                        [DiagnosticLogStore.shared.logFileURL]
-                    )
+                    ForEach(CaptureHistoryFilter.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
                 }
+                .pickerStyle(.menu)
+            }
 
-                Divider()
+            ToolbarSpacer(.fixed, placement: .primaryAction)
 
+            ToolbarItem(placement: .primaryAction) {
                 Button(
-                    "清空诊断日志…",
+                    "开始录音",
+                    systemImage: "mic",
+                    action: controller.startCaptureOnly
+                )
+                .disabled(!controller.canStartCapture)
+            }
+
+        case .dictionary:
+            ToolbarItem(placement: .primaryAction) {
+                toolbarSearchField(
+                    "搜索词语",
+                    text: $presentation.dictionarySearch
+                )
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Button("编辑词语", systemImage: "pencil") {
+                    guard let id = selectedDictionaryUserEntryID else {
+                        return
+                    }
+                    presentation.dictionaryEditingEntryID = id
+                    presentation.dictionaryShowingEditor = true
+                }
+                .disabled(selectedDictionaryUserEntryID == nil)
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Button(
+                    "删除词语…",
                     systemImage: "trash",
                     role: .destructive
                 ) {
-                    presentation.diagnosticConfirmsClear = true
+                    presentation.dictionaryConfirmsDeletion = true
+                }
+                .disabled(selectedDictionaryUserEntryID == nil)
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Button("添加词语", systemImage: "plus") {
+                    presentation.dictionaryEditingEntryID = nil
+                    presentation.dictionaryShowingEditor = true
                 }
             }
 
-        case .overview, .history, .memory, .settings, .permissions:
-            toolbarPlaceholder()
+        case .memory:
+            ToolbarItem(placement: .primaryAction) {
+                toolbarSearchField(
+                    "搜索个人记忆",
+                    text: $presentation.memorySearch
+                )
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Button("告诉 Morie 一件事", systemImage: "plus") {
+                    presentation.memoryEditor = .create
+                }
+            }
+
+        case .settings:
+            ToolbarItem(placement: .primaryAction) {
+                Button(
+                    "恢复出厂设置…",
+                    systemImage: "arrow.counterclockwise",
+                    role: .destructive
+                ) {
+                    presentation.confirmsFactoryReset = true
+                }
+                .disabled(
+                    presentation.factoryResetInProgress
+                        || controller.isCaptureActive
+                )
+            }
+
+        case .permissions:
+            ToolbarItem(placement: .primaryAction) {
+                Button("重新检查", systemImage: "arrow.clockwise") {
+                    Task {
+                        await controller.setup.refresh()
+                    }
+                }
+                .disabled(permissionRefreshDisabled)
+            }
+
+        case .diagnostics:
+            ToolbarItem(placement: .primaryAction) {
+                toolbarSearchField(
+                    "搜索诊断日志",
+                    text: $presentation.diagnosticSearch
+                )
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Picker(
+                    "筛选日志",
+                    selection: $presentation.diagnosticLevel
+                ) {
+                    Text("全部日志")
+                        .tag(nil as DiagnosticLevel?)
+
+                    ForEach(
+                        [
+                            DiagnosticLevel.info,
+                            .warning,
+                            .error,
+                        ],
+                        id: \.self
+                    ) {
+                        Text($0.title).tag(Optional($0))
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Button(
+                    "复制当前筛选",
+                    systemImage: "line.3.horizontal.decrease.circle"
+                ) {
+                    copyDiagnostics(filteredDiagnosticEntries)
+                }
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Button("复制全部日志", systemImage: "doc.on.doc") {
+                    copyDiagnostics(DiagnosticLogStore.shared.entries)
+                }
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Menu("诊断操作", systemImage: "ellipsis") {
+                    Button(
+                        "在访达中显示日志文件",
+                        systemImage: "doc.text.magnifyingglass"
+                    ) {
+                        NSWorkspace.shared.activateFileViewerSelecting(
+                            [DiagnosticLogStore.shared.logFileURL]
+                        )
+                    }
+
+                    Divider()
+
+                    Button(
+                        "清空诊断日志…",
+                        systemImage: "trash",
+                        role: .destructive
+                    ) {
+                        presentation.diagnosticConfirmsClear = true
+                    }
+                }
+            }
         }
     }
 
@@ -678,15 +677,6 @@ private struct ControlCenterRouteHost: View {
             .textFieldStyle(.roundedBorder)
             .frame(width: 220)
     }
-
-    private func toolbarPlaceholder(
-        width: CGFloat = 28
-    ) -> some View {
-        Color.clear
-            .frame(width: width, height: 1)
-            .accessibilityHidden(true)
-    }
-
 
     private var permissionRefreshDisabled: Bool {
         controller.setup.isRefreshing
