@@ -198,7 +198,15 @@ Overview, Dictionary, Personal Memory, Settings and Permissions share the same `
 
 Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center navigation shells or move unrelated feature state into `AppController`.
 
-Control Center summary views must not hydrate an entire persistent collection into the UI's main `ModelContext` merely to calculate aggregates. Use bounded SwiftData traversal and narrow fetched properties for summary work, and keep large feature collections behind the feature controller/store that owns their lifecycle.
+Control Center presentation memory follows the Control Center window lifecycle.
+
+- Overview never scans Capture history when the window opens. Capture usage metrics are persisted incrementally with Capture persistence and Overview reads only the small aggregate snapshot.
+- History owns a presentation-only `CaptureHistoryController` and `ModelContext` created for the Control Center session. The first page is bounded, further records load on demand, and the list/context/player are released when History or the Control Center closes.
+- Diagnostics writes runtime logs to disk regardless of UI visibility, but its in-memory Entry collection exists only while the Diagnostics page is visible. Leaving the page releases that collection.
+- Search, filters, selections and page snapshots belong to `ControlCenterPresentationState` and are reset when the Control Center closes.
+- Runtime Dictionary/Memory state is separate from Control Center presentation state because voice recognition/refinement can use those domains while the window is closed.
+
+Do not attach History/Diagnostics/Overview presentation collections to `AppController` or another application-lifetime owner.
 
 ## Core input flow
 
