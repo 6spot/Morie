@@ -43,6 +43,7 @@ final class CaptureStore {
     ) throws {
         let schema = Schema([
             CaptureRecord.self,
+            CaptureUsageMetricsRecord.self,
             DictionaryEntry.self,
             DictionaryCorrectionRule.self,
             MemoryRecord.self,
@@ -97,6 +98,7 @@ final class CaptureStore {
         try FileManager.default.createDirectory(at: self.audioDirectory, withIntermediateDirectories: true)
         try recoverInterruptedCaptures()
         try pruneExpiredAudio()
+        try ensureUsageMetricsRecord()
     }
 
     func beginVoiceCapture(
@@ -159,6 +161,15 @@ final class CaptureStore {
 
         schedulePersistence(for: record)
         lastProgressiveSave[id] = now
+    }
+
+    func finalizeCaptureOnlyUsage(_ id: UUID) throws {
+        guard let record = records[id] else {
+            throw StoreError.captureNotFound
+        }
+        record.usageMetricsFinalized = true
+        record.updatedAt = Date()
+        schedulePersistence(for: record)
     }
 
     @discardableResult
@@ -411,6 +422,9 @@ final class CaptureStore {
             for record in try context.fetch(FetchDescriptor<CaptureRecord>()) {
                 context.delete(record)
             }
+            for record in try context.fetch(FetchDescriptor<CaptureUsageMetricsRecord>()) {
+                context.delete(record)
+            }
             try context.save()
         } catch {
             context.rollback()
@@ -455,6 +469,7 @@ final class CaptureStore {
         }
         record.lifecycle = lifecycle
         record.deliveryErrorDescription = error
+        record.usageMetricsFinalized = true
         record.updatedAt = Date()
         schedulePersistence(for: record)
         records[id] = nil
@@ -549,6 +564,82 @@ final class CaptureStore {
         revision: Int
     ) -> CapturePersistenceSnapshot {
         CapturePersistenceSnapshot(record: record, revision: revision)
+    }
+
+    func usageMetricsSnapshot() throws -> CaptureUsageMetricsSnapshot {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+
+        var descriptor = FetchDescriptor<CaptureUsageMetricsRecord>(
+            predicate: #Predicate { $0.key == "overview" }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first?.snapshot ?? .empty
+    }
+
+    private func ensureUsageMetricsRecord() throws {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+
+        var metricsDescriptor = FetchDescriptor<CaptureUsageMetricsRecord>(
+            predicate: #Predicate { $0.key == "overview" }
+        )
+        metricsDescriptor.fetchLimit = 1
+        guard try context.fetch(metricsDescriptor).first == nil else {
+            return
+        }
+
+        let metrics = CaptureUsageMetricsRecord()
+        let capturing = CaptureLifecycle.capturing.rawValue
+        var descriptor = FetchDescriptor<CaptureRecord>(
+            predicate: #Predicate { $0.lifecycleRawValue != capturing }
+        )
+        descriptor.propertiesToFetch = [
+            \CaptureRecord.lifecycleRawValue,
+            \CaptureRecord.deliveryModeRawValue,
+            \CaptureRecord.recognizedText,
+            \CaptureRecord.refinement,
+        ]
+
+        try context.enumerate(
+            descriptor,
+            batchSize: 128,
+            allowEscapingMutations: false
+        ) { capture in
+            Self.accumulateUsage(capture, into: metrics)
+        }
+
+        context.insert(metrics)
+        try context.save()
+    }
+
+    static func accumulateUsage(
+        _ capture: CaptureRecord,
+        into metrics: CaptureUsageMetricsRecord
+    ) {
+        metrics.totalCaptures += 1
+        metrics.recognizedCharacters += capture.recognizedText.count
+
+        if capture.deliveryModeRawValue
+            == CaptureDeliveryMode.currentApp.rawValue,
+           [.delivered, .deliveryFailed, .failed].contains(capture.lifecycle) {
+            metrics.currentAppAttempts += 1
+
+            switch capture.lifecycle {
+            case .delivered:
+                metrics.successfulInputs += 1
+            case .deliveryFailed, .failed:
+                metrics.failedInputs += 1
+            default:
+                break
+            }
+        }
+
+        if let duration = capture.refinement?.durationSeconds,
+           duration >= 0 {
+            metrics.refinementSamples += 1
+            metrics.refinementDurationTotal += duration
+        }
     }
 
     func pruneExpiredAudio(now: Date = Date()) throws {
