@@ -29,6 +29,7 @@ final class AppController {
     )
     let refinementModels = RefinementModelController()
     let refinementPrompts = RefinementPromptController()
+    let applicationContextInspector = ApplicationContextInspectionStore()
 
     private static let setupCompletedKey = "setup.completed"
 
@@ -51,6 +52,7 @@ final class AppController {
             personalizer: personalizer,
             postInsertionLearning: postInsertionLearning,
             memoryLearning: memoryLearning,
+            applicationContextInspector: applicationContextInspector,
             inputRefinementEnabled: preferences.inputRefinementEnabled,
             resolveRefinementConfiguration: { [weak self] snapshot in
                 let model =
@@ -219,8 +221,9 @@ final class AppController {
 
         Diagnostics.record(
             "App",
-            "Morie controller initialized; launch bootstrap scheduled"
+            "Morie controller initialized; \(AppBuildIdentity.current.logValue); launch bootstrap scheduled"
         )
+        DevelopmentDiagnostics.recordEnvironment()
 
         Task { @MainActor [weak self] in
             await self?.bootstrap()
@@ -537,6 +540,14 @@ final class AppController {
 
         do {
             await setup.refresh()
+            DevelopmentDiagnostics.list(
+                "Capability",
+                label: "bootstrapChecks",
+                setup.checks.map {
+                    "\($0.requirement)=\($0.state)"
+                        + ($0.detail.map { "; detail=\($0)" } ?? "")
+                }
+            )
             try Task.checkCancellation()
 
             guard runtime.state == .checking else {
@@ -736,10 +747,29 @@ final class AppController {
     }
 
     private func handleHotkeyToggle() {
+        DevelopmentDiagnostics.record(
+            "Hotkey",
+            "toggleReceived; shortcut=\(preferences.captureShortcut.logName); runtimeState=\(String(describing: runtime.state)); activeCapture=\(captureSession.hasActiveCapture)"
+        )
         if captureSession.hasActiveCapture {
-            captureSession.requestFinish(
-                source: preferences.captureShortcut.logName
-            )
+            switch captureSession.phase {
+            case .recording:
+                captureSession.requestFinish(
+                    source: preferences.captureShortcut.logName
+                )
+            case .finalizing, .refining:
+                Task { @MainActor [weak self] in
+                    await self?.captureSession.cancel(
+                        source: "\(self?.preferences.captureShortcut.logName ?? "Shortcut") during processing"
+                    )
+                }
+            default:
+                Diagnostics.record(
+                    "Session",
+                    "Toggle ignored while capture phase=\(String(describing: captureSession.phase))",
+                    level: .warning
+                )
+            }
             return
         }
 
@@ -762,6 +792,11 @@ final class AppController {
         deliveryMode: CaptureDeliveryMode
     ) {
         guard canStartCapture else {
+            DevelopmentDiagnostics.record(
+                "Hotkey",
+                level: .warning,
+                "startBlocked; deliveryMode=\(deliveryMode.rawValue); runtimeState=\(String(describing: runtime.state)); setupReady=\(setup.isReady)"
+            )
             return
         }
 
@@ -812,6 +847,10 @@ final class AppController {
     private func applyCapturePhase(
         _ phase: CaptureSessionController.Phase
     ) {
+        DevelopmentDiagnostics.record(
+            "UIState",
+            "capturePhase=\(String(describing: phase)); previousRuntimeState=\(String(describing: runtime.state))"
+        )
         switch phase {
         case .idle:
             switch runtime.state {

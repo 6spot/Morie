@@ -246,14 +246,11 @@ final class DictionaryStore: ObservableObject {
     }
 
 
-    func relevantEntries(for text: String) throws -> [DictionarySnapshot] {
-        let candidates = try contextualEntries()
-        let tokens = InputText.words(in: text).map { String(text[$0]) }
-        return Array(
-            candidates
-                .filter { Self.cleanupTermIsRelevant($0.name, in: text, tokens: tokens) }
-                .prefix(16)
-        )
+    /// Refinement receives the same bounded canonical dictionary as Speech.
+    /// Relevance is a model decision; local code does not hide a term because
+    /// an ASR error failed a lexical/edit-distance heuristic.
+    func refinementEntries() throws -> [DictionarySnapshot] {
+        try contextualEntries()
     }
 
     func relevantConfirmedCorrections(for text: String) throws -> [DictionaryCorrectionSnapshot] {
@@ -341,55 +338,6 @@ final class DictionaryStore: ObservableObject {
     }
 
 
-    private static func cleanupTermIsRelevant(
-        _ term: String,
-        in text: String,
-        tokens: [String]
-    ) -> Bool {
-        let termKey = cleanupKey(term)
-        guard !termKey.isEmpty else { return false }
-
-        if containsCJK(term) {
-            return text.range(
-                of: term,
-                options: [.caseInsensitive, .diacriticInsensitive]
-            ) != nil
-        }
-
-        if term.contains(where: \.isWhitespace) {
-            return text.range(
-                of: term,
-                options: [.caseInsensitive, .diacriticInsensitive]
-            ) != nil
-        }
-
-        let tokenKeys = tokens.map(cleanupKey)
-        if tokenKeys.contains(termKey) { return true }
-
-        guard termKey.count >= 4,
-              termKey.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) })
-        else { return false }
-
-        let maxDistance = termKey.count <= 5 ? 1 : 2
-        return tokenKeys.contains { tokenKey in
-            guard tokenKey.count >= 4,
-                  abs(tokenKey.count - termKey.count) <= maxDistance,
-                  tokenKey.first == termKey.first,
-                  tokenKey.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) })
-            else { return false }
-            return editDistance(tokenKey, termKey) <= maxDistance
-        }
-    }
-
-    private static func cleanupKey(_ text: String) -> String {
-        text
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .folding(
-                options: [.caseInsensitive, .diacriticInsensitive],
-                locale: Locale(identifier: "en_US_POSIX")
-            )
-    }
-
     private static func containsCJK(_ text: String) -> Bool {
         text.unicodeScalars.contains { scalar in
             switch scalar.value {
@@ -399,27 +347,6 @@ final class DictionaryStore: ObservableObject {
                 false
             }
         }
-    }
-
-    private static func editDistance(_ lhs: String, _ rhs: String) -> Int {
-        let left = Array(lhs)
-        let right = Array(rhs)
-        if left.isEmpty { return right.count }
-        if right.isEmpty { return left.count }
-
-        var previous = Array(0...right.count)
-        for (leftIndex, leftCharacter) in left.enumerated() {
-            var current = Array(repeating: 0, count: right.count + 1)
-            current[0] = leftIndex + 1
-            for (rightIndex, rightCharacter) in right.enumerated() {
-                let substitution = previous[rightIndex] + (leftCharacter == rightCharacter ? 0 : 1)
-                let insertion = current[rightIndex] + 1
-                let deletion = previous[rightIndex + 1] + 1
-                current[rightIndex + 1] = min(substitution, insertion, deletion)
-            }
-            previous = current
-        }
-        return previous[right.count]
     }
 
     private func save() throws {

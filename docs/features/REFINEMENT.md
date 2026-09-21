@@ -132,6 +132,18 @@ Take extra care with content whose exact form may matter, including names, numbe
 
 Do not normalize these merely because another form looks more natural.
 
+
+## External model transport
+
+Cloud refinement uses the same trusted instructions and runtime reference payload as local refinement. Provider transport must not change the semantic contract.
+
+Morie's external-model boundary is standard OpenAI Chat Completions over HTTP. The configured endpoint owns its gateway/version prefix; Morie only normalizes the terminal path to `/chat/completions`. For example, `https://api.openai.com/v1` becomes `https://api.openai.com/v1/chat/completions`. A full `/chat/completions` URL is also accepted.
+
+The provider-neutral request contains only `model`, `stream: false`, and `messages` with one system message and one user message. Authentication, when configured, is `Authorization: Bearer <key>`. Morie does not inject provider-private session IDs, thinking controls, tools, response schemas, sampling parameters or token-limit fields into this generic path.
+
+Providers that require proprietary headers or session protocols are not treated as generic OpenAI-compatible endpoints. Support for such a provider requires a separate explicit product decision rather than hidden compatibility branches in the generic adapter.
+
+Privacy-safe Cloud failure metadata (HTTP status plus bounded provider error type/code/parameter) is written to diagnostics. Morie never logs API keys, authorization headers, raw provider response bodies or provider error messages that may echo user input. A failed remote refinement still preserves and delivers the already-saved recognized text.
 ## Output
 
 Return only the refined final text.

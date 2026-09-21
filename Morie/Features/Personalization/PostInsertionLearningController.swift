@@ -34,10 +34,23 @@ final class PostInsertionLearningController {
     func observeInsertion(
         _ text: String,
         in application: NSRunningApplication?,
+        captureID: UUID? = nil,
         dictionarySuggestionsEnabled: Bool,
         expressionLearningEnabled: Bool
     ) {
         stop()
+        DevelopmentDiagnostics.text(
+            "PostInsertion",
+            captureID: captureID,
+            label: "injected",
+            text,
+            limit: 2_000
+        )
+        DevelopmentDiagnostics.record(
+            "PostInsertion",
+            captureID: captureID,
+            "requested; app=\(application?.localizedName ?? "none"); bundle=\(application?.bundleIdentifier ?? "none"); dictionarySuggestions=\(dictionarySuggestionsEnabled); expressionLearning=\(expressionLearningEnabled)"
+        )
         guard dictionarySuggestionsEnabled || expressionLearningEnabled,
               let application, !application.isTerminated,
               application.bundleIdentifier != Bundle.main.bundleIdentifier,
@@ -64,7 +77,20 @@ final class PostInsertionLearningController {
                     guard self?.observationID == id else { return }
                     if await reader.anchor(text, pid: pid) { anchored = true; break }
                 }
-                guard anchored else { return }
+                guard anchored else {
+                    DevelopmentDiagnostics.record(
+                        "PostInsertion",
+                        captureID: captureID,
+                        level: .warning,
+                        "anchorFailed"
+                    )
+                    return
+                }
+                DevelopmentDiagnostics.record(
+                    "PostInsertion",
+                    captureID: captureID,
+                    "anchorSucceeded; pid=\(pid)"
+                )
                 var correctionTracker = DictionaryCorrectionTracker(original: text)
                 var styleTracker = StableInsertedEditTracker(original: text)
                 var expressionRecorded = false
@@ -79,6 +105,13 @@ final class PostInsertionLearningController {
                         continue
                     }
                     let now = Date()
+                    DevelopmentDiagnostics.text(
+                        "PostInsertion",
+                        captureID: captureID,
+                        label: "observedEdit",
+                        sample,
+                        limit: 2_000
+                    )
                     if expressionLearningEnabled, !expressionRecorded,
                        let stableEdit = styleTracker.observe(sample, at: now),
                        ExpressionStyleExtractor.extract(injected: text, edited: stableEdit) != nil,
@@ -86,6 +119,11 @@ final class PostInsertionLearningController {
                         do {
                             try self.expressionProfile.record(injected: text, edited: stableEdit, at: now)
                             expressionRecorded = true
+                            DevelopmentDiagnostics.record(
+                                "PostInsertion",
+                                captureID: captureID,
+                                "expressionSampleRecorded"
+                            )
                             Diagnostics.record("ExpressionProfile", "Recorded one bounded style-edit sample")
                         } catch {
                             Diagnostics.record("ExpressionProfile", "Could not save style sample", level: .warning)
@@ -94,6 +132,11 @@ final class PostInsertionLearningController {
 
                     if dictionarySuggestionsEnabled,
                        let correction = correctionTracker.observe(sample, at: now) {
+                        DevelopmentDiagnostics.record(
+                            "PostInsertion",
+                            captureID: captureID,
+                            "dictionaryCorrectionCandidate=\(correction.original) → \(correction.replacement)"
+                        )
                         self?.present(correction)
                         guard self?.panel != nil else { return }
                         offeredText = sample

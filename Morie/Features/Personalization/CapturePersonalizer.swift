@@ -31,6 +31,7 @@ final class CapturePersonalizer {
     func refine(
         _ captureID: UUID,
         enabled: Bool,
+        personalMemoryEnabled: Bool = PersonalMemorySettings.isEnabled,
         expressionStyleEnabled: Bool = false,
         otherModelWorkActive: Bool = false,
         configuration: RefinementConfiguration = .local
@@ -40,12 +41,12 @@ final class CapturePersonalizer {
         var skip: RefinementReason? = enabled ? nil : .disabled
         if enabled && (otherModelWorkActive || runner.isBusy) { skip = .modelBusy }
         let source = try store.capture(captureID).finalText
-        let dictionaryEntries = (try? dictionary.relevantEntries(for: source)) ?? []
+        let dictionaryEntries = (try? dictionary.refinementEntries()) ?? []
         let correctionEntries = (try? dictionary.relevantConfirmedCorrections(for: source)) ?? []
         let corrected = DictionaryCorrections.apply(source, using: correctionEntries)
         let prepared = DictionarySpelling.normalize(corrected.text, using: dictionaryEntries).text
         // Neither a missing personal profile nor retrieval failure disables day-one cleanup.
-        let context = skip == nil && PersonalMemorySettings.isEnabled
+        let context = skip == nil && personalMemoryEnabled
             ? ((try? memory.relevantContext(for: prepared, limit: Self.cleanupMemoryContextLimit)) ?? [])
             : []
         let expressionStyle = skip == nil && expressionStyleEnabled
@@ -59,6 +60,65 @@ final class CapturePersonalizer {
             expressionStyle: expressionStyle
         )
 
+        DevelopmentDiagnostics.text(
+            "RefinementInput",
+            captureID: captureID,
+            label: "recognizedSource",
+            source
+        )
+        DevelopmentDiagnostics.text(
+            "RefinementInput",
+            captureID: captureID,
+            label: "dictionaryPrepared",
+            input.prepared.text
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "dictionaryCandidates",
+            input.dictionary.map(\.name)
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "applicationReferenceTermsRuntimeOnly",
+            configuration.applicationSpellingCandidates
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "confirmedCorrections",
+            input.confirmedCorrections.map { "\($0.original) → \($0.replacement)" }
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "expressionStyle",
+            input.expressionStyle
+        )
+        DevelopmentDiagnostics.list(
+            "RefinementInput",
+            captureID: captureID,
+            label: "memoryMatches",
+            input.context.map {
+                "\($0.memory.name) | matched=\($0.matchedTerm) | kind=\($0.memory.kind.rawValue) | scope=\($0.memory.scope.rawValue)"
+            }
+        )
+        for match in input.context {
+            DevelopmentDiagnostics.text(
+                "RefinementMemory",
+                captureID: captureID,
+                label: "notes[\(match.memory.name)]",
+                match.memory.notes,
+                limit: 4_000
+            )
+        }
+
+        Diagnostics.record(
+            "RefinementContext",
+            "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); memoryMatches=\(input.context.count); dictionaryCandidates=\(input.dictionary.count); confirmedCorrections=\(input.confirmedCorrections.count); expressionDirectives=\(input.expressionStyle.count); applicationSpellingCandidates=\(configuration.applicationSpellingCandidates.count); applicationRawContextIncluded=false; memoryNotesIncluded=false"
+        )
+
         do {
             try store.beginRefinement(input)
         } catch {
@@ -69,21 +129,44 @@ final class CapturePersonalizer {
             )
             return input.prepared.text
         }
-        if let skip { return try keepOriginal(input, reason: skip, started: started) }
+        if let skip {
+            DevelopmentDiagnostics.record(
+                "RefinementDecision",
+                captureID: captureID,
+                "skippedBeforeModel; reason=\(skip.rawValue)"
+            )
+            return try keepOriginal(input, reason: skip, started: started)
+        }
         do {
             let generation = try await runner.run(input, configuration: configuration)
             try Task.checkCancellation()
             try store.requireRefinementSource(input)
 
-            guard (try? dictionary.relevantEntries(for: input.text)) == input.dictionary,
+            guard (try? dictionary.refinementEntries()) == input.dictionary,
                   (try? dictionary.relevantConfirmedCorrections(for: input.text)) == input.confirmedCorrections else {
                 return try keepOriginal(input, reason: .dictionaryChanged, started: started)
             }
             switch generation {
             case .keptOriginal(let reason):
+                DevelopmentDiagnostics.record(
+                    "RefinementDecision",
+                    captureID: captureID,
+                    "modelKeptOriginal; reason=\(reason.rawValue)"
+                )
                 return try keepOriginal(input, reason: reason, started: started)
             case .text(let text):
-                let current = PersonalMemorySettings.isEnabled
+                DevelopmentDiagnostics.text(
+                    "RefinementOutput",
+                    captureID: captureID,
+                    label: "generated",
+                    text,
+                    limit: 16_000
+                )
+                Diagnostics.record(
+                    "RefinementGeneration",
+                    "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); generatedCharacters=\(text.count); deltaCharacters=\(text.count - input.prepared.text.count); memoryMatches=\(input.context.count)"
+                )
+                let current = personalMemoryEnabled
                     ? ((try? memory.relevantContext(
                         for: input.prepared.text,
                         limit: Self.cleanupMemoryContextLimit
@@ -100,11 +183,33 @@ final class CapturePersonalizer {
                 }
                 let result: ValidatedRefinement
                 do {
-                    result = try ValidatedRefinement.accepting(text, for: input)
+                    result = try ValidatedRefinement.accepting(
+                        text,
+                        for: input
+                    )
+                    DevelopmentDiagnostics.text(
+                        "RefinementOutput",
+                        captureID: captureID,
+                        label: "accepted",
+                        result.text,
+                        limit: 16_000
+                    )
+                    DevelopmentDiagnostics.list(
+                        "RefinementOutput",
+                        captureID: captureID,
+                        label: "edits",
+                        result.edits.map { "\($0.original) → \($0.replacement)" }
+                    )
                 } catch {
+                    DevelopmentDiagnostics.record(
+                        "RefinementDecision",
+                        captureID: captureID,
+                        level: .warning,
+                        "boundaryRejected; errorType=\(DevelopmentDiagnostics.errorType(error))"
+                    )
                     Diagnostics.record(
                         "Refinement",
-                        "Rejected cleanup output that crossed a protected fact or intent boundary",
+                        "Rejected cleanup output because the model returned an unusable payload",
                         level: .warning
                     )
                     return try keepOriginal(input, reason: .invalidEdits, started: started)
@@ -129,9 +234,14 @@ final class CapturePersonalizer {
 
     private func keepOriginal(_ input: RefinementInput, reason: RefinementReason, started: ContinuousClock.Instant) throws -> String {
         try store.requireRefinementSource(input)
+        DevelopmentDiagnostics.record(
+            "RefinementDecision",
+            captureID: input.captureID,
+            "keepOriginal; reason=\(reason.rawValue)"
+        )
         do {
             let mayApplyDictionary = reason != .dictionaryChanged && reason != .saveFailed
-                && (try? dictionary.relevantEntries(for: input.text)) == input.dictionary
+                && (try? dictionary.refinementEntries()) == input.dictionary
                 && (try? dictionary.relevantConfirmedCorrections(for: input.text)) == input.confirmedCorrections
             let result = mayApplyDictionary ? input.prepared : ValidatedRefinement(text: input.text, edits: [])
             return try store.saveRefinement(input, result: result, reason: reason, durationSeconds: elapsed(since: started))

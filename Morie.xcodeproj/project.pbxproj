@@ -6,14 +6,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A90000000000000000000001 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
+		A90000000000000000000002 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
+		A80000000000000000000003 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
+		A80000000000000000000001 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
+		A80000000000000000000002 /* ApplicationContextCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000002 /* ApplicationContextCollector.swift */; };
 		A50000000000000000000001 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
 		A50000000000000000000004 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
 		A60000000000000000000001 /* RefinementPromptSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000001 /* RefinementPromptSettings.swift */; };
 		A60000000000000000000002 /* RefinementPromptSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000001 /* RefinementPromptSettings.swift */; };
 		A60000000000000000000003 /* DefaultRefinementInstructions.txt in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000002 /* DefaultRefinementInstructions.txt */; };
 		A60000000000000000000004 /* DefaultRefinementInstructions.txt in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000002 /* DefaultRefinementInstructions.txt */; };
-		A50000000000000000000002 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000001 /* FoundationModelsUtilities */; };
-		A50000000000000000000003 /* FoundationModelsUtilities in Frameworks */ = {isa = PBXBuildFile; productRef = G50000000000000000000002 /* FoundationModelsUtilities */; };
 		A10000000000000000000001 /* MorieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* MorieApp.swift */; };
 		A10000000000000000000002 /* AppController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* AppController.swift */; };
 		A70000000000000000000001 /* AppRuntimeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000001 /* AppRuntimeController.swift */; };
@@ -98,6 +101,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BA0000000000000000000001 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		BA0000000000000000000002 /* LocalSigning.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = LocalSigning.xcconfig.example; sourceTree = "<group>"; };
+		B90000000000000000000001 /* SpeechContextHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechContextHints.swift; sourceTree = "<group>"; };
+		B80000000000000000000001 /* ApplicationContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationContext.swift; sourceTree = "<group>"; };
+		B80000000000000000000002 /* ApplicationContextCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationContextCollector.swift; sourceTree = "<group>"; };
 		B50000000000000000000001 /* RefinementModelSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementModelSettings.swift; sourceTree = "<group>"; };
 		B60000000000000000000001 /* RefinementPromptSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementPromptSettings.swift; sourceTree = "<group>"; };
 		B60000000000000000000002 /* DefaultRefinementInstructions.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = DefaultRefinementInstructions.txt; sourceTree = "<group>"; };
@@ -168,7 +176,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A50000000000000000000002 /* FoundationModelsUtilities in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,7 +183,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A50000000000000000000003 /* FoundationModelsUtilities in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,8 +194,18 @@
 			children = (
 				D10000000000000000000002 /* Morie */,
 				D20000000000000000000001 /* MorieTests */,
+				DA0000000000000000000001 /* Config */,
 				D10000000000000000000003 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000001 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				BA0000000000000000000001 /* Signing.xcconfig */,
+				BA0000000000000000000002 /* LocalSigning.xcconfig.example */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		D10000000000000000000002 /* Morie */ = {
@@ -222,6 +238,7 @@
 			isa = PBXGroup;
 			children = (
 				D30000000000000000000010 /* Overview */,
+				D80000000000000000000001 /* ApplicationContext */,
 				D30000000000000000000003 /* Capture */,
 				D30000000000000000000005 /* Memory */,
 				D30000000000000000000006 /* Dictionary */,
@@ -239,6 +256,15 @@
 			path = Overview;
 			sourceTree = "<group>";
 		};
+		D80000000000000000000001 /* ApplicationContext */ = {
+			isa = PBXGroup;
+			children = (
+				B80000000000000000000001 /* ApplicationContext.swift */,
+				B80000000000000000000002 /* ApplicationContextCollector.swift */,
+			);
+			path = ApplicationContext;
+			sourceTree = "<group>";
+		};
 		D30000000000000000000003 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
@@ -247,6 +273,7 @@
 				B10000000000000000000015 /* CaptureAudioSource.swift */,
 				B10000000000000000000018 /* CaptureAudioStream.swift */,
 				B10000000000000000000016 /* CaptureFileTranscriber.swift */,
+				B90000000000000000000001 /* SpeechContextHints.swift */,
 				B10000000000000000000004 /* SpeechPipeline.swift */,
 				B10000000000000000000027 /* CaptureRefinement.swift */,
 				B10000000000000000000028 /* InputRefiner.swift */,
@@ -462,12 +489,12 @@
 				C10000000000000000000002 /* Sources */,
 				C10000000000000000000001 /* Frameworks */,
 				C10000000000000000000003 /* Resources */,
+				C90000000000000000000001 /* Stamp Build Identity */,
 			);
 			buildRules = ();
 			dependencies = ();
 			name = Morie;
 			packageProductDependencies = (
-				G50000000000000000000001 /* FoundationModelsUtilities */,
 			);
 			productName = Morie;
 			productReference = B10000000000000000000007 /* Morie.app */;
@@ -485,7 +512,6 @@
 			dependencies = ();
 			name = MorieTests;
 			packageProductDependencies = (
-				G50000000000000000000002 /* FoundationModelsUtilities */,
 			);
 			productName = MorieTests;
 			productReference = B20000000000000000000002 /* MorieTests.xctest */;
@@ -524,7 +550,6 @@
 			mainGroup = D10000000000000000000001;
 			productRefGroup = D10000000000000000000003 /* Products */;
 			packageReferences = (
-				H50000000000000000000001 /* XCRemoteSwiftPackageReference "foundation-models-utilities" */,
 			);
 			projectDirPath = "";
 			projectRoot = "";
@@ -555,11 +580,35 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		C90000000000000000000001 /* Stamp Build Identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/stamp-build-identity.sh",
+			);
+			name = "Stamp Build Identity";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/MorieBuildIdentity.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/scripts/stamp-build-identity.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		C10000000000000000000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A90000000000000000000001 /* SpeechContextHints.swift in Sources */,
+				A80000000000000000000001 /* ApplicationContext.swift in Sources */,
+				A80000000000000000000002 /* ApplicationContextCollector.swift in Sources */,
 				A50000000000000000000001 /* RefinementModelSettings.swift in Sources */,
 				A60000000000000000000001 /* RefinementPromptSettings.swift in Sources */,
 				A10000000000000000000020 /* PermissionSetupController.swift in Sources */,
@@ -613,6 +662,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A90000000000000000000002 /* SpeechContextHints.swift in Sources */,
+				A80000000000000000000003 /* ApplicationContext.swift in Sources */,
 				A50000000000000000000004 /* RefinementModelSettings.swift in Sources */,
 				A60000000000000000000002 /* RefinementPromptSettings.swift in Sources */,
 				A2000000000000000000001D /* CaptureHUD.swift in Sources */,
@@ -656,30 +707,6 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		H50000000000000000000001 /* XCRemoteSwiftPackageReference "foundation-models-utilities" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/foundation-models-utilities";
-			requirement = {
-				kind = revision;
-				revision = 2aa12937e30d310687f40fc470ea35495816c9a4;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		G50000000000000000000001 /* FoundationModelsUtilities */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = H50000000000000000000001 /* XCRemoteSwiftPackageReference "foundation-models-utilities" */;
-			productName = FoundationModelsUtilities;
-		};
-		G50000000000000000000002 /* FoundationModelsUtilities */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = H50000000000000000000001 /* XCRemoteSwiftPackageReference "foundation-models-utilities" */;
-			productName = FoundationModelsUtilities;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin XCBuildConfiguration section */
 		F20000000000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -704,6 +731,7 @@
 		};
 		F20000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BA0000000000000000000001 /* Signing.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Morie/Morie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -724,6 +752,7 @@
 		};
 		F20000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BA0000000000000000000001 /* Signing.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Morie/Morie.entitlements;
 				CODE_SIGN_STYLE = Automatic;

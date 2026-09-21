@@ -47,6 +47,15 @@ struct CapabilityGate {
             : .init(requirement: .accessibility, state: .denied,
                     detail: "在“隐私与安全性 → 辅助功能”中开启 Morie，然后返回这里。", action: .openSettings)
         let checks = [intelligence, transcription, microphone, recognition, accessibility]
+        DevelopmentDiagnostics.list(
+            "Capability",
+            label: "inspect",
+            checks.map {
+                "\($0.requirement)=\($0.state)"
+                    + ($0.detail.map { "; detail=\($0)" } ?? "")
+                    + ($0.action.map { "; action=\($0)" } ?? "")
+            }
+        )
         Diagnostics.record("Capability", checks.map { "\($0.requirement)=\($0.state)" }.joined(separator: "; "))
         Diagnostics.recordMemory("capability-inspect-finish")
         return checks
@@ -58,10 +67,12 @@ struct CapabilityGate {
         case .microphone:
             guard AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined else { return }
             Diagnostics.record("Permission", "Requesting microphone access from setup")
+            DevelopmentDiagnostics.record("Capability", "requestPermission=microphone")
             _ = await AVCaptureDevice.requestAccess(for: .audio)
         case .speechRecognition:
             guard SFSpeechRecognizer.authorizationStatus() == .notDetermined else { return }
             Diagnostics.record("Permission", "Requesting Speech authorization from setup")
+            DevelopmentDiagnostics.record("Capability", "requestPermission=speechRecognition")
             await Self.requestSpeechAuthorization()
         default:
             break
@@ -83,6 +94,10 @@ struct CapabilityGate {
         guard let url = requirement.settingsURL else { return }
         let permissionWindow = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow
         Diagnostics.record("Permission", "Opening permission flow for \(requirement)")
+        DevelopmentDiagnostics.record(
+            "Capability",
+            "openSettings=\(requirement); currentlyGranted=\(permissionIsGranted(requirement))"
+        )
         if requirement == .accessibility, !AXIsProcessTrusted() {
             // This is the only public API that registers the current signed
             // app in the Accessibility list. Let its single native prompt own

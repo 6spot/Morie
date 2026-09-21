@@ -12,6 +12,7 @@ final class CaptureAudioStream {
     let analyzerInputs: AsyncThrowingStream<AnalyzerInput, Error>
 
     private let destinationURL: URL
+    private let captureID: UUID?
     private var convert: ((AVAudioPCMBuffer) throws -> [AnalyzerInput])?
     private var flush: (() throws -> [AnalyzerInput])?
     private var onAudioLevel: (@Sendable (Double) -> Void)?
@@ -26,15 +27,22 @@ final class CaptureAudioStream {
 
     init(
         destinationURL: URL,
+        captureID: UUID? = nil,
         convert: @escaping (AVAudioPCMBuffer) throws -> [AnalyzerInput],
         flush: @escaping () throws -> [AnalyzerInput],
         onAudioLevel: @escaping @Sendable (Double) -> Void
     ) throws {
         (analyzerInputs, continuation) = AsyncThrowingStream.makeStream()
         self.destinationURL = destinationURL
+        self.captureID = captureID
         self.convert = convert
         self.flush = flush
         self.onAudioLevel = onAudioLevel
+        DevelopmentDiagnostics.record(
+            "AudioStream",
+            captureID: captureID,
+            "init; file=\(destinationURL.lastPathComponent); targetFormat=16000Hz/mono/AAC32kbps"
+        )
         audioFile = try AVAudioFile(
             forWriting: destinationURL,
             settings: [
@@ -70,6 +78,12 @@ final class CaptureAudioStream {
 
     func fail(_ error: Error) {
         guard !ended else { return }
+        DevelopmentDiagnostics.record(
+            "AudioStream",
+            captureID: captureID,
+            level: .error,
+            "failed; errorType=\(DevelopmentDiagnostics.errorType(error)); callbacks=\(callbackCount); writtenFrames=\(writtenFrames)"
+        )
         failure = error
         ended = true
         continuation.finish(throwing: error)
@@ -77,6 +91,11 @@ final class CaptureAudioStream {
 
     func finish() -> Completion {
         if let completion { return completion }
+        DevelopmentDiagnostics.record(
+            "AudioStream",
+            captureID: captureID,
+            "finishRequested; callbacks=\(callbackCount); writtenFrames=\(writtenFrames)"
+        )
         if !ended {
             do {
                 if let flush {
@@ -95,6 +114,12 @@ final class CaptureAudioStream {
 
     func stopImmediately() -> CapturedSourceAudio {
         if let completion { return completion.sourceAudio }
+        DevelopmentDiagnostics.record(
+            "AudioStream",
+            captureID: captureID,
+            level: .warning,
+            "stopImmediately; callbacks=\(callbackCount); writtenFrames=\(writtenFrames)"
+        )
         ended = true
         continuation.finish(throwing: CancellationError())
         return closeFile().sourceAudio
@@ -109,6 +134,11 @@ final class CaptureAudioStream {
         onAudioLevel = nil
         let evidence = speechEvidence.summary
         let hasMeaningfulAudio = evidence.hasMeaningfulSpeech
+        DevelopmentDiagnostics.record(
+            "AudioEvidence",
+            captureID: captureID,
+            "closed; meaningful=\(hasMeaningfulAudio); activeMs=\(Int(evidence.bestActiveDuration * 1_000)); voiceLikeMs=\(Int(evidence.bestVoiceLikeDuration * 1_000)); dynamicRangeDb=\(String(format: "%.1f", evidence.bestDynamicRangeDecibels)); noiseFloorDb=\(String(format: "%.1f", evidence.noiseFloorDecibels)); peakDb=\(evidence.peakDecibels.isFinite ? String(format: "%.1f", evidence.peakDecibels) : "-inf"); callbacks=\(callbackCount); writtenFrames=\(writtenFrames)"
+        )
         Diagnostics.record(
             "AudioEvidence",
             "Capture audio closed; meaningful=\(hasMeaningfulAudio); "

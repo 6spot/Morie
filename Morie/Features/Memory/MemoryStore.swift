@@ -334,20 +334,49 @@ final class MemoryStore: ObservableObject {
 
             for suggestion in suggestions {
                 guard let suggestion = grounded(suggestion, in: input.source.text)
-                else { continue }
+                else {
+                    DevelopmentDiagnostics.record(
+                        "MemoryAdmission",
+                        captureID: input.source.captureID,
+                        level: .warning,
+                        "groundingRejected; action=\(suggestion.action.rawValue); name=\(suggestion.draft.name); confidence=\(suggestion.confidence); evidence=\(suggestion.evidence)"
+                    )
+                    continue
+                }
 
                 let signature = [
                     suggestion.existingMemoryID?.uuidString ?? "new",
                     suggestion.action.rawValue,
                     MemoryText.normalized(suggestion.evidence),
                 ].joined(separator: "|")
-                guard seen.insert(signature).inserted else { continue }
+                guard seen.insert(signature).inserted else {
+                    DevelopmentDiagnostics.record(
+                        "MemoryAdmission",
+                        captureID: input.source.captureID,
+                        "duplicateSuggestionIgnored; signature=\(signature)"
+                    )
+                    continue
+                }
 
                 var observation = MemoryObservation(suggestion: suggestion)
                 try admit(&observation, input: input)
+                DevelopmentDiagnostics.record(
+                    "MemoryAdmission",
+                    captureID: input.source.captureID,
+                    "disposition=\(observation.disposition.rawValue); action=\(suggestion.action.rawValue); name=\(suggestion.draft.name); memoryID=\(observation.memoryID?.uuidString ?? "none")"
+                )
                 observations.append(observation)
             }
 
+            DevelopmentDiagnostics.list(
+                "MemoryAdmission",
+                captureID: input.source.captureID,
+                label: "finalObservations",
+                observations.map {
+                    "\($0.disposition.rawValue) | \($0.suggestion.action.rawValue) | \($0.suggestion.draft.name) | memoryID=\($0.memoryID?.uuidString ?? "none")"
+                },
+                limit: 8
+            )
             analysis.observations = observations
             analysis.contextSnapshot = input.context
             analysis.stateRawValue = MemoryAnalysisState.completed.rawValue
@@ -545,7 +574,8 @@ final class MemoryStore: ObservableObject {
     ) -> MemorySuggestion? {
         guard suggestion.confidence.isFinite,
               (0.75...1).contains(suggestion.confidence),
-              let draft = try? validated(suggestion.draft)
+              let draft = try? validated(suggestion.draft),
+              !looksMachineGeneratedMemoryName(draft.name)
         else { return nil }
 
         let evidence = suggestion.evidence
@@ -558,6 +588,22 @@ final class MemoryStore: ObservableObject {
         var accepted = suggestion
         accepted.draft = draft
         return accepted
+    }
+
+    private func looksMachineGeneratedMemoryName(_ name: String) -> Bool {
+        let value = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.contains("_") else { return false }
+
+        let parts = value.split(separator: "_", omittingEmptySubsequences: false)
+        guard parts.count >= 2,
+              parts.allSatisfy({ part in
+                  !part.isEmpty && part.unicodeScalars.allSatisfy {
+                      CharacterSet.alphanumerics.contains($0)
+                  }
+              })
+        else { return false }
+
+        return true
     }
 
     func memory(_ id: UUID) throws -> MemoryRecord {

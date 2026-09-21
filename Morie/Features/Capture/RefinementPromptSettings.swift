@@ -4,6 +4,9 @@ import Foundation
 struct RefinementConfiguration: Equatable, Sendable {
     let model: RefinementModelConfiguration
     let instructions: String
+    /// Ephemeral current-app vocabulary. This stays outside RefinementInput so
+    /// Capture/History persistence never stores Application Context terms.
+    var applicationSpellingCandidates: [String] = []
 
     static let local = RefinementConfiguration(
         model: .local,

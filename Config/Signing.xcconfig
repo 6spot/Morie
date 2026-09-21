@@ -1,0 +1,11 @@
+// Shared signing bridge for Morie.
+//
+// Keep personal Apple Developer Team IDs out of the tracked Xcode project.
+// Create Config/LocalSigning.xcconfig locally (ignored by Git), or run:
+//   sh scripts/setup-local-signing.sh YOUR_TEAM_ID
+
+MORIE_DEVELOPMENT_TEAM =
+
+#include? "LocalSigning.xcconfig"
+
+DEVELOPMENT_TEAM = $(MORIE_DEVELOPMENT_TEAM)

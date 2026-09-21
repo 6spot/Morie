@@ -374,68 +374,44 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(fetch(id, from: reopened)).sourceAudioHasMeaningfulContent, true)
     }
 
-    func testOnlyConfirmedSilenceOrNoInputDiscardsEmptyCapture() throws {
-        for (duration, meaningful) in [(2.0, false as Bool?), (0.0, nil)] {
+    func testEmptyFinalRecognitionAlwaysDiscardsCaptureAndAudio() throws {
+        let scenarios: [(duration: TimeInterval, meaningful: Bool?)] = [
+            (2, false),
+            (2, nil),
+            (2, true),
+            (0, nil),
+            (0, true),
+        ]
+
+        for scenario in scenarios {
             let store = try CaptureStore(inMemory: true)
             defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
             let id = UUID()
-            let url = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil)
+            let url = try store.beginVoiceCapture(
+                id: id,
+                deliveryMode: .currentApp,
+                applicationName: nil,
+                bundleIdentifier: nil
+            )
             try Data("audio".utf8).write(to: url)
-            let source = CapturedSourceAudio(url: url, duration: duration, hasMeaningfulAudio: meaningful)
+            let source = CapturedSourceAudio(
+                url: url,
+                duration: scenario.duration,
+                hasMeaningfulAudio: scenario.meaningful
+            )
             try store.attachSourceAudio(source, for: id)
 
-            let outcome = try store.finishEmptyRecognition(for: id, sourceAudio: source)
+            try store.finishEmptyRecognition(for: id)
 
-            XCTAssertEqual(outcome, .discarded)
-            XCTAssertNil(try fetch(id, from: store))
-            XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+            XCTAssertNil(
+                try fetch(id, from: store),
+                "No usable transcript means there is no History Capture, regardless of audio evidence."
+            )
+            XCTAssertFalse(
+                FileManager.default.fileExists(atPath: url.path),
+                "Source audio for an empty final recognition must be discarded with the Capture."
+            )
         }
-    }
-
-    func testUncertainSignalAndPreviouslyRecognizedSpeechRemainRetryable() throws {
-        for (duration, meaningful) in [(2.0, nil as Bool?), (2.0, true), (0.0, true)] {
-            let store = try CaptureStore(inMemory: true)
-            defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
-            let id = UUID()
-            let url = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil)
-            try Data("audio".utf8).write(to: url)
-            let source = CapturedSourceAudio(url: url, duration: duration, hasMeaningfulAudio: meaningful)
-            try store.attachSourceAudio(source, for: id)
-
-            let outcome = try store.finishEmptyRecognition(for: id, sourceAudio: source)
-
-            XCTAssertEqual(outcome, .retainedForRetry)
-            XCTAssertEqual(try store.capture(id).lifecycle, .failed)
-            XCTAssertEqual(try store.sourceAudioURL(for: id), url)
-        }
-    }
-
-    func testExpiredEmptyFailureSurvivesRepeatedStoreRecreation() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appending(path: "MorieExpiredFailureTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let storeURL = directory.appending(path: "captures.store")
-        let id = UUID()
-        let store = try CaptureStore(storageURL: storeURL)
-        let audioURL = try store.beginVoiceCapture(id: id, deliveryMode: .currentApp, applicationName: nil, bundleIdentifier: nil)
-        try Data("audio".utf8).write(to: audioURL)
-        let source = CapturedSourceAudio(url: audioURL, duration: 2)
-        try store.attachSourceAudio(source, for: id)
-        _ = try store.finishEmptyRecognition(for: id, sourceAudio: source)
-        try store.capture(id).sourceAudioExpiresAt = .distantPast
-        try store.container.mainContext.save()
-
-        for _ in 0..<2 {
-            let reopened = try CaptureStore(storageURL: storeURL)
-            let capture = try reopened.capture(id)
-            XCTAssertEqual(capture.lifecycle, .failed)
-            XCTAssertNil(capture.sourceAudioRelativePath)
-            XCTAssertEqual(capture.sourceAudioDurationSeconds, 2)
-            XCTAssertEqual(capture.sourceAudioExpiresAt, .distantPast)
-            XCTAssertThrowsError(try reopened.sourceAudioURL(for: id))
-        }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: audioURL.path))
     }
 
     func testInterruptedCaptureRecoversUnfinishedAudio() throws {

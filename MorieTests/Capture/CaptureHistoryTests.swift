@@ -31,6 +31,27 @@ final class CaptureHistoryTests: XCTestCase {
         )
     }
 
+    func testFinalRecognitionRejectsGrosslyTruncatedAccurateResult() {
+        let live = "这是一个比较完整的实时识别结果，里面包含前半段、中间内容和最后的结尾信息。"
+        XCTAssertEqual(
+            CaptureFileTranscriber.preferredTranscript(
+                live: live,
+                accurate: "只有前半段"
+            ),
+            live
+        )
+    }
+
+    func testFinalRecognitionStillPrefersComparableAccurateResult() {
+        XCTAssertEqual(
+            CaptureFileTranscriber.preferredTranscript(
+                live: "接下来把 Vercowa 模块接进去，然后处理缓存",
+                accurate: "接下来把 Vercova 模块接进去，然后处理缓存。"
+            ),
+            "接下来把 Vercova 模块接进去，然后处理缓存。"
+        )
+    }
+
     func testHistoryQueryExcludesLiveCaptureUntilTerminalState() async throws {
         let store = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: store.audioDirectory) }

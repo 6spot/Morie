@@ -417,6 +417,36 @@ final class MemoryLearningTests: XCTestCase {
         )
     }
 
+    func testAutomaticLearningRejectsMachineStyleMemoryNames() throws {
+        let fixture = try LearningFixture()
+        let sourceText = "可以，你给我一段文字，我念出来看看整理结果。"
+        let source = try fixture.capture(sourceText)
+        try fixture.learn(
+            source,
+            suggestion: LearningFixture.suggestion(
+                name: "project_development_approach",
+                text: sourceText,
+                notes: sourceText
+            )
+        )
+
+        XCTAssertTrue(fixture.memory.entries.isEmpty)
+        XCTAssertEqual(
+            fixture.memory.analyses.first?.observations.count,
+            0
+        )
+    }
+
+    func testMemoryLearnerInstructionsRejectOneOffAssistantTasksFromLongTerm() {
+        let instructions = MemoryLearner.instructionsText
+        XCTAssertTrue(instructions.contains("weeks or"))
+        XCTAssertTrue(instructions.contains("months later"))
+        XCTAssertTrue(instructions.contains("one-off request"))
+        XCTAssertTrue(instructions.contains("test/evaluation prompt"))
+        XCTAssertTrue(instructions.contains("prefer workingContext or no memory"))
+        XCTAssertTrue(instructions.contains("Never emit\nsnake_case") || instructions.contains("snake_case"))
+    }
+
     func testSourceDeletionRemovesAnalysisButKeepsIndependentEvidence() throws {
         let fixture = try LearningFixture()
         let id = try fixture.capture("I work on Morie.")

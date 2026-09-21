@@ -46,6 +46,9 @@ actor SpeechPipeline {
     private var hasTranscriptEvidence = false
     private var isFinalizing = false
     private var reportedFailure = false
+    private var activeDictionaryWords: [String] = []
+    private var activeApplicationContextWords: [String] = []
+    private var lastDevelopmentTranscriptLogLength = 0
     private var preparedBackend: SpeechRecognitionBackend?
 
     private static let recognitionUnavailableMessage = "语音识别暂时不可用，请稍后重试。"
@@ -95,6 +98,7 @@ actor SpeechPipeline {
         locale requestedLocale: Locale,
         sourceAudioURL: URL,
         dictionaryWords: [String] = [],
+        applicationContextWords: [String] = [],
         onTranscript: @escaping @Sendable (UUID, String) -> Void,
         onAudioLevel: @escaping @Sendable (UUID, Double) -> Void,
         onFailure: @escaping @Sendable (UUID, String) -> Void
@@ -104,6 +108,9 @@ actor SpeechPipeline {
         finalizedText = ""
         volatileText = ""
         hasTranscriptEvidence = false
+        activeDictionaryWords = dictionaryWords
+        activeApplicationContextWords = applicationContextWords
+        lastDevelopmentTranscriptLogLength = 0
 
         let session = label(sessionID)
         Diagnostics.record("Speech", "Pipeline start requested for \(session)")
@@ -116,6 +123,11 @@ actor SpeechPipeline {
                 throw PipelineError.noMicrophone
             }
             Diagnostics.record("Speech", "Default microphone resolved for \(session): \(microphone.localizedName)")
+            DevelopmentDiagnostics.record(
+                "Audio",
+                captureID: sessionID,
+                "device=\(microphone.localizedName); uniqueID=\(microphone.uniqueID); modelID=\(microphone.modelID); manufacturer=\(microphone.manufacturer); deviceType=\(microphone.deviceType.rawValue); connected=\(microphone.isConnected); requestedCaptureFormat=16000Hz/mono/float32; savedAudio=AAC-32kbps"
+            )
 
             let backend: SpeechRecognitionBackend
             if let preparedBackend {
@@ -129,9 +141,18 @@ actor SpeechPipeline {
             }
 
             try requireActiveSession(sessionID)
+            let contextualWords = SpeechContextHints.merged(
+                dictionaryWords: dictionaryWords,
+                applicationContextWords: applicationContextWords
+            )
             Diagnostics.record(
                 "SpeechQuality",
-                "Session \(session) backend=\(backend.logName); locale=\(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count)"
+                "Session \(session) backend=\(backend.logName); locale=\(backend.locale.identifier); dictionaryHints=\(dictionaryWords.count); applicationHints=\(applicationContextWords.count); contextualHints=\(contextualWords.count)"
+            )
+            DevelopmentDiagnostics.record(
+                "Speech",
+                captureID: sessionID,
+                "backend=\(backend.logName); locale=\(backend.locale.identifier); sourceAudioFile=\(sourceAudioURL.lastPathComponent)"
             )
 
             let setup = try await configureLiveBackend(
@@ -140,7 +161,9 @@ actor SpeechPipeline {
                 sessionLabel: session,
                 microphone: microphone,
                 sourceAudioURL: sourceAudioURL,
-                dictionaryWords: dictionaryWords,
+                contextualWords: contextualWords,
+                dictionaryHintCount: dictionaryWords.count,
+                applicationHintCount: applicationContextWords.count,
                 onTranscript: onTranscript,
                 onAudioLevel: onAudioLevel,
                 onFailure: onFailure
@@ -150,6 +173,20 @@ actor SpeechPipeline {
             audioSource = setup.source
             analyzer = setup.analyzer
             resultTask = setup.resultTask
+
+            let latestContextualWords = SpeechContextHints.merged(
+                dictionaryWords: activeDictionaryWords,
+                applicationContextWords: activeApplicationContextWords
+            )
+            if latestContextualWords != contextualWords {
+                try await applyRecognitionContext(
+                    latestContextualWords,
+                    dictionaryHintCount: activeDictionaryWords.count,
+                    applicationHintCount: activeApplicationContextWords.count,
+                    analyzer: setup.analyzer,
+                    sessionID: sessionID
+                )
+            }
 
             let analyzerInputs = setup.source.analyzerInputs
             analysisTask = Task {
@@ -194,6 +231,45 @@ actor SpeechPipeline {
         }
     }
 
+    func updateApplicationContextWords(
+        _ words: [String],
+        sessionID: UUID
+    ) async {
+        guard activeSessionID == sessionID else { return }
+        activeApplicationContextWords = words
+        DevelopmentDiagnostics.list(
+            "SpeechContext",
+            captureID: sessionID,
+            label: "lateApplicationHints",
+            words
+        )
+
+        guard let analyzer else {
+            DevelopmentDiagnostics.record(
+                "SpeechContext",
+                captureID: sessionID,
+                "late update stored before analyzer became available"
+            )
+            return
+        }
+        let contextualWords = SpeechContextHints.merged(
+            dictionaryWords: activeDictionaryWords,
+            applicationContextWords: activeApplicationContextWords
+        )
+        do {
+            try await applyRecognitionContext(
+                contextualWords,
+                dictionaryHintCount: activeDictionaryWords.count,
+                applicationHintCount: activeApplicationContextWords.count,
+                analyzer: analyzer,
+                sessionID: sessionID
+            )
+        } catch {
+            // Application Context is optional. Session cancellation/teardown owns
+            // any stale-session error from this best-effort context update.
+        }
+    }
+
     func stop(sessionID: UUID) async throws -> Result {
         try requireActiveSession(sessionID)
         guard let analyzer, let analysisTask else {
@@ -211,26 +287,6 @@ actor SpeechPipeline {
 
         do {
             if let error = completion.error { throw error }
-
-            if !hasTranscriptEvidence, completion.sourceAudio.hasMeaningfulAudio == false {
-                Diagnostics.record(
-                    "SpeechQuality",
-                    "No speech evidence for \(session); skipping analyzer finalization and accurate retry"
-                )
-                analysisTask.cancel()
-                resultTask?.cancel()
-                await analyzer.cancelAndFinishNow()
-                _ = await analysisTask.result
-                _ = await resultTask?.result
-
-                let result = snapshot(sourceAudio: completion.sourceAudio)
-                Diagnostics.record(
-                    "Speech",
-                    "Fast no-speech stop completed for \(session)"
-                )
-                reset(sessionID: sessionID)
-                return result
-            }
 
             let lastSampleTime = try await analysisTask.value
             try requireActiveSession(sessionID)
@@ -312,7 +368,9 @@ actor SpeechPipeline {
         sessionLabel: String,
         microphone: AVCaptureDevice,
         sourceAudioURL: URL,
-        dictionaryWords: [String],
+        contextualWords: [String],
+        dictionaryHintCount: Int,
+        applicationHintCount: Int,
         onTranscript: @escaping @Sendable (UUID, String) -> Void,
         onAudioLevel: @escaping @Sendable (UUID, Double) -> Void,
         onFailure: @escaping @Sendable (UUID, String) -> Void
@@ -320,8 +378,7 @@ actor SpeechPipeline {
         switch backend {
         case .speechTranscriber(let locale):
             let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
-            let detector = SpeechDetector()
-            let modules: [any SpeechModule] = [detector, transcriber]
+            let modules: [any SpeechModule] = [transcriber]
             let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
             try requireActiveSession(sessionID)
 
@@ -329,10 +386,17 @@ actor SpeechPipeline {
                 device: microphone,
                 converter: converter,
                 destinationURL: sourceAudioURL,
+                captureID: sessionID,
                 onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
             let analyzer = SpeechAnalyzer(modules: modules)
-            try await applyDictionaryContext(dictionaryWords, analyzer: analyzer, sessionID: sessionID)
+            try await applyRecognitionContext(
+                contextualWords,
+                dictionaryHintCount: dictionaryHintCount,
+                applicationHintCount: applicationHintCount,
+                analyzer: analyzer,
+                sessionID: sessionID
+            )
 
             let task = Task {
                 do {
@@ -359,8 +423,7 @@ actor SpeechPipeline {
 
         case .dictationTranscriber(let locale):
             let transcriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
-            let detector = SpeechDetector()
-            let modules: [any SpeechModule] = [detector, transcriber]
+            let modules: [any SpeechModule] = [transcriber]
             let converter = try await AnalyzerInputConverter.converter(compatibleWith: modules)
             try requireActiveSession(sessionID)
 
@@ -368,10 +431,17 @@ actor SpeechPipeline {
                 device: microphone,
                 converter: converter,
                 destinationURL: sourceAudioURL,
+                captureID: sessionID,
                 onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
             let analyzer = SpeechAnalyzer(modules: modules)
-            try await applyDictionaryContext(dictionaryWords, analyzer: analyzer, sessionID: sessionID)
+            try await applyRecognitionContext(
+                contextualWords,
+                dictionaryHintCount: dictionaryHintCount,
+                applicationHintCount: applicationHintCount,
+                analyzer: analyzer,
+                sessionID: sessionID
+            )
 
             let task = Task {
                 do {
@@ -421,27 +491,47 @@ actor SpeechPipeline {
             "SpeechText",
             "Session \(sessionLabel) transcriptCharacters=\(combined.count); final=\(isFinal)"
         )
+        if isFinal
+            || combined.count < lastDevelopmentTranscriptLogLength
+            || combined.count - lastDevelopmentTranscriptLogLength >= 8 {
+            DevelopmentDiagnostics.text(
+                "SpeechLive",
+                captureID: sessionID,
+                label: isFinal ? "segmentFinal" : "partial",
+                combined,
+                limit: 8_000
+            )
+            lastDevelopmentTranscriptLogLength = combined.count
+        }
         onTranscript(sessionID, combined)
     }
 
-    private func applyDictionaryContext(
-        _ dictionaryWords: [String],
+    private func applyRecognitionContext(
+        _ contextualWords: [String],
+        dictionaryHintCount: Int,
+        applicationHintCount: Int,
         analyzer: SpeechAnalyzer,
         sessionID: UUID
     ) async throws {
-        guard !dictionaryWords.isEmpty else { return }
+        guard !contextualWords.isEmpty else { return }
+        DevelopmentDiagnostics.list(
+            "SpeechContext",
+            captureID: sessionID,
+            label: "applied",
+            contextualWords
+        )
         let context = AnalysisContext()
-        context.contextualStrings = [.general: dictionaryWords]
+        context.contextualStrings = [.general: contextualWords]
         do {
             try await analyzer.setContext(context)
             Diagnostics.record(
                 "SpeechQuality",
-                "Applied \(dictionaryWords.count) contextual dictionary strings for \(label(sessionID))"
+                "Applied \(contextualWords.count) contextual strings for \(label(sessionID)); dictionaryHints=\(dictionaryHintCount); applicationHints=\(applicationHintCount)"
             )
         } catch {
             Diagnostics.record(
                 "Speech",
-                "Dictionary context was unavailable; continuing recognition: \(error.localizedDescription)",
+                "Recognition context was unavailable; continuing recognition: \(error.localizedDescription)",
                 level: .warning
             )
         }
@@ -453,8 +543,7 @@ actor SpeechPipeline {
         case .speechTranscriber(let locale):
             let liveTranscriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
             let finalTranscriber = SpeechTranscriber(locale: locale, preset: .transcription)
-            let detector = SpeechDetector()
-            let modules: [any SpeechModule] = [detector, liveTranscriber, finalTranscriber]
+            let modules: [any SpeechModule] = [liveTranscriber, finalTranscriber]
             if let installation = try await AssetInventory.assetInstallationRequest(
                 supporting: modules
             ) {
@@ -468,8 +557,7 @@ actor SpeechPipeline {
         case .dictationTranscriber(let locale):
             let liveTranscriber = DictationTranscriber(locale: locale, preset: .progressiveLongDictation)
             let finalTranscriber = DictationTranscriber(locale: locale, preset: .longDictation)
-            let detector = SpeechDetector()
-            let modules: [any SpeechModule] = [detector, liveTranscriber, finalTranscriber]
+            let modules: [any SpeechModule] = [liveTranscriber, finalTranscriber]
             if let installation = try await AssetInventory.assetInstallationRequest(
                 supporting: modules
             ) {
@@ -540,6 +628,9 @@ actor SpeechPipeline {
         hasTranscriptEvidence = false
         isFinalizing = false
         reportedFailure = false
+        activeDictionaryWords = []
+        activeApplicationContextWords = []
+        lastDevelopmentTranscriptLogLength = 0
     }
 
     private func join(_ lhs: String, _ rhs: String) -> String {

@@ -25,11 +25,6 @@ final class CaptureStore {
         }
     }
 
-    enum EmptyRecognitionDisposition {
-        case discarded
-        case retainedForRetry
-    }
-
     static let audioRetentionDaysDefaultsKey = "captureAudioRetentionDays"
     static let defaultAudioRetentionDays = 7
 
@@ -125,6 +120,11 @@ final class CaptureStore {
         try container.mainContext.save()
         persistenceRevision[id] = 0
         Diagnostics.record("CaptureStore", "Durably created voice Capture \(label(id))")
+        DevelopmentDiagnostics.record(
+            "Persistence",
+            captureID: id,
+            "beginVoiceCapture; deliveryMode=\(deliveryMode.rawValue); sourceApp=\(applicationName ?? "unknown"); sourceBundle=\(bundleIdentifier ?? "unknown"); initialRevision=0"
+        )
         return audioDirectory.appending(path: "\(id.uuidString).m4a")
     }
 
@@ -140,6 +140,11 @@ final class CaptureStore {
         record.updatedAt = Date()
         schedulePersistence(for: record)
         Diagnostics.record("CaptureStore", "Source audio queued for \(label(id)); bytes=\(size)")
+        DevelopmentDiagnostics.record(
+            "Persistence",
+            captureID: id,
+            "audioAttached; bytes=\(size); durationSeconds=\(source.duration); meaningful=\(String(describing: source.hasMeaningfulAudio)); expiresAt=\(record.sourceAudioExpiresAt?.timeIntervalSince1970 ?? 0)"
+        )
     }
 
     func updateRecognizedText(_ text: String, for id: UUID) throws {
@@ -169,6 +174,11 @@ final class CaptureStore {
         schedulePersistence(for: record)
         lastProgressiveSave[id] = nil
         Diagnostics.record("CaptureStore", "Capture \(label(id)) recognition queued; characters=\(text.count)")
+        DevelopmentDiagnostics.record(
+            "Persistence",
+            captureID: id,
+            "recognitionCommittedInMemory; lifecycle=recognized; characters=\(text.count); revision=\(persistenceRevision[id] ?? 0)"
+        )
         return deliveryMode
     }
 
@@ -268,19 +278,16 @@ final class CaptureStore {
         try finish(id, lifecycle: .failed, error: error)
     }
 
-    func finishEmptyRecognition(
-        for id: UUID,
-        sourceAudio: CapturedSourceAudio
-    ) throws -> EmptyRecognitionDisposition {
+    /// Empty final recognition is never a History item.
+    ///
+    /// Audio evidence decides whether saved-audio recognition gets a chance,
+    /// not whether a Capture with no usable transcript should survive. By the
+    /// time this method is called, both live and saved-audio recognition have
+    /// produced no usable text, so the unfinished Capture and its source audio
+    /// are discarded together.
+    func finishEmptyRecognition(for id: UUID) throws {
         guard records[id] != nil else { throw StoreError.captureNotFound }
-        if sourceAudio.hasMeaningfulAudio == false
-            || (sourceAudio.duration == 0 && sourceAudio.hasMeaningfulAudio != true) {
-            try cancel(id)
-            return .discarded
-        }
-
-        try markFailed(id, error: "未识别到语音，可以在历史记录中播放录音或重新识别。")
-        return .retainedForRetry
+        try cancel(id)
     }
 
     func capture(_ id: UUID) throws -> CaptureRecord {
@@ -397,13 +404,38 @@ final class CaptureStore {
         records[id] = nil
         lastProgressiveSave[id] = nil
         Diagnostics.record("CaptureStore", "Capture \(label(id)) queued with lifecycle=\(lifecycle.rawValue)")
+        DevelopmentDiagnostics.record(
+            "Persistence",
+            captureID: id,
+            "terminalLifecycleQueued=\(lifecycle.rawValue); errorPresent=\(error != nil); revision=\(persistenceRevision[id] ?? 0)"
+        )
     }
 
     func flushPersistence(for id: UUID) async throws {
         let record = try capture(id)
         let revision = persistenceRevision[id] ?? 0
         let snapshot = persistenceSnapshot(for: record, revision: revision)
-        try await persistenceWriter.persist(snapshot)
+        DevelopmentDiagnostics.record(
+            "Persistence",
+            captureID: id,
+            "flushStart; revision=\(revision); lifecycle=\(record.lifecycle.rawValue)"
+        )
+        do {
+            try await persistenceWriter.persist(snapshot)
+            DevelopmentDiagnostics.record(
+                "Persistence",
+                captureID: id,
+                "flushSucceeded; revision=\(revision); lifecycle=\(record.lifecycle.rawValue)"
+            )
+        } catch {
+            DevelopmentDiagnostics.record(
+                "Persistence",
+                captureID: id,
+                level: .error,
+                "flushFailed; revision=\(revision); errorType=\(DevelopmentDiagnostics.errorType(error))"
+            )
+            throw error
+        }
     }
 
     private func schedulePersistence(for record: CaptureRecord) {
@@ -411,10 +443,26 @@ final class CaptureStore {
         let revision = (persistenceRevision[id] ?? 0) + 1
         persistenceRevision[id] = revision
         let snapshot = persistenceSnapshot(for: record, revision: revision)
+        DevelopmentDiagnostics.record(
+            "Persistence",
+            captureID: id,
+            "backgroundPersistQueued; revision=\(revision); lifecycle=\(record.lifecycle.rawValue)"
+        )
         Task(priority: .utility) { [persistenceWriter] in
             do {
                 try await persistenceWriter.persist(snapshot)
+                DevelopmentDiagnostics.record(
+                    "Persistence",
+                    captureID: id,
+                    "backgroundPersistSucceeded; revision=\(revision)"
+                )
             } catch {
+                DevelopmentDiagnostics.record(
+                    "Persistence",
+                    captureID: id,
+                    level: .error,
+                    "backgroundPersistFailed; revision=\(revision); errorType=\(DevelopmentDiagnostics.errorType(error))"
+                )
                 Diagnostics.record(
                     "CapturePersistence",
                     "Background persist failed for \(String(id.uuidString.prefix(8))) revision=\(revision): \(error.localizedDescription)",

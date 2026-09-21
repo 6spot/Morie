@@ -23,7 +23,7 @@ final class DiagnosticLogStore: ObservableObject {
 
     @Published private(set) var entries: [Entry] = []
 
-    private let maximumEntries = 1_000
+    private let maximumEntries = DevelopmentDiagnostics.isEnabled ? 5_000 : 1_000
     private let fileFlushDelay: Duration = .milliseconds(400)
     private var pendingFileText = ""
     private var fileFlushTask: Task<Void, Never>?
@@ -79,8 +79,12 @@ final class DiagnosticLogStore: ObservableObject {
     }
 
     var plainText: String {
+        text(for: entries)
+    }
+
+    func text(for entries: [Entry]) -> String {
         entries.map(format)
-        .joined(separator: "\n")
+            .joined(separator: "\n")
     }
 
     private func scheduleFileFlush() {
@@ -116,7 +120,8 @@ final class DiagnosticLogStore: ObservableObject {
 
 private enum DiagnosticFileWriter {
     private static let queue = DispatchQueue(label: "com.sixspot.morie.diagnostics-file")
-    private static let maximumFileSize: UInt64 = 5 * 1_024 * 1_024
+    private static let maximumFileSize: UInt64 =
+        (DevelopmentDiagnostics.isEnabled ? 20 : 5) * 1_024 * 1_024
 
     static func append(_ text: String, to url: URL) {
         queue.async {
@@ -183,6 +188,195 @@ private struct ProcessMemorySnapshot {
             heapInUseBytes: UInt64(heap.size_in_use),
             heapAllocatedBytes: UInt64(heap.size_allocated)
         )
+    }
+}
+
+struct AppBuildIdentity: Equatable {
+    let version: String
+    let build: String
+    let commit: String
+    let branch: String?
+    let configuration: String
+    let sdk: String
+    let archs: String
+    let xcodeVersion: String
+    let isDirty: Bool
+
+    static let current = AppBuildIdentity(bundle: .main)
+
+    init(bundle: Bundle) {
+        version =
+            bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String
+            ?? "dev"
+        build =
+            bundle.object(forInfoDictionaryKey: "CFBundleVersion")
+            as? String
+            ?? "0"
+
+        let metadata = Self.metadata(from: bundle)
+        commit = metadata["commit"] as? String ?? "unknown"
+
+        if let value = metadata["branch"] as? String,
+           !value.isEmpty,
+           value != "detached" {
+            branch = value
+        } else {
+            branch = nil
+        }
+        configuration = metadata["configuration"] as? String ?? "unknown"
+        sdk = metadata["sdk"] as? String ?? "unknown"
+        archs = metadata["archs"] as? String ?? "unknown"
+        xcodeVersion = metadata["xcodeVersion"] as? String ?? "unknown"
+        isDirty = metadata["dirty"] as? Bool ?? false
+    }
+
+    var commitDisplay: String {
+        isDirty ? "\(commit)*" : commit
+    }
+
+    var compactDisplay: String {
+        "\(version) (\(build)) · \(commitDisplay)"
+    }
+
+    var logValue: String {
+        var value = "version=\(version); build=\(build); commit=\(commitDisplay)"
+        if let branch {
+            value += "; branch=\(branch)"
+        }
+        value += "; configuration=\(configuration); sdk=\(sdk); archs=\(archs); xcode=\(xcodeVersion)"
+        return value
+    }
+
+    private static func metadata(from bundle: Bundle) -> [String: Any] {
+        guard let url = bundle.url(
+            forResource: "MorieBuildIdentity",
+            withExtension: "plist"
+        ),
+        let data = try? Data(contentsOf: url),
+        let value = try? PropertyListSerialization.propertyList(
+            from: data,
+            options: [],
+            format: nil
+        ),
+        let dictionary = value as? [String: Any]
+        else {
+            return [:]
+        }
+        return dictionary
+    }
+}
+
+/// Verbose local diagnostics for development builds.
+///
+/// A build stamped as Debug is a development build even when a local build
+/// setting changes Swift optimization. Release builds keep only the existing
+/// privacy-preserving summary logs.
+///
+/// Development diagnostics may contain user-authored text and current-app text.
+/// They must never contain credentials, API keys, authorization headers, or
+/// unrelated clipboard contents.
+enum DevelopmentDiagnostics {
+    static var isEnabled: Bool {
+        _isDebugAssertConfiguration()
+            || AppBuildIdentity.current.configuration
+                .caseInsensitiveCompare("Debug") == .orderedSame
+    }
+
+    static func record(
+        _ category: String,
+        captureID: UUID? = nil,
+        level: DiagnosticLevel = .info,
+        _ message: @autoclosure () -> String
+    ) {
+        guard isEnabled else { return }
+        Diagnostics.record(
+            "Dev/\(category)",
+            prefix(captureID) + sanitizeSingleLine(message()),
+            level: level
+        )
+    }
+
+    static func text(
+        _ category: String,
+        captureID: UUID? = nil,
+        label: String,
+        _ value: String?,
+        limit: Int = 8_000
+    ) {
+        guard isEnabled else { return }
+        let rendered: String
+        if let value {
+            let normalized = value
+                .replacingOccurrences(of: "\u{0000}", with: "")
+                .replacingOccurrences(of: "\r\n", with: "\n")
+                .replacingOccurrences(of: "\r", with: "\n")
+            if normalized.count > limit {
+                rendered = String(normalized.prefix(limit))
+                    + "…<truncated \(normalized.count - limit) chars>"
+            } else {
+                rendered = normalized
+            }
+        } else {
+            rendered = "<nil>"
+        }
+
+        Diagnostics.record(
+            "Dev/\(category)",
+            prefix(captureID)
+                + "\(label)=\(rendered.replacingOccurrences(of: "\n", with: "\\n"))"
+        )
+    }
+
+    static func list(
+        _ category: String,
+        captureID: UUID? = nil,
+        label: String,
+        _ values: [String],
+        limit: Int = 128
+    ) {
+        guard isEnabled else { return }
+        let bounded = Array(values.prefix(limit))
+        let suffix = values.count > bounded.count
+            ? " …(+\(values.count - bounded.count))"
+            : ""
+        record(
+            category,
+            captureID: captureID,
+            "\(label)=[\(bounded.joined(separator: " | "))]\(suffix)"
+        )
+    }
+
+    static func recordEnvironment() {
+        guard isEnabled else { return }
+        let process = ProcessInfo.processInfo
+        record(
+            "Environment",
+            "\(AppBuildIdentity.current.logValue); "
+                + "pid=\(process.processIdentifier); "
+                + "os=\(process.operatingSystemVersionString); "
+                + "locale=\(Locale.current.identifier); "
+                + "bundle=\(Bundle.main.bundleIdentifier ?? "unknown"); "
+                + "executable=\(Bundle.main.executableURL?.lastPathComponent ?? "unknown"); "
+                + "rawDevelopmentTextLogging=true"
+        )
+    }
+
+    static func errorType(_ error: Error) -> String {
+        String(reflecting: type(of: error))
+    }
+
+    private static func prefix(_ captureID: UUID?) -> String {
+        guard let captureID else { return "" }
+        return "Capture \(String(captureID.uuidString.prefix(8))); "
+    }
+
+    private static func sanitizeSingleLine(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\u{0000}", with: "")
+            .replacingOccurrences(of: "\r\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\n")
+            .replacingOccurrences(of: "\n", with: "\\n")
     }
 }
 
@@ -311,7 +505,11 @@ struct DiagnosticLogView: View {
             alignment: .topLeading
         )
         .navigationTitle("诊断")
-        .navigationSubtitle("\(visibleEntries.count) 条日志")
+        .navigationSubtitle(
+            DevelopmentDiagnostics.isEnabled
+                ? "\(visibleEntries.count) 条日志 · 开发追踪已启用"
+                : "\(visibleEntries.count) 条日志"
+        )
         .searchable(text: $search, prompt: "搜索诊断日志")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -331,6 +529,19 @@ struct DiagnosticLogView: View {
                     }
                 }
                 .pickerStyle(.menu)
+
+                Button(
+                    "复制当前筛选",
+                    systemImage: "line.3.horizontal.decrease.circle"
+                ) {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(
+                        store.text(for: visibleEntries),
+                        forType: .string
+                    )
+                }
+                .disabled(visibleEntries.isEmpty)
 
                 Button(
                     "复制全部日志",

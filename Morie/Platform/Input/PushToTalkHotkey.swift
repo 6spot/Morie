@@ -258,6 +258,10 @@ final class PushToTalkHotkey {
             }
 
             Diagnostics.record("Hotkey", "Fn solo release accepted; toggling capture")
+            DevelopmentDiagnostics.record(
+                "HotkeyEvent",
+                "accepted; shortcut=Fn; event=soloRelease; consumed=true"
+            )
             onToggle()
             return nil
         }
@@ -286,6 +290,10 @@ final class PushToTalkHotkey {
 
             shortcutPressOwned = true
             Diagnostics.record("Hotkey", "\(shortcut.logName) keyDown accepted; toggling capture")
+            DevelopmentDiagnostics.record(
+                "HotkeyEvent",
+                "accepted; shortcut=\(shortcut.logName); event=keyDown; consumed=true; flags=0x\(String(event.flags.rawValue, radix: 16))"
+            )
             onToggle()
             return nil
 
@@ -316,6 +324,10 @@ final class PushToTalkHotkey {
 
             escapePressOwned = true
             Diagnostics.record("Hotkey", "Escape keyDown accepted; cancelling capture")
+            DevelopmentDiagnostics.record(
+                "HotkeyEvent",
+                "accepted; shortcut=Escape; event=keyDown; consumed=true; cancellationEnabled=\(cancellationEnabled)"
+            )
             onCancel()
             return nil
 
