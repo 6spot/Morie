@@ -81,7 +81,9 @@ enum InputRefiner {
         for input: RefinementInput,
         configuration: RefinementConfiguration = .local
     ) throws -> String {
-        let data = try JSONEncoder().encode(PromptInputData(
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+        let data = try encoder.encode(PromptInputData(
             transcript: input.prepared.text,
             spellingCandidates: input.dictionary.map(\.name),
             applicationSpellingCandidates: configuration.applicationSpellingCandidates,
@@ -275,7 +277,10 @@ enum InputRefiner {
         )
         let instructions = Instructions { instructionsText }
         let prompt = Prompt { promptText }
-        let responseBudget = min(1_536, max(256, input.prepared.text.count * 2))
+        let responseBudget = min(
+            4_096,
+            max(256, input.prepared.text.count * 2 + 128)
+        )
         DevelopmentDiagnostics.record(
             "RefinementModel",
             captureID: input.captureID,
@@ -339,15 +344,19 @@ enum RefinementGeneration: Sendable {
     case keptOriginal(RefinementReason)
 }
 
-/// One explicitly owned model task. Completion is model-driven; caller cancellation
-/// still releases the input path without waiting for model cancellation to drain.
+/// One explicitly owned model task. Foreground dictation has a product-level
+/// waiting limit and remains caller-cancellable. Cancelling or timing out releases
+/// the input path immediately; an underlying model task that ignores cancellation
+/// stays owned until it actually exits.
 @MainActor
 final class InputRefinementRunner {
     typealias Generate = @Sendable (RefinementInput, RefinementConfiguration) async throws -> String
     typealias LegacyGenerate = @Sendable (RefinementInput) async throws -> String
 
     private let generate: Generate
+    private let maximumWaitOverride: Duration?
     private var generationTask: Task<Void, Never>?
+    private var timeoutTask: Task<Void, Never>?
     private var modelID: UUID?
     private var waitingID: UUID?
     private var continuation: CheckedContinuation<RefinementGeneration, Error>?
@@ -357,16 +366,25 @@ final class InputRefinementRunner {
     // Observation for shutdown/validation only. The live input path never awaits model teardown.
     func waitForModelToFinish() async { await generationTask?.value }
 
-    init() {
+    init(maximumWait: Duration? = nil) {
         generate = InputRefiner.generate
+        maximumWaitOverride = maximumWait
     }
 
-    init(generate: @escaping Generate) {
+    init(
+        generate: @escaping Generate,
+        maximumWait: Duration? = nil
+    ) {
         self.generate = generate
+        maximumWaitOverride = maximumWait
     }
 
-    init(generate: @escaping LegacyGenerate) {
+    init(
+        generate: @escaping LegacyGenerate,
+        maximumWait: Duration? = nil
+    ) {
         self.generate = { input, _ in try await generate(input) }
+        maximumWaitOverride = maximumWait
     }
 
     func run(
@@ -383,21 +401,26 @@ final class InputRefinementRunner {
             )
             return .keptOriginal(.modelBusy)
         }
+
         let id = UUID()
+        let maximumWait = waitLimit(for: configuration)
         DevelopmentDiagnostics.record(
             "RefinementRunner",
             captureID: input.captureID,
-            "start; job=\(String(id.uuidString.prefix(8)))"
+            "start; job=\(String(id.uuidString.prefix(8))); maximumWaitMs=\(maximumWaitMilliseconds(maximumWait))"
         )
+
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 guard !Task.isCancelled else {
                     continuation.resume(throwing: CancellationError())
                     return
                 }
+
                 self.continuation = continuation
                 waitingID = id
                 modelID = id
+
                 generationTask = Task { [weak self, generate] in
                     let outcome: RefinementGeneration
                     do {
@@ -409,7 +432,9 @@ final class InputRefinementRunner {
                             level: .warning,
                             "modelTaskFailed; job=\(String(id.uuidString.prefix(8))); errorType=\(DevelopmentDiagnostics.errorType(error))"
                         )
-                        outcome = .keptOriginal((error as? RefinementReason) ?? .generationFailed)
+                        outcome = .keptOriginal(
+                            (error as? RefinementReason) ?? .generationFailed
+                        )
                     }
                     DevelopmentDiagnostics.record(
                         "RefinementRunner",
@@ -417,6 +442,26 @@ final class InputRefinementRunner {
                         "modelTaskFinished; job=\(String(id.uuidString.prefix(8)))"
                     )
                     self?.modelFinished(id, outcome: outcome)
+                }
+
+                timeoutTask = Task { @MainActor [weak self] in
+                    do {
+                        try await Task.sleep(for: maximumWait)
+                    } catch {
+                        return
+                    }
+                    guard let self, self.waitingID == id else { return }
+                    DevelopmentDiagnostics.record(
+                        "RefinementRunner",
+                        captureID: input.captureID,
+                        level: .warning,
+                        "timedOut; job=\(String(id.uuidString.prefix(8)))"
+                    )
+                    self.finishWaiting(
+                        id,
+                        result: .success(.keptOriginal(.timeLimit)),
+                        cancelModel: true
+                    )
                 }
             }
         } onCancel: {
@@ -427,9 +472,32 @@ final class InputRefinementRunner {
                 "waitingCancelled; job=\(String(id.uuidString.prefix(8)))"
             )
             Task { @MainActor [weak self] in
-                self?.finishWaiting(id, result: .failure(CancellationError()), cancelModel: true)
+                self?.finishWaiting(
+                    id,
+                    result: .failure(CancellationError()),
+                    cancelModel: true
+                )
             }
         }
+    }
+
+    private func waitLimit(for configuration: RefinementConfiguration) -> Duration {
+        if let maximumWaitOverride {
+            return maximumWaitOverride
+        }
+        switch configuration.model.mode {
+        case .cloud:
+            return .seconds(20)
+        case .automatic, .local:
+            return .seconds(12)
+        }
+    }
+
+    private func maximumWaitMilliseconds(_ duration: Duration) -> Int64 {
+        let components = duration.components
+        let seconds = components.seconds * 1_000
+        let attoseconds = components.attoseconds / 1_000_000_000_000_000
+        return seconds + attoseconds
     }
 
     private func modelFinished(_ id: UUID, outcome: RefinementGeneration) {
@@ -439,12 +507,21 @@ final class InputRefinementRunner {
         finishWaiting(id, result: .success(outcome), cancelModel: false)
     }
 
-    private func finishWaiting(_ id: UUID, result: Result<RefinementGeneration, Error>, cancelModel: Bool) {
+    private func finishWaiting(
+        _ id: UUID,
+        result: Result<RefinementGeneration, Error>,
+        cancelModel: Bool
+    ) {
         guard waitingID == id, let continuation else { return }
+        timeoutTask?.cancel()
+        timeoutTask = nil
         self.continuation = nil
         waitingID = nil
-        if cancelModel { generationTask?.cancel() }
+        if cancelModel {
+            generationTask?.cancel()
+        }
         continuation.resume(with: result)
-        // generationTask remains owned until it actually ends. New optional work must skip while busy.
+        // generationTask remains owned until it actually ends. New optional work
+        // may observe it as busy, but the foreground Capture is no longer blocked.
     }
 }
