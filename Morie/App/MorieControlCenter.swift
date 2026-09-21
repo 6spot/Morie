@@ -1,19 +1,22 @@
 import Observation
 import SwiftUI
 
-enum ControlCenterPageFamily {
-    case scrolling
-    case form
-    case workspace
-}
-
 private enum ControlCenterLayout {
     static let contentInset: CGFloat = 24
     static let readingMaxWidth: CGFloat = 760
 }
 
-struct ControlCenterReadingContent<Content: View>: View {
+struct ControlCenterScrollableContent<Content: View>: View {
+    let maxWidth: CGFloat?
     @ViewBuilder let content: Content
+
+    init(
+        maxWidth: CGFloat? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.maxWidth = maxWidth
+        self.content = content()
+    }
 
     var body: some View {
         ScrollView {
@@ -21,12 +24,37 @@ struct ControlCenterReadingContent<Content: View>: View {
                 content
             }
             .frame(
-                maxWidth: ControlCenterLayout.readingMaxWidth,
-                alignment: .leading
+                maxWidth: maxWidth ?? .infinity,
+                alignment: .topLeading
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(ControlCenterLayout.contentInset)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct ControlCenterReadingContent<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ControlCenterScrollableContent(
+            maxWidth: ControlCenterLayout.readingMaxWidth
+        ) {
+            content
+        }
+    }
+}
+
+struct ControlCenterFormContent<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Form {
+            content
+        }
+        .formStyle(.grouped)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -65,16 +93,6 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var pageFamily: ControlCenterPageFamily {
-        switch self {
-        case .overview, .dictionary, .memory:
-            .scrolling
-        case .settings, .permissions:
-            .form
-        case .history, .diagnostics:
-            .workspace
-        }
-    }
 }
 
 @MainActor
@@ -166,34 +184,27 @@ private struct ControlCenterSidebar: View {
     }
 }
 
+private struct ControlCenterDetailHost<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
+    }
+}
+
 @MainActor
 private struct ControlCenterRouteHost: View {
     let controller: AppController
     @Bindable var session: ControlCenterSession
 
-    @ViewBuilder
     var body: some View {
-        switch session.currentSection.pageFamily {
-        case .scrolling:
-            ScrollView {
-                routedPage
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(ControlCenterLayout.contentInset)
-            }
-
-        case .form:
-            Form {
-                routedPage
-            }
-            .formStyle(.grouped)
-
-        case .workspace:
+        ControlCenterDetailHost {
             routedPage
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: .topLeading
-                )
         }
     }
 
