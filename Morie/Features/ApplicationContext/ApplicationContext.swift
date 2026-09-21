@@ -236,6 +236,102 @@ enum ApplicationContextVocabulary {
         inspect(from: snapshot, limit: limit).map(\.value)
     }
 
+    /// Application Context is broad enough for Speech biasing before recognition,
+    /// but cleanup must only see terms that the transcript plausibly tried to say.
+    /// This keeps page-only vocabulary out of the model and its protected-term allow-list.
+    static func refinementCandidates(
+        from candidates: [String],
+        transcript: String,
+        limit: Int = 12
+    ) -> [String] {
+        guard limit > 0 else { return [] }
+
+        let tokenKeys = transcriptTokens(in: transcript).map(refinementKey)
+        var seen = Set<String>()
+        var result: [String] = []
+
+        for raw in candidates {
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = refinementKey(value)
+            guard !key.isEmpty, seen.insert(key).inserted else { continue }
+
+            let exact = transcript.range(
+                of: value,
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]
+            ) != nil
+            let fuzzy = !exact && isPlausibleRecognitionNeighbor(key, tokenKeys: tokenKeys)
+            guard exact || fuzzy else { continue }
+
+            result.append(value)
+            if result.count == limit { break }
+        }
+        return result
+    }
+
+    private static func transcriptTokens(in text: String) -> [String] {
+        let pattern = #"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9._+-]{1,79}(?![A-Za-z0-9_])"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.matches(in: text, range: range).compactMap {
+            guard let range = Range($0.range, in: text) else { return nil }
+            return String(text[range])
+        }
+    }
+
+    private static func isPlausibleRecognitionNeighbor(
+        _ candidateKey: String,
+        tokenKeys: [String]
+    ) -> Bool {
+        guard candidateKey.count >= 4,
+              candidateKey.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) })
+        else { return false }
+
+        let maximumDistance: Int
+        switch candidateKey.count {
+        case 4...5: maximumDistance = 1
+        case 6...9: maximumDistance = 2
+        default: maximumDistance = 3
+        }
+
+        return tokenKeys.contains { tokenKey in
+            guard tokenKey.count >= 4,
+                  abs(tokenKey.count - candidateKey.count) <= maximumDistance,
+                  tokenKey.first == candidateKey.first,
+                  tokenKey.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) })
+            else { return false }
+            return editDistance(tokenKey, candidateKey) <= maximumDistance
+        }
+    }
+
+    private static func refinementKey(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+    }
+
+    private static func editDistance(_ lhs: String, _ rhs: String) -> Int {
+        let left = Array(lhs)
+        let right = Array(rhs)
+        if left.isEmpty { return right.count }
+        if right.isEmpty { return left.count }
+
+        var previous = Array(0...right.count)
+        for (leftIndex, leftCharacter) in left.enumerated() {
+            var current = Array(repeating: 0, count: right.count + 1)
+            current[0] = leftIndex + 1
+            for (rightIndex, rightCharacter) in right.enumerated() {
+                let substitution = previous[rightIndex] + (leftCharacter == rightCharacter ? 0 : 1)
+                let insertion = current[rightIndex] + 1
+                let deletion = previous[rightIndex + 1] + 1
+                current[rightIndex + 1] = min(substitution, insertion, deletion)
+            }
+            previous = current
+        }
+        return previous[right.count]
+    }
+
     private static func candidates(in text: String) -> [String] {
         let pattern = #"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9._+-]{1,63}(?![A-Za-z0-9_])"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
