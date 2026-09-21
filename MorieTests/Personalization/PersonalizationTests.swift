@@ -12,7 +12,7 @@ final class PersonalizationTests: XCTestCase {
             ),
             selectedText: "Use Qelvatrix with API",
             focusedText: "Roventia works with AppController and Keychain",
-            nearbyText: "This page also mentions SwiftUI, OpenAI and Google Chrome.",
+            nearbyText: "This page also mentions SwiftUI, OpenAI, pg17 and me.morie.mac in Google Chrome.",
             capturedAt: Date()
         )
 
@@ -39,6 +39,8 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertTrue(terms.contains("Keychain"))
         XCTAssertTrue(terms.contains("SwiftUI"))
         XCTAssertTrue(terms.contains("OpenAI"))
+        XCTAssertTrue(terms.contains("pg17"))
+        XCTAssertTrue(terms.contains("me.morie.mac"))
         XCTAssertFalse(terms.contains("This"))
 
         let selectedIndex = try XCTUnwrap(terms.firstIndex(of: "Qelvatrix"))
