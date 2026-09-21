@@ -22,6 +22,7 @@ struct CapturePersistenceSnapshot: Sendable {
     let lastRecognitionAttemptAt: Date?
     let lastRecognitionErrorDescription: String?
     let refinement: CaptureRefinement?
+    let usageMetricsFinalized: Bool
 
     init(record: CaptureRecord, revision: Int, enqueuedAt: Date = Date()) {
         id = record.id
@@ -44,6 +45,7 @@ struct CapturePersistenceSnapshot: Sendable {
         lastRecognitionAttemptAt = record.lastRecognitionAttemptAt
         lastRecognitionErrorDescription = record.lastRecognitionErrorDescription
         refinement = record.refinement
+        usageMetricsFinalized = record.usageMetricsFinalized
     }
 }
 
@@ -81,7 +83,17 @@ actor CapturePersistenceWriter {
             return
         }
 
+        let shouldRecordUsage =
+            snapshot.usageMetricsFinalized && !record.usageMetricsRecorded
+
         apply(snapshot, to: record)
+
+        if shouldRecordUsage {
+            let metrics = try usageMetricsRecord()
+            CaptureStore.accumulateUsage(record, into: metrics)
+            record.usageMetricsRecorded = true
+        }
+
         let writeStarted = ContinuousClock.now
         do {
             try context.save()
@@ -143,6 +155,22 @@ actor CapturePersistenceWriter {
         record.lastRecognitionAttemptAt = snapshot.lastRecognitionAttemptAt
         record.lastRecognitionErrorDescription = snapshot.lastRecognitionErrorDescription
         record.refinement = snapshot.refinement
+        record.usageMetricsFinalized = snapshot.usageMetricsFinalized
+    }
+
+    private func usageMetricsRecord() throws -> CaptureUsageMetricsRecord {
+        var descriptor = FetchDescriptor<CaptureUsageMetricsRecord>(
+            predicate: #Predicate { $0.key == "overview" }
+        )
+        descriptor.fetchLimit = 1
+
+        if let existing = try context.fetch(descriptor).first {
+            return existing
+        }
+
+        let record = CaptureUsageMetricsRecord()
+        context.insert(record)
+        return record
     }
 
     private func milliseconds(since date: Date) -> Int {
