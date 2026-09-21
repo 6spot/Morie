@@ -39,13 +39,14 @@ struct CaptureHistoryWorkspace: View {
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
     @Binding var selection: UUID?
-
-    @State private var search = ""
-    @State private var filter: CaptureHistoryFilter = .all
+    @Binding var search: String
+    @Binding var filter: CaptureHistoryFilter
 
     init(
         controller: AppController,
-        selection: Binding<UUID?>
+        selection: Binding<UUID?>,
+        search: Binding<String>,
+        filter: Binding<CaptureHistoryFilter>
     ) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
@@ -54,6 +55,8 @@ struct CaptureHistoryWorkspace: View {
         )
         _setup = ObservedObject(wrappedValue: controller.setup)
         _selection = selection
+        _search = search
+        _filter = filter
     }
 
     private var canStartCapture: Bool {
@@ -67,22 +70,6 @@ struct CaptureHistoryWorkspace: View {
                 TextField("搜索历史记录", text: $search)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 280)
-
-                Picker("筛选记录", selection: $filter) {
-                    ForEach(CaptureHistoryFilter.allCases) { item in
-                        Text(item.title).tag(item)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                Spacer(minLength: 12)
-
-                Button(
-                    "开始录音",
-                    systemImage: "mic",
-                    action: controller.startCaptureOnly
-                )
-                .disabled(!canStartCapture)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
