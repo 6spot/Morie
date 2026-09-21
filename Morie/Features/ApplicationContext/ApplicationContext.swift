@@ -255,10 +255,7 @@ enum ApplicationContextVocabulary {
             let key = refinementKey(value)
             guard !key.isEmpty, seen.insert(key).inserted else { continue }
 
-            let exact = transcript.range(
-                of: value,
-                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]
-            ) != nil
+            let exact = tokenKeys.contains(key)
             let fuzzy = !exact && isPlausibleRecognitionNeighbor(key, tokenKeys: tokenKeys)
             guard exact || fuzzy else { continue }
 
