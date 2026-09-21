@@ -34,7 +34,10 @@ struct TextInjector {
     /// destination only when the final text is ready, never reactivate an app
     /// remembered at recording start.
     @MainActor
-    func deliver(_ text: String) throws -> NSRunningApplication {
+    func deliver(
+        _ text: String,
+        captureID: UUID? = nil
+    ) throws -> NSRunningApplication {
         try Task.checkCancellation()
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -54,7 +57,13 @@ struct TextInjector {
                 "No external frontmost application at delivery time; preserving transcript on clipboard",
                 level: .error
             )
-            copyToClipboard(text)
+            DevelopmentDiagnostics.record(
+                "Injector",
+                captureID: captureID,
+                level: .warning,
+                "noExternalTarget; frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "none")"
+            )
+            copyToClipboard(text, captureID: captureID)
             throw InjectionError.noCurrentTargetApplication
         }
 
@@ -64,12 +73,17 @@ struct TextInjector {
             "Delivery",
             "Dispatching current-focus input to \(targetName) (\(targetBundle))"
         )
+        DevelopmentDiagnostics.record(
+            "Injector",
+            captureID: captureID,
+            "targetResolved; app=\(targetName); bundle=\(targetBundle); pid=\(application.processIdentifier); textCharacters=\(text.count)"
+        )
 
         // A temporary clipboard value plus a synthetic Cmd+V intentionally lets
         // macOS and the target application's first-responder chain decide which
         // control receives text. Accessibility is not used to prove editability.
-        guard pasteThroughClipboard(text) else {
-            copyToClipboard(text)
+        guard pasteThroughClipboard(text, captureID: captureID) else {
+            copyToClipboard(text, captureID: captureID)
             Diagnostics.record(
                 "Delivery",
                 "Clipboard Cmd+V delivery failed; transcript left on clipboard",
@@ -79,14 +93,27 @@ struct TextInjector {
         }
 
         Diagnostics.record("Delivery", "Current-focus clipboard Cmd+V dispatched")
+        DevelopmentDiagnostics.record(
+            "Injector",
+            captureID: captureID,
+            "pasteDispatched; app=\(targetName); bundle=\(targetBundle)"
+        )
         return application
     }
 
     @MainActor
-    private func pasteThroughClipboard(_ text: String) -> Bool {
+    private func pasteThroughClipboard(
+        _ text: String,
+        captureID: UUID?
+    ) -> Bool {
         let pasteboard = NSPasteboard.general
         let snapshot = ClipboardSnapshot.capture(from: pasteboard)
         Diagnostics.record("Clipboard", "Captured restorable clipboard snapshot; items=\(snapshot.itemCount)")
+        DevelopmentDiagnostics.record(
+            "Clipboard",
+            captureID: captureID,
+            "snapshotCaptured; items=\(snapshot.itemCount); contentsLogged=false"
+        )
 
         let temporaryItem = NSPasteboardItem()
         temporaryItem.setString(text, forType: .string)
@@ -95,17 +122,34 @@ struct TextInjector {
         pasteboard.clearContents()
         guard pasteboard.writeObjects([temporaryItem]) else {
             Diagnostics.record("Clipboard", "Failed to write transcript to pasteboard", level: .error)
+            DevelopmentDiagnostics.record(
+                "Clipboard",
+                captureID: captureID,
+                level: .error,
+                "temporaryWriteFailed"
+            )
             return false
         }
 
         let transcriptChangeCount = pasteboard.changeCount
         Diagnostics.record("Clipboard", "Temporary transcript written; changeCount=\(transcriptChangeCount)")
+        DevelopmentDiagnostics.record(
+            "Clipboard",
+            captureID: captureID,
+            "temporaryWriteSucceeded; changeCount=\(transcriptChangeCount); characters=\(text.count)"
+        )
 
         guard let source = CGEventSource(stateID: .combinedSessionState),
               let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false)
         else {
             Diagnostics.record("Delivery", "Could not create synthetic Cmd+V events", level: .error)
+            DevelopmentDiagnostics.record(
+                "Injector",
+                captureID: captureID,
+                level: .error,
+                "syntheticPasteEventCreationFailed"
+            )
             return false
         }
 
@@ -116,17 +160,33 @@ struct TextInjector {
         keyDown.post(tap: .cghidEventTap)
         keyUp.post(tap: .cghidEventTap)
         Diagnostics.record("Delivery", "Synthetic Cmd+V posted")
+        DevelopmentDiagnostics.record(
+            "Injector",
+            captureID: captureID,
+            "syntheticCmdVPosted"
+        )
 
         Task { @MainActor in
             try? await Task.sleep(for: Self.clipboardRestoreDelay)
             let restored = snapshot.restore(to: pasteboard, expectedChangeCount: transcriptChangeCount)
             if restored {
                 Diagnostics.record("Clipboard", "Previous clipboard restored")
+                DevelopmentDiagnostics.record(
+                    "Clipboard",
+                    captureID: captureID,
+                    "restoreSucceeded"
+                )
             } else {
                 Diagnostics.record(
                     "Clipboard",
                     "Previous clipboard not restored because clipboard changed or snapshot was empty",
                     level: .warning
+                )
+                DevelopmentDiagnostics.record(
+                    "Clipboard",
+                    captureID: captureID,
+                    level: .warning,
+                    "restoreSkipped; reason=clipboardChangedOrSnapshotEmpty"
                 )
             }
         }
@@ -134,11 +194,19 @@ struct TextInjector {
         return true
     }
 
-    private func copyToClipboard(_ text: String) {
+    private func copyToClipboard(
+        _ text: String,
+        captureID: UUID? = nil
+    ) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
         Diagnostics.record("Clipboard", "Transcript preserved on clipboard; characters=\(text.count)")
+        DevelopmentDiagnostics.record(
+            "Clipboard",
+            captureID: captureID,
+            "fallbackPreservedTranscript; characters=\(text.count)"
+        )
     }
 }
 
