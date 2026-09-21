@@ -9,15 +9,31 @@ enum DiagnosticLevel: String, Sendable {
     case error = "ERROR"
 }
 
+struct DiagnosticLogEntry: Identifiable, Sendable {
+    let id: UUID
+    let timestamp: Date
+    let level: DiagnosticLevel
+    let category: String
+    let message: String
+
+    init(
+        id: UUID = UUID(),
+        timestamp: Date,
+        level: DiagnosticLevel,
+        category: String,
+        message: String
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.level = level
+        self.category = category
+        self.message = message
+    }
+}
+
 @MainActor
 final class DiagnosticLogStore: ObservableObject {
-    struct Entry: Identifiable {
-        let id = UUID()
-        let timestamp: Date
-        let level: DiagnosticLevel
-        let category: String
-        let message: String
-    }
+    typealias Entry = DiagnosticLogEntry
 
     static let shared = DiagnosticLogStore()
 
@@ -27,6 +43,8 @@ final class DiagnosticLogStore: ObservableObject {
     private let fileFlushDelay: Duration = .milliseconds(400)
     private var pendingFileText = ""
     private var fileFlushTask: Task<Void, Never>?
+    private var presentationLoadTask: Task<Void, Never>?
+    private var isPresentationVisible = false
     let logFileURL: URL
 
     private init() {
@@ -56,12 +74,15 @@ final class DiagnosticLogStore: ObservableObject {
             category: category,
             message: message
         )
-        entries.append(entry)
-        pendingFileText += format(entry) + "\n"
+        if isPresentationVisible {
+            entries.append(entry)
 
-        if entries.count > maximumEntries {
-            entries.removeFirst(entries.count - maximumEntries)
+            if entries.count > maximumEntries {
+                entries.removeFirst(entries.count - maximumEntries)
+            }
         }
+
+        pendingFileText += format(entry) + "\n"
 
         if level == .error {
             flushPendingFile()
@@ -71,11 +92,48 @@ final class DiagnosticLogStore: ObservableObject {
     }
 
     func clear() {
-        entries.removeAll(keepingCapacity: true)
-        pendingFileText.removeAll(keepingCapacity: true)
+        entries.removeAll(keepingCapacity: false)
+        pendingFileText.removeAll(keepingCapacity: false)
         fileFlushTask?.cancel()
         fileFlushTask = nil
         DiagnosticFileWriter.clear(logFileURL)
+    }
+
+    func setPresentationVisible(_ visible: Bool) {
+        isPresentationVisible = visible
+        presentationLoadTask?.cancel()
+        presentationLoadTask = nil
+
+        guard visible else {
+            entries.removeAll(keepingCapacity: false)
+            return
+        }
+
+        entries.removeAll(keepingCapacity: false)
+        let url = logFileURL
+        let limit = maximumEntries
+
+        presentationLoadTask = Task { [weak self] in
+            let loaded = await Task.detached(priority: .utility) {
+                DiagnosticFileReader.readRecent(
+                    from: url,
+                    limit: limit
+                )
+            }.value
+
+            guard !Task.isCancelled,
+                  let self,
+                  self.isPresentationVisible
+            else { return }
+
+            let live = self.entries
+            self.entries = DiagnosticFileReader.merge(
+                loaded,
+                live,
+                limit: limit
+            )
+            self.presentationLoadTask = nil
+        }
     }
 
     var plainText: String {
@@ -116,6 +174,130 @@ final class DiagnosticLogStore: ObservableObject {
         )
         return "\(time) [\(entry.level.rawValue)] [\(entry.category)] \(entry.message)"
     }
+}
+
+private enum DiagnosticFileReader {
+    private static let maximumReadBytes: UInt64 = 1_048_576
+
+    static func readRecent(
+        from url: URL,
+        limit: Int
+    ) -> [DiagnosticLogEntry] {
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return []
+        }
+        defer { try? handle.close() }
+
+        do {
+            let size = try handle.seekToEnd()
+            let start = size > maximumReadBytes
+                ? size - maximumReadBytes
+                : 0
+            try handle.seek(toOffset: start)
+
+            guard let data = try handle.readToEnd(),
+                  !data.isEmpty
+            else { return [] }
+
+            var text = String(decoding: data, as: UTF8.self)
+            if start > 0,
+               let newline = text.firstIndex(of: "\n") {
+                text = String(text[text.index(after: newline)...])
+            }
+
+            return text
+                .split(separator: "\n", omittingEmptySubsequences: true)
+                .suffix(limit)
+                .compactMap { parse(String($0)) }
+        } catch {
+            return []
+        }
+    }
+
+    static func merge(
+        _ persisted: [DiagnosticLogEntry],
+        _ live: [DiagnosticLogEntry],
+        limit: Int
+    ) -> [DiagnosticLogEntry] {
+        var seen = Set<String>()
+        var merged: [DiagnosticLogEntry] = []
+
+        for entry in persisted + live {
+            let key =
+                "\(entry.timestamp.timeIntervalSince1970)|"
+                + "\(entry.level.rawValue)|"
+                + "\(entry.category)|"
+                + entry.message
+            guard seen.insert(key).inserted else { continue }
+            merged.append(entry)
+        }
+
+        merged.sort { $0.timestamp < $1.timestamp }
+        return Array(merged.suffix(limit))
+    }
+
+    private static func parse(_ line: String) -> DiagnosticLogEntry? {
+        guard let firstSpace = line.firstIndex(of: " ") else {
+            return nil
+        }
+
+        let timestampText = String(line[..<firstSpace])
+        var remainder = String(line[line.index(after: firstSpace)...])
+        guard remainder.first == "[",
+              let levelEnd = remainder.firstIndex(of: "]")
+        else { return nil }
+
+        let levelText = String(
+            remainder[
+                remainder.index(after: remainder.startIndex)..<levelEnd
+            ]
+        )
+        guard let level = DiagnosticLevel(rawValue: levelText) else {
+            return nil
+        }
+
+        remainder = remainder
+            .dropFirst(remainder.distance(
+                from: remainder.startIndex,
+                to: remainder.index(after: levelEnd)
+            ))
+            .trimmingCharacters(in: .whitespaces)
+
+        guard remainder.first == "[",
+              let categoryEnd = remainder.firstIndex(of: "]")
+        else { return nil }
+
+        let category = String(
+            remainder[
+                remainder.index(after: remainder.startIndex)..<categoryEnd
+            ]
+        )
+        let message = String(
+            remainder[remainder.index(after: categoryEnd)...]
+        )
+        .trimmingCharacters(in: .whitespaces)
+
+        let timestamp =
+            fractionalISO8601.date(from: timestampText)
+            ?? ISO8601DateFormatter().date(from: timestampText)
+        guard let timestamp else { return nil }
+
+        return DiagnosticLogEntry(
+            timestamp: timestamp,
+            level: level,
+            category: category,
+            message: message
+        )
+    }
+
+    private static let fractionalISO8601: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [
+            .withInternetDateTime,
+            .withFractionalSeconds,
+        ]
+        return formatter
+    }()
 }
 
 private enum DiagnosticFileWriter {
@@ -436,8 +618,6 @@ struct DiagnosticLogView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Divider()
-
             HStack(spacing: 8) {
                 Text("\(visibleEntries.count) 条日志")
                     .foregroundStyle(.secondary)
@@ -458,8 +638,6 @@ struct DiagnosticLogView: View {
             .font(.callout)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-
-            Divider()
 
             VSplitView {
                 Table(visibleEntries, selection: $selection) {
@@ -546,6 +724,12 @@ struct DiagnosticLogView: View {
             }
         } message: {
             Text("将清空当前显示的全部日志和本地诊断日志文件。")
+        }
+        .onAppear {
+            store.setPresentationVisible(true)
+        }
+        .onDisappear {
+            store.setPresentationVisible(false)
         }
         .onChange(of: visibleEntries.map(\.id)) { _, ids in
             if let selection, !ids.contains(selection) {
