@@ -45,7 +45,8 @@ struct MemoryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
+        ControlCenterScrollableContent(maxWidth: 840) {
+            VStack(alignment: .leading, spacing: 28) {
             Text(
                 "Morie 会把稳定事实沉淀为长期记忆，把近期但仍可能变化的信息保留在“最近”里。"
             )
@@ -115,8 +116,8 @@ struct MemoryView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            }
         }
-        .frame(maxWidth: 840, alignment: .topLeading)
         .navigationTitle("个人记忆")
         .navigationSubtitle(
             "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
