@@ -945,32 +945,24 @@ final class CaptureSessionController {
                 throw SessionError.persistenceUnavailable("记录存储尚未初始化。")
             }
 
-            let disposition: CaptureStore.EmptyRecognitionDisposition
             if let result {
-                preserveSpeechResult(result, for: sessionID)
-                disposition = try captureStore.finishEmptyRecognition(
-                    for: sessionID,
-                    sourceAudio: result.sourceAudio
+                DevelopmentDiagnostics.record(
+                    "Speech",
+                    captureID: sessionID,
+                    "recognitionRejectedDiscard; transcriptCharacters=\(result.transcript.count); durationSeconds=\(result.sourceAudio.duration); meaningful=\(String(describing: result.sourceAudio.hasMeaningfulAudio))"
                 )
-                history?.captureListDidChange()
-            } else {
-                try captureStore.cancel(sessionID)
-                disposition = .discarded
             }
+            try captureStore.finishEmptyRecognition(for: sessionID)
+            history?.captureListDidChange()
 
             Diagnostics.record(
                 "SpeechQuality",
-                "Recognition rejection settled for \(label(sessionID)); disposition=\(String(describing: disposition))"
+                "Recognition rejection discarded for \(label(sessionID)); historyRetained=false"
             )
             onCancellationEnabledChange?(false)
             resetSessionIdentity()
             setPhase(.idle)
-
-            if disposition == .retainedForRetry {
-                hud.showRecognitionFailure()
-            } else {
-                hud.showNoSpeech()
-            }
+            hud.showNoSpeech()
         } catch {
             Diagnostics.record(
                 "CaptureStore",
