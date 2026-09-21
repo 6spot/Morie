@@ -600,7 +600,8 @@ final class CaptureSessionController {
                         result.sourceAudio.url,
                         locale: sessionContext.locale,
                         dictionaryWords: sessionContext.dictionaryWords,
-                        applicationContextWords: activeApplicationContextWords
+                        applicationContextWords: activeApplicationContextWords,
+                        captureID: sessionID
                     )
                     Diagnostics.record(
                         "SpeechQuality",
