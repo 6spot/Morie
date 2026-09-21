@@ -602,7 +602,7 @@ struct DiagnosticLogView: View {
     }
 }
 
-private extension DiagnosticLevel {
+extension DiagnosticLevel {
     var title: String {
         switch self {
         case .info: "信息"
