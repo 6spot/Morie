@@ -323,9 +323,9 @@ struct MemoryDetailView: View {
                             .foregroundStyle(.secondary)
                         }
 
-                        ForEach(Array(evidence.enumerated()), id: \.element.id) {
-                            index,
-                            item in
+                        ForEach(evidence.indices, id: \.self) { index in
+                            let item = evidence[index]
+
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(item.claim)
                                     .textSelection(.enabled)
