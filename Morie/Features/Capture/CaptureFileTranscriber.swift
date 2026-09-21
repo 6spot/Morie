@@ -125,10 +125,12 @@ enum CaptureFileTranscriber {
                 for try await result in transcriber.results {
                     try Task.checkCancellation()
                     guard result.isFinal else { continue }
-                    let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !text.isEmpty { segments.append(text) }
+                    let text = String(result.text.characters)
+                    if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        segments.append(text)
+                    }
                 }
-                return segments.joined()
+                return segments.joined().trimmingCharacters(in: .whitespacesAndNewlines)
             }
             defer { results.cancel() }
 
@@ -208,10 +210,12 @@ enum CaptureFileTranscriber {
                 for try await result in transcriber.results {
                     try Task.checkCancellation()
                     guard result.isFinal else { continue }
-                    let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !text.isEmpty { segments.append(text) }
+                    let text = String(result.text.characters)
+                    if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        segments.append(text)
+                    }
                 }
-                return segments.joined()
+                return segments.joined().trimmingCharacters(in: .whitespacesAndNewlines)
             }
             defer { results.cancel() }
 
@@ -265,12 +269,40 @@ enum CaptureFileTranscriber {
     }
 
     static func preferredTranscript(live: String, accurate: String?) -> String {
-        guard let accurate,
-              !accurate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        else {
-            return live
+        guard let accurate else { return live }
+
+        let liveText = live.trimmingCharacters(in: .whitespacesAndNewlines)
+        let accurateText = accurate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accurateText.isEmpty else { return live }
+        guard !liveText.isEmpty else { return accurateText }
+
+        let liveCount = comparableCharacterCount(liveText)
+        let accurateCount = comparableCharacterCount(accurateText)
+
+        // Saved-audio recognition normally differs in wording or punctuation, not
+        // by losing most of the utterance or inventing a much larger transcript.
+        // Reject only gross regressions so genuine accuracy improvements still win.
+        if liveCount >= 12 {
+            if accurateCount * 100 < liveCount * 55 {
+                return live
+            }
+            if accurateCount > liveCount * 2 + 24 {
+                return live
+            }
         }
-        return accurate
+
+        return accurateText
+    }
+
+    private static func comparableCharacterCount(_ text: String) -> Int {
+        text.unicodeScalars.reduce(into: 0) { count, scalar in
+            if CharacterSet.alphanumerics.contains(scalar)
+                || (0x3400...0x4DBF).contains(scalar.value)
+                || (0x4E00...0x9FFF).contains(scalar.value)
+                || (0xF900...0xFAFF).contains(scalar.value) {
+                count += 1
+            }
+        }
     }
 
     private static func applyRecognitionContext(
