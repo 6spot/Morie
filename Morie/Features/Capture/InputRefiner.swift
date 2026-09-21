@@ -529,9 +529,9 @@ final class InputRefinementRunner {
             return maximumWaitOverride
         }
         switch configuration.model.mode {
-        case .cloud:
+        case .cloud, .automatic:
             return .seconds(20)
-        case .automatic, .local:
+        case .local:
             return .seconds(12)
         }
     }
