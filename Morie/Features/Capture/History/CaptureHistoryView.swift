@@ -331,6 +331,37 @@ struct CaptureDetailView: View {
 
     var body: some View {
         ControlCenterReadingContent {
+            ControlCenterCommandBar {
+                Button("复制最终文字", systemImage: "doc.on.doc") {
+                    copy(capture.finalText)
+                }
+                .disabled(capture.finalText.isEmpty)
+
+                Menu("记录操作", systemImage: "ellipsis") {
+                    Button("复制识别文字", systemImage: "doc.on.doc") {
+                        copy(capture.recognizedText)
+                    }
+                    .disabled(capture.recognizedText.isEmpty)
+
+                    Divider()
+
+                    Button(
+                        "删除记录…",
+                        systemImage: "trash",
+                        role: .destructive
+                    ) {
+                        confirmsDeletion = true
+                    }
+                    .disabled(
+                        capture.lifecycle == .capturing
+                            || capture.refinement?.status == .running
+                    )
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.bottom, 16)
+
             VStack(alignment: .leading, spacing: 10) {
                 Text(capture.finalText.isEmpty ? "识别文字" : "最终文字")
                     .font(.title)
@@ -429,35 +460,6 @@ struct CaptureDetailView: View {
             DisclosureGroup("原始录音") {
                 recording
                     .padding(.top, 12)
-            }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button("复制最终文字", systemImage: "doc.on.doc") {
-                    copy(capture.finalText)
-                }
-                .disabled(capture.finalText.isEmpty)
-
-                Menu("记录操作", systemImage: "ellipsis") {
-                    Button("复制识别文字", systemImage: "doc.on.doc") {
-                        copy(capture.recognizedText)
-                    }
-                    .disabled(capture.recognizedText.isEmpty)
-
-                    Divider()
-
-                    Button(
-                        "删除记录…",
-                        systemImage: "trash",
-                        role: .destructive
-                    ) {
-                        confirmsDeletion = true
-                    }
-                    .disabled(
-                        capture.lifecycle == .capturing
-                            || capture.refinement?.status == .running
-                    )
-                }
             }
         }
         .confirmationDialog(
