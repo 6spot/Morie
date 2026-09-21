@@ -589,7 +589,7 @@ private struct ControlCenterRouteHost: View {
     }
 
     private func toolbarPlaceholder(
-        width: CGFloat = 1
+        width: CGFloat = 28
     ) -> some View {
         Color.clear
             .frame(width: width, height: 1)
