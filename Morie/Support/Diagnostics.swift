@@ -207,10 +207,23 @@ private enum DiagnosticFileReader {
                 text = String(text[text.index(after: newline)...])
             }
 
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [
+                .withInternetDateTime,
+                .withFractionalSeconds,
+            ]
+            let standard = ISO8601DateFormatter()
+
             return text
                 .split(separator: "\n", omittingEmptySubsequences: true)
                 .suffix(limit)
-                .compactMap { parse(String($0)) }
+                .compactMap {
+                    parse(
+                        String($0),
+                        fractionalISO8601: fractional,
+                        standardISO8601: standard
+                    )
+                }
         } catch {
             return []
         }
@@ -238,7 +251,11 @@ private enum DiagnosticFileReader {
         return Array(merged.suffix(limit))
     }
 
-    private static func parse(_ line: String) -> DiagnosticLogEntry? {
+    private static func parse(
+        _ line: String,
+        fractionalISO8601: ISO8601DateFormatter,
+        standardISO8601: ISO8601DateFormatter
+    ) -> DiagnosticLogEntry? {
         guard let firstSpace = line.firstIndex(of: " ") else {
             return nil
         }
@@ -283,7 +300,7 @@ private enum DiagnosticFileReader {
 
         let timestamp =
             fractionalISO8601.date(from: timestampText)
-            ?? ISO8601DateFormatter().date(from: timestampText)
+            ?? standardISO8601.date(from: timestampText)
         guard let timestamp else { return nil }
 
         return DiagnosticLogEntry(
@@ -294,14 +311,6 @@ private enum DiagnosticFileReader {
         )
     }
 
-    private static let fractionalISO8601: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [
-            .withInternetDateTime,
-            .withFractionalSeconds,
-        ]
-        return formatter
-    }()
 }
 
 private enum DiagnosticFileWriter {
