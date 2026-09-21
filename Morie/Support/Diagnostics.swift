@@ -449,21 +449,6 @@ struct DiagnosticLogView: View {
 
             Divider()
 
-                    Button(
-                        "清空诊断日志…",
-                        systemImage: "trash",
-                        role: .destructive
-                    ) {
-                        confirmsClear = true
-                    }
-                    .disabled(store.entries.isEmpty)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-
-            Divider()
-
             VSplitView {
                 Table(visibleEntries, selection: $selection) {
                     TableColumn("时间") { entry in
