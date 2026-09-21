@@ -82,8 +82,9 @@ available.
   safe error types.
 - `Dev/RefinementRunner`: model-task ownership/busy/cancellation lifecycle.
 - `Dev/RefinementOutput`: generated and accepted text plus edits.
-- `Dev/RefinementGuard` / `Dev/RefinementGuardDetail`: exact deterministic
-  rejection rule and supporting fact/leak/script/expansion evidence.
+- `Dev/RefinementBoundary`: model-output transport acceptance/rejection
+  (for example empty/control-character payloads). It intentionally does not
+  judge facts, numbers, negation, language, structure or context relevance.
 
 ### Memory learning and post-insertion learning
 
