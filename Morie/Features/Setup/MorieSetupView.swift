@@ -317,9 +317,9 @@ struct PermissionManagementView: View {
     private func capabilityRows(
         _ checks: [CapabilityCheck]
     ) -> some View {
-        ForEach(Array(checks.enumerated()), id: \.element.id) {
-            index,
-            check in
+        ForEach(checks.indices, id: \.self) { index in
+            let check = checks[index]
+
             PermissionRequirementRow(
                 check: check,
                 activeRequest: setup.activeRequest,
