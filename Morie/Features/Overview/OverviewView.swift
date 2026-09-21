@@ -83,14 +83,14 @@ struct OverviewView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             buildSection
-            Divider()
-            usageSection
-            Divider()
-            modelSection
             if DevelopmentDiagnostics.isEnabled {
                 Divider()
                 applicationContextSection
             }
+            Divider()
+            usageSection
+            Divider()
+            modelSection
         }
         .frame(maxWidth: 820, alignment: .topLeading)
         .navigationTitle("总览")
