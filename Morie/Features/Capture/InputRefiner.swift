@@ -399,15 +399,24 @@ final class InputRefinementRunner {
     private let generate: Generate
     private let maximumWaitOverride: Duration?
     private var generationTask: Task<Void, Never>?
+    private var drainingTasks: [UUID: Task<Void, Never>] = [:]
     private var timeoutTask: Task<Void, Never>?
     private var modelID: UUID?
     private var waitingID: UUID?
     private var continuation: CheckedContinuation<RefinementGeneration, Error>?
 
+    /// Only foreground ownership blocks a new refinement. A timed-out/cancelled
+    /// provider call that ignores cancellation is quarantined in drainingTasks
+    /// and cannot make the next Capture silently skip cleanup.
     var isBusy: Bool { generationTask != nil }
 
-    // Observation for shutdown/validation only. The live input path never awaits model teardown.
-    func waitForModelToFinish() async { await generationTask?.value }
+    // Observation for shutdown/tests only. The live input path never joins drain.
+    func waitForModelToFinish() async {
+        let tasks = [generationTask].compactMap { $0 } + Array(drainingTasks.values)
+        for task in tasks {
+            await task.value
+        }
+    }
 
     init(maximumWait: Duration? = nil) {
         generate = InputRefiner.generate
@@ -440,7 +449,7 @@ final class InputRefinementRunner {
                 "RefinementRunner",
                 captureID: input.captureID,
                 level: .warning,
-                "busy; activeModelJob=\(modelID.map { String($0.uuidString.prefix(8)) } ?? "none")"
+                "busy; activeModelJob=\(modelID.map { String($0.uuidString.prefix(8)) } ?? "none"); drainingJobs=\(drainingTasks.count)"
             )
             return .keptOriginal(.modelBusy)
         }
@@ -450,7 +459,7 @@ final class InputRefinementRunner {
         DevelopmentDiagnostics.record(
             "RefinementRunner",
             captureID: input.captureID,
-            "start; job=\(String(id.uuidString.prefix(8))); maximumWaitMs=\(maximumWaitMilliseconds(maximumWait))"
+            "start; job=\(String(id.uuidString.prefix(8))); maximumWaitMs=\(maximumWaitMilliseconds(maximumWait)); drainingJobs=\(drainingTasks.count)"
         )
 
         return try await withTaskCancellationHandler {
@@ -503,7 +512,7 @@ final class InputRefinementRunner {
                     self.finishWaiting(
                         id,
                         result: .success(.keptOriginal(.timeLimit)),
-                        cancelModel: true
+                        quarantineModel: true
                     )
                 }
             }
@@ -518,7 +527,7 @@ final class InputRefinementRunner {
                 self?.finishWaiting(
                     id,
                     result: .failure(CancellationError()),
-                    cancelModel: true
+                    quarantineModel: true
                 )
             }
         }
@@ -544,27 +553,50 @@ final class InputRefinementRunner {
     }
 
     private func modelFinished(_ id: UUID, outcome: RefinementGeneration) {
-        guard modelID == id else { return }
-        generationTask = nil
-        modelID = nil
-        finishWaiting(id, result: .success(outcome), cancelModel: false)
+        if modelID == id {
+            generationTask = nil
+            modelID = nil
+            finishWaiting(
+                id,
+                result: .success(outcome),
+                quarantineModel: false
+            )
+            return
+        }
+
+        if drainingTasks.removeValue(forKey: id) != nil {
+            DevelopmentDiagnostics.record(
+                "RefinementRunner",
+                "drainedCancelledModel; job=\(String(id.uuidString.prefix(8))); remaining=\(drainingTasks.count)"
+            )
+        }
     }
 
     private func finishWaiting(
         _ id: UUID,
         result: Result<RefinementGeneration, Error>,
-        cancelModel: Bool
+        quarantineModel: Bool
     ) {
         guard waitingID == id, let continuation else { return }
+
         timeoutTask?.cancel()
         timeoutTask = nil
         self.continuation = nil
         waitingID = nil
-        if cancelModel {
-            generationTask?.cancel()
+
+        if quarantineModel,
+           modelID == id,
+           let task = generationTask {
+            task.cancel()
+            drainingTasks[id] = task
+            generationTask = nil
+            modelID = nil
+            DevelopmentDiagnostics.record(
+                "RefinementRunner",
+                "quarantinedCancelledModel; job=\(String(id.uuidString.prefix(8))); drainingJobs=\(drainingTasks.count)"
+            )
         }
+
         continuation.resume(with: result)
-        // generationTask remains owned until it actually ends. New optional work
-        // may observe it as busy, but the foreground Capture is no longer blocked.
     }
 }
