@@ -256,6 +256,13 @@ final class DictionaryStore: ObservableObject {
         )
     }
 
+    /// Refinement receives the same bounded canonical dictionary as Speech.
+    /// Relevance is a model decision; local code does not hide a term because
+    /// an ASR error failed a lexical/edit-distance heuristic.
+    func refinementEntries() throws -> [DictionarySnapshot] {
+        try contextualEntries()
+    }
+
     func relevantConfirmedCorrections(for text: String) throws -> [DictionaryCorrectionSnapshot] {
         try confirmedCorrections().filter { rule in
             if Self.containsCJK(rule.original) {
