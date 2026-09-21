@@ -528,7 +528,7 @@ final class CaptureStore: ObservableObject {
             captureID: id,
             "backgroundPersistQueued; revision=\(revision); lifecycle=\(record.lifecycle.rawValue)"
         )
-        Task(priority: .utility) { [persistenceWriter] in
+        Task(priority: .utility) { [weak self, persistenceWriter] in
             do {
                 try await persistenceWriter.persist(snapshot)
                 if snapshot.usageMetricsFinalized {
