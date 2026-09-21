@@ -58,7 +58,7 @@ enum RefinementReason: String, Codable, Error, Sendable {
         case .textTooLong: "输入内容超过单次本机处理范围，已保留完整文字。"
         case .declined: "Apple 智能未能处理本次润色，已保留保存的文字。"
         case .generationFailed: "AI 润色未能完成，已保留保存的文字。"
-        case .invalidEdits: "AI 润色结果越过了事实或意图安全边界，已使用字典修正后的文字继续输入。"
+        case .invalidEdits: "AI 润色返回了不可用的文本，已使用字典修正后的文字继续输入。"
         case .memoryChanged: "润色期间个人记忆发生变化，已使用字典修正后的文字继续输入。"
         case .dictionaryChanged: "润色期间字典发生变化，已保留识别文字。"
         case .expressionStyleChanged: "润色期间表达习惯发生变化，已使用当前保存的文字继续输入。"
