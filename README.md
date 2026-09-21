@@ -6,7 +6,7 @@ Morie is an Apple-native voice-input product that learns useful personal context
 
 - **One Mac first:** finish reliable input, a custom dictionary, independent AI cleanup and automatic personal Memory before cross-device work.
 - **Latest Apple only:** macOS 27+ on Apple Intelligence-capable Macs, using Swift and Apple system frameworks/components.
-- **Capture first:** save intentional input before AI processing; save final text before insertion and Memory analysis.
+- **Capture first:** save intentional input before AI processing; commit the chosen final text to Capture state before insertion, then flush it durably before Memory analysis.
 - **Expression first:** preserve meaning and tone. Cleanup never answers, summarizes or adds information to what the user said.
 - **Dictionary, Memory and Expression Profile are separate:** the dictionary specifies words and spellings; personal Memory learns semantic facts/projects/preferences; Expression Profile learns only aggregate presentation habits from bounded edits to Morie-inserted text.
 - **Private Mode:** local Apple intelligence with no Morie backend. iCloud/CloudKit is explicit opt-in and uses each user's own private database; raw source audio remains local. iOS and mobile inspiration follow-up remain unscheduled.
