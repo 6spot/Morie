@@ -190,7 +190,7 @@ The macOS Control Center has one window-level presentation owner.
 
 `MorieControlCenter` owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. A Control Center session owns only state that must survive route changes, such as the selected destination, sidebar visibility and cross-route selections.
 
-`ControlCenterRouteHost` chooses the page-family container. Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center shells or move unrelated feature state into `AppController`.
+`ControlCenterRouteHost` only resolves the selected route into page content. Every route is rendered inside the same persistent `ControlCenterDetailHost`; the router must not replace the right-side root with different ScrollView/Form/workspace containers. A feature page may use a native Form, ScrollView, List, Table or split view internally when its content requires it, but those are page contents rather than alternate Control Center shells. Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center navigation shells or move unrelated feature state into `AppController`.
 
 Control Center summary views must not hydrate an entire persistent collection into the UI's main `ModelContext` merely to calculate aggregates. Use bounded SwiftData traversal and narrow fetched properties for summary work, and keep large feature collections behind the feature controller/store that owns their lifecycle.
 
