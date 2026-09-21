@@ -47,19 +47,11 @@ struct MemoryView: View {
     var body: some View {
         ControlCenterScrollableContent {
             VStack(alignment: .leading, spacing: 24) {
-                ControlCenterCommandBar {
-                    TextField(
-                        "搜索 Morie 记住的内容",
-                        text: $search
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 320)
-
-                    Text(
-                        "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
-                    )
-                    .foregroundStyle(.secondary)
-                }
+                Text(
+                    "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
 
                 Text(
                     "Morie 会把稳定事实沉淀为长期记忆，把近期但仍可能变化的信息保留在“最近”里。"
