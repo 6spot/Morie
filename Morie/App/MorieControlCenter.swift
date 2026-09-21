@@ -189,11 +189,13 @@ private final class ControlCenterSession {
 @MainActor
 @Observable
 private final class ControlCenterPresentationState {
-    let history: CaptureHistoryController?
+    var history: CaptureHistoryController?
     var overview = OverviewPageState()
 
-    init(history: CaptureHistoryController?) {
-        self.history = history
+    func prepare(history: CaptureHistoryController?) {
+        if self.history == nil {
+            self.history = history
+        }
     }
 
     var dictionarySearch = ""
@@ -217,6 +219,7 @@ private final class ControlCenterPresentationState {
 
     func reset() {
         history?.releasePresentationResources()
+        history = nil
         overview.metricsSnapshot = nil
 
         dictionarySearch = ""
@@ -244,18 +247,8 @@ private final class ControlCenterPresentationState {
 struct MorieControlCenter: View {
     let controller: AppController
 
-    @State private var session: ControlCenterSession
-    @State private var presentation: ControlCenterPresentationState
-
-    init(controller: AppController) {
-        self.controller = controller
-        _session = State(initialValue: ControlCenterSession())
-        _presentation = State(
-            initialValue: ControlCenterPresentationState(
-                history: controller.makeControlCenterHistoryController()
-            )
-        )
-    }
+    @State private var session = ControlCenterSession()
+    @State private var presentation = ControlCenterPresentationState()
 
     var body: some View {
         @Bindable var session = session
@@ -274,6 +267,9 @@ struct MorieControlCenter: View {
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
         .onAppear {
+            presentation.prepare(
+                history: controller.makeControlCenterHistoryController()
+            )
             Diagnostics.record("ControlCenter", "Shell mounted")
             Diagnostics.recordMemory("control-center-mounted")
         }
