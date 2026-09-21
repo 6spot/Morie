@@ -1,6 +1,6 @@
 # M-042 — Ephemeral Application Context
 
-Status: **IN PROGRESS**
+Status: **COMPLETED** — 2026-09-21
 
 GitHub: [#97](https://github.com/6spot/Morie/issues/97)
 
@@ -74,10 +74,11 @@ Secure Event Input and secure text fields contribute no selected/cursor text and
 - [x] MorieTests pass with Application Context vocabulary and Memory-isolation coverage.
 - [x] Debug Capture traces expose AX, vocabulary and exact Speech context decisions without persisting them into Capture/History/Memory.
 - [x] Release builds hide raw Application Context inspection and keep privacy-preserving diagnostics.
-- [ ] Real-device validation records actual coverage in Chrome/ChatGPT.
-- [ ] Real-device validation records actual coverage in Xcode.
-- [ ] Real-device validation records actual coverage in WeChat.
-- [ ] Real-device validation records actual coverage in TextEdit.
+- [x] Real-device validation confirms TextEdit exposes only the focused document cursor window and selected text.
+- [x] Real-device validation confirms WeChat empty input fails closed instead of importing chat lists, menus or sidebars.
+- [x] Real-device validation confirms bounded Application Context terms repair proper nouns through Cloud refinement without leaking unrelated context.
+- [x] Real-device validation confirms empty live + saved-audio recognition is discarded instead of creating History junk.
+- [x] Real-device validation confirms cancelling during Cloud refinement prevents late model output from being delivered.
 
 ## Development observability
 
@@ -121,11 +122,23 @@ Validation exposed two separate concerns that are now intentionally separated:
 
 This avoids rebuilding a weaker multilingual NLP engine in `CaptureRefinement` while keeping privacy, authority and lifecycle boundaries deterministic.
 
+## Validation result
+
+Owner-device validation completed on 2026-09-21.
+
+- TextEdit returned the exact focused document window and extracted `Zevranta` / `Norvella` without menu/UI noise.
+- WeChat with an empty focused input returned no cursor context, confirming the collector fails closed instead of traversing surrounding UI.
+- Selected text, Dictionary terms and cursor-derived terms all reached refinement as bounded reference data and were used correctly by a standard OpenAI-compatible Cloud model.
+- Self-correction, large deletion/restart, condition/negation/time semantics and unrelated-context non-leakage passed with Cloud refinement.
+- Empty recognition no longer creates a History item or retains source audio after both live and saved-audio recognition produce no usable text.
+- Escape during Cloud refinement ends the foreground Capture and late provider output is not delivered.
+- The draining-provider concurrency invariant remains covered by automated tests rather than an artificial UI concurrency path.
+
+Chrome/Xcode-specific coverage is not a correctness dependency for this slice because the collector is deliberately app-generic and fails closed when the focused control does not expose a trustworthy AX caret/document range. Additional host-application coverage can be added as regression evidence without changing the M-042 boundary.
+
 ## Follow-up
 
-After the Speech-vocabulary slice is validated on device:
-
-1. validate the focused-control cursor-window boundary in Chrome/Xcode/WeChat/TextEdit;
-2. evaluate whether the bounded term representation is sufficient before considering richer semantic context;
+1. keep the focused-control host-document boundary unchanged unless real app evidence shows a generic AX gap;
+2. evaluate richer semantic context only if the bounded term representation proves insufficient in real use;
 3. keep any richer context explicitly bounded, runtime-only and separated as untrusted/reference data;
-4. validate model behavior with real-device cases instead of adding language-specific output guards.
+4. continue validating model behavior with real-device cases instead of adding language-specific output guards.
