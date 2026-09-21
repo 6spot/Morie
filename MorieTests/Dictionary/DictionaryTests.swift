@@ -106,6 +106,19 @@ final class DictionaryTests: XCTestCase {
         XCTAssertTrue(try store.speechHints().contains("GitHub"))
     }
 
+    func testRefinementEntriesExposeBoundedDictionaryWithoutTranscriptFiltering() throws {
+        let captures = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
+        let store = DictionaryStore(container: captures.container)
+        let id = try store.create(DictionaryDraft(name: "UserSpecificTerm"))
+
+        let entries = try store.refinementEntries()
+        XCTAssertTrue(entries.map(\.id).contains(id))
+        XCTAssertTrue(entries.contains(where: { $0.name == "GitHub" }))
+        XCTAssertLessThanOrEqual(entries.count, 100)
+        XCTAssertLessThanOrEqual(entries.map(\.name.count).reduce(0, +), 2_000)
+    }
+
     func testUnrelatedDictionaryTermsAndCorrectionsDoNotReachCleanupContext() throws {
         let captures = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
