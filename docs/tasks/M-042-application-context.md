@@ -22,7 +22,7 @@ Implement the capture foundation plus bounded Speech vocabulary injection:
 - capture the frontmost application identity at voice-input start;
 - read bounded selected/focused/nearby text through Apple Accessibility when available;
 - pin the target application/PID at Capture Start, resolve bounded AX context asynchronously, and retain the resulting snapshot only for that active Capture;
-- keep raw application text out of Capture/History/Memory and refinement input;
+- keep raw application text out of Capture/History/Memory and refinement input; only the bounded extracted term set may reach refinement as runtime-only reference data;
 - Release diagnostics log metadata/counts only; Debug development tracing may log bounded raw context locally for troubleshooting;
 - use no app-specific adapters, screen recording or OCR;
 - extract at most 32 high-signal transient terms, prioritizing selected → focused → nearby text;
@@ -35,7 +35,7 @@ Implement the capture foundation plus bounded Speech vocabulary injection:
 This slice does **not**:
 
 - add raw Application Context text to the cleanup/model prompt;
-- use Application Context as a source of final-text facts or requests;
+- give Application Context any instruction/tool authority; extracted terms are read-only model reference data;
 - persist Application Context in Capture/History/Memory;
 - add Chrome/Xcode/WeChat-specific behavior;
 - add sensitive-app profiles or generalized privacy modes.
@@ -84,7 +84,7 @@ Debug builds provide a Capture-correlated `Dev/*` trace covering:
 - throttled live recognition evolution plus live/accurate/preferred final text;
 - Dictionary, Memory and Expression Profile inputs to refinement;
 - effective refinement instructions/payload, model backend and token budgets;
-- generated output, exact deterministic guard rejection rule/evidence and final text;
+- generated output, transport/lifecycle boundary decisions and final text;
 - delivery destination and post-insertion learning;
 - Memory learner prompts, suggestions, grounding and admission decisions.
 
@@ -97,24 +97,23 @@ unrelated clipboard contents are never logged.
 See [development diagnostics](../development-diagnostics.md) for the complete
 contract and troubleshooting workflow.
 
-## Refinement safety prerequisite discovered during validation
+## Refinement boundary discovered during validation
 
-Real-device validation exposed an existing Personal Memory leakage path: raw Memory notes were included in refinement prompts and a model could reuse an older clause as new user-authored text. Before Application Context is allowed into refinement:
+Validation exposed two separate concerns that are now intentionally separated:
 
-- automatic long-term Memory admission is now conservative about one-off assistant/test/debug requests;
-- machine-style automatic Memory names such as snake_case category labels are rejected;
-- refinement receives topic-level Memory hints only, never raw Memory notes/evidence;
-- raw Memory notes remain local-only for deterministic leakage checks;
-- the output guard now checks comma-delimited clauses and long CJK fragments, not only complete Memory sentences.
+- raw Personal Memory notes/evidence are not sent to refinement; only topic-level hints are;
+- bounded Application Context terms may be sent as runtime-only reference data;
+- reference data is serialized separately from trusted instructions and cannot grant tools or actions;
+- the model, not local regex/word-list code, decides semantic relevance, self-correction, number/time meaning, negation, language and structure;
+- post-generation code validates only payload/lifecycle integrity. Stale, cancelled, timed-out or unsaved results cannot be delivered.
 
-Existing stored Memory is not automatically deleted or rewritten.
+This avoids rebuilding a weaker multilingual NLP engine in `CaptureRefinement` while keeping privacy, authority and lifecycle boundaries deterministic.
 
 ## Follow-up
 
 After the Speech-vocabulary slice is validated on device:
 
 1. tune extraction quality from real Chrome/Xcode/WeChat/TextEdit evidence;
-2. decide whether runtime-only semantic Application Context should enter refinement at all;
-3. if it does, add only a bounded reference representation, never raw page text by default;
-4. update the cleanup prompt with a strict context-only/reference-material contract;
-5. extend deterministic output guards so context-only facts cannot enter final text.
+2. evaluate whether the bounded term representation is sufficient before considering richer semantic context;
+3. keep any richer context explicitly bounded, runtime-only and separated as untrusted/reference data;
+4. validate model behavior with real-device cases instead of adding language-specific output guards.
