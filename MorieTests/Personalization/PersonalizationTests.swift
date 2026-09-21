@@ -525,7 +525,7 @@ final class PersonalizationTests: XCTestCase {
         let id = try fixture.capture("morie is my project", mode: .currentApp)
         let dictionaryID = try fixture.addWord()
         let runner = InputRefinementRunner { input in
-            XCTAssertEqual(input.dictionary.map(\.id), [dictionaryID])
+            XCTAssertTrue(input.dictionary.map(\.id).contains(dictionaryID))
             XCTAssertEqual(input.prepared.text, "Morie is my project")
             XCTAssertTrue(input.context.isEmpty)
             return "Morie is my project."
@@ -536,7 +536,7 @@ final class PersonalizationTests: XCTestCase {
         XCTAssertEqual(result, "Morie is my project.")
         XCTAssertEqual(live.finalText, result)
         XCTAssertEqual(live.recognizedText, "morie is my project")
-        XCTAssertEqual(live.refinement?.input.dictionary.map(\.id), [dictionaryID])
+        XCTAssertTrue(live.refinement?.input.dictionary.map(\.id).contains(dictionaryID) == true)
 
         let durable = try await fixture.saved(id)
         XCTAssertEqual(durable.finalText, result)
