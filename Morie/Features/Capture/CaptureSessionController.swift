@@ -598,7 +598,7 @@ final class CaptureSessionController {
             )
 
             var accurateTranscript: String?
-            if result.sourceAudio.hasMeaningfulAudio != false
+            if result.sourceAudio.duration > 0
                 || !result.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 do {
                     DevelopmentDiagnostics.list(
@@ -640,7 +640,7 @@ final class CaptureSessionController {
             } else {
                 Diagnostics.record(
                     "SpeechQuality",
-                    "Skipped accurate final re-recognition for \(label(sessionID)); source audio was confirmed as no speech"
+                    "Skipped accurate final re-recognition for \(label(sessionID)); source audio contained no recorded frames"
                 )
             }
 
