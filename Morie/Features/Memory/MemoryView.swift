@@ -45,110 +45,111 @@ struct MemoryView: View {
     }
 
     var body: some View {
-        ControlCenterScrollableContent {
-            VStack(alignment: .leading, spacing: 24) {
-                Text(
-                    "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
-                )
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-                Text(
-                    "Morie 会把稳定事实沉淀为长期记忆，把近期但仍可能变化的信息保留在“最近”里。"
-                )
-                .foregroundStyle(.secondary)
-
-                if !memoryEnabled {
-                    Label(
-                        "个人记忆已关闭。已有内容会保留，但 Morie 暂时不会继续学习，也不会在润色时使用这些内容。",
-                        systemImage: "pause.circle"
-                    )
-                    .foregroundStyle(.secondary)
+        ControlCenterPage {
+            HStack(spacing: 8) {
+                Text("\(activeLongTerm.count) 条长期")
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Text("\(recentContext.count) 条近期")
+                if !history.isEmpty {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text("\(history.count) 条历史")
                 }
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
 
-                if let errorMessage {
-                    Label(
-                        errorMessage,
-                        systemImage: "exclamationmark.triangle"
+            if !memoryEnabled {
+                Label(
+                    "个人记忆已关闭。已有内容会保留，但 Morie 暂时不会继续学习，也不会在润色时使用这些内容。",
+                    systemImage: "pause.circle"
+                )
+                .foregroundStyle(.secondary)
+            }
+
+            if let errorMessage {
+                Label(
+                    errorMessage,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(.secondary)
+            }
+
+            if !activeLongTerm.isEmpty {
+                ControlCenterSectionBlock(
+                    "长期记忆",
+                    subtitle: "稳定且仍然有效的事实。Morie 会在相关输入中参考这些内容。"
+                ) {
+                    MemoryTopicRows(
+                        entries: activeLongTerm,
+                        store: store
                     )
-                    .foregroundStyle(.secondary)
                 }
+            }
 
+            if !recentContext.isEmpty {
                 if !activeLongTerm.isEmpty {
-                    memorySection(
-                        title: "长期记忆",
-                        entries: activeLongTerm
-                    )
+                    Divider()
                 }
 
-                if !recentContext.isEmpty {
-                    memorySection(
-                        title: "最近",
+                ControlCenterSectionBlock(
+                    "最近",
+                    subtitle: "近期仍可能变化的上下文，不会被当作长期事实保存。"
+                ) {
+                    MemoryTopicRows(
                         entries: recentContext,
+                        store: store,
                         showsDate: true
                     )
                 }
+            }
 
-                if !history.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("已归档与历史")
-                            .font(.headline)
+            if !history.isEmpty {
+                if !activeLongTerm.isEmpty || !recentContext.isEmpty {
+                    Divider()
+                }
 
-                        DisclosureGroup("查看历史内容") {
-                            MemoryTopicRows(
-                                entries: history,
-                                store: store,
-                                showsStatus: true
-                            )
-                            .padding(.top, 8)
+                ControlCenterSectionBlock(
+                    "已归档与历史",
+                    subtitle: "已归档或被新内容替代的记忆，仅供查阅。"
+                ) {
+                    MemoryTopicRows(
+                        entries: history,
+                        store: store,
+                        showsStatus: true
+                    )
+                }
+            }
+
+            if !hasVisibleMemory && errorMessage == nil {
+                ContentUnavailableView {
+                    Label(
+                        query.isEmpty
+                            ? "Morie 还不了解你"
+                            : "没有匹配的内容",
+                        systemImage: "person.text.rectangle"
+                    )
+                } description: {
+                    Text(
+                        query.isEmpty
+                            ? "继续正常使用即可。Morie 会逐渐形成有用的长期理解和近期上下文。"
+                            : "试试其他搜索词。"
+                    )
+                } actions: {
+                    if query.isEmpty {
+                        Button("告诉 Morie 一件事", systemImage: "plus") {
+                            editor = .create
                         }
                     }
                 }
-
-                if !hasVisibleMemory && errorMessage == nil {
-                    ContentUnavailableView {
-                        Label(
-                            query.isEmpty
-                                ? "Morie 还不了解你"
-                                : "没有匹配的内容",
-                            systemImage: "person.text.rectangle"
-                        )
-                    } description: {
-                        Text(
-                            query.isEmpty
-                                ? "继续正常使用即可。Morie 会逐渐形成有用的长期理解和近期上下文。"
-                                : "试试其他搜索词。"
-                        )
-                    }
-                    .frame(maxWidth: .infinity)
-                }
+                .frame(maxWidth: .infinity)
             }
         }
         .sheet(item: $editor) {
             MemoryEditorSheet(store: store, mode: $0)
         }
         .onAppear(perform: load)
-    }
-
-    private func memorySection(
-        title: String,
-        entries: [MemoryRecord],
-        showsDate: Bool = false
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-
-            MemoryTopicRows(
-                entries: entries,
-                store: store,
-                showsDate: showsDate
-            )
-        }
-    }
-
-    private func addMemory() {
-        editor = .create
     }
 
     private func load() {
