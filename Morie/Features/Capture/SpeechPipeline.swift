@@ -407,6 +407,7 @@ actor SpeechPipeline {
                 device: microphone,
                 converter: converter,
                 destinationURL: sourceAudioURL,
+                captureID: sessionID,
                 onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
             let analyzer = SpeechAnalyzer(modules: modules)
@@ -452,6 +453,7 @@ actor SpeechPipeline {
                 device: microphone,
                 converter: converter,
                 destinationURL: sourceAudioURL,
+                captureID: sessionID,
                 onAudioLevel: { level in onAudioLevel(sessionID, level) }
             )
             let analyzer = SpeechAnalyzer(modules: modules)
