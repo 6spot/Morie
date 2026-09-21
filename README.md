@@ -49,12 +49,14 @@ The existing **历史记录 → 开始录音** action remains available for save
 ## Documentation
 
 - [Documentation index](docs/README.md)
-- [Product and architecture baseline](docs/product-architecture-baseline.md)
-- [Architecture](docs/architecture.md)
-- [Task overview](docs/tasks.md)
-- [Development guide](docs/development.md)
-- [Validation matrix](docs/validation.md)
-- [Deployment guide](docs/deployment.md)
-- [Contributor rules](AGENTS.md)
+- [Product](docs/PRODUCT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Design](docs/DESIGN.md)
+- [Testing](docs/TESTING.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Refinement behavior](docs/features/REFINEMENT.md)
+- [Task records](docs/tasks/)
+- [Contributor / agent navigation](AGENTS.md)
 
 Development uses feature branches and pull requests.
