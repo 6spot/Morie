@@ -108,8 +108,7 @@ enum CaptureFileTranscriber {
         captureID: UUID?
     ) async throws -> String {
         let audioFile = try AVAudioFile(forReading: url)
-        let detector = SpeechDetector()
-        let modules: [any SpeechModule] = [detector, transcriber]
+        let modules: [any SpeechModule] = [transcriber]
         let analyzer = SpeechAnalyzer(modules: modules)
         await applyRecognitionContext(
             contextualWords,
@@ -193,8 +192,7 @@ enum CaptureFileTranscriber {
     ) async throws -> String {
         let audioFile = try AVAudioFile(forReading: url)
         let transcriber = DictationTranscriber(locale: locale, preset: .longDictation)
-        let detector = SpeechDetector()
-        let modules: [any SpeechModule] = [detector, transcriber]
+        let modules: [any SpeechModule] = [transcriber]
         let analyzer = SpeechAnalyzer(modules: modules)
         await applyRecognitionContext(
             contextualWords,
@@ -343,8 +341,7 @@ enum CaptureFileTranscriber {
     }
 
     private static func installAssetsIfNeeded(for transcriber: SpeechTranscriber) async throws {
-        let detector = SpeechDetector()
-        let modules: [any SpeechModule] = [detector, transcriber]
+        let modules: [any SpeechModule] = [transcriber]
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: modules) {
             try await installation.downloadAndInstall()
         }
