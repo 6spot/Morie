@@ -157,6 +157,19 @@ private enum RefinementOutputGuard {
         ) else {
             try reject("protectedFactChanged", input: input, source: source, output: output)
         }
+        guard !introducesUnhintedMixedLanguageTerm(
+            output,
+            source: source,
+            input: input,
+            applicationSpellingCandidates: applicationSpellingCandidates
+        ) else {
+            try reject(
+                "unhintedProperTermIntroduced",
+                input: input,
+                source: source,
+                output: output
+            )
+        }
         guard !introducesContextOnlyContent(output, source: source, input: input) else {
             try reject("contextOnlyContentIntroduced", input: input, source: source, output: output)
         }
@@ -361,51 +374,73 @@ private enum RefinementOutputGuard {
     }
 
     private static func protectedIdentifierTokens(in text: String) -> [String] {
-        let mixedWithCJK = text.unicodeScalars.contains { scalar in
+        regexMatches(#"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9_.+-]{1,}(?![A-Za-z0-9_])"#, in: text)
+            .filter { token in
+                let scalars = token.unicodeScalars
+                let hasUpper = scalars.contains { CharacterSet.uppercaseLetters.contains($0) }
+                let hasLower = scalars.contains { CharacterSet.lowercaseLetters.contains($0) }
+                let tailHasUpper = token.dropFirst().unicodeScalars.contains {
+                    CharacterSet.uppercaseLetters.contains($0)
+                }
+                let hasDigit = scalars.contains { CharacterSet.decimalDigits.contains($0) }
+                let allCaps = hasUpper && !hasLower && token.count >= 2
+                let mixedCase = hasUpper && hasLower && tailHasUpper
+                let identifierPunctuation = token.contains("_") || token.contains("-")
+                return allCaps || mixedCase || hasDigit || identifierPunctuation
+            }
+    }
+    private static func introducesUnhintedMixedLanguageTerm(
+        _ output: String,
+        source: String,
+        input: RefinementInput,
+        applicationSpellingCandidates: [String]
+    ) -> Bool {
+        guard output.unicodeScalars.contains(where: { scalar in
             switch scalar.value {
             case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
                 true
             default:
                 false
             }
+        }) else {
+            return false
         }
 
-        return regexMatches(
-            #"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9_.+-]{1,}(?![A-Za-z0-9_])"#,
+        let allowedTerms = input.dictionary.map(\.name)
+            + input.context.map(\.memory.name)
+            + applicationSpellingCandidates
+        let allowedKeys = Set(allowedTerms.map(canonicalLatinTerm))
+        let sourceKeys = Set(
+            simpleTitleCaseLatinTerms(in: source).map(canonicalLatinTerm)
+        )
+
+        for term in simpleTitleCaseLatinTerms(in: output) {
+            let key = canonicalLatinTerm(term)
+            guard !sourceKeys.contains(key) else { continue }
+            guard allowedKeys.contains(key) else {
+                DevelopmentDiagnostics.record(
+                    "RefinementGuardDetail",
+                    captureID: input.captureID,
+                    "unhintedProperTerm=\(term)"
+                )
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func simpleTitleCaseLatinTerms(in text: String) -> [String] {
+        regexMatches(
+            #"(?<![A-Za-z0-9_])[A-Z][a-z]{3,}(?![A-Za-z0-9_])"#,
             in: text
         )
-        .filter { token in
-            let scalars = token.unicodeScalars
-            let hasUpper = scalars.contains {
-                CharacterSet.uppercaseLetters.contains($0)
-            }
-            let hasLower = scalars.contains {
-                CharacterSet.lowercaseLetters.contains($0)
-            }
-            let tailHasUpper = token.dropFirst().unicodeScalars.contains {
-                CharacterSet.uppercaseLetters.contains($0)
-            }
-            let hasDigit = scalars.contains {
-                CharacterSet.decimalDigits.contains($0)
-            }
-            let firstIsUpper = token.unicodeScalars.first.map {
-                CharacterSet.uppercaseLetters.contains($0)
-            } ?? false
-            let titleCaseInCJK =
-                mixedWithCJK
-                && firstIsUpper
-                && hasLower
-                && !tailHasUpper
-                && token.count >= 4
-            let allCaps = hasUpper && !hasLower && token.count >= 2
-            let mixedCase = hasUpper && hasLower && tailHasUpper
-            let identifierPunctuation = token.contains("_") || token.contains("-")
-            return allCaps
-                || mixedCase
-                || hasDigit
-                || identifierPunctuation
-                || titleCaseInCJK
-        }
+    }
+
+    private static func canonicalLatinTerm(_ value: String) -> String {
+        value.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        )
     }
 
     private static func introducesContextOnlyContent(
