@@ -49,7 +49,8 @@ struct DictionaryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
+        ControlCenterScrollableContent {
+            VStack(alignment: .leading, spacing: 28) {
             if let errorMessage {
                 Label(
                     errorMessage,
@@ -126,8 +127,8 @@ struct DictionaryView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
         .navigationTitle("字典")
         .navigationSubtitle("\(visibleCount) 个词语")
         .searchable(text: $search, prompt: "搜索词语")
