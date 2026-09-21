@@ -229,7 +229,7 @@ struct PermissionManagementView: View {
                     ProgressView("正在检查设备和权限…")
                 }
             } else {
-                Section("设备能力") {
+                ControlCenterSectionBlock("设备能力") {
                     capabilityRows(
                         setup.checks.filter {
                             !$0.requirement.isPermission
