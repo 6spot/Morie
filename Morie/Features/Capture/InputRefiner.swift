@@ -274,13 +274,6 @@ enum InputRefiner {
             supportsGuidedGeneration: false
         )
         let instructions = Instructions { instructionsText }
-        let promptText = try promptText(
-            for: input,
-            configuration: RefinementConfiguration(
-                model: .local,
-                instructions: instructionsText
-            )
-        )
         let prompt = Prompt { promptText }
         let responseBudget = min(1_536, max(256, input.prepared.text.count * 2))
         DevelopmentDiagnostics.record(
