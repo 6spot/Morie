@@ -109,8 +109,8 @@ The current design source of truth is `docs/DESIGN.md`.
 - [x] Redesign Memory detail and directly expose provenance/history.
 - [x] Redesign History list/detail workspace and directly expose record detail.
 - [x] Redesign Diagnostics workspace.
-- [ ] Xcode 27 compile passes on the final implementation.
-- [ ] MorieTests pass on the final implementation.
+- [x] Xcode 27 compile passes on the final implementation.
+- [x] MorieTests pass on the final implementation.
 - [ ] Owner-device visual acceptance passes.
 
 ## Owner-device acceptance
@@ -128,4 +128,4 @@ Check at the normal development window size and at the 960 × 600 minimum:
 - [ ] Diagnostics fills the detail workspace;
 - [ ] light/dark appearance and resizing remain native.
 
-Do not mark this task DONE until owner-device visual acceptance passes.
+Validation: macOS 27 CI run #534 passed on code commit `7868fbbfae9eb250507118d0b5acdd005664f121`: Xcode 27 compile and MorieTests both succeeded.\n\nDo not mark this task DONE until owner-device visual acceptance passes.
