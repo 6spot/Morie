@@ -45,4 +45,4 @@ The pure detector expands differences to aligned native word boundaries, includi
 
 A nonactivating native `NSPanel` contains standard Text and Buttons. Explicit confirmation keeps/adds the canonical spelling and, under M-027, may also persist the detected observed-ASR → canonical-word mapping in the internal correction-rule store. The wrong form is not shown as a normal Dictionary row. Not Now/20-second expiry saves nothing, and a normalized word is offered at most once per process. Observed external text is not sent to AI, logged or persisted into Capture.
 
-See [M-009](../tasks/M-009-macos-input-memory.md) for current evidence and the [validation matrix](../validation.md#m-009-correction-suggestions) for uncompleted device checks.
+See [M-009](../tasks/M-009-macos-input-memory.md) for historical implementation evidence and [TESTING.md](../TESTING.md) for the current validation policy.
