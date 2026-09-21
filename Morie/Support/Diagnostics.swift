@@ -436,6 +436,31 @@ struct DiagnosticLogView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Divider()
+
+            HStack(spacing: 8) {
+                Text("\(visibleEntries.count) 条日志")
+                    .foregroundStyle(.secondary)
+
+                if let level {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(level.title)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(store.logFileURL.lastPathComponent)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.callout)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Divider()
+
             VSplitView {
                 Table(visibleEntries, selection: $selection) {
                     TableColumn("时间") { entry in
