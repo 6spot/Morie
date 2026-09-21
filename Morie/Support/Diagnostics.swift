@@ -436,19 +436,6 @@ struct DiagnosticLogView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ControlCenterCommandBar {
-                TextField("搜索诊断日志", text: $search)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 280)
-
-                Text("\(visibleEntries.count) 条")
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-
-            Divider()
-
             VSplitView {
                 Table(visibleEntries, selection: $selection) {
                     TableColumn("时间") { entry in
