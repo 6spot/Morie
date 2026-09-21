@@ -21,24 +21,24 @@ Owner-approved on 2026-09-18. Applies to the current Mac input loop, independent
 
 ## Prompt organization
 
-The Foundation Models implementation intentionally uses a **small closed-world instruction** rather than a growing collection of special cases.
+The runtime contract follows **trust model semantics; constrain model capabilities**.
 
-Apple's on-device prompting guidance favors concise, specific requests with one clear goal and warns that long/conditional instructions can reduce instruction following. M-035 therefore removed the deterministic `compact / semanticParagraphs / explicitList` routing and the duplicated behavioral policy that previously lived in both `Instructions` and `@Guide`.
+Morie does not run a second hand-written natural-language system after generation. The model owns self-correction, fact replacement, negation/condition interpretation, number/time normalization, multilingual wording, paragraphing and list structure. Local code must not reject a valid model result because a regex disagrees with the model's semantic interpretation.
 
 The current runtime shape is:
 
-1. **One three-paragraph instruction:** define the cleanup task/content boundary, allowed light edits/protected content, and natural formatting.
-2. **Transcript is the only content source:** every output fact, request, judgment, question, attitude and topic must already be expressed in `transcript`.
-3. **Helper fields are non-content:** `spellingCandidates`, related Memory and Expression Profile may only disambiguate or repair text already expressed. They can never create a new sentence/topic.
-4. **Semantic paragraphing and logic, not a classifier:** paragraph boundaries follow topic/intent/stance/stage/object changes rather than character count. The model should make logical relations already present in speech—parallel, sequence, cause/effect, contrast, condition and whole-to-parts—read clearly through punctuation, paragraphs or lists, without inventing new reasoning. Explicit spoken enumeration may become a list, but any spoken lead-in, explanation, question, closing and item order remain content and must survive. No generated headings/items are authorized.
-5. **Schema-only guided generation:** local Apple refinement keeps `@Generable`, while the field `@Guide` only identifies the final cleaned body instead of repeating the cleanup rules.
-6. **Post-generation grounding:** empty/control-character payloads and clearly unsupported longer clauses are rejected before delivery.
+1. **One three-paragraph instruction:** define the editing task and the model's capability boundary.
+2. **Separated data fields:** `transcript`, Dictionary spellings, bounded Application Context terms, topic-level Personal Memory hints and Expression Profile directives are serialized as data. They are not instructions and cannot grant tools/actions.
+3. **Model-owned relevance:** the model decides whether Dictionary/Application Context/Memory/style reference data is relevant to the utterance. Morie does not gate these references with transcript edit-distance, negation lists, time regexes or language-specific correction phrases.
+4. **Text-only capability:** refinement can only return text. It has no tools, file/system actions, delivery authority, Memory-write authority or persistence authority.
+5. **Lifecycle boundary:** Capture identity, frozen settings, cancellation, timeout, stale-source checks, Dictionary/Memory/style freshness and durable save all remain code-owned. A cancelled or stale model result cannot be delivered.
+6. **Minimal output boundary:** non-empty text without unsupported control characters is accepted. Morie does not second-guess the model by comparing facts, numbers, URLs, paths, language scripts, output length or semantic relation word lists.
 
 The shipped default lives in `Morie/Resources/DefaultRefinementInstructions.txt`; it is not embedded in `InputRefiner`. On launch, `RefinementPromptController` reads the default or saved override once into process memory. Saving from Settings replaces that in-memory instruction immediately for later Captures and persists the same value only for the next launch; the model hot path does not reread storage. **恢复默认** replaces memory with the bundled baseline and removes the override. Each Capture freezes the effective instructions together with its refinement-model selection at Start, so editing Settings cannot change an in-flight recording.
 
-Apple-local and user-configured external refinement share the same instruction snapshot. Prompt editability does not bypass dictionary preparation, grounding validation or stale-context checks.
+Apple-local and user-configured external refinement share the same instruction snapshot and data-boundary contract. Prompt editability does not bypass deterministic Dictionary preparation, Capture freshness, cancellation, timeout or durable-save checks.
 
-Morie intentionally does **not** copy Type4Me/OpenLess prompts wholesale. Their useful task-boundary and editability lessons are adapted to Morie's smaller Apple-native cleanup task; stronger rewrite/style-pack behavior remains out of scope.
+Morie intentionally follows the OpenLess-style distinction between **untrusted/reference data** and **trusted system instructions** for normal dictation. Type4Me-style semantic output validators are not used for Morie's main cleanup path because they duplicate natural-language understanding in weaker hard-coded rules.
 
 ## Acceptance examples
 
