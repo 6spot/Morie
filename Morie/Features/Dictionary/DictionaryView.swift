@@ -50,107 +50,112 @@ struct DictionaryView: View {
 
     var body: some View {
         ControlCenterScrollableContent {
-            VStack(alignment: .leading, spacing: 28) {
-            if let errorMessage {
-                Label(
-                    errorMessage,
-                    systemImage: "exclamationmark.triangle"
-                )
-                .foregroundStyle(.secondary)
-            }
+            VStack(alignment: .leading, spacing: 24) {
+                ControlCenterCommandBar {
+                    TextField("搜索词语", text: $search)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 280)
 
-            if search.isEmpty || !visibleUserEntries.isEmpty {
-                dictionarySection(
-                    title: "用户添加",
-                    description: "你添加或确认过的词语，可以编辑和删除。"
-                ) {
-                    if visibleUserEntries.isEmpty {
-                        ContentUnavailableView {
-                            Label(
-                                "还没有自定义词语",
-                                systemImage: "character.book.closed"
-                            )
-                        } description: {
-                            Text(
-                                "添加人名、产品名或专业术语，帮助语音识别。"
-                            )
-                        } actions: {
-                            Button(
-                                "添加词语",
-                                systemImage: "plus",
-                                action: add
-                            )
+                    Text("\(visibleCount) 个词语")
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 12)
+
+                    Button("编辑", systemImage: "pencil") {
+                        if let selectedUserEntryID {
+                            edit(selectedUserEntryID)
                         }
-                        .frame(maxWidth: .infinity)
-                    } else {
+                    }
+                    .disabled(selectedUserEntryID == nil)
+
+                    Button(
+                        "删除",
+                        systemImage: "trash",
+                        role: .destructive
+                    ) {
+                        confirmsDeletion = true
+                    }
+                    .disabled(selectedUserEntryID == nil)
+
+                    Button("添加", systemImage: "plus", action: add)
+                }
+
+                if let errorMessage {
+                    Label(
+                        errorMessage,
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .foregroundStyle(.secondary)
+                }
+
+                if search.isEmpty || !visibleUserEntries.isEmpty {
+                    dictionarySection(
+                        title: "用户添加",
+                        description: "你添加或确认过的词语，可以编辑和删除。"
+                    ) {
+                        if visibleUserEntries.isEmpty {
+                            ContentUnavailableView {
+                                Label(
+                                    "还没有自定义词语",
+                                    systemImage: "character.book.closed"
+                                )
+                            } description: {
+                                Text(
+                                    "添加人名、产品名或专业术语，帮助语音识别。"
+                                )
+                            } actions: {
+                                Button(
+                                    "添加词语",
+                                    systemImage: "plus",
+                                    action: add
+                                )
+                            }
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            LazyVGrid(
+                                columns: columns,
+                                alignment: .leading,
+                                spacing: 8
+                            ) {
+                                ForEach(visibleUserEntries) { entry in
+                                    userWord(entry)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !visibleBuiltInEntries.isEmpty {
+                    Divider()
+
+                    dictionarySection(
+                        title: "系统内置",
+                        description:
+                            "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
+                    ) {
                         LazyVGrid(
                             columns: columns,
                             alignment: .leading,
                             spacing: 8
                         ) {
-                            ForEach(visibleUserEntries) { entry in
-                                userWord(entry)
+                            ForEach(visibleBuiltInEntries) { entry in
+                                builtInWord(entry)
                             }
                         }
                     }
                 }
-            }
 
-            if !visibleBuiltInEntries.isEmpty {
-                Divider()
-
-                dictionarySection(
-                    title: "系统内置",
-                    description:
-                        "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
-                ) {
-                    LazyVGrid(
-                        columns: columns,
-                        alignment: .leading,
-                        spacing: 8
-                    ) {
-                        ForEach(visibleBuiltInEntries) { entry in
-                            builtInWord(entry)
-                        }
+                if visibleCount == 0 && errorMessage == nil {
+                    ContentUnavailableView {
+                        Label(
+                            "没有匹配的词语",
+                            systemImage: "magnifyingglass"
+                        )
+                    } description: {
+                        Text("试试其他搜索词。")
                     }
+                    .frame(maxWidth: .infinity)
                 }
-            }
-
-            if visibleCount == 0 && errorMessage == nil {
-                ContentUnavailableView {
-                    Label(
-                        "没有匹配的词语",
-                        systemImage: "magnifyingglass"
-                    )
-                } description: {
-                    Text("试试其他搜索词。")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            }
-        }
-        .navigationTitle("字典")
-        .navigationSubtitle("\(visibleCount) 个词语")
-        .searchable(text: $search, prompt: "搜索词语")
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button("编辑词语", systemImage: "pencil") {
-                    if let selectedUserEntryID {
-                        edit(selectedUserEntryID)
-                    }
-                }
-                .disabled(selectedUserEntryID == nil)
-
-                Button(
-                    "删除词语…",
-                    systemImage: "trash",
-                    role: .destructive
-                ) {
-                    confirmsDeletion = true
-                }
-                .disabled(selectedUserEntryID == nil)
-
-                Button("添加词语", systemImage: "plus", action: add)
             }
         }
         .sheet(isPresented: $showingEditor) {
