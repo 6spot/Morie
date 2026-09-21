@@ -30,7 +30,7 @@ A healthy Capture should be reconstructable in this order:
 12. `Dev/RefinementInput` / `Dev/RefinementMemory`
 13. `Dev/RefinementPrompt`
 14. `Dev/RefinementModel` / `Dev/RefinementRunner`
-15. `Dev/RefinementOutput` / `Dev/RefinementGuard*`
+15. `Dev/RefinementOutput` / `Dev/RefinementBoundary`
 16. `Dev/Delivery` / `Dev/Injector` / `Dev/Clipboard`
 17. `Dev/PostInsertion`
 18. `Dev/Persistence` terminal flush
@@ -72,11 +72,9 @@ Interpretation:
 - present in AX but rejected by Vocabulary => extraction/ranking problem;
 - selected but absent from SpeechContext => pipeline propagation problem;
 - present in SpeechContext but ASR still wrong => Apple Speech bias limitation;
-- ASR wrong but refinement repairs it from a transcript-relevant Application Context
-  spelling candidate => spelling resolution path is working;
-- a page term that is not exact/close to the preferred transcript must be absent from
-  `applicationSpellingCandidatesRelevant`;
-- final output introduces page-only facts => refinement safety defect.
+- ASR wrong but refinement repairs it using Application Context reference terms => contextual spelling resolution is working;
+- `Dev/RefinementInput applicationReferenceTerms` shows the bounded runtime reference set supplied to the model;
+- final output uses an unrelated page term incorrectly => model/prompt quality defect, not a deterministic Guard failure.
 
 ### C. Focused-editor term
 
@@ -104,7 +102,7 @@ that mentions only a nearby proper noun.
 Expected:
 - spelling may be repaired;
 - the unspoken page fact must never enter final text;
-- if a model attempts it, `Dev/RefinementGuard*` identifies the exact rejection.
+- if a model incorrectly imports it, capture the prompt/output trace and fix the model contract or context representation; do not add a language-specific post-generation regex.
 
 ### F. Self-correction
 
@@ -113,7 +111,7 @@ Dictate a correction such as “周一，不，周二下午三点”.
 Expected:
 - preferred recognition preserves enough evidence;
 - refinement keeps the final correction;
-- protected-fact guard does not restore the superseded fact.
+- no local fact/negation rule restores the superseded text; the model owns the correction.
 
 ### G. No speech / room noise
 
@@ -152,8 +150,8 @@ Use speech that matches a stored Memory topic but does not speak its notes.
 Expected:
 - RefinementInput may show a Memory topic match;
 - raw Memory notes are not in the refinement model payload;
-- old Memory wording cannot leak into final text;
-- Guard evidence identifies any attempted leak.
+- raw Memory notes are structurally absent from the model payload;
+- if output is still wrong, diagnose the prompt/model path rather than adding note-matching output rules.
 
 ## Artifacts to collect per failed case
 
