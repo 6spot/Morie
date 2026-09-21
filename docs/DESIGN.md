@@ -134,22 +134,23 @@ The top-level toolbar belongs to the persistent shell.
 
 Route-specific controls are composed into that toolbar by the shell using route-owned presentation state.
 
-### Toolbar controls stay native and independent
+### Toolbar controls preserve semantic grouping
 
-Search, filters and actions should remain separate native toolbar items.
+Search, filters and actions must remain visually distinct by function.
 
-Do not merge unrelated controls into one large custom capsule, HStack surface or fake toolbar group merely to keep geometry stable.
+Do not merge a search field with action buttons, or a filter control with unrelated actions, into one large custom capsule or fake toolbar surface merely to keep geometry stable.
 
-For example:
+Related action buttons at the same semantic level may use native macOS toolbar grouping. For example, Edit / Delete / Add may appear as one action group.
+
+Prefer this structure:
 
 - search field;
-- filter picker;
-- primary action;
-- secondary action;
+- fixed visual separation;
+- filter when present;
+- fixed visual separation;
+- one related action group.
 
-should remain visually distinct native controls.
-
-Stability must come from a stable toolbar structure, not from visually fusing controls together.
+Stability must come from native toolbar structure, not from visually fusing unrelated control types together.
 
 ### Search
 
