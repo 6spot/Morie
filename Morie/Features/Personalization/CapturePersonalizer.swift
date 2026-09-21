@@ -31,6 +31,7 @@ final class CapturePersonalizer {
     func refine(
         _ captureID: UUID,
         enabled: Bool,
+        personalMemoryEnabled: Bool = PersonalMemorySettings.isEnabled,
         expressionStyleEnabled: Bool = false,
         otherModelWorkActive: Bool = false,
         configuration: RefinementConfiguration = .local
@@ -45,7 +46,7 @@ final class CapturePersonalizer {
         let corrected = DictionaryCorrections.apply(source, using: correctionEntries)
         let prepared = DictionarySpelling.normalize(corrected.text, using: dictionaryEntries).text
         // Neither a missing personal profile nor retrieval failure disables day-one cleanup.
-        let context = skip == nil && PersonalMemorySettings.isEnabled
+        let context = skip == nil && personalMemoryEnabled
             ? ((try? memory.relevantContext(for: prepared, limit: Self.cleanupMemoryContextLimit)) ?? [])
             : []
         let expressionStyle = skip == nil && expressionStyleEnabled
@@ -165,7 +166,7 @@ final class CapturePersonalizer {
                     "RefinementGeneration",
                     "Capture \(String(captureID.uuidString.prefix(8))); sourceCharacters=\(input.prepared.text.count); generatedCharacters=\(text.count); deltaCharacters=\(text.count - input.prepared.text.count); memoryMatches=\(input.context.count)"
                 )
-                let current = PersonalMemorySettings.isEnabled
+                let current = personalMemoryEnabled
                     ? ((try? memory.relevantContext(
                         for: input.prepared.text,
                         limit: Self.cleanupMemoryContextLimit
