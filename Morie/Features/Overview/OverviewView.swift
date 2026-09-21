@@ -65,7 +65,7 @@ struct OverviewMetricsSnapshot: Equatable {
 @MainActor
 @Observable
 final class OverviewPageState {
-    var state.metricsSnapshot: OverviewMetricsSnapshot?
+    var metricsSnapshot: OverviewMetricsSnapshot?
 }
 
 
