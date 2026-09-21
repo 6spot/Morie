@@ -48,12 +48,7 @@ enum RefinementModelSettings {
                   url.host != nil
             else {
                 throw RefinementModelSettingsError.invalidBaseURL
-            }
-
-            if url.path.lowercased().hasSuffix("/chat/completions") {
-                throw RefinementModelSettingsError.chatCompletionsPathIncluded
-            }
-        }
+            }        }
 
         UserDefaults.standard.set(baseURL, forKey: cloudBaseURLDefaultsKey)
         UserDefaults.standard.set(modelName, forKey: cloudModelNameDefaultsKey)
@@ -317,15 +312,12 @@ final class RefinementModelController: ObservableObject {
 
 enum RefinementModelSettingsError: LocalizedError {
     case invalidBaseURL
-    case chatCompletionsPathIncluded
     case keychain(OSStatus)
 
     var errorDescription: String? {
         switch self {
         case .invalidBaseURL:
             "Base URL 无效，请填写 http 或 https 地址。"
-        case .chatCompletionsPathIncluded:
-            "请填写 API Base URL，不要包含 /chat/completions；Morie 会自动补全接口路径。"
         case .keychain(let status):
             "无法访问 macOS 钥匙串中的 API Key（状态码 \(status)）。"
         }
