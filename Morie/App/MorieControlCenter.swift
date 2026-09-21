@@ -570,14 +570,14 @@ private struct ControlCenterRouteHost: View {
                 guard let id = selectedDictionaryUserEntryID else {
                     return
                 }
-                dictionaryEditingEntryID = id
-                dictionaryShowingEditor = true
+                presentation.dictionaryEditingEntryID = id
+                presentation.dictionaryShowingEditor = true
             }
             .disabled(selectedDictionaryUserEntryID == nil)
 
         case .memory:
             Button("告诉 Morie 一件事", systemImage: "plus") {
-                memoryEditor = .create
+                presentation.memoryEditor = .create
             }
 
         case .settings:
@@ -620,7 +620,7 @@ private struct ControlCenterRouteHost: View {
                 systemImage: "trash",
                 role: .destructive
             ) {
-                dictionaryConfirmsDeletion = true
+                presentation.dictionaryConfirmsDeletion = true
             }
             .disabled(selectedDictionaryUserEntryID == nil)
 
@@ -639,8 +639,8 @@ private struct ControlCenterRouteHost: View {
         switch session.currentSection {
         case .dictionary:
             Button("添加词语", systemImage: "plus") {
-                dictionaryEditingEntryID = nil
-                dictionaryShowingEditor = true
+                presentation.dictionaryEditingEntryID = nil
+                presentation.dictionaryShowingEditor = true
             }
 
         case .diagnostics:
@@ -661,7 +661,7 @@ private struct ControlCenterRouteHost: View {
                     systemImage: "trash",
                     role: .destructive
                 ) {
-                    diagnosticConfirmsClear = true
+                    presentation.diagnosticConfirmsClear = true
                 }
             }
 
@@ -711,7 +711,7 @@ private struct ControlCenterRouteHost: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return DiagnosticLogStore.shared.entries.filter { entry in
-            (diagnosticLevel == nil || entry.level == presentation.diagnosticLevel)
+            (presentation.diagnosticLevel == nil || entry.level == presentation.diagnosticLevel)
                 && (
                     query.isEmpty
                         || entry.category.localizedStandardContains(query)
