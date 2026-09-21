@@ -21,6 +21,7 @@ final class CaptureHistoryController: ObservableObject {
     private var selectedCaptureID: UUID?
     private var recognitionTask: Task<Void, Never>?
     private var playbackObservation: NSKeyValueObservation?
+    private var historyRevisionObservation: AnyCancellable?
     private var listLimit = 0
     private var listSignature: CaptureHistorySignature?
     private var listNeedsRefresh = false
@@ -37,6 +38,12 @@ final class CaptureHistoryController: ObservableObject {
         self.store = store
         self.locale = locale
         self.recognizeFile = recognizeFile
+
+        historyRevisionObservation = store.$historyRevision
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.captureListDidChange()
+            }
     }
 
     var canLoadMoreCaptures: Bool {
