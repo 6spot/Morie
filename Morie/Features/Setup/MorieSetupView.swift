@@ -86,7 +86,7 @@ struct PermissionSetupContent: View {
                 if checks.isEmpty {
                     ProgressView("正在检查设备和权限…")
                 } else {
-                    Section("设备能力") {
+                    ControlCenterSectionBlock("设备能力") {
                         ForEach(checks.filter { !$0.requirement.isPermission }) { check in
                             PermissionRequirementRow(
                                 check: check, activeRequest: activeRequest, isBusy: isBusy,
@@ -225,10 +225,8 @@ struct PermissionManagementView: View {
         ControlCenterScrollableContent {
             VStack(alignment: .leading, spacing: 24) {
             if setup.checks.isEmpty {
-                Section {
+                ControlCenterSectionBlock("设备与权限") {
                     ProgressView("正在检查设备和权限…")
-                } header: {
-                    Text("设备与权限")
                 }
             } else {
                 Section("设备能力") {
@@ -239,7 +237,7 @@ struct PermissionManagementView: View {
                     )
                 }
 
-                Section {
+                ControlCenterSectionBlock("使用权限") {
                     capabilityRows(
                         setup.checks.filter {
                             $0.requirement.isPermission
@@ -269,8 +267,6 @@ struct PermissionManagementView: View {
                             isBusy || controller.isCaptureActive
                         )
                     }
-                } header: {
-                    Text("使用权限")
                 } footer: {
                     Text(
                         "权限由 macOS 管理。从系统设置返回后，状态会自动更新。"
@@ -279,7 +275,7 @@ struct PermissionManagementView: View {
             }
 
             if let error = capabilities.setupError {
-                Section("状态") {
+                ControlCenterSectionBlock("状态") {
                     Label(
                         error,
                         systemImage: "exclamationmark.triangle"
