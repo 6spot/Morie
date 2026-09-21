@@ -317,26 +317,22 @@ struct CaptureDetailView: View {
                 }
                 .disabled(capture.finalText.isEmpty)
 
-                Menu("记录操作", systemImage: "ellipsis") {
-                    Button("复制识别文字", systemImage: "doc.on.doc") {
-                        copy(capture.recognizedText)
-                    }
-                    .disabled(capture.recognizedText.isEmpty)
-
-                    Divider()
-
-                    Button(
-                        "删除记录…",
-                        systemImage: "trash",
-                        role: .destructive
-                    ) {
-                        confirmsDeletion = true
-                    }
-                    .disabled(
-                        capture.lifecycle == .capturing
-                            || capture.refinement?.status == .running
-                    )
+                Button("复制识别文字", systemImage: "doc.on.doc") {
+                    copy(capture.recognizedText)
                 }
+                .disabled(capture.recognizedText.isEmpty)
+
+                Button(
+                    "删除记录…",
+                    systemImage: "trash",
+                    role: .destructive
+                ) {
+                    confirmsDeletion = true
+                }
+                .disabled(
+                    capture.lifecycle == .capturing
+                        || capture.refinement?.status == .running
+                )
 
                 Spacer(minLength: 0)
             }
@@ -393,7 +389,9 @@ struct CaptureDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            DisclosureGroup("识别与润色") {
+            Divider()
+
+            ControlCenterSectionBlock("识别与润色") {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("原始语音识别")
                         .font(.headline)
@@ -434,12 +432,12 @@ struct CaptureDetailView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 12)
             }
 
-            DisclosureGroup("原始录音") {
+            Divider()
+
+            ControlCenterSectionBlock("原始录音") {
                 recording
-                    .padding(.top, 12)
             }
         }
         .confirmationDialog(
