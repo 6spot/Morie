@@ -1,6 +1,7 @@
 import AVFoundation
 import Combine
 import Foundation
+import SwiftData
 
 @MainActor
 final class CaptureHistoryController: ObservableObject {
@@ -24,6 +25,9 @@ final class CaptureHistoryController: ObservableObject {
     private var listSignature: CaptureHistorySignature?
     private var listNeedsRefresh = false
     private var isListVisible = false
+    private var presentationContext: ModelContext?
+
+    private static let pageSize = 50
 
     init(
         store: CaptureStore,
@@ -36,17 +40,48 @@ final class CaptureHistoryController: ObservableObject {
     }
 
     var canLoadMoreCaptures: Bool {
-        listLimit > 0 && captures.count >= listLimit
+        guard let total = listSignature?.count else { return false }
+        return captures.count < total
     }
 
     func setListVisible(_ visible: Bool) {
         isListVisible = visible
-        guard visible else { return }
-        refreshListIfNeeded()
+
+        if visible {
+            if presentationContext == nil {
+                let context = ModelContext(store.container)
+                context.autosaveEnabled = false
+                presentationContext = context
+            }
+            refreshListIfNeeded()
+        } else {
+            releasePresentationResources()
+        }
     }
 
     func loadMoreCaptures() {
-        reloadList(limit: max(listLimit + 200, 200))
+        guard isListVisible else { return }
+        let nextLimit = max(
+            listLimit + Self.pageSize,
+            Self.pageSize
+        )
+        reloadList(limit: nextLimit)
+    }
+
+    func releasePresentationResources() {
+        isListVisible = false
+        cancelRecognition()
+        releasePlayer()
+
+        selectedCaptureID = nil
+        recognitionMessage = nil
+        audioMessage = nil
+        captures.removeAll(keepingCapacity: false)
+        listError = nil
+        listLimit = 0
+        listSignature = nil
+        listNeedsRefresh = false
+        presentationContext = nil
     }
 
     func captureListDidChange() {
@@ -58,12 +93,13 @@ final class CaptureHistoryController: ObservableObject {
 
     private func refreshListIfNeeded() {
         guard listLimit > 0 else {
-            reloadList(limit: 200)
+            reloadList(limit: Self.pageSize)
             return
         }
 
         do {
-            let signature = try CaptureHistoryQuery.signature(in: store.container.mainContext)
+            guard let context = presentationContext else { return }
+            let signature = try CaptureHistoryQuery.signature(in: context)
             guard listNeedsRefresh || signature != listSignature else {
                 listError = nil
                 return
@@ -84,8 +120,10 @@ final class CaptureHistoryController: ObservableObject {
         signature prefetchedSignature: CaptureHistorySignature? = nil
     ) {
         do {
-            let context = store.container.mainContext
-            let records = try context.fetch(CaptureHistoryQuery.descriptor(limit: limit))
+            guard let context = presentationContext else { return }
+            let records = try context.fetch(
+                CaptureHistoryQuery.descriptor(limit: limit)
+            )
             let signature: CaptureHistorySignature
             if let prefetchedSignature {
                 signature = prefetchedSignature
