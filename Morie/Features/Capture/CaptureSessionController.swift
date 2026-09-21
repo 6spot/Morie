@@ -710,28 +710,17 @@ final class CaptureSessionController {
                     resolveRefinementConfiguration(
                         sessionContext.refinementConfiguration
                     )
-                let relevantApplicationCandidates =
-                    ApplicationContextVocabulary.refinementCandidates(
-                        from: activeApplicationContextWords,
-                        transcript: finalText
-                    )
                 let refinementConfiguration = RefinementConfiguration(
                     model: resolvedRefinementConfiguration.model,
                     instructions: resolvedRefinementConfiguration.instructions,
                     applicationSpellingCandidates:
-                        relevantApplicationCandidates
+                        activeApplicationContextWords
                 )
                 DevelopmentDiagnostics.list(
                     "RefinementInput",
                     captureID: sessionID,
-                    label: "applicationSpellingCandidatesAll",
+                    label: "applicationReferenceTerms",
                     activeApplicationContextWords
-                )
-                DevelopmentDiagnostics.list(
-                    "RefinementInput",
-                    captureID: sessionID,
-                    label: "applicationSpellingCandidatesRelevant",
-                    relevantApplicationCandidates
                 )
                 finalText = try await personalizer.refine(
                     sessionID,
