@@ -53,7 +53,7 @@
 		A20000000000000000000003 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
 		A20000000000000000000004 /* TestDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* TestDiagnostics.swift */; };
 		A20000000000000000000005 /* CaptureFileTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* CaptureFileTranscriber.swift */; };
-		A20000000000000000000006 /* CaptureHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* CaptureHistoryController.swift */; };
+		A20000000000000000000006 /* RuntimeCaptureHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4500000000000000000000D /* RuntimeCaptureHistoryController.swift */; };
 		A20000000000000000000007 /* CaptureHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* CaptureHistoryTests.swift */; };
 		A30000000000000000000002 /* CaptureHistoryQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000001 /* CaptureHistoryQuery.swift */; };
 		A20000000000000000000008 /* CaptureAudioStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* CaptureAudioStream.swift */; };
@@ -158,6 +158,8 @@
 		A4500000000000000000003A /* MorieRuntimeStatusItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4500000000000000000000B /* MorieRuntimeStatusItem.swift */;};
 		A4500000000000000000003B /* MorieRuntimeXPCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4500000000000000000000C /* MorieRuntimeXPCServer.swift */;};
 		A4500000000000000000003C /* RuntimeCaptureHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4500000000000000000000D /* RuntimeCaptureHistoryController.swift */;};
+		A45000000000000000000041 /* ICloudSyncState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000040 /* ICloudSyncState.swift */; };
+		A45000000000000000000042 /* ICloudSyncState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000040 /* ICloudSyncState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -280,6 +282,7 @@
 		B4500000000000000000000E /* me.morie.mac.runtime.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = me.morie.mac.runtime.plist; sourceTree = "<group>"; };
 		B4500000000000000000000F /* MorieRuntime.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MorieRuntime.entitlements; sourceTree = "<group>"; };
 		B45000000000000000000010 /* MorieDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieDefaults.swift; sourceTree = "<group>"; };
+		B45000000000000000000040 /* ICloudSyncState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSyncState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -527,6 +530,7 @@
 		D3000000000000000000000D /* Cloud */ = {
 			isa = PBXGroup;
 			children = (
+				B45000000000000000000040 /* ICloudSyncState.swift */,
 				B10000000000000000000038 /* ICloudSyncSettings.swift */,
 				B45000000000000000000005 /* RefinementModelConfiguration.swift */,
 				B50000000000000000000001 /* RefinementModelSettings.swift */,
@@ -785,13 +789,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A45000000000000000000041 /* ICloudSyncState.swift in Sources */,
 				A45000000000000000000001 /* MorieRuntimeIPC.swift in Sources */,
 				A45000000000000000000002 /* MorieRuntimeClient.swift in Sources */,
 				A45000000000000000000003 /* CaptureShortcut.swift in Sources */,
 				A45000000000000000000004 /* RefinementModelConfiguration.swift in Sources */,
 				A45000000000000000000005 /* DictionaryPresentationStore.swift in Sources */,
 				A45000000000000000000006 /* MemoryPresentationStore.swift in Sources */,
-				A45000000000000000000007 /* MorieDefaults.swift in Sources */,
 				A80000000000000000000001 /* ApplicationContext.swift in Sources */,
 				A10000000000000000000020 /* PermissionSetupController.swift in Sources */,
 				A10000000000000000000021 /* MorieSetupView.swift in Sources */,
@@ -802,20 +806,11 @@
 				A70000000000000000000003 /* AppCapabilityController.swift in Sources */,
 				A10000000000000000000007 /* Diagnostics.swift in Sources */,
 				A10000000000000000000028 /* OverviewView.swift in Sources */,
-				A10000000000000000000009 /* CaptureRecord.swift in Sources */,
 				A1000000000000000000000B /* CaptureHistoryView.swift in Sources */,
 				A1000000000000000000000C /* MorieControlCenter.swift in Sources */,
 				A1000000000000000000000F /* CaptureHistoryController.swift in Sources */,
-				A10000000000000000000011 /* MemoryRecord.swift in Sources */,
-				A10000000000000000000013 /* MemoryContextRetriever.swift in Sources */,
 				A10000000000000000000014 /* MemoryView.swift in Sources */,
-				A10000000000000000000015 /* MemoryAnalysisRecord.swift in Sources */,
-				A10000000000000000000018 /* MemoryLearningView.swift in Sources */,
-				A10000000000000000000019 /* CaptureRefinement.swift in Sources */,
-				A10000000000000000000024 /* ICloudSyncSettings.swift in Sources */,
-				A1000000000000000000001E /* DictionaryCorrection.swift in Sources */,
 				A1000000000000000000001D /* DictionaryView.swift in Sources */,
-				A1000000000000000000001C /* DictionaryStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -842,7 +837,7 @@
 				A20000000000000000000023 /* CaptureSoundFeedback.swift in Sources */,
 				A20000000000000000000004 /* TestDiagnostics.swift in Sources */,
 				A20000000000000000000005 /* CaptureFileTranscriber.swift in Sources */,
-				A20000000000000000000006 /* CaptureHistoryController.swift in Sources */,
+				A20000000000000000000006 /* RuntimeCaptureHistoryController.swift in Sources */,
 				A30000000000000000000002 /* CaptureHistoryQuery.swift in Sources */,
 				A20000000000000000000007 /* CaptureHistoryTests.swift in Sources */,
 				A20000000000000000000008 /* CaptureAudioStream.swift in Sources */,
@@ -872,6 +867,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A45000000000000000000042 /* ICloudSyncState.swift in Sources */,
 				A4500000000000000000000D /* SpeechContextHints.swift in Sources */,
 				A4500000000000000000000E /* ApplicationContext.swift in Sources */,
 				A4500000000000000000000F /* ApplicationContextCollector.swift in Sources */,
