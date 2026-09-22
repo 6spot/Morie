@@ -33,7 +33,7 @@ final class CaptureHistoryController: ObservableObject {
     init(
         store: CaptureStore,
         locale: Locale,
-        recognizeFile: @escaping RecognizeFile = CaptureFileTranscriber.recognize
+        recognizeFile: @escaping RecognizeFile
     ) {
         self.store = store
         self.locale = locale
