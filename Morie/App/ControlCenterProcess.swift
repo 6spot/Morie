@@ -38,12 +38,31 @@ enum ControlCenterLaunchRoute: String {
     }
 }
 
+struct ControlCenterRuntimeSnapshot: Codable, Sendable {
+    let checks: [CapabilityCheck]
+    let isBootstrapping: Bool
+    let setupError: String?
+    let canStartCapture: Bool
+    let isCaptureActive: Bool
+    let speechBackend: SpeechBackendPresentation?
+    let localModelStatusTitle: String
+}
+
 extension Notification.Name {
     static let morieControlCenterRouteRequest = Notification.Name(
         "me.morie.mac.control-center.route-request"
     )
     static let morieRuntimeSharedStateChanged = Notification.Name(
         "me.morie.mac.runtime.shared-state-changed"
+    )
+    static let morieRuntimeSnapshotRequest = Notification.Name(
+        "me.morie.mac.runtime.snapshot-request"
+    )
+    static let morieControlCenterRuntimeSnapshot = Notification.Name(
+        "me.morie.mac.control-center.runtime-snapshot"
+    )
+    static let morieRuntimePermissionActionRequest = Notification.Name(
+        "me.morie.mac.runtime.permission-action-request"
     )
     static let morieControlCenterSharedDataChanged = Notification.Name(
         "me.morie.mac.control-center.shared-data-changed"
@@ -67,6 +86,8 @@ extension Notification.Name {
 
 enum ControlCenterProcessBridge {
     private static let routeKey = "route"
+    private static let snapshotKey = "snapshot"
+    private static let requirementKey = "requirement"
 
     static func requestRoute(_ route: ControlCenterLaunchRoute) {
         DistributedNotificationCenter.default().postNotificationName(
@@ -82,6 +103,58 @@ enum ControlCenterProcessBridge {
             return nil
         }
         return ControlCenterLaunchRoute(rawValue: rawValue)
+    }
+
+    static func requestRuntimeSnapshot() {
+        post(.morieRuntimeSnapshotRequest)
+    }
+
+    static func publishRuntimeSnapshot(
+        _ snapshot: ControlCenterRuntimeSnapshot
+    ) {
+        guard let data = try? JSONEncoder().encode(snapshot) else {
+            return
+        }
+        DistributedNotificationCenter.default().postNotificationName(
+            .morieControlCenterRuntimeSnapshot,
+            object: nil,
+            userInfo: [snapshotKey: data],
+            deliverImmediately: true
+        )
+    }
+
+    static func runtimeSnapshot(
+        from notification: Notification
+    ) -> ControlCenterRuntimeSnapshot? {
+        guard let data =
+            notification.userInfo?[snapshotKey] as? Data else {
+            return nil
+        }
+        return try? JSONDecoder().decode(
+            ControlCenterRuntimeSnapshot.self,
+            from: data
+        )
+    }
+
+    static func requestPermissionAction(
+        _ requirement: SetupRequirement
+    ) {
+        DistributedNotificationCenter.default().postNotificationName(
+            .morieRuntimePermissionActionRequest,
+            object: nil,
+            userInfo: [requirementKey: requirement.rawValue],
+            deliverImmediately: true
+        )
+    }
+
+    static func permissionRequirement(
+        from notification: Notification
+    ) -> SetupRequirement? {
+        guard let rawValue =
+            notification.userInfo?[requirementKey] as? String else {
+            return nil
+        }
+        return SetupRequirement(rawValue: rawValue)
     }
 
     static func notifySharedStateChanged() {
