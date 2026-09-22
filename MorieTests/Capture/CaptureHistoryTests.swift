@@ -89,6 +89,43 @@ final class CaptureHistoryTests: XCTestCase {
                        "A retained terminal Capture should enter History exactly after it stops being live.")
     }
 
+    func testHistoryQueryFetchesOnlyListAttributesAndFaultsDetailFieldsOnDemand() throws {
+        let store = try CaptureStore(inMemory: true)
+        defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
+
+        let id = UUID()
+        _ = try store.beginVoiceCapture(
+            id: id,
+            deliveryMode: .captureOnly,
+            applicationName: "Morie",
+            bundleIdentifier: "me.morie.mac"
+        )
+        try store.updateRecognizedText("lightweight history row", for: id)
+        try store.markFailed(id, error: "detail loaded on demand")
+
+        let descriptor = CaptureHistoryQuery.descriptor(limit: 50)
+        let expected: [PartialKeyPath<CaptureRecord>] = [
+            \CaptureRecord.id,
+            \CaptureRecord.createdAt,
+            \CaptureRecord.lifecycleRawValue,
+            \CaptureRecord.deliveryModeRawValue,
+            \CaptureRecord.recognizedText,
+            \CaptureRecord.finalText,
+            \CaptureRecord.sourceApplicationName,
+        ]
+        XCTAssertEqual(descriptor.propertiesToFetch, expected)
+
+        let reader = ModelContext(store.container)
+        let capture = try XCTUnwrap(reader.fetch(descriptor).first)
+        XCTAssertEqual(capture.id, id)
+        XCTAssertEqual(capture.recognizedText, "lightweight history row")
+        XCTAssertEqual(
+            capture.deliveryErrorDescription,
+            "detail loaded on demand",
+            "Detail-only attributes must fault in correctly when the user opens a row."
+        )
+    }
+
     func testHistoryControllerReleasesListAcrossPageSwitchAndReloadsOnReturn() async throws {
         let store = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
