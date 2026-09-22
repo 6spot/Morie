@@ -210,6 +210,19 @@ final class AppController {
             )
         }
 
+        let notifyFeatureDataChange = {
+            if processRole == .runtime {
+                ControlCenterProcessBridge
+                    .notifyControlCenterSharedDataChanged()
+            } else {
+                ControlCenterProcessBridge.notifySharedStateChanged()
+            }
+        }
+        dictionary?.onPersistentChange = notifyFeatureDataChange
+        memory?.onPersistentChange = notifyFeatureDataChange
+        expressionProfile?.onPersistentChange =
+            notifyFeatureDataChange
+
         if let cloudSyncStartupError {
             Diagnostics.record(
                 "iCloud",
@@ -856,6 +869,7 @@ final class AppController {
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.reloadSharedStateFromPersistence()
+                    self?.refreshFeatureStoresAfterExternalChange()
                 }
             }
         )
@@ -925,6 +939,19 @@ final class AppController {
 
     private func installControlCenterProcessObservers() {
         let center = DistributedNotificationCenter.default()
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterSharedDataChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.refreshFeatureStoresAfterExternalChange()
+                }
+            }
+        )
+
         distributedObservers.append(
             center.addObserver(
                 forName: .morieControlCenterRouteRequest,
@@ -948,6 +975,12 @@ final class AppController {
                 }
             }
         )
+    }
+
+    private func refreshFeatureStoresAfterExternalChange() {
+        dictionary?.refreshAfterExternalChange()
+        memory?.refreshAfterExternalChange()
+        expressionProfile?.refreshAfterExternalChange()
     }
 
     private func reloadSharedStateFromPersistence() {
