@@ -17,6 +17,7 @@ final class AppController {
         }
     }
 
+    let processRole: MorieProcessRole
     let runtime = AppRuntimeController()
     let capabilities = AppCapabilityController()
     let preferences: AppPreferencesController
@@ -45,6 +46,7 @@ final class AppController {
     private var audioMaintenanceTask: Task<Void, Never>?
     private var lastPresentedFailure: String?
     private var iCloudStatusTask: Task<Void, Never>?
+    private var distributedObservers: [NSObjectProtocol] = []
 
     private lazy var captureSession: CaptureSessionController = {
         let session = CaptureSessionController(
@@ -91,8 +93,10 @@ final class AppController {
     init(
         captureStore: CaptureStore?,
         persistenceError: Error? = nil,
-        cloudSyncStartupError: Error? = nil
+        cloudSyncStartupError: Error? = nil,
+        processRole: MorieProcessRole = .current
     ) {
+        self.processRole = processRole
         self.captureStore = captureStore
         self.persistenceError = persistenceError
         self.cloudSyncStartupError = cloudSyncStartupError
@@ -216,12 +220,20 @@ final class AppController {
 
         Diagnostics.record(
             "App",
-            "Morie controller initialized; \(AppBuildIdentity.current.logValue); launch bootstrap scheduled"
+            "Morie controller initialized; role=\(processRole); \(AppBuildIdentity.current.logValue)"
         )
         DevelopmentDiagnostics.recordEnvironment()
 
-        Task { @MainActor [weak self] in
-            await self?.bootstrap()
+        if processRole == .runtime {
+            installRuntimeProcessObservers()
+            Task { @MainActor [weak self] in
+                await self?.bootstrap()
+            }
+        } else {
+            installControlCenterProcessObservers()
+            Task { @MainActor [weak self] in
+                await self?.prepareControlCenterProcess()
+            }
         }
 
         refreshICloudSyncState()
