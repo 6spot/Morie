@@ -7,102 +7,154 @@ private enum ControlCenterWindowIdentity: String, Codable, Hashable {
 
 @main
 struct MorieApp: App {
+    private let processRole: MorieProcessRole
     private let controller: AppController
     private let captureStore: CaptureStore?
 
     init() {
+        let role = MorieProcessRole.current
+        processRole = role
+
         let wantsICloud = ICloudSyncSettings.isEnabled
         do {
-            let store = try CaptureStore(cloudSyncEnabled: wantsICloud)
+            let store = try CaptureStore(
+                cloudSyncEnabled: wantsICloud,
+                performsLaunchMaintenance: role == .runtime
+            )
             captureStore = store
-            controller = AppController(captureStore: store)
+            controller = AppController(
+                captureStore: store,
+                processRole: role
+            )
         } catch where wantsICloud {
             // Optional iCloud must never make local input unusable. If the
             // CloudKit-backed SwiftData configuration cannot open, retry the
             // same current schema locally and surface the cloud failure.
             do {
-                let store = try CaptureStore(cloudSyncEnabled: false)
+                let store = try CaptureStore(
+                    cloudSyncEnabled: false,
+                    performsLaunchMaintenance: role == .runtime
+                )
                 captureStore = store
                 controller = AppController(
                     captureStore: store,
-                    cloudSyncStartupError: error
+                    cloudSyncStartupError: error,
+                    processRole: role
                 )
             } catch {
                 captureStore = nil
                 controller = AppController(
                     captureStore: nil,
-                    persistenceError: error
+                    persistenceError: error,
+                    processRole: role
                 )
             }
         } catch {
             captureStore = nil
             controller = AppController(
                 captureStore: nil,
-                persistenceError: error
+                persistenceError: error,
+                processRole: role
             )
         }
     }
 
     var body: some Scene {
-        MenuBarExtra {
-            MorieMenuContent(controller: controller)
-        } label: {
-            MorieMenuBarLabel(controller: controller)
-        }
-        .menuBarExtraStyle(.menu)
-
-        WindowGroup(
-            "Morie",
-            id: "control-center",
-            for: ControlCenterWindowIdentity.self
-        ) { _ in
-            Group {
-                if let captureStore {
-                    MorieControlCenter(controller: controller)
-                        .modelContainer(captureStore.container)
-                } else {
-                    ContentUnavailableView(
-                        "Morie 暂不可用",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text("无法打开记录存储，请在使用引导中查看详情。")
-                    )
+        if processRole == .controlCenter {
+            Window("Morie", id: "control-center") {
+                Group {
+                    if let captureStore {
+                        MorieControlCenter(controller: controller)
+                            .modelContainer(captureStore.container)
+                    } else {
+                        ContentUnavailableView(
+                            "Morie 暂不可用",
+                            systemImage: "exclamationmark.triangle",
+                            description: Text(
+                                "无法打开记录存储，请重新启动 Morie 后重试。"
+                            )
+                        )
+                    }
                 }
-            }
-            .environment(\.locale, Locale(identifier: "zh-Hans"))
-            .onAppear {
-                MorieApplicationActivation.windowDidAppear("control-center")
-            }
-            .onDisappear {
-                MorieApplicationActivation.windowDidDisappear("control-center")
-            }
-        }
-        .defaultSize(width: 1120, height: 720)
-        .defaultLaunchBehavior(.suppressed)
-        .commands {
-            CommandGroup(replacing: .newItem) { }
-            SidebarCommands()
-            MorieCommands()
-        }
-
-        Window("欢迎使用 Morie", id: "setup") {
-            MorieSetupView(controller: controller)
-                .environment(\.locale, Locale(identifier: "zh-Hans"))
+                .environment(
+                    \.locale,
+                    Locale(identifier: "zh-Hans")
+                )
                 .onAppear {
-                    MorieApplicationActivation.windowDidAppear("setup")
+                    MorieApplicationActivation.windowDidAppear(
+                        "control-center"
+                    )
+                    Diagnostics.record(
+                        "ControlCenterProcess",
+                        "Window appeared; pid=\(ProcessInfo.processInfo.processIdentifier)"
+                    )
+
+                    guard ControlCenterLaunchRoute.current
+                        == .settings else {
+                        return
+                    }
+                    Task { @MainActor in
+                        await Task.yield()
+                        NotificationCenter.default.post(
+                            name: .morieShowSettings,
+                            object: nil
+                        )
+                    }
                 }
                 .onDisappear {
-                    MorieApplicationActivation.windowDidDisappear("setup")
+                    Diagnostics.record(
+                        "ControlCenterProcess",
+                        "Window closed; terminating presentation process"
+                    )
+                    ControlCenterProcessBridge.notifyWillTerminate()
+                    MorieApplicationActivation.windowDidDisappear(
+                        "control-center"
+                    )
+                    NSApplication.shared.terminate(nil)
                 }
-        }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 700, height: 740)
-        .defaultPosition(.center)
-        .windowResizability(.contentMinSize)
-        .defaultLaunchBehavior(.suppressed)
+            }
+            .defaultSize(width: 1120, height: 720)
+            .commands {
+                CommandGroup(replacing: .newItem) { }
+                SidebarCommands()
+                MorieControlCenterCommands()
+            }
+        } else {
+            MenuBarExtra {
+                MorieMenuContent(controller: controller)
+            } label: {
+                MorieMenuBarLabel(controller: controller)
+            }
+            .menuBarExtraStyle(.menu)
+            .commands {
+                MorieRuntimeCommands()
+            }
 
+            Window("欢迎使用 Morie", id: "setup") {
+                MorieSetupView(controller: controller)
+                    .environment(
+                        \.locale,
+                        Locale(identifier: "zh-Hans")
+                    )
+                    .onAppear {
+                        MorieApplicationActivation.windowDidAppear(
+                            "setup"
+                        )
+                    }
+                    .onDisappear {
+                        MorieApplicationActivation.windowDidDisappear(
+                            "setup"
+                        )
+                    }
+            }
+            .windowStyle(.hiddenTitleBar)
+            .defaultSize(width: 700, height: 740)
+            .defaultPosition(.center)
+            .windowResizability(.contentMinSize)
+            .defaultLaunchBehavior(.suppressed)
+        }
     }
 }
-
 
 @MainActor
 private enum MorieApplicationActivation {
