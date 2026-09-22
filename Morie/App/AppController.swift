@@ -223,6 +223,13 @@ final class AppController {
         expressionProfile?.onPersistentChange =
             notifyFeatureDataChange
 
+        if processRole == .runtime {
+            captureStore?.onHistoryChange = {
+                ControlCenterProcessBridge
+                    .notifyControlCenterHistoryChanged()
+            }
+        }
+
         if let cloudSyncStartupError {
             Diagnostics.record(
                 "iCloud",
@@ -948,6 +955,19 @@ final class AppController {
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.refreshFeatureStoresAfterExternalChange()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterHistoryChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.captureStore?
+                        .refreshHistoryAfterExternalChange()
                 }
             }
         )
