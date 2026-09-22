@@ -45,6 +45,9 @@ extension Notification.Name {
     static let morieRuntimeSharedStateChanged = Notification.Name(
         "me.morie.mac.runtime.shared-state-changed"
     )
+    static let morieControlCenterSharedDataChanged = Notification.Name(
+        "me.morie.mac.control-center.shared-data-changed"
+    )
     static let morieRuntimeStartCaptureOnlyRequest = Notification.Name(
         "me.morie.mac.runtime.start-capture-only"
     )
@@ -80,6 +83,10 @@ enum ControlCenterProcessBridge {
 
     static func notifySharedStateChanged() {
         post(.morieRuntimeSharedStateChanged)
+    }
+
+    static func notifyControlCenterSharedDataChanged() {
+        post(.morieControlCenterSharedDataChanged)
     }
 
     static func requestCaptureOnly() {
