@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import FoundationModels
 import Security
 
 enum RefinementModelSettings {
@@ -10,7 +9,7 @@ enum RefinementModelSettings {
 
     /// Loads only non-secret preferences. Launch-time callers must never touch Keychain.
     static func load() -> RefinementModelConfiguration {
-        let defaults = UserDefaults.standard
+        let defaults = MorieDefaults.shared
         let mode = defaults.string(forKey: modeDefaultsKey)
             .flatMap(RefinementModelMode.init(rawValue:)) ?? .local
 
@@ -27,7 +26,7 @@ enum RefinementModelSettings {
     }
 
     static func saveMode(_ mode: RefinementModelMode) {
-        UserDefaults.standard.set(mode.rawValue, forKey: modeDefaultsKey)
+        MorieDefaults.shared.set(mode.rawValue, forKey: modeDefaultsKey)
     }
 
     /// Saves public endpoint metadata and optionally replaces the Keychain credential.
@@ -50,8 +49,8 @@ enum RefinementModelSettings {
                 throw RefinementModelSettingsError.invalidBaseURL
             }        }
 
-        UserDefaults.standard.set(baseURL, forKey: cloudBaseURLDefaultsKey)
-        UserDefaults.standard.set(modelName, forKey: cloudModelNameDefaultsKey)
+        MorieDefaults.shared.set(baseURL, forKey: cloudBaseURLDefaultsKey)
+        MorieDefaults.shared.set(modelName, forKey: cloudModelNameDefaultsKey)
 
         if let newAPIKey {
             try RefinementCredentialStore.writeAPIKey(
@@ -59,7 +58,7 @@ enum RefinementModelSettings {
             )
         }
 
-        let mode = UserDefaults.standard.string(forKey: modeDefaultsKey)
+        let mode = MorieDefaults.shared.string(forKey: modeDefaultsKey)
             .flatMap(RefinementModelMode.init(rawValue:)) ?? .local
         return RefinementModelConfiguration(
             mode: mode,
@@ -76,7 +75,7 @@ enum RefinementModelSettings {
     static func resetToDefaults() throws {
         try RefinementCredentialStore.writeAPIKey("")
 
-        let defaults = UserDefaults.standard
+        let defaults = MorieDefaults.shared
         defaults.removeObject(forKey: modeDefaultsKey)
         defaults.removeObject(forKey: cloudBaseURLDefaultsKey)
         defaults.removeObject(forKey: cloudModelNameDefaultsKey)
@@ -89,6 +88,7 @@ final class RefinementModelController: ObservableObject {
     @Published private(set) var cloudBaseURL: String
     @Published private(set) var cloudModelName: String
     @Published private(set) var settingsMessage: String?
+    @Published private(set) var localModelStatusTitle = "未检查"
 
     /// A successful Keychain read/write is kept only for this process lifetime.
     /// Relaunch stays Keychain-free until an external model is actually needed.
@@ -156,23 +156,19 @@ final class RefinementModelController: ObservableObject {
     func modelStatusTitle(inputRefinementEnabled: Bool) -> String {
         guard inputRefinementEnabled else { return "已关闭" }
         if mode == .cloud {
-            return configuration.hasUsableCloudConfiguration ? "已配置" : "待配置"
+            return configuration.hasUsableCloudConfiguration
+                ? "已配置"
+                : "待配置"
         }
-        if mode == .automatic, configuration.hasUsableCloudConfiguration {
+        if mode == .automatic,
+           configuration.hasUsableCloudConfiguration {
             return "自动"
         }
-        switch SystemLanguageModel.default.availability {
-        case .available:
-            return "可用"
-        case .unavailable(.modelNotReady):
-            return "模型准备中"
-        case .unavailable(.appleIntelligenceNotEnabled):
-            return "Apple 智能未开启"
-        case .unavailable(.deviceNotEligible):
-            return "设备不支持"
-        case .unavailable:
-            return "暂不可用"
-        }
+        return localModelStatusTitle
+    }
+
+    func setLocalModelStatusTitle(_ title: String) {
+        localModelStatusTitle = title
     }
 
     func setMode(_ mode: RefinementModelMode) {
@@ -181,6 +177,19 @@ final class RefinementModelController: ObservableObject {
         DevelopmentDiagnostics.record(
             "CloudConfig",
             "modeChanged=\(mode.rawValue)"
+        )
+    }
+
+    func reloadPersistedConfiguration() {
+        let saved = RefinementModelSettings.load()
+        mode = saved.mode
+        cloudBaseURL = saved.cloudBaseURL
+        cloudModelName = saved.cloudModelName
+        cachedAPIKey = nil
+        settingsMessage = nil
+        DevelopmentDiagnostics.record(
+            "CloudConfig",
+            "controllerReloaded; mode=\(saved.mode.rawValue); host=\(saved.cloudURL?.host ?? "none"); model=\(saved.trimmedCloudModelName.isEmpty ? "none" : saved.trimmedCloudModelName); keychainCacheCleared=true"
         )
     }
 

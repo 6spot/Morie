@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import FoundationModels
 
 @MainActor
 final class AppController {
@@ -17,6 +18,7 @@ final class AppController {
         }
     }
 
+    let processRole: MorieProcessRole
     let runtime = AppRuntimeController()
     let capabilities = AppCapabilityController()
     let preferences: AppPreferencesController
@@ -45,6 +47,7 @@ final class AppController {
     private var audioMaintenanceTask: Task<Void, Never>?
     private var lastPresentedFailure: String?
     private var iCloudStatusTask: Task<Void, Never>?
+    private var distributedObservers: [NSObjectProtocol] = []
 
     private lazy var captureSession: CaptureSessionController = {
         let session = CaptureSessionController(
@@ -91,8 +94,10 @@ final class AppController {
     init(
         captureStore: CaptureStore?,
         persistenceError: Error? = nil,
-        cloudSyncStartupError: Error? = nil
+        cloudSyncStartupError: Error? = nil,
+        processRole: MorieProcessRole = .current
     ) {
+        self.processRole = processRole
         self.captureStore = captureStore
         self.persistenceError = persistenceError
         self.cloudSyncStartupError = cloudSyncStartupError
@@ -206,6 +211,26 @@ final class AppController {
             )
         }
 
+        let notifyFeatureDataChange = {
+            if processRole == .runtime {
+                ControlCenterProcessBridge
+                    .notifyControlCenterSharedDataChanged()
+            } else {
+                ControlCenterProcessBridge.notifySharedStateChanged()
+            }
+        }
+        dictionary?.onPersistentChange = notifyFeatureDataChange
+        memory?.onPersistentChange = notifyFeatureDataChange
+        expressionProfile?.onPersistentChange =
+            notifyFeatureDataChange
+
+        if processRole == .runtime {
+            captureStore?.onHistoryChange = {
+                ControlCenterProcessBridge
+                    .notifyControlCenterHistoryChanged()
+            }
+        }
+
         if let cloudSyncStartupError {
             Diagnostics.record(
                 "iCloud",
@@ -214,14 +239,26 @@ final class AppController {
             )
         }
 
+        refinementModels.setLocalModelStatusTitle(
+            Self.localModelStatusTitle()
+        )
+
         Diagnostics.record(
             "App",
-            "Morie controller initialized; \(AppBuildIdentity.current.logValue); launch bootstrap scheduled"
+            "Morie controller initialized; role=\(processRole); pid=\(ProcessInfo.processInfo.processIdentifier); \(AppBuildIdentity.current.logValue)"
         )
         DevelopmentDiagnostics.recordEnvironment()
 
-        Task { @MainActor [weak self] in
-            await self?.bootstrap()
+        if processRole == .runtime {
+            installRuntimeProcessObservers()
+            Task { @MainActor [weak self] in
+                await self?.bootstrap()
+            }
+        } else {
+            installControlCenterProcessObservers()
+            Task { @MainActor [weak self] in
+                await self?.prepareControlCenterProcess()
+            }
         }
 
         refreshICloudSyncState()
@@ -262,6 +299,12 @@ final class AppController {
     }
 
     var canStartCapture: Bool {
+        if processRole == .controlCenter {
+            return !capabilities.isBootstrapping
+                && setup.isReady
+                && captureStore != nil
+        }
+
         guard !captureSession.isActive,
               !capabilities.isBootstrapping,
               setup.isReady,
@@ -284,11 +327,21 @@ final class AppController {
     }
 
     var isCaptureActive: Bool {
-        captureSession.isActive
+        processRole == .runtime && captureSession.isActive
     }
 
     func setAudioRetentionDays(_ days: Int) {
         let value = min(max(days, 1), 365)
+
+        if processRole == .controlCenter {
+            UserDefaults.standard.set(
+                value,
+                forKey: CaptureStore.audioRetentionDaysDefaultsKey
+            )
+            preferences.audioRetentionDays = value
+            notifyRuntimeOfSharedStateChange()
+            return
+        }
 
         do {
             try captureStore?.setAudioRetentionDays(value)
@@ -304,17 +357,23 @@ final class AppController {
 
     func setInputRefinementEnabled(_ enabled: Bool) {
         preferences.inputRefinementEnabled = enabled
-        captureSession.inputRefinementEnabled = enabled
+        if processRole == .runtime {
+            captureSession.inputRefinementEnabled = enabled
+        }
         UserDefaults.standard.set(
             enabled,
             forKey: CapturePersonalizer.enabledDefaultsKey
         )
+        notifyRuntimeOfSharedStateChange()
     }
 
     func setPersonalMemoryEnabled(_ enabled: Bool) {
         preferences.personalMemoryEnabled = enabled
         PersonalMemorySettings.setEnabled(enabled)
-        memoryLearning?.setEnabled(enabled)
+        if processRole == .runtime {
+            memoryLearning?.setEnabled(enabled)
+        }
+        notifyRuntimeOfSharedStateChange()
     }
 
     func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
@@ -325,12 +384,15 @@ final class AppController {
                 PostInsertionLearningController
                     .dictionarySuggestionsDefaultsKey
         )
-        captureSession.correctionSuggestionsEnabled = enabled
+        if processRole == .runtime {
+            captureSession.correctionSuggestionsEnabled = enabled
 
-        if !enabled
-            && !preferences.expressionLearningEnabled {
-            postInsertionLearning?.stop()
+            if !enabled
+                && !preferences.expressionLearningEnabled {
+                postInsertionLearning?.stop()
+            }
         }
+        notifyRuntimeOfSharedStateChange()
     }
 
     func setExpressionLearningEnabled(_ enabled: Bool) {
@@ -339,26 +401,33 @@ final class AppController {
             enabled,
             forKey: ExpressionProfileStore.enabledDefaultsKey
         )
-        captureSession.expressionLearningEnabled = enabled
+        if processRole == .runtime {
+            captureSession.expressionLearningEnabled = enabled
 
-        if !enabled
-            && !preferences.correctionSuggestionsEnabled {
-            postInsertionLearning?.stop()
+            if !enabled
+                && !preferences.correctionSuggestionsEnabled {
+                postInsertionLearning?.stop()
+            }
         }
+        notifyRuntimeOfSharedStateChange()
     }
 
     func setSoundFeedbackEnabled(_ enabled: Bool) {
         preferences.soundFeedbackEnabled = enabled
-        captureSession.soundFeedbackEnabled = enabled
+        if processRole == .runtime {
+            captureSession.soundFeedbackEnabled = enabled
+        }
         UserDefaults.standard.set(
             enabled,
             forKey: CaptureSoundFeedback.enabledDefaultsKey
         )
+        notifyRuntimeOfSharedStateChange()
     }
 
     func clearExpressionProfile() {
         do {
             try expressionProfile?.clear()
+            notifyRuntimeOfSharedStateChange()
             Diagnostics.record(
                 "ExpressionProfile",
                 "Cleared learned expression profile"
@@ -373,6 +442,12 @@ final class AppController {
     }
 
     func factoryReset() async throws {
+        if processRole == .controlCenter {
+            ControlCenterProcessBridge.requestFactoryReset()
+            NSApplication.shared.terminate(nil)
+            return
+        }
+
         guard !isCaptureActive else {
             throw ControllerError.factoryResetUnavailable(
                 "录音或润色进行中，暂时不能恢复出厂设置。"
@@ -433,6 +508,7 @@ final class AppController {
                     "已关闭，重启 Morie 后停止 iCloud 同步。"
                 )
                 : .off
+            notifyRuntimeOfSharedStateChange()
             return
         }
 
@@ -463,6 +539,7 @@ final class AppController {
                     : .restartRequired(
                         "已开启，重启 Morie 后开始 iCloud 同步。"
                     )
+                self.notifyRuntimeOfSharedStateChange()
 
             case .failure(let error):
                 self.preferences.iCloudSyncEnabled = false
@@ -542,14 +619,42 @@ final class AppController {
     }
 
     func startCaptureOnly() {
+        if processRole == .controlCenter {
+            ControlCenterProcessBridge.requestCaptureOnly()
+            return
+        }
         startNewCapture(deliveryMode: .captureOnly)
+    }
+
+    func refreshPermissions() async {
+        await setup.refresh()
+        refinementModels.setLocalModelStatusTitle(
+            Self.localModelStatusTitle()
+        )
+        publishControlCenterRuntimeSnapshot()
+    }
+
+    func performPermissionAction(
+        _ requirement: SetupRequirement
+    ) async {
+        await setup.performAction(for: requirement)
+        refinementModels.setLocalModelStatusTitle(
+            Self.localModelStatusTitle()
+        )
+        publishControlCenterRuntimeSnapshot()
     }
 
     func makeControlCenterHistoryController() -> CaptureHistoryController? {
         captureStore.map {
             CaptureHistoryController(
                 store: $0,
-                locale: Locale(identifier: "zh-CN")
+                locale: Locale(identifier: "zh-CN"),
+                recognizeFile: { _, url, locale in
+                    try await CaptureFileTranscriber.recognize(
+                        url,
+                        locale: locale
+                    )
+                }
             )
         }
     }
@@ -567,6 +672,12 @@ final class AppController {
     func bootstrap(
         completingSetup: Bool = false
     ) async {
+        if processRole == .controlCenter {
+            ControlCenterProcessBridge.requestBootstrap()
+            await prepareControlCenterProcess()
+            return
+        }
+
         guard !captureSession.isActive,
               !capabilities.isBootstrapping,
               setup.activeRequest == nil else {
@@ -595,6 +706,9 @@ final class AppController {
 
         do {
             await setup.refresh()
+            refinementModels.setLocalModelStatusTitle(
+                Self.localModelStatusTitle()
+            )
             DevelopmentDiagnostics.list(
                 "Capability",
                 label: "bootstrapChecks",
@@ -642,8 +756,18 @@ final class AppController {
             }
 
             try await captureSession.prepareSpeech()
-            capabilities.speechBackend =
-                await captureSession.preparedSpeechBackend()
+            if let backend =
+                await captureSession.preparedSpeechBackend() {
+                capabilities.speechBackend =
+                    SpeechBackendPresentation(
+                        displayName: backend.displayName,
+                        localeIdentifier:
+                            backend.localeIdentifier,
+                        isFallback: backend.isFallback
+                    )
+            } else {
+                capabilities.speechBackend = nil
+            }
 
             try Task.checkCancellation()
             guard runtime.state == .checking else {
@@ -686,6 +810,7 @@ final class AppController {
                 "Bootstrap complete; Morie is Ready"
             )
             Diagnostics.recordMemory("bootstrap-ready")
+            publishControlCenterRuntimeSnapshot()
         } catch is CancellationError {
             runtime.state = .blocked(
                 "准备已取消，可以在使用引导中重试。"
@@ -721,7 +846,8 @@ final class AppController {
             return
         }
 
-        guard !captureSession.hasActiveCapture else {
+        if processRole == .runtime,
+           captureSession.hasActiveCapture {
             Diagnostics.record(
                 "Hotkey",
                 "Shortcut change ignored during an active capture",
@@ -741,6 +867,11 @@ final class AppController {
             "Shortcut preference changed to \(shortcut.logName)"
         )
 
+        if processRole == .controlCenter {
+            notifyRuntimeOfSharedStateChange()
+            return
+        }
+
         guard canStartCapture else {
             return
         }
@@ -757,6 +888,389 @@ final class AppController {
                 )
             }
         }
+    }
+
+    func notifyRuntimeOfSharedStateChange() {
+        guard processRole == .controlCenter else { return }
+        ControlCenterProcessBridge.notifySharedStateChanged()
+    }
+
+    private func prepareControlCenterProcess() async {
+        await setup.refresh()
+
+        if setup.isReady {
+            capabilities.needsSetup = false
+            capabilities.setupError = nil
+            runtime.state = .ready
+        } else {
+            capabilities.needsSetup = true
+            runtime.state = .blocked(
+                setup.firstIssue?.detail
+                    ?? "请先完成设备与权限检查。"
+            )
+        }
+
+        Diagnostics.record(
+            "ControlCenterProcess",
+            "Presentation process prepared; setupReady=\(setup.isReady)"
+        )
+        Diagnostics.recordMemory("control-center-process-ready")
+    }
+
+    private func installRuntimeProcessObservers() {
+        let center = DistributedNotificationCenter.default()
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeSnapshotRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.publishControlCenterRuntimeSnapshot()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimePermissionActionRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let requirement =
+                    ControlCenterProcessBridge.permissionRequirement(
+                        from: notification
+                    ) else {
+                    return
+                }
+
+                Task { @MainActor [weak self] in
+                    await self?.performPermissionAction(
+                        requirement
+                    )
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName:
+                    .morieRuntimeHistoryRecognitionRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let request =
+                    ControlCenterProcessBridge
+                        .historyRecognitionRequest(
+                            from: notification
+                        ) else {
+                    return
+                }
+
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+
+                    do {
+                        guard let captureStore else {
+                            throw ControllerError
+                                .persistenceUnavailable(
+                                    "记录存储尚未初始化。"
+                                )
+                        }
+
+                        try await captureStore
+                            .flushPersistence(
+                                for: request.captureID
+                            )
+                        let url = try captureStore
+                            .sourceAudioURL(
+                                for: request.captureID
+                            )
+                        let text = try await
+                            CaptureFileTranscriber
+                                .recognize(
+                                    url,
+                                    locale: Locale(
+                                        identifier: "zh-CN"
+                                    )
+                                )
+                        ControlCenterProcessBridge
+                            .publishHistoryRecognitionResult(
+                                requestID:
+                                    request.requestID,
+                                text: text,
+                                error: nil
+                            )
+                    } catch {
+                        ControlCenterProcessBridge
+                            .publishHistoryRecognitionResult(
+                                requestID:
+                                    request.requestID,
+                                text: nil,
+                                error:
+                                    error.localizedDescription
+                            )
+                    }
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeSharedStateChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.reloadSharedStateFromPersistence()
+                    self?.refreshFeatureStoresAfterExternalChange()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeStartCaptureOnlyRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.startCaptureOnly()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeBootstrapRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.bootstrap(completingSetup: true)
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeFactoryResetRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    do {
+                        try await self?.factoryReset()
+                    } catch {
+                        Diagnostics.record(
+                            "ControlCenterProcess",
+                            "Runtime factory reset request failed: \(error.localizedDescription)",
+                            level: .error
+                        )
+                    }
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterWillTerminate,
+                object: nil,
+                queue: .main
+            ) { _ in
+                Task { @MainActor in
+                    Diagnostics.recordMemory(
+                        "runtime-after-control-center-close"
+                    )
+                    try? await Task.sleep(for: .seconds(1))
+                    Diagnostics.recordMemory(
+                        "runtime-after-control-center-close+1s"
+                    )
+                }
+            }
+        )
+    }
+
+    private func installControlCenterProcessObservers() {
+        let center = DistributedNotificationCenter.default()
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterSharedDataChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.refreshFeatureStoresAfterExternalChange()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterHistoryChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.captureStore?
+                        .refreshHistoryAfterExternalChange()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterRouteRequest,
+                object: nil,
+                queue: .main
+            ) { notification in
+                guard ControlCenterProcessBridge.route(
+                    from: notification
+                ) == .settings else {
+                    return
+                }
+
+                Task { @MainActor in
+                    NotificationCenter.default.post(
+                        name: .morieShowSettings,
+                        object: nil
+                    )
+                    NSApplication.shared.activate()
+                }
+            }
+        )
+    }
+
+    private func publishControlCenterRuntimeSnapshot() {
+        guard processRole == .runtime else { return }
+
+        ControlCenterProcessBridge.publishRuntimeSnapshot(
+            ControlCenterRuntimeSnapshot(
+                checks: setup.checks,
+                isBootstrapping:
+                    capabilities.isBootstrapping,
+                setupError: capabilities.setupError,
+                canStartCapture: canStartCapture,
+                isCaptureActive: isCaptureActive,
+                speechBackend:
+                    capabilities.speechBackend,
+                localModelStatusTitle:
+                    refinementModels.localModelStatusTitle
+            )
+        )
+    }
+
+    private func refreshFeatureStoresAfterExternalChange() {
+        dictionary?.refreshAfterExternalChange()
+        memory?.refreshAfterExternalChange()
+        expressionProfile?.refreshAfterExternalChange()
+    }
+
+    private func reloadSharedStateFromPersistence() {
+        guard processRole == .runtime else { return }
+
+        let defaults = UserDefaults.standard
+
+        let shortcut =
+            defaults.string(forKey: CaptureShortcut.defaultsKey)
+                .flatMap(CaptureShortcut.init(rawValue:))
+                ?? CaptureShortcut.defaultValue
+        if shortcut != preferences.captureShortcut {
+            setCaptureShortcut(shortcut)
+        }
+
+        let audioRetentionDays = CaptureStore.audioRetentionDays
+        if audioRetentionDays != preferences.audioRetentionDays {
+            do {
+                try captureStore?.setAudioRetentionDays(
+                    audioRetentionDays
+                )
+                preferences.audioRetentionDays =
+                    audioRetentionDays
+            } catch {
+                Diagnostics.record(
+                    "CaptureStore",
+                    "Could not apply Control Center audio retention change: \(error.localizedDescription)",
+                    level: .warning
+                )
+            }
+        }
+
+        let inputRefinementEnabled =
+            defaults.object(
+                forKey: CapturePersonalizer.enabledDefaultsKey
+            ) as? Bool
+            ?? true
+        preferences.inputRefinementEnabled =
+            inputRefinementEnabled
+        captureSession.inputRefinementEnabled =
+            inputRefinementEnabled
+
+        let personalMemoryEnabled =
+            PersonalMemorySettings.isEnabled
+        preferences.personalMemoryEnabled =
+            personalMemoryEnabled
+        memoryLearning?.setEnabled(
+            personalMemoryEnabled
+        )
+
+        let correctionSuggestionsEnabled =
+            defaults.bool(
+                forKey:
+                    PostInsertionLearningController
+                        .dictionarySuggestionsDefaultsKey
+            )
+        preferences.correctionSuggestionsEnabled =
+            correctionSuggestionsEnabled
+        captureSession.correctionSuggestionsEnabled =
+            correctionSuggestionsEnabled
+
+        let expressionLearningEnabled =
+            defaults.bool(
+                forKey: ExpressionProfileStore.enabledDefaultsKey
+            )
+        preferences.expressionLearningEnabled =
+            expressionLearningEnabled
+        captureSession.expressionLearningEnabled =
+            expressionLearningEnabled
+
+        let soundFeedbackEnabled =
+            defaults.object(
+                forKey: CaptureSoundFeedback.enabledDefaultsKey
+            ) as? Bool
+            ?? true
+        preferences.soundFeedbackEnabled =
+            soundFeedbackEnabled
+        captureSession.soundFeedbackEnabled =
+            soundFeedbackEnabled
+
+        let iCloudSyncEnabled = ICloudSyncSettings.isEnabled
+        preferences.iCloudSyncEnabled = iCloudSyncEnabled
+        if iCloudSyncEnabled {
+            preferences.iCloudSyncState =
+                captureStore?.cloudSyncEnabled == true
+                ? .ready
+                : .restartRequired(
+                    "已开启，重启 Morie 后开始 iCloud 同步。"
+                )
+        } else {
+            preferences.iCloudSyncState =
+                captureStore?.cloudSyncEnabled == true
+                ? .restartRequired(
+                    "已关闭，重启 Morie 后停止 iCloud 同步。"
+                )
+                : .off
+        }
+
+        refinementModels.reloadPersistedConfiguration()
+        refinementPrompts.reloadPersistedInstructions()
+
+        Diagnostics.record(
+            "ControlCenterProcess",
+            "Runtime reloaded shared Control Center state"
+        )
     }
 
     private func installHotkeyIfNeeded() throws {
@@ -938,6 +1452,8 @@ final class AppController {
         case .failed(let message):
             runtime.state = .failed(message)
         }
+
+        publishControlCenterRuntimeSnapshot()
     }
 
     private func startAudioMaintenanceLoopIfNeeded() {
@@ -977,6 +1493,21 @@ final class AppController {
             }
     }
 
+    private static func localModelStatusTitle() -> String {
+        switch SystemLanguageModel.default.availability {
+        case .available:
+            return "可用"
+        case .unavailable(.modelNotReady):
+            return "模型准备中"
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return "Apple 智能未开启"
+        case .unavailable(.deviceNotEligible):
+            return "设备不支持"
+        case .unavailable:
+            return "暂不可用"
+        }
+    }
+
     private func presentFailure(
         title: String,
         message: String
@@ -999,9 +1530,9 @@ final class AppController {
         alert.informativeText = message
         alert.addButton(withTitle: "好")
 
-        NSApplication.shared.activate(
-            ignoringOtherApps: true
-        )
+        NSApplication.shared.activate()
         alert.runModal()
     }
 }
+
+extension AppController: ControlCenterControlling {}

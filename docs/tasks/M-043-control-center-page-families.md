@@ -114,7 +114,8 @@ The current design source of truth is `docs/DESIGN.md`.
 - [x] Scope History controller to the Control Center rather than CaptureSession/AppController.
 - [x] Keep Diagnostics entries in memory only while the Diagnostics page is visible.
 - [x] Reset Control Center presentation state when the window closes.
-- [x] Xcode 27 compile passes on the final implementation.
+- [x] Move Control Center presentation into the disposable process boundary defined by M-044 / ADR 0002 after Release Instruments showed framework-owned UI working-set retention in the resident process.
+- [x] Xcode 27 compile passes on the final M-043 page implementation before the process-boundary follow-up.
 - [x] MorieTests pass on the final implementation.
 - [ ] Owner-device visual acceptance passes.
 
@@ -132,8 +133,8 @@ Check at the normal development window size and at the 960 × 600 minimum:
 - [ ] Permissions exposes current state and recovery actions clearly;
 - [ ] Diagnostics fills the detail workspace;
 - [ ] History loads the initial bounded page and additional rows only when scrolling reaches the end;
-- [ ] closing the Control Center releases History presentation records/player/context and Diagnostics in-memory entries;
-- [ ] memory diagnostics at close, +1s and +5s show `heapInUse` / physical footprint settling after presentation data is released;
+- [ ] closing the Control Center releases History presentation records/player/context and Diagnostics in-memory entries before the disposable Control Center process terminates;
+- [ ] M-044 owner-device validation confirms that terminating the Control Center process returns the resident runtime near its pre-Control-Center memory baseline;
 - [ ] light/dark appearance and resizing remain native.
 
-Validation: macOS 27 CI run #562 passed on code commit `0447c7ac44500b5f36a8b2214a50d1a0076a9322`: Xcode 27 compile and MorieTests both succeeded after the Control Center memory-lifecycle refactor.\n\nDo not mark this task DONE until owner-device visual acceptance passes.
+Validation: the page-family implementation previously passed macOS 27 CI. M-044 now owns the subsequent process-boundary refactor and its compile/runtime/memory acceptance.\n\nDo not mark this task DONE until owner-device visual acceptance passes.

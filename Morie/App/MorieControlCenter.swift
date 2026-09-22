@@ -238,7 +238,7 @@ private final class ControlCenterPresentationState {
 
 @MainActor
 struct MorieControlCenter: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
 
     @State private var session = ControlCenterSession()
     @State private var presentation = ControlCenterPresentationState()
@@ -264,7 +264,6 @@ struct MorieControlCenter: View {
                 history: controller.makeControlCenterHistoryController()
             )
             Diagnostics.record("ControlCenter", "Shell mounted")
-            Diagnostics.recordMemory("control-center-mounted")
         }
         .onDisappear {
             DiagnosticLogStore.shared.setPresentationVisible(false)
@@ -272,14 +271,6 @@ struct MorieControlCenter: View {
             session.resetPresentation()
 
             Diagnostics.record("ControlCenter", "Shell unmounted")
-            Diagnostics.recordMemory("control-center-unmounted")
-
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1))
-                Diagnostics.recordMemory("control-center-unmounted+1s")
-                try? await Task.sleep(for: .seconds(4))
-                Diagnostics.recordMemory("control-center-unmounted+5s")
-            }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .morieShowSettings)
@@ -345,7 +336,7 @@ private struct ControlCenterDetailHost<Content: View>: View {
 
 @MainActor
 private struct ControlCenterRouteHost: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
     @Bindable var session: ControlCenterSession
     @Bindable var presentation: ControlCenterPresentationState
 

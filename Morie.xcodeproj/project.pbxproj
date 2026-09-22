@@ -6,6 +6,58 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000032 /* PermissionManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000052 /* PermissionManagementView.swift */; };
+		AC0000000000000000000038 /* PermissionManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000052 /* PermissionManagementView.swift */; };
+		A10000000000000000000031 /* ControlCenterControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000051 /* ControlCenterControlling.swift */; };
+		AC0000000000000000000037 /* ControlCenterControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000051 /* ControlCenterControlling.swift */; };
+		A10000000000000000000030 /* MemoryAnalysisSourceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000050 /* MemoryAnalysisSourceView.swift */; };
+		AC0000000000000000000036 /* MemoryAnalysisSourceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000050 /* MemoryAnalysisSourceView.swift */; };
+		AC0000000000000000000001 /* AppCapabilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000003 /* AppCapabilityController.swift */; };
+		AC0000000000000000000002 /* AppPreferencesController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000002 /* AppPreferencesController.swift */; };
+		AC0000000000000000000003 /* AppRuntimeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000001 /* AppRuntimeController.swift */; };
+		AC0000000000000000000004 /* ControlCenterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000045 /* ControlCenterController.swift */; };
+		AC0000000000000000000005 /* ControlCenterProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ControlCenterProcess.swift */; };
+		AC0000000000000000000006 /* MorieControlCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* MorieControlCenter.swift */; };
+		AC0000000000000000000007 /* MorieSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000046 /* MorieSettingsView.swift */; };
+		AC0000000000000000000008 /* MoriePreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000048 /* MoriePreferenceKey.swift */; };
+		AC0000000000000000000009 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
+		AC0000000000000000000010 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* CaptureRecord.swift */; };
+		AC0000000000000000000011 /* CaptureRefinement.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* CaptureRefinement.swift */; };
+		AC0000000000000000000012 /* CapturePersistenceWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* CapturePersistenceWriter.swift */; };
+		AC0000000000000000000013 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* CaptureStore.swift */; };
+		AC0000000000000000000014 /* CaptureHistoryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* CaptureHistoryController.swift */; };
+		AC0000000000000000000015 /* CaptureHistoryQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000001 /* CaptureHistoryQuery.swift */; };
+		AC0000000000000000000016 /* CaptureHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* CaptureHistoryView.swift */; };
+		AC0000000000000000000017 /* RefinementPromptSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000001 /* RefinementPromptSettings.swift */; };
+		AC0000000000000000000018 /* CaptureShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000047 /* CaptureShortcut.swift */; };
+		AC0000000000000000000019 /* DictionaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000030 /* DictionaryStore.swift */; };
+		AC0000000000000000000020 /* DictionaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000031 /* DictionaryView.swift */; };
+		AC0000000000000000000021 /* MemoryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* MemoryRecord.swift */; };
+		AC0000000000000000000022 /* MemoryAnalysisRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* MemoryAnalysisRecord.swift */; };
+		AC0000000000000000000023 /* MemoryContextRetriever.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* MemoryContextRetriever.swift */; };
+		AC0000000000000000000024 /* MemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* MemoryStore.swift */; };
+		AC0000000000000000000025 /* MemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* MemoryView.swift */; };
+		AC0000000000000000000026 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000042 /* OverviewView.swift */; };
+		AC0000000000000000000027 /* ExpressionProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* ExpressionProfile.swift */; };
+		AC0000000000000000000028 /* MorieSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000035 /* MorieSetupView.swift */; };
+		AC0000000000000000000029 /* PermissionSetupController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* PermissionSetupController.swift */; };
+		AC0000000000000000000030 /* ICloudSyncSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000038 /* ICloudSyncSettings.swift */; };
+		AC0000000000000000000031 /* RefinementModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000003 /* RefinementModelConfiguration.swift */; };
+		AC0000000000000000000032 /* RefinementModelSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* RefinementModelSettings.swift */; };
+		AC0000000000000000000033 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* Diagnostics.swift */; };
+		AC0000000000000000000034 /* MorieDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000049 /* MorieDefaults.swift */; };
+		AC0000000000000000000035 /* MorieControlCenterMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0000000000000000000001 /* MorieControlCenterMain.swift */; };
+		AC0000000000000000000099 /* Morie Control Center in Embed Control Center Helper */ = {isa = PBXBuildFile; fileRef = BC0000000000000000000002 /* Morie Control Center */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A1000000000000000000002F /* MorieDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000049 /* MorieDefaults.swift */; };
+		A20000000000000000000026 /* MorieDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000049 /* MorieDefaults.swift */; };
+		A1000000000000000000002D /* CaptureShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000047 /* CaptureShortcut.swift */; };
+		A20000000000000000000025 /* CaptureShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000047 /* CaptureShortcut.swift */; };
+		A1000000000000000000002E /* MoriePreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000048 /* MoriePreferenceKey.swift */; };
+		A1000000000000000000002C /* MorieSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000046 /* MorieSettingsView.swift */; };
+		A50000000000000000000005 /* RefinementModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000003 /* RefinementModelConfiguration.swift */; };
+		A50000000000000000000006 /* RefinementModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000003 /* RefinementModelConfiguration.swift */; };
+		A1000000000000000000002B /* ControlCenterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000045 /* ControlCenterController.swift */; };
+		A1000000000000000000002A /* ControlCenterProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ControlCenterProcess.swift */; };
 		A90000000000000000000001 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
 		A90000000000000000000002 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
 		A80000000000000000000003 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
@@ -101,6 +153,18 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000052 /* PermissionManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManagementView.swift; sourceTree = "<group>"; };
+		B10000000000000000000051 /* ControlCenterControlling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterControlling.swift; sourceTree = "<group>"; };
+		B10000000000000000000050 /* MemoryAnalysisSourceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryAnalysisSourceView.swift; sourceTree = "<group>"; };
+		BC0000000000000000000001 /* MorieControlCenterMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieControlCenterMain.swift; sourceTree = "<group>"; };
+		BC0000000000000000000002 /* Morie Control Center */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "Morie Control Center"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000049 /* MorieDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieDefaults.swift; sourceTree = "<group>"; };
+		B10000000000000000000047 /* CaptureShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureShortcut.swift; sourceTree = "<group>"; };
+		B10000000000000000000048 /* MoriePreferenceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoriePreferenceKey.swift; sourceTree = "<group>"; };
+		B10000000000000000000046 /* MorieSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieSettingsView.swift; sourceTree = "<group>"; };
+		B50000000000000000000003 /* RefinementModelConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementModelConfiguration.swift; sourceTree = "<group>"; };
+		B10000000000000000000045 /* ControlCenterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterController.swift; sourceTree = "<group>"; };
+		B10000000000000000000044 /* ControlCenterProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterProcess.swift; sourceTree = "<group>"; };
 		BA0000000000000000000001 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		BA0000000000000000000002 /* LocalSigning.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = LocalSigning.xcconfig.example; sourceTree = "<group>"; };
 		B90000000000000000000001 /* SpeechContextHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechContextHints.swift; sourceTree = "<group>"; };
@@ -171,6 +235,38 @@
 		B10000000000000000000036 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXContainerItemProxy section */
+		DC0000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E10000000000000000000002 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EC0000000000000000000001;
+			remoteInfo = "Morie Control Center";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CC0000000000000000000003 /* Embed Control Center Helper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "Contents/Helpers";
+			dstSubfolderSpec = 1;
+			files = (
+				AC0000000000000000000099 /* Morie Control Center in Embed Control Center Helper */,
+			);
+			name = "Embed Control Center Helper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		DC0000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EC0000000000000000000001 /* Morie Control Center */;
+			targetProxy = DC0000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		C10000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -180,6 +276,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C20000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC0000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -225,6 +328,12 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000001 /* MorieApp.swift */,
+				B10000000000000000000044 /* ControlCenterProcess.swift */,
+				B10000000000000000000051 /* ControlCenterControlling.swift */,
+				B10000000000000000000045 /* ControlCenterController.swift */,
+				B10000000000000000000046 /* MorieSettingsView.swift */,
+				BC0000000000000000000001 /* MorieControlCenterMain.swift */,
+				B10000000000000000000048 /* MoriePreferenceKey.swift */,
 				B10000000000000000000002 /* AppController.swift */,
 				B70000000000000000000001 /* AppRuntimeController.swift */,
 				B70000000000000000000002 /* AppPreferencesController.swift */,
@@ -301,6 +410,7 @@
 		D30000000000000000000005 /* Memory */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000050 /* MemoryAnalysisSourceView.swift */,
 				B10000000000000000000019 /* MemoryRecord.swift */,
 				B10000000000000000000023 /* MemoryAnalysisRecord.swift */,
 				B10000000000000000000020 /* MemoryStore.swift */,
@@ -336,6 +446,7 @@
 		D30000000000000000000008 /* Setup */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000052 /* PermissionManagementView.swift */,
 				B10000000000000000000034 /* PermissionSetupController.swift */,
 				B10000000000000000000035 /* MorieSetupView.swift */,
 			);
@@ -364,6 +475,7 @@
 		D3000000000000000000000B /* Input */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000047 /* CaptureShortcut.swift */,
 				B10000000000000000000005 /* PushToTalkHotkey.swift */,
 			);
 			path = Input;
@@ -380,6 +492,7 @@
 		D3000000000000000000000D /* Cloud */ = {
 			isa = PBXGroup;
 			children = (
+				B50000000000000000000003 /* RefinementModelConfiguration.swift */,
 				B10000000000000000000038 /* ICloudSyncSettings.swift */,
 				B50000000000000000000001 /* RefinementModelSettings.swift */,
 			);
@@ -389,6 +502,7 @@
 		D3000000000000000000000E /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000049 /* MorieDefaults.swift */,
 				B10000000000000000000008 /* Diagnostics.swift */,
 			);
 			path = Support;
@@ -474,6 +588,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000007 /* Morie.app */,
+				BC0000000000000000000002 /* Morie Control Center */,
 				B20000000000000000000002 /* MorieTests.xctest */,
 			);
 			name = Products;
@@ -489,16 +604,35 @@
 				C10000000000000000000002 /* Sources */,
 				C10000000000000000000001 /* Frameworks */,
 				C10000000000000000000003 /* Resources */,
+				CC0000000000000000000003 /* Embed Control Center Helper */,
 				C90000000000000000000001 /* Stamp Build Identity */,
 			);
 			buildRules = ();
-			dependencies = ();
+			dependencies = (
+				DC0000000000000000000002 /* PBXTargetDependency */,
+			);
 			name = Morie;
 			packageProductDependencies = (
 			);
 			productName = Morie;
 			productReference = B10000000000000000000007 /* Morie.app */;
 			productType = "com.apple.product-type.application";
+		};
+		EC0000000000000000000001 /* Morie Control Center */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FC0000000000000000000003 /* Build configuration list for PBXNativeTarget "Morie Control Center" */;
+			buildPhases = (
+				CC0000000000000000000002 /* Sources */,
+				CC0000000000000000000001 /* Frameworks */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = "Morie Control Center";
+			packageProductDependencies = (
+			);
+			productName = "Morie Control Center";
+			productReference = BC0000000000000000000002 /* Morie Control Center */;
+			productType = "com.apple.product-type.tool";
 		};
 		E20000000000000000000001 /* MorieTests */ = {
 			isa = PBXNativeTarget;
@@ -539,6 +673,7 @@
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					E10000000000000000000001 = { CreatedOnToolsVersion = 27.0; };
+					EC0000000000000000000001 = { CreatedOnToolsVersion = 27.0; };
 					E20000000000000000000001 = { CreatedOnToolsVersion = 27.0; };
 				};
 			};
@@ -555,6 +690,7 @@
 			projectRoot = "";
 			targets = (
 				E10000000000000000000001 /* Morie */,
+				EC0000000000000000000001 /* Morie Control Center */,
 				E20000000000000000000001 /* MorieTests */,
 			);
 		};
@@ -606,13 +742,22 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000002F /* MorieDefaults.swift in Sources */,
+				A1000000000000000000002D /* CaptureShortcut.swift in Sources */,
+				A1000000000000000000002E /* MoriePreferenceKey.swift in Sources */,
+				A1000000000000000000002C /* MorieSettingsView.swift in Sources */,
+				A10000000000000000000031 /* ControlCenterControlling.swift in Sources */,
+				A1000000000000000000002B /* ControlCenterController.swift in Sources */,
+				A1000000000000000000002A /* ControlCenterProcess.swift in Sources */,
 				A90000000000000000000001 /* SpeechContextHints.swift in Sources */,
 				A80000000000000000000001 /* ApplicationContext.swift in Sources */,
 				A80000000000000000000002 /* ApplicationContextCollector.swift in Sources */,
+				A50000000000000000000005 /* RefinementModelConfiguration.swift in Sources */,
 				A50000000000000000000001 /* RefinementModelSettings.swift in Sources */,
 				A60000000000000000000001 /* RefinementPromptSettings.swift in Sources */,
 				A10000000000000000000020 /* PermissionSetupController.swift in Sources */,
 				A10000000000000000000021 /* MorieSetupView.swift in Sources */,
+				A10000000000000000000032 /* PermissionManagementView.swift in Sources */,
 				A10000000000000000000001 /* MorieApp.swift in Sources */,
 				A10000000000000000000002 /* AppController.swift in Sources */,
 				A70000000000000000000001 /* AppRuntimeController.swift in Sources */,
@@ -643,6 +788,7 @@
 				A10000000000000000000013 /* MemoryContextRetriever.swift in Sources */,
 				A10000000000000000000014 /* MemoryView.swift in Sources */,
 				A10000000000000000000015 /* MemoryAnalysisRecord.swift in Sources */,
+				A10000000000000000000030 /* MemoryAnalysisSourceView.swift in Sources */,
 				A10000000000000000000016 /* MemoryLearner.swift in Sources */,
 				A10000000000000000000017 /* MemoryLearningController.swift in Sources */,
 				A10000000000000000000018 /* MemoryLearningView.swift in Sources */,
@@ -658,12 +804,60 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CC0000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AC0000000000000000000001 /* AppCapabilityController.swift in Sources */,
+				AC0000000000000000000002 /* AppPreferencesController.swift in Sources */,
+				AC0000000000000000000003 /* AppRuntimeController.swift in Sources */,
+				AC0000000000000000000037 /* ControlCenterControlling.swift in Sources */,
+				AC0000000000000000000004 /* ControlCenterController.swift in Sources */,
+				AC0000000000000000000005 /* ControlCenterProcess.swift in Sources */,
+				AC0000000000000000000006 /* MorieControlCenter.swift in Sources */,
+				AC0000000000000000000007 /* MorieSettingsView.swift in Sources */,
+				AC0000000000000000000008 /* MoriePreferenceKey.swift in Sources */,
+				AC0000000000000000000009 /* ApplicationContext.swift in Sources */,
+				AC0000000000000000000010 /* CaptureRecord.swift in Sources */,
+				AC0000000000000000000011 /* CaptureRefinement.swift in Sources */,
+				AC0000000000000000000012 /* CapturePersistenceWriter.swift in Sources */,
+				AC0000000000000000000013 /* CaptureStore.swift in Sources */,
+				AC0000000000000000000014 /* CaptureHistoryController.swift in Sources */,
+				AC0000000000000000000015 /* CaptureHistoryQuery.swift in Sources */,
+				AC0000000000000000000016 /* CaptureHistoryView.swift in Sources */,
+				AC0000000000000000000017 /* RefinementPromptSettings.swift in Sources */,
+				AC0000000000000000000018 /* CaptureShortcut.swift in Sources */,
+				AC0000000000000000000019 /* DictionaryStore.swift in Sources */,
+				AC0000000000000000000020 /* DictionaryView.swift in Sources */,
+				AC0000000000000000000021 /* MemoryRecord.swift in Sources */,
+				AC0000000000000000000022 /* MemoryAnalysisRecord.swift in Sources */,
+				AC0000000000000000000036 /* MemoryAnalysisSourceView.swift in Sources */,
+				AC0000000000000000000023 /* MemoryContextRetriever.swift in Sources */,
+				AC0000000000000000000024 /* MemoryStore.swift in Sources */,
+				AC0000000000000000000025 /* MemoryView.swift in Sources */,
+				AC0000000000000000000026 /* OverviewView.swift in Sources */,
+				AC0000000000000000000027 /* ExpressionProfile.swift in Sources */,
+				AC0000000000000000000028 /* MorieSetupView.swift in Sources */,
+				AC0000000000000000000038 /* PermissionManagementView.swift in Sources */,
+				AC0000000000000000000029 /* PermissionSetupController.swift in Sources */,
+				AC0000000000000000000030 /* ICloudSyncSettings.swift in Sources */,
+				AC0000000000000000000031 /* RefinementModelConfiguration.swift in Sources */,
+				AC0000000000000000000032 /* RefinementModelSettings.swift in Sources */,
+				AC0000000000000000000033 /* Diagnostics.swift in Sources */,
+				AC0000000000000000000034 /* MorieDefaults.swift in Sources */,
+				AC0000000000000000000035 /* MorieControlCenterMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C20000000000000000000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A20000000000000000000026 /* MorieDefaults.swift in Sources */,
+				A20000000000000000000025 /* CaptureShortcut.swift in Sources */,
 				A90000000000000000000002 /* SpeechContextHints.swift in Sources */,
 				A80000000000000000000003 /* ApplicationContext.swift in Sources */,
+				A50000000000000000000006 /* RefinementModelConfiguration.swift in Sources */,
 				A50000000000000000000004 /* RefinementModelSettings.swift in Sources */,
 				A60000000000000000000002 /* RefinementPromptSettings.swift in Sources */,
 				A2000000000000000000001D /* CaptureHUD.swift in Sources */,
@@ -771,6 +965,43 @@
 			};
 			name = Release;
 		};
+		FC0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BA0000000000000000000001 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Morie/Morie.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.morie.mac;
+				PRODUCT_NAME = "Morie Control Center";
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		FC0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BA0000000000000000000001 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Morie/Morie.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.morie.mac;
+				PRODUCT_NAME = "Morie Control Center";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 		F20000000000000000000005 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -814,6 +1045,15 @@
 			buildConfigurations = (
 				F20000000000000000000003 /* Debug */,
 				F20000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FC0000000000000000000003 /* Build configuration list for PBXNativeTarget "Morie Control Center" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FC0000000000000000000001 /* Debug */,
+				FC0000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

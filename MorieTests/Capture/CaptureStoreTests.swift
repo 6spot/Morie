@@ -32,7 +32,7 @@ final class CaptureStoreTests: XCTestCase {
 
         var reader = ModelContext(store.container)
         var descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
-        var persisted = try XCTUnwrap(reader.fetch(descriptor).first)
+        let persisted = try XCTUnwrap(reader.fetch(descriptor).first)
         XCTAssertEqual(persisted.lifecycle, .delivered)
         XCTAssertEqual(persisted.finalText, "newer")
 
@@ -412,6 +412,48 @@ final class CaptureStoreTests: XCTestCase {
                 "Source audio for an empty final recognition must be discarded with the Capture."
             )
         }
+    }
+
+    func testPresentationStoreDoesNotRecoverLiveRuntimeCapture() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(
+                path: "MoriePresentationStoreTests-\(UUID().uuidString)",
+                directoryHint: .isDirectory
+            )
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let storeURL = directory.appending(path: "captures.store")
+        let runtimeStore = try CaptureStore(storageURL: storeURL)
+        let id = UUID()
+        _ = try runtimeStore.beginVoiceCapture(
+            id: id,
+            deliveryMode: .currentApp,
+            applicationName: nil,
+            bundleIdentifier: nil
+        )
+
+        let presentationStore = try CaptureStore(
+            storageURL: storeURL,
+            performsLaunchMaintenance: false
+        )
+        let context = ModelContext(presentationStore.container)
+        let record = try XCTUnwrap(
+            context.fetch(
+                FetchDescriptor<CaptureRecord>(
+                    predicate: #Predicate { $0.id == id }
+                )
+            ).first
+        )
+
+        XCTAssertEqual(
+            record.lifecycle,
+            .capturing,
+            "Opening the disposable Control Center process must not recover the resident runtime's live Capture."
+        )
     }
 
     func testInterruptedCaptureRecoversUnfinishedAudio() throws {

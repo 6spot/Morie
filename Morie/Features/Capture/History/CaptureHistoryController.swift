@@ -5,9 +5,11 @@ import SwiftData
 
 @MainActor
 final class CaptureHistoryController: ObservableObject {
-    typealias RecognizeFile = @Sendable (URL, Locale) async throws -> String
+    typealias RecognizeFile =
+        @Sendable (UUID, URL, Locale) async throws -> String
 
     @Published private(set) var player: AVPlayer?
+    @Published private(set) var isPlaying = false
     @Published private(set) var audioMessage: String?
     @Published private(set) var recognizingCaptureID: UUID?
     @Published private(set) var recognitionMessage: String?
@@ -21,6 +23,8 @@ final class CaptureHistoryController: ObservableObject {
     private var selectedCaptureID: UUID?
     private var recognitionTask: Task<Void, Never>?
     private var playbackObservation: NSKeyValueObservation?
+    private var playbackStateObservation: NSKeyValueObservation?
+    private var playbackEndObserver: NSObjectProtocol?
     private var historyRevisionObservation: AnyCancellable?
     private var listLimit = 0
     private var listSignature: CaptureHistorySignature?
@@ -33,7 +37,7 @@ final class CaptureHistoryController: ObservableObject {
     init(
         store: CaptureStore,
         locale: Locale,
-        recognizeFile: @escaping RecognizeFile = CaptureFileTranscriber.recognize
+        recognizeFile: @escaping RecognizeFile
     ) {
         self.store = store
         self.locale = locale
@@ -180,15 +184,58 @@ final class CaptureHistoryController: ObservableObject {
         do {
             let url = try store.sourceAudioURL(for: id)
             let item = AVPlayerItem(url: url)
-            player = AVPlayer(playerItem: item)
+            let player = AVPlayer(playerItem: item)
+            self.player = player
+            isPlaying = false
             audioMessage = nil
-            playbackObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+
+            playbackObservation = item.observe(
+                \.status,
+                options: [.initial, .new]
+            ) { [weak self] item, _ in
                 Task { @MainActor [weak self, weak item] in
                     guard let self, let item,
-                          self.selectedCaptureID == id, self.player?.currentItem === item,
+                          self.selectedCaptureID == id,
+                          self.player?.currentItem === item,
                           item.status == .failed
-                    else { return }
-                    self.audioMessage = "无法播放这段录音。\(item.error?.localizedDescription ?? "")"
+                    else {
+                        return
+                    }
+                    self.audioMessage =
+                        "无法播放这段录音。\(item.error?.localizedDescription ?? "")"
+                }
+            }
+
+            playbackStateObservation = player.observe(
+                \.timeControlStatus,
+                options: [.initial, .new]
+            ) { [weak self, weak player] player, _ in
+                Task { @MainActor [weak self, weak player] in
+                    guard let self, let player,
+                          self.selectedCaptureID == id,
+                          self.player === player
+                    else {
+                        return
+                    }
+                    self.isPlaying =
+                        player.timeControlStatus == .playing
+                }
+            }
+
+            playbackEndObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: item,
+                queue: .main
+            ) { [weak self, weak item] _ in
+                Task { @MainActor [weak self, weak item] in
+                    guard let self, let item,
+                          self.selectedCaptureID == id,
+                          self.player?.currentItem === item
+                    else {
+                        return
+                    }
+                    self.player?.seek(to: .zero)
+                    self.isPlaying = false
                 }
             }
         } catch {
@@ -202,8 +249,21 @@ final class CaptureHistoryController: ObservableObject {
         if let selectedCaptureID { refreshAudio(for: selectedCaptureID) }
     }
 
+    func togglePlayback() {
+        guard let player else { return }
+
+        if isPlaying {
+            player.pause()
+            isPlaying = false
+        } else {
+            player.play()
+            isPlaying = true
+        }
+    }
+
     func pausePlayback() {
         player?.pause()
+        isPlaying = false
     }
 
     func recognizeAgain(_ id: UUID) {
@@ -235,7 +295,11 @@ final class CaptureHistoryController: ObservableObject {
                 try Task.checkCancellation()
                 guard !self.isInputActive else { throw CancellationError() }
 
-                let text = try await recognizeFile(url, locale)
+                let text = try await recognizeFile(
+                    id,
+                    url,
+                    locale
+                )
                 try Task.checkCancellation()
                 guard !self.isInputActive else { throw CancellationError() }
                 try self.store.saveReRecognition(text, for: id)
@@ -288,8 +352,18 @@ final class CaptureHistoryController: ObservableObject {
 
     private func releasePlayer() {
         playbackObservation = nil
+        playbackStateObservation = nil
+
+        if let playbackEndObserver {
+            NotificationCenter.default.removeObserver(
+                playbackEndObserver
+            )
+            self.playbackEndObserver = nil
+        }
+
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         player = nil
+        isPlaying = false
     }
 }

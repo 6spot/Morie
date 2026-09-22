@@ -10,7 +10,7 @@ final class OverviewPageState {
 
 @MainActor
 struct OverviewView: View {
-    private let controller: AppController
+    private let controller: any ControlCenterControlling
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var preferences: AppPreferencesController
     @ObservedObject private var refinementModels: RefinementModelController
@@ -23,7 +23,7 @@ struct OverviewView: View {
     @State private var metricsError: String?
 
     init(
-        controller: AppController,
+        controller: any ControlCenterControlling,
         state: OverviewPageState
     ) {
         self.controller = controller

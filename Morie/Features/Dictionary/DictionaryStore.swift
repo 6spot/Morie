@@ -143,10 +143,14 @@ final class DictionaryStore: ObservableObject {
         }
     }
 
-    private let context: ModelContext
+    var onPersistentChange: (() -> Void)?
+
+    private let container: ModelContainer
+    private var context: ModelContext
     private var hasLoadedEntries = false
 
     init(container: ModelContainer) {
+        self.container = container
         context = ModelContext(container)
         context.autosaveEnabled = false
     }
@@ -159,6 +163,24 @@ final class DictionaryStore: ObservableObject {
     func loadIfNeeded() throws {
         guard !hasLoadedEntries else { return }
         try load()
+    }
+
+    func refreshAfterExternalChange() {
+        let shouldReload = hasLoadedEntries
+        resetContext()
+        hasLoadedEntries = false
+        entries.removeAll(keepingCapacity: false)
+
+        guard shouldReload else { return }
+        do {
+            try load()
+        } catch {
+            Diagnostics.record(
+                "Dictionary",
+                "Could not refresh after external change: \(error.localizedDescription)",
+                level: .warning
+            )
+        }
     }
 
     @discardableResult
@@ -353,6 +375,12 @@ final class DictionaryStore: ObservableObject {
         do { try context.save() }
         catch { context.rollback(); throw error }
         try load()
+        onPersistentChange?()
+    }
+
+    private func resetContext() {
+        context = ModelContext(container)
+        context.autosaveEnabled = false
     }
 }
 

@@ -582,8 +582,9 @@ enum Diagnostics {
         record(
             "Memory",
             String(
-                format: "%@; resident=%.1fMB; footprint=%.1fMB; heapInUse=%.1fMB; heapAllocated=%.1fMB",
+                format: "%@; pid=%d; resident=%.1fMB; footprint=%.1fMB; heapInUse=%.1fMB; heapAllocated=%.1fMB",
                 phase,
+                ProcessInfo.processInfo.processIdentifier,
                 Double(memory.residentBytes) / divisor,
                 Double(memory.physicalFootprintBytes) / divisor,
                 Double(memory.heapInUseBytes) / divisor,

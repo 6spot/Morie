@@ -77,11 +77,11 @@ enum PersonalMemorySettings {
     static let enabledDefaultsKey = "personalMemoryEnabled"
 
     static var isEnabled: Bool {
-        UserDefaults.standard.object(forKey: enabledDefaultsKey) as? Bool ?? true
+        MorieDefaults.shared.object(forKey: enabledDefaultsKey) as? Bool ?? true
     }
 
     static func setEnabled(_ enabled: Bool) {
-        UserDefaults.standard.set(enabled, forKey: enabledDefaultsKey)
+        MorieDefaults.shared.set(enabled, forKey: enabledDefaultsKey)
     }
 }
 

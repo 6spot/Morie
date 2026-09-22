@@ -35,6 +35,8 @@ final class CaptureStore: ObservableObject {
 
     @Published private(set) var historyRevision: UInt64 = 0
 
+    var onHistoryChange: (() -> Void)?
+
     private var records: [UUID: CaptureRecord] = [:]
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
     private var persistenceRevision: [UUID: Int] = [:]
@@ -42,7 +44,8 @@ final class CaptureStore: ObservableObject {
 
     init(
         inMemory: Bool = false, storageURL: URL? = nil, audioDirectory: URL? = nil,
-        cloudSyncEnabled requestedCloudSync: Bool = false
+        cloudSyncEnabled requestedCloudSync: Bool = false,
+        performsLaunchMaintenance: Bool = true
     ) throws {
         let schema = Schema([
             CaptureRecord.self,
@@ -99,9 +102,11 @@ final class CaptureStore: ObservableObject {
             ).appending(path: "Morie/CaptureAudio", directoryHint: .isDirectory)
         }
         try FileManager.default.createDirectory(at: self.audioDirectory, withIntermediateDirectories: true)
-        try recoverInterruptedCaptures()
-        try pruneExpiredAudio()
-        try ensureUsageMetricsRecord()
+        if performsLaunchMaintenance {
+            try recoverInterruptedCaptures()
+            try pruneExpiredAudio()
+            try ensureUsageMetricsRecord()
+        }
     }
 
     func beginVoiceCapture(
@@ -532,7 +537,7 @@ final class CaptureStore: ObservableObject {
             do {
                 try await persistenceWriter.persist(snapshot)
                 if snapshot.usageMetricsFinalized {
-                    await self?.markHistoryChanged()
+                    self?.markHistoryChanged()
                 }
                 DevelopmentDiagnostics.record(
                     "Persistence",
@@ -678,7 +683,7 @@ final class CaptureStore: ObservableObject {
 
     func setAudioRetentionDays(_ days: Int) throws {
         let value = min(max(days, 1), 365)
-        UserDefaults.standard.set(value, forKey: Self.audioRetentionDaysDefaultsKey)
+        MorieDefaults.shared.set(value, forKey: Self.audioRetentionDaysDefaultsKey)
         let descriptor = FetchDescriptor<CaptureRecord>()
         for record in try container.mainContext.fetch(descriptor) where record.sourceAudioRelativePath != nil {
             record.sourceAudioExpiresAt = Calendar.current.date(byAdding: .day, value: value, to: record.createdAt)
@@ -689,7 +694,7 @@ final class CaptureStore: ObservableObject {
     }
 
     static var audioRetentionDays: Int {
-        let saved = UserDefaults.standard.integer(forKey: audioRetentionDaysDefaultsKey)
+        let saved = MorieDefaults.shared.integer(forKey: audioRetentionDaysDefaultsKey)
         return saved > 0 ? saved : defaultAudioRetentionDays
     }
 
@@ -746,8 +751,13 @@ final class CaptureStore: ObservableObject {
         Diagnostics.record("CaptureStore", "Recovered \(interrupted.count) interrupted Capture(s)")
     }
 
+    func refreshHistoryAfterExternalChange() {
+        historyRevision &+= 1
+    }
+
     private func markHistoryChanged() {
         historyRevision &+= 1
+        onHistoryChange?()
     }
 
     private func label(_ id: UUID) -> String {

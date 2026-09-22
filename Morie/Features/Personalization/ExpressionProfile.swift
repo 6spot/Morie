@@ -134,12 +134,21 @@ enum ExpressionStyleExtractor {
 final class ExpressionProfileStore {
     static let enabledDefaultsKey = "expressionProfileLearningEnabled"
 
-    private let context: ModelContext
+    var onPersistentChange: (() -> Void)?
+
+    private let container: ModelContainer
+    private var context: ModelContext
     private let learningSamples = 5
     private let stableSamples = 10
     private let stableDaySpan = 3
 
     init(container: ModelContainer) {
+        self.container = container
+        context = ModelContext(container)
+        context.autosaveEnabled = false
+    }
+
+    func refreshAfterExternalChange() {
         context = ModelContext(container)
         context.autosaveEnabled = false
     }
@@ -259,5 +268,6 @@ final class ExpressionProfileStore {
             context.rollback()
             throw error
         }
+        onPersistentChange?()
     }
 }

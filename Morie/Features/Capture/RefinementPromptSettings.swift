@@ -23,20 +23,45 @@ enum RefinementPromptSettings {
     /// stored in UserDefaults and therefore do not require rebuilding Morie.
     static let defaultInstructions: String = {
         let bundle = Bundle(for: RefinementPromptBundleToken.self)
-        guard let url = bundle.url(
+        let bundledURL = bundle.url(
             forResource: "DefaultRefinementInstructions",
             withExtension: "txt"
-        ),
-        let text = try? String(contentsOf: url, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-        !text.isEmpty
+        )
+
+        let executableURL = URL(
+            fileURLWithPath:
+                ProcessInfo.processInfo.arguments.first ?? ""
+        )
+        let hostResourcesURL = executableURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(
+                path: "Resources/DefaultRefinementInstructions.txt"
+            )
+
+        let url = bundledURL
+            ?? (FileManager.default.fileExists(
+                atPath: hostResourcesURL.path
+            ) ? hostResourcesURL : nil)
+
+        guard let url,
+              let text = try? String(
+                contentsOf: url,
+                encoding: .utf8
+              )
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+              !text.isEmpty
         else {
-            preconditionFailure("DefaultRefinementInstructions.txt is missing or empty")
+            preconditionFailure(
+                "DefaultRefinementInstructions.txt is missing or empty"
+            )
         }
         return text
     }()
 
-    static func load(from defaults: UserDefaults = .standard) -> String {
+    static func load(from defaults: UserDefaults = MorieDefaults.shared) -> String {
         guard let saved = defaults.string(forKey: defaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
               !saved.isEmpty
@@ -47,14 +72,14 @@ enum RefinementPromptSettings {
     }
 
     @discardableResult
-    static func save(_ instructions: String, to defaults: UserDefaults = .standard) -> Bool {
+    static func save(_ instructions: String, to defaults: UserDefaults = MorieDefaults.shared) -> Bool {
         let value = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return false }
         defaults.set(value, forKey: defaultsKey)
         return true
     }
 
-    static func restoreDefault(in defaults: UserDefaults = .standard) {
+    static func restoreDefault(in defaults: UserDefaults = MorieDefaults.shared) {
         defaults.removeObject(forKey: defaultsKey)
     }
 }
@@ -70,6 +95,11 @@ final class RefinementPromptController: ObservableObject {
 
     var isDefault: Bool {
         instructions == RefinementPromptSettings.defaultInstructions
+    }
+
+    func reloadPersistedInstructions() {
+        instructions = RefinementPromptSettings.load()
+        settingsMessage = nil
     }
 
     @discardableResult
