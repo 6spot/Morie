@@ -774,7 +774,8 @@ final class AppController {
             return
         }
 
-        guard !captureSession.hasActiveCapture else {
+        if processRole == .runtime,
+           captureSession.hasActiveCapture {
             Diagnostics.record(
                 "Hotkey",
                 "Shortcut change ignored during an active capture",
@@ -794,6 +795,11 @@ final class AppController {
             "Shortcut preference changed to \(shortcut.logName)"
         )
 
+        if processRole == .controlCenter {
+            notifyRuntimeOfSharedStateChange()
+            return
+        }
+
         guard canStartCapture else {
             return
         }
@@ -810,6 +816,229 @@ final class AppController {
                 )
             }
         }
+    }
+
+    func notifyRuntimeOfSharedStateChange() {
+        guard processRole == .controlCenter else { return }
+        ControlCenterProcessBridge.notifySharedStateChanged()
+    }
+
+    private func prepareControlCenterProcess() async {
+        await setup.refresh()
+
+        if setup.isReady {
+            capabilities.needsSetup = false
+            capabilities.setupError = nil
+            runtime.state = .ready
+        } else {
+            capabilities.needsSetup = true
+            runtime.state = .blocked(
+                setup.firstIssue?.detail
+                    ?? "请先完成设备与权限检查。"
+            )
+        }
+
+        Diagnostics.record(
+            "ControlCenterProcess",
+            "Presentation process prepared; setupReady=\(setup.isReady)"
+        )
+        Diagnostics.recordMemory("control-center-process-ready")
+    }
+
+    private func installRuntimeProcessObservers() {
+        let center = DistributedNotificationCenter.default()
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeSharedStateChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.reloadSharedStateFromPersistence()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeStartCaptureOnlyRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.startCaptureOnly()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeBootstrapRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.bootstrap(completingSetup: true)
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeFactoryResetRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    do {
+                        try await self?.factoryReset()
+                    } catch {
+                        Diagnostics.record(
+                            "ControlCenterProcess",
+                            "Runtime factory reset request failed: \(error.localizedDescription)",
+                            level: .error
+                        )
+                    }
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterWillTerminate,
+                object: nil,
+                queue: .main
+            ) { _ in
+                Task { @MainActor in
+                    Diagnostics.recordMemory(
+                        "runtime-after-control-center-close"
+                    )
+                    try? await Task.sleep(for: .seconds(1))
+                    Diagnostics.recordMemory(
+                        "runtime-after-control-center-close+1s"
+                    )
+                }
+            }
+        )
+    }
+
+    private func installControlCenterProcessObservers() {
+        let center = DistributedNotificationCenter.default()
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterRouteRequest,
+                object: nil,
+                queue: .main
+            ) { notification in
+                guard ControlCenterProcessBridge.route(
+                    from: notification
+                ) == .settings else {
+                    return
+                }
+
+                Task { @MainActor in
+                    NotificationCenter.default.post(
+                        name: .morieShowSettings,
+                        object: nil
+                    )
+                    NSApplication.shared.activate(
+                        ignoringOtherApps: true
+                    )
+                }
+            }
+        )
+    }
+
+    private func reloadSharedStateFromPersistence() {
+        guard processRole == .runtime else { return }
+
+        let defaults = UserDefaults.standard
+
+        let shortcut =
+            defaults.string(forKey: CaptureShortcut.defaultsKey)
+                .flatMap(CaptureShortcut.init(rawValue:))
+                ?? CaptureShortcut.defaultValue
+        if shortcut != preferences.captureShortcut {
+            setCaptureShortcut(shortcut)
+        }
+
+        preferences.audioRetentionDays =
+            CaptureStore.audioRetentionDays
+
+        let inputRefinementEnabled =
+            defaults.object(
+                forKey: CapturePersonalizer.enabledDefaultsKey
+            ) as? Bool
+            ?? true
+        preferences.inputRefinementEnabled =
+            inputRefinementEnabled
+        captureSession.inputRefinementEnabled =
+            inputRefinementEnabled
+
+        let personalMemoryEnabled =
+            PersonalMemorySettings.isEnabled
+        preferences.personalMemoryEnabled =
+            personalMemoryEnabled
+        memoryLearning?.setEnabled(
+            personalMemoryEnabled
+        )
+
+        let correctionSuggestionsEnabled =
+            defaults.bool(
+                forKey:
+                    PostInsertionLearningController
+                        .dictionarySuggestionsDefaultsKey
+            )
+        preferences.correctionSuggestionsEnabled =
+            correctionSuggestionsEnabled
+        captureSession.correctionSuggestionsEnabled =
+            correctionSuggestionsEnabled
+
+        let expressionLearningEnabled =
+            defaults.bool(
+                forKey: ExpressionProfileStore.enabledDefaultsKey
+            )
+        preferences.expressionLearningEnabled =
+            expressionLearningEnabled
+        captureSession.expressionLearningEnabled =
+            expressionLearningEnabled
+
+        let soundFeedbackEnabled =
+            defaults.object(
+                forKey: CaptureSoundFeedback.enabledDefaultsKey
+            ) as? Bool
+            ?? true
+        preferences.soundFeedbackEnabled =
+            soundFeedbackEnabled
+        captureSession.soundFeedbackEnabled =
+            soundFeedbackEnabled
+
+        let iCloudSyncEnabled = ICloudSyncSettings.isEnabled
+        preferences.iCloudSyncEnabled = iCloudSyncEnabled
+        if iCloudSyncEnabled {
+            preferences.iCloudSyncState =
+                captureStore?.cloudSyncEnabled == true
+                ? .ready
+                : .restartRequired(
+                    "已开启，重启 Morie 后开始 iCloud 同步。"
+                )
+        } else {
+            preferences.iCloudSyncState =
+                captureStore?.cloudSyncEnabled == true
+                ? .restartRequired(
+                    "已关闭，重启 Morie 后停止 iCloud 同步。"
+                )
+                : .off
+        }
+
+        refinementModels.reloadPersistedConfiguration()
+        refinementPrompts.reloadPersistedInstructions()
+
+        Diagnostics.record(
+            "ControlCenterProcess",
+            "Runtime reloaded shared Control Center state"
+        )
     }
 
     private func installHotkeyIfNeeded() throws {
