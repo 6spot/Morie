@@ -6,6 +6,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1000000000000000000002F /* MorieDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000049 /* MorieDefaults.swift */; };
+		A20000000000000000000026 /* MorieDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000049 /* MorieDefaults.swift */; };
 		A1000000000000000000002D /* CaptureShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000047 /* CaptureShortcut.swift */; };
 		A20000000000000000000025 /* CaptureShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000047 /* CaptureShortcut.swift */; };
 		A1000000000000000000002E /* MoriePreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000048 /* MoriePreferenceKey.swift */; };
@@ -109,6 +111,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000049 /* MorieDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieDefaults.swift; sourceTree = "<group>"; };
 		B10000000000000000000047 /* CaptureShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureShortcut.swift; sourceTree = "<group>"; };
 		B10000000000000000000048 /* MoriePreferenceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoriePreferenceKey.swift; sourceTree = "<group>"; };
 		B10000000000000000000046 /* MorieSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieSettingsView.swift; sourceTree = "<group>"; };
@@ -409,6 +412,7 @@
 		D3000000000000000000000E /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000049 /* MorieDefaults.swift */,
 				B10000000000000000000008 /* Diagnostics.swift */,
 			);
 			path = Support;
@@ -626,6 +630,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000002F /* MorieDefaults.swift in Sources */,
 				A1000000000000000000002D /* CaptureShortcut.swift in Sources */,
 				A1000000000000000000002E /* MoriePreferenceKey.swift in Sources */,
 				A1000000000000000000002C /* MorieSettingsView.swift in Sources */,
@@ -688,6 +693,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A20000000000000000000026 /* MorieDefaults.swift in Sources */,
 				A20000000000000000000025 /* CaptureShortcut.swift in Sources */,
 				A90000000000000000000002 /* SpeechContextHints.swift in Sources */,
 				A80000000000000000000003 /* ApplicationContext.swift in Sources */,
