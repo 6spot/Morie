@@ -727,6 +727,67 @@ struct DiagnosticLogView: View {
             maxHeight: .infinity,
             alignment: .topLeading
         )
+        .searchable(
+            text: $search,
+            placement: .toolbar,
+            prompt: Text("搜索诊断日志")
+        )
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Picker("筛选日志", selection: $level) {
+                    Text("全部日志")
+                        .tag(nil as DiagnosticLevel?)
+
+                    ForEach(
+                        [
+                            DiagnosticLevel.info,
+                            .warning,
+                            .error,
+                        ],
+                        id: \.self
+                    ) {
+                        Text($0.title).tag(Optional($0))
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(
+                    "复制当前筛选",
+                    systemImage: "line.3.horizontal.decrease.circle"
+                ) {
+                    copyDiagnostics(visibleEntries)
+                }
+
+                Button("复制全部日志", systemImage: "doc.on.doc") {
+                    copyDiagnostics(store.entries)
+                }
+
+                Menu("诊断操作", systemImage: "ellipsis") {
+                    Button(
+                        "在访达中显示日志文件",
+                        systemImage: "doc.text.magnifyingglass"
+                    ) {
+                        NSWorkspace.shared.activateFileViewerSelecting(
+                            [store.logFileURL]
+                        )
+                    }
+
+                    Divider()
+
+                    Button(
+                        "清空诊断日志…",
+                        systemImage: "trash",
+                        role: .destructive
+                    ) {
+                        confirmsClear = true
+                    }
+                }
+            }
+        }
         .confirmationDialog(
             "清空诊断日志？",
             isPresented: $confirmsClear,
@@ -749,6 +810,17 @@ struct DiagnosticLogView: View {
                 self.selection = nil
             }
         }
+    }
+
+    private func copyDiagnostics(
+        _ entries: [DiagnosticLogStore.Entry]
+    ) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(
+            store.text(for: entries),
+            forType: .string
+        )
     }
 
     @ViewBuilder
