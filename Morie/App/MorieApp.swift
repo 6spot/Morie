@@ -258,25 +258,21 @@ extension Notification.Name {
     static let morieShowSettings = Notification.Name("MorieShowSettings")
 }
 
-private struct MorieRuntimeCommands: Commands {
-    var body: some Commands {
-        CommandGroup(replacing: .appSettings) {
-            Button("设置…") {
-                ControlCenterProcessLauncher.open(.settings)
-            }
-            .keyboardShortcut(",", modifiers: .command)
-        }
-    }
-}
+@MainActor
+private struct MorieCommands: Commands {
+    let processRole: MorieProcessRole
 
-private struct MorieControlCenterCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appSettings) {
             Button("设置…") {
-                NotificationCenter.default.post(
-                    name: .morieShowSettings,
-                    object: nil
-                )
+                if processRole == .controlCenter {
+                    NotificationCenter.default.post(
+                        name: .morieShowSettings,
+                        object: nil
+                    )
+                } else {
+                    ControlCenterProcessLauncher.open(.settings)
+                }
             }
             .keyboardShortcut(",", modifiers: .command)
         }
