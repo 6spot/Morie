@@ -6,6 +6,73 @@ It applies to every user-facing surface: Control Center, History, Dictionary, Pe
 
 The goal is not to make Morie look custom. The goal is to make it feel **native, fast, predictable and carefully made**.
 
+## Non-negotiable Apple-native UI rule
+
+This is a **MUST / MUST NOT** rule, not a preference.
+
+Morie's user-facing UI **MUST use the globally shared Apple-native macOS design system and the repository's shared Control Center structure**.
+
+A page **MUST NOT invent its own page-level visual language, title treatment, toolbar system, search control, container chrome, spacing system, card system, glass treatment, button geometry or navigation shell** merely because the page has different content.
+
+If Apple already provides the behavior or control, use the Apple-native SwiftUI/AppKit solution.
+
+Examples include:
+
+- `NavigationSplitView`;
+- `NavigationStack`;
+- `.navigationTitle`;
+- `.searchable`;
+- `.toolbar`, `ToolbarItem`, `ToolbarItemGroup`, `ToolbarSpacer`;
+- `List`;
+- `Table`;
+- `Form`;
+- `ScrollView`;
+- native split views;
+- native buttons, pickers, toggles, menus, sheets, popovers and confirmation dialogs;
+- semantic system typography, colors, materials and spacing behavior.
+
+### Global consistency is mandatory
+
+Peer pages at the same hierarchy level **MUST use the same global title position, shell, page origin and navigation behavior**.
+
+A page **MUST NOT** create a custom header to imitate or replace the shared system title.
+
+In particular:
+
+- Overview, History, Dictionary, Personal Memory, Settings, Permissions and Diagnostics all use the same Control Center title system;
+- History and Diagnostics are allowed to have workspace-style content, but that does **not** permit a custom page title/header system;
+- a full-width workspace may begin below the shared title/toolbar, but must not replace them;
+- pagination/loading implementation details such as an internal page size must never become decorative UI unless they represent meaningful user-facing information.
+
+### No page-specific style inventions
+
+The following are prohibited unless an explicit product requirement cannot be implemented with the native/global system:
+
+- custom page headers that duplicate `.navigationTitle`;
+- fake toolbar search fields when `.searchable` is available;
+- custom toolbar containers, action arrays, placeholder items or fixed-width fake slots;
+- manually imitated Liquid Glass;
+- one-off capsule/button backgrounds that override native toolbar sizing;
+- page-specific title offsets or outer content margins;
+- bespoke card shells or separators used only on one peer page;
+- arbitrary fixed widths/heights whose purpose is visual compensation rather than content or platform behavior;
+- duplicated controls or labels added only to make one page look different.
+
+### Shared components are for shared rules
+
+Repository-owned UI components are allowed only when they encode a **global, reusable product rule** or when Apple does not provide the required behavior.
+
+A shared component must not exist merely to give one page a unique visual treatment.
+
+If a page needs a real exception because Apple-native controls cannot satisfy the requirement:
+
+1. identify the missing native capability;
+2. document why the global pattern cannot satisfy the requirement;
+3. keep the custom implementation as small as possible;
+4. update this design document or an accepted decision before treating the exception as the new pattern.
+
+Do not silently introduce exceptions in implementation code.
+
 ## Design foundations
 
 Morie follows these principles in order.
@@ -30,9 +97,11 @@ Adding a useful label, status, action or explanation can make an interface simpl
 
 Use the interaction patterns macOS users already understand.
 
-Prefer native selection, toolbar placement, sidebars, menus, sheets, confirmation dialogs, keyboard navigation and system controls.
+Use native selection, toolbar placement, sidebars, menus, sheets, confirmation dialogs, keyboard navigation and system controls.
 
-Break a familiar macOS pattern only when there is a concrete product reason and the replacement is demonstrably clearer.
+For page-level UI and Control Center structure, native/global patterns are mandatory. Do not replace them with a custom pattern merely because another layout seems visually interesting.
+
+A custom interaction is acceptable only when a concrete product requirement cannot be satisfied by the current Apple-native/global pattern and the exception is documented.
 
 ### Stable geometry builds trust
 
@@ -58,9 +127,11 @@ Use current SwiftUI, AppKit and Apple system frameworks.
 
 Implementation priority:
 
-1. SwiftUI native component.
+1. SwiftUI native component and the existing global Morie page/shell pattern.
 2. AppKit native component when SwiftUI is insufficient.
-3. Small repository-owned custom implementation only when the native stack cannot satisfy the requirement.
+3. Small repository-owned custom implementation only when the native stack and existing global pattern cannot satisfy the requirement.
+
+For Control Center page structure and common macOS controls, this priority is mandatory. Do not skip directly to a custom implementation.
 
 Do not introduce an external UI framework, component library, animation library or design system without a concrete requirement that cannot reasonably be met with Apple's native stack.
 
@@ -548,21 +619,25 @@ A custom component assumes responsibility for behavior a native component would 
 
 Before accepting a UI change, verify:
 
-1. Is this using the native macOS component/pattern where one exists?
-2. Is the common action directly visible?
-3. Is anything hidden only to make the interface look cleaner?
-4. Does the page begin from the same coordinate system as peer pages?
-5. Does route/state change keep sidebar, title and toolbar geometry stable?
-6. Does the page use Apple-native searchable/toolbar APIs, with search/filter/actions semantically separated and only related actions grouped?
-7. Is hierarchy created with type/spacing/alignment before decoration?
-8. Is the page unnecessarily card-heavy?
-9. Is desktop information density appropriate?
-10. Does async work update only the smallest necessary region?
-11. Does every animation have a functional purpose?
-12. Would a high-frequency user find this interaction slower or more distracting after the hundredth use?
-13. Does the page still work with keyboard, VoiceOver, dark mode, increased contrast and Reduce Motion?
+1. Is this using the existing global Morie pattern and Apple-native macOS component where one exists?
+2. Does this page keep the exact same page-title system and page origin as its peers, without a custom replacement header?
+3. Has any page-specific visual invention been introduced that should instead be removed or shared globally?
+4. Is the common action directly visible?
+5. Is anything hidden only to make the interface look cleaner?
+6. Does the page begin from the same coordinate system as peer pages?
+7. Does route/state change keep sidebar, title and toolbar geometry stable?
+8. Does the page use Apple-native searchable/toolbar APIs, with search/filter/actions semantically separated and only related actions grouped?
+9. Is hierarchy created with type/spacing/alignment before decoration?
+10. Is the page unnecessarily card-heavy?
+11. Is desktop information density appropriate?
+12. Does async work update only the smallest necessary region?
+13. Does every animation have a functional purpose?
+14. Would a high-frequency user find this interaction slower or more distracting after the hundredth use?
+15. Does the page still work with keyboard, VoiceOver, dark mode, increased contrast and Reduce Motion?
 
 ## Design principle
+
+**Global Apple-native design before page-specific invention.**
 
 **Native before custom.**
 
