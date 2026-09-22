@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DictionaryView: View {
-    @ObservedObject var store: DictionaryStore
+    @ObservedObject var store: DictionaryPresentationStore
     @Binding var selection: UUID?
     @Binding var search: String
     @Binding var showingEditor: Bool
@@ -18,7 +18,7 @@ struct DictionaryView: View {
         )
     ]
 
-    private var selectedEntry: DictionaryDisplayEntry? {
+    private var selectedEntry: MorieDictionaryEntryDTO? {
         guard let selection else { return nil }
         return store.displayEntries.first { $0.id == selection }
     }
@@ -28,7 +28,7 @@ struct DictionaryView: View {
         return selectedEntry?.id
     }
 
-    private var filteredEntries: [DictionaryDisplayEntry] {
+    private var filteredEntries: [MorieDictionaryEntryDTO] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return store.displayEntries.filter { entry in
             query.isEmpty
@@ -36,11 +36,11 @@ struct DictionaryView: View {
         }
     }
 
-    private var visibleUserEntries: [DictionaryDisplayEntry] {
+    private var visibleUserEntries: [MorieDictionaryEntryDTO] {
         filteredEntries.filter(\.isEditable)
     }
 
-    private var visibleBuiltInEntries: [DictionaryDisplayEntry] {
+    private var visibleBuiltInEntries: [MorieDictionaryEntryDTO] {
         filteredEntries.filter { !$0.isEditable }
     }
 
@@ -193,7 +193,7 @@ struct DictionaryView: View {
         } message: {
             Text("已保存的输入和个人记忆会保留。")
         }
-        .onAppear(perform: load)
+        .task { await load() }
         .onChange(
             of: visibleUserEntries.map(\.id),
             initial: true
@@ -229,7 +229,7 @@ struct DictionaryView: View {
     }
 
     private func userWord(
-        _ entry: DictionaryDisplayEntry
+        _ entry: MorieDictionaryEntryDTO
     ) -> some View {
         Button {
             selection = entry.id
@@ -263,7 +263,7 @@ struct DictionaryView: View {
     }
 
     private func builtInWord(
-        _ entry: DictionaryDisplayEntry
+        _ entry: MorieDictionaryEntryDTO
     ) -> some View {
         HStack(spacing: 8) {
             Text(entry.name)
@@ -292,7 +292,7 @@ struct DictionaryView: View {
 }
 
 struct DictionaryEditorSheet: View {
-    @ObservedObject var store: DictionaryStore
+    @ObservedObject var store: DictionaryPresentationStore
     var entryID: UUID?
 
     @Environment(\.dismiss) private var dismiss

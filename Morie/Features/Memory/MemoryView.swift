@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct MemoryView: View {
-    @ObservedObject var store: MemoryStore
+    @ObservedObject var store: MemoryPresentationStore
     @Binding var search: String
     @Binding var editor: MemoryEditorMode?
     @AppStorage(PersonalMemorySettings.enabledDefaultsKey)
@@ -14,7 +14,7 @@ struct MemoryView: View {
         search.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var activeLongTerm: [MemoryRecord] {
+    private var activeLongTerm: [MorieMemoryDTO] {
         matching(
             store.entries.filter {
                 $0.status == .active && $0.scope != .workingContext
@@ -22,7 +22,7 @@ struct MemoryView: View {
         )
     }
 
-    private var recentContext: [MemoryRecord] {
+    private var recentContext: [MorieMemoryDTO] {
         matching(
             store.entries.filter {
                 $0.status == .active && $0.scope == .workingContext
@@ -30,7 +30,7 @@ struct MemoryView: View {
         )
     }
 
-    private var history: [MemoryRecord] {
+    private var history: [MorieMemoryDTO] {
         matching(
             store.entries.filter {
                 $0.status == .archived || $0.status == .superseded
@@ -161,7 +161,7 @@ struct MemoryView: View {
         .sheet(item: $editor) {
             MemoryEditorSheet(store: store, mode: $0)
         }
-        .onAppear(perform: load)
+        .task { await load() }
     }
 
     private func load() {
@@ -174,9 +174,9 @@ struct MemoryView: View {
     }
 
     private func matching(
-        _ entries: [MemoryRecord]
-    ) -> [MemoryRecord] {
-        let result: [MemoryRecord]
+        _ entries: [MorieMemoryDTO]
+    ) -> [MorieMemoryDTO] {
+        let result: [MorieMemoryDTO]
 
         if query.isEmpty {
             result = entries
@@ -197,8 +197,8 @@ struct MemoryView: View {
 }
 
 private struct MemoryTopicRows: View {
-    let entries: [MemoryRecord]
-    @ObservedObject var store: MemoryStore
+    let entries: [MorieMemoryDTO]
+    @ObservedObject var store: MemoryPresentationStore
     var showsDate = false
     var showsStatus = false
 
@@ -259,7 +259,7 @@ private struct MemoryTopicRows: View {
 }
 
 struct MemoryDetailView: View {
-    @ObservedObject var store: MemoryStore
+    @ObservedObject var store: MemoryPresentationStore
     let memoryID: UUID
     var onDelete: (() -> Void)? = nil
 
@@ -268,7 +268,7 @@ struct MemoryDetailView: View {
     @State private var confirmsDeletion = false
     @State private var errorMessage: String?
 
-    private var evidence: [MemoryEvidenceSnapshot] {
+    private var evidence: [MorieMemoryEvidenceDTO] {
         store.evidence(for: memoryID)
     }
 
@@ -358,12 +358,7 @@ struct MemoryDetailView: View {
 
                                 NavigationLink("查看来源输入") {
                                     ManagementDetailContent {
-                                        CaptureMemorySource(
-                                            captureID: item.sourceCaptureID
-                                        )
-                                        MemoryAnalysisSourceView(
-                                            sourceText: item.sourceText
-                                        )
+                                        CaptureMemorySource(evidence: item)
                                     }
                                     .navigationTitle("记忆来源")
                                 }
@@ -434,14 +429,14 @@ struct MemoryDetailView: View {
                                 "归档个人记忆",
                                 systemImage: "archivebox"
                             ) {
-                                perform { try store.archive(memoryID) }
+                                perform { try await store.archive(memoryID) }
                             }
                         } else if memory.status == .archived {
                             Button(
                                 "恢复个人记忆",
                                 systemImage: "arrow.uturn.backward"
                             ) {
-                                perform { try store.restore(memoryID) }
+                                perform { try await store.restore(memoryID) }
                             }
                         }
 
@@ -485,7 +480,7 @@ struct MemoryDetailView: View {
         ) {
             Button("删除个人记忆", role: .destructive) {
                 perform {
-                    try store.delete(memoryID)
+                    try await store.delete(memoryID)
                     if let onDelete {
                         onDelete()
                     } else {
@@ -552,7 +547,7 @@ enum MemoryEditorMode: Identifiable {
 }
 
 struct MemoryEditorSheet: View {
-    @ObservedObject var store: MemoryStore
+    @ObservedObject var store: MemoryPresentationStore
     let mode: MemoryEditorMode
 
     @Environment(\.dismiss) private var dismiss
@@ -612,7 +607,7 @@ struct MemoryEditorSheet: View {
                     break
                 case .edit(let id), .replace(let id):
                     guard let saved = try store.memory(id).draft else {
-                        throw MemoryStore.StoreError.memoryUnavailable
+                        throw MemoryPresentationStore.StoreError.memoryUnavailable
                     }
                     draft = saved
                 }
@@ -640,36 +635,23 @@ struct MemoryEditorSheet: View {
 }
 
 private struct CaptureMemorySource: View {
-    @Query private var captures: [CaptureRecord]
-
-    init(captureID: UUID) {
-        _captures = Query(
-            filter: #Predicate<CaptureRecord> { $0.id == captureID }
-        )
-    }
+    let evidence: MorieMemoryEvidenceDTO
 
     var body: some View {
-        if let capture = captures.first {
-            LabeledContent(
-                "记录时间",
-                value: capture.createdAt.formatted(
-                    .dateTime
-                        .locale(Locale(identifier: "zh-Hans"))
-                        .year()
-                        .month()
-                        .day()
-                        .hour()
-                        .minute()
-                )
+        LabeledContent(
+            "记录时间",
+            value: evidence.capturedAt.formatted(
+                .dateTime
+                    .locale(Locale(identifier: "zh-Hans"))
+                    .year()
+                    .month()
+                    .day()
+                    .hour()
+                    .minute()
             )
-            if let app = capture.sourceApplicationName {
-                LabeledContent("来源应用", value: app)
-            }
-            Text(capture.finalText)
-                .textSelection(.enabled)
-        } else {
-            Text("来源输入已删除，独立保存的记忆证据仍可查阅。")
-                .foregroundStyle(.secondary)
-        }
+        )
+
+        Text(evidence.sourceText)
+            .textSelection(.enabled)
     }
 }

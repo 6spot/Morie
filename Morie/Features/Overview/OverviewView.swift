@@ -4,7 +4,7 @@ import SwiftUI
 @MainActor
 @Observable
 final class OverviewPageState {
-    var metricsSnapshot: CaptureUsageMetricsSnapshot?
+    var metricsSnapshot: MorieUsageMetricsDTO?
 }
 
 
@@ -13,7 +13,7 @@ struct OverviewView: View {
     private let controller: AppController
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var preferences: AppPreferencesController
-    @ObservedObject private var refinementModels: RefinementModelController
+    @ObservedObject private var refinementModels: RefinementModelPresentationController
     @ObservedObject private var setup: PermissionSetupController
     @ObservedObject private var applicationContextInspector: ApplicationContextInspectionStore
 

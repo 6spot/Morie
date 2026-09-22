@@ -378,9 +378,8 @@ private struct ControlCenterRouteHost: View {
             }
 
         case .dictionary:
-            if let dictionary = controller.dictionary {
-                DictionaryView(
-                    store: dictionary,
+            DictionaryView(
+                    store: controller.dictionary,
                     selection: $session.selectedDictionaryEntry,
                     search: $presentation.dictionarySearch,
                     showingEditor: $presentation.dictionaryShowingEditor,
