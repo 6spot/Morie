@@ -21,9 +21,9 @@ The current design source of truth is `docs/DESIGN.md`.
 - one persistent sidebar;
 - one persistent detail `NavigationStack`;
 - one `ControlCenterDetailHost`;
-- the shell owns primary title and top-level toolbar;
-- top-level pages do not install `.toolbar`, `.searchable` or replacement navigation roots;
-- toolbar search/filter/actions remain separate native toolbar items;
+- the shell owns the persistent NavigationSplitView / NavigationStack and primary title;
+- routed pages contribute route-specific search and actions through Apple-native `.searchable` / `.toolbar`;
+- the shell/router contains no route-specific toolbar switch, placeholder slots or custom toolbar configuration model;
 - Overview, Dictionary, Personal Memory, Settings and Permissions share `ControlCenterPage` and the same 24-point content origin;
 - History and Diagnostics are full-size workspaces inside the same shell;
 - page state updates must not invalidate the window-level shell.
@@ -40,14 +40,14 @@ The current design source of truth is `docs/DESIGN.md`.
 
 - native selectable list plus persistent detail workspace;
 - list has an explicit record-count header;
-- search/filter/record controls live in the shell toolbar;
+- History itself contributes native toolbar search/filter/record controls;
 - selected record exposes final text, recognition/refinement and original recording directly;
 - common record actions are directly visible;
 - internal split widths must never squeeze the outer sidebar.
 
 ### Dictionary
 
-- search and add/edit/delete live in the shell toolbar;
+- Dictionary itself contributes native toolbar search and add/edit/delete actions;
 - user and system terms remain clearly separated;
 - user terms are editable/selectable;
 - built-in terms are visibly read-only;
@@ -78,7 +78,7 @@ The current design source of truth is `docs/DESIGN.md`.
 ### Diagnostics
 
 - native Table plus selected-log detail workspace;
-- toolbar owns search/filter/copy/overflow actions;
+- Diagnostics itself contributes native toolbar search/filter/copy/overflow actions;
 - page shows a compact log-count/status strip;
 - workspace fills the available detail region.
 
@@ -100,7 +100,7 @@ The current design source of truth is `docs/DESIGN.md`.
 - [x] Rewrite `docs/DESIGN.md` as the current Morie UI source of truth.
 - [x] Keep one persistent Control Center shell.
 - [x] Add shared `ControlCenterPage` page rhythm.
-- [x] Keep native toolbar controls as separate items rather than one fused capsule.
+- [x] Remove the custom parent toolbar abstraction and let each page use Apple-native `.searchable` / `.toolbar` directly.
 - [x] Redesign Overview information hierarchy.
 - [x] Redesign Settings and remove unnecessary disclosure.
 - [x] Redesign Permissions around readiness and required actions.
@@ -123,7 +123,7 @@ The current design source of truth is `docs/DESIGN.md`.
 Check at the normal development window size and at the 960 × 600 minimum:
 
 - [ ] switch every top-level destination repeatedly with no sidebar/title flash;
-- [ ] toolbar controls remain separate native items and do not merge into one large capsule;
+- [ ] search fields use native toolbar search and never share one glass group with unrelated actions; related action buttons may group natively;
 - [ ] Overview, Dictionary, Memory, Settings and Permissions begin on the same content grid;
 - [ ] History starts immediately below the toolbar and never distorts the outer sidebar;
 - [ ] History selected-record detail shows ordinary content without disclosure clicks;
