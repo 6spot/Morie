@@ -186,7 +186,24 @@ Side effects caused by preference changes are coordinated with the appropriate o
 
 ## Control Center ownership
 
-The macOS Control Center has one window-level presentation owner.
+Morie separates the always-running voice-input runtime from the occasional Control Center UI at the **process boundary**.
+
+The resident Morie process owns the menu bar, global shortcut, live Capture workflow, Speech, refinement, delivery, background learning and runtime maintenance. It does not construct the Control Center SwiftUI/AppKit window hierarchy.
+
+Opening the Control Center launches a new instance of the same signed Morie application with the Control Center process role. The launcher uses the native `NSWorkspace.OpenConfiguration` new-instance capability rather than an additional helper executable or third-party process manager. Reusing the same application identity preserves the existing macOS permission identity, Keychain access, UserDefaults domain and application data locations without introducing a second product bundle.
+
+The Control Center process:
+
+- owns the Control Center `Window`, `NavigationSplitView`, sidebar and routed page hierarchy;
+- opens the existing SwiftData-backed product data for presentation and explicit user edits;
+- does not recover interrupted Captures, prune audio, install the global shortcut, prepare Speech, start Memory learning or run other resident-runtime bootstrap work;
+- proxies runtime-only actions such as starting a Capture, re-enabling runtime bootstrap and factory reset back to the resident process;
+- notifies the resident process after persisted configuration changes so its in-memory runtime configuration is refreshed;
+- terminates when the Control Center window closes.
+
+Process termination is the memory ownership boundary for SwiftUI/AppKit/CoreUI/font/language-service allocations warmed by Control Center presentation. Do not attempt to make the resident runtime purge framework-owned UI caches with `malloc` tricks, artificial cleanup loops or page-specific memory workarounds.
+
+Within the Control Center process, the UI still has one persistent window-level presentation owner.
 
 `MorieControlCenter` owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. A Control Center session owns only state that must survive route changes, such as the selected destination, sidebar visibility and cross-route selections.
 
@@ -196,18 +213,17 @@ The persistent detail host owns the primary navigation title and stable navigati
 
 Overview, Dictionary, Personal Memory, Settings and Permissions share the same `ControlCenterScrollableContent` geometry and the same 24-point outer content inset. Overview metrics live in a dedicated page state rather than `ControlCenterSession`, so asynchronous metric refreshes do not invalidate the window-level shell or toolbar. They must not introduce route-specific outer widths or an alternate top-level Form margin model. History and Diagnostics are full-size internal workspaces, but their split-view minimum widths must remain subordinate to the outer NavigationSplitView and must never squeeze the sidebar below its supported width range.
 
-Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center navigation shells or move unrelated feature state into `AppController`.
+Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center navigation shells or move unrelated feature state into the resident `AppController`.
 
-Control Center presentation memory follows the Control Center window lifecycle.
+Control Center presentation data follows the Control Center process/window lifecycle.
 
 - Overview never scans Capture history when the window opens. Capture usage metrics are persisted incrementally with Capture persistence and Overview reads only the small aggregate snapshot.
-- History owns a presentation-only `CaptureHistoryController` and `ModelContext` created for the Control Center session. The first page is bounded, further records load on demand, and the list/context/player are released when History or the Control Center closes.
-- Diagnostics writes runtime logs to disk regardless of UI visibility, but its in-memory Entry collection exists only while the Diagnostics page is visible. Leaving the page releases that collection.
-- Search, filters, selections and page snapshots belong to `ControlCenterPresentationState` and are reset when the Control Center closes.
-- Runtime Dictionary/Memory state is separate from Control Center presentation state because voice recognition/refinement can use those domains while the window is closed.
+- History owns a presentation-only `CaptureHistoryController` and `ModelContext` created for the Control Center session. The first page is bounded, further records load on demand, and the list/context/player are released when History is left. Closing the window additionally terminates the entire presentation process.
+- Diagnostics writes runtime logs to disk regardless of UI visibility, but its in-memory Entry collection exists only while the Diagnostics page is visible.
+- Search, filters, selections and page snapshots belong to `ControlCenterPresentationState`.
+- Runtime Dictionary/Memory state remains conceptually separate from Control Center presentation state because the resident Capture pipeline can use those domains while no Control Center process exists.
 
-Do not attach History/Diagnostics/Overview presentation collections to `AppController` or another application-lifetime owner.
-
+Do not attach History/Diagnostics/Overview presentation collections to a resident application-lifetime owner.
 ## Core input flow
 
 The primary interactive flow is:
