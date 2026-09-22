@@ -90,25 +90,22 @@ When a future requirement actually appears, redesign the relevant boundary then.
 
 ## Apple-native UI is mandatory
 
-For user-facing UI, `docs/DESIGN.md` is a required engineering constraint, not optional visual guidance.
+For any user-facing UI work, `docs/DESIGN.md` is an engineering constraint, not optional visual guidance.
 
-Before changing any Control Center or macOS page, read the relevant current design rules and inspect the peer pages that already implement the global pattern.
+Before changing a view, identify the existing global pattern for its hierarchy and responsibility.
 
-UI implementation must use current Apple platform capabilities and the existing shared Morie shell/layout before creating any custom solution.
+Implementation **must** reuse the shared design system and Apple-native platform behavior before considering custom UI.
 
 Developers and agents **must not**:
 
-- invent a page-specific title/header when the global navigation title exists;
-- create a custom toolbar/search system when SwiftUI `.toolbar` / `.searchable` provides the behavior;
-- introduce one-off spacing, fixed control widths, glass/capsule treatment or page chrome to make one page look different;
-- treat History, Diagnostics or another workspace page as permission to replace the global title/shell;
-- preserve an incorrect custom UI mechanism merely because code already exists.
+- create a local replacement for an existing global shell, title, toolbar, search, layout or interaction pattern;
+- recreate behavior already provided by SwiftUI/AppKit;
+- introduce one-off geometry, spacing, materials or control styling merely to distinguish one feature;
+- preserve an incorrect custom mechanism merely because it already exists.
 
-If an Apple-native/global solution is inadequate, identify the exact missing capability first. A custom implementation is allowed only for that missing capability, must remain minimal, and must be documented as an explicit exception in `docs/DESIGN.md` or an accepted decision.
+If the global/native solution cannot satisfy a concrete requirement, identify the missing capability first. A custom implementation must be minimal and must be documented as an explicit design or architecture exception before it becomes an accepted pattern.
 
-For non-UI platform functionality, continue to prefer current Apple frameworks and straightforward Swift implementations over recreating platform behavior.
-
-If a native non-UI solution is inadequate, choose the solution with the lowest total complexity.
+For non-UI platform functionality, prefer current Apple frameworks and straightforward Swift implementations over recreating platform behavior.
 
 ## External dependencies
 
@@ -183,7 +180,7 @@ Related cleanup is appropriate when it removes code made obsolete by the change 
 For normal development:
 
 1. Read the relevant current documentation. For any UI task, `docs/DESIGN.md` is mandatory.
-2. For UI changes, compare the target page with peer pages and identify the existing global Apple-native pattern before writing code.
+2. For UI changes, identify the existing global Apple-native pattern for the target hierarchy before writing code.
 3. Inspect the current implementation.
 4. Reproduce or understand the existing behavior.
 5. Identify the owning layer and root cause.
