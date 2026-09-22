@@ -48,6 +48,11 @@ final class CaptureHistoryController: ObservableObject {
             }
     }
 
+    deinit {
+        Diagnostics.record("History", "Control Center History controller deinitialized")
+        Diagnostics.recordMemory("control-center-history-deinit")
+    }
+
     var canLoadMoreCaptures: Bool {
         guard let total = listSignature?.count else { return false }
         return captures.count < total
