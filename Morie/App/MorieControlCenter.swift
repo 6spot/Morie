@@ -10,99 +10,6 @@ private enum ControlCenterLayout {
     static let sidebarMaxWidth: CGFloat = 260
 }
 
-struct ControlCenterToolbarSearch {
-    let prompt: String
-    let text: Binding<String>
-}
-
-struct ControlCenterToolbarFilter {
-    let content: AnyView
-
-    init<Content: View>(
-        @ViewBuilder content: () -> Content
-    ) {
-        self.content = AnyView(content())
-    }
-}
-
-struct ControlCenterToolbarAction: Identifiable {
-    let id: String
-    let content: AnyView
-
-    init<Content: View>(
-        _ id: String,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.id = id
-        self.content = AnyView(content())
-    }
-}
-
-struct ControlCenterToolbarConfiguration {
-    var search: ControlCenterToolbarSearch?
-    var filter: ControlCenterToolbarFilter?
-    var actions: [ControlCenterToolbarAction]
-
-    init(
-        search: ControlCenterToolbarSearch? = nil,
-        filter: ControlCenterToolbarFilter? = nil,
-        actions: [ControlCenterToolbarAction] = []
-    ) {
-        self.search = search
-        self.filter = filter
-        self.actions = actions
-    }
-
-    static let empty = ControlCenterToolbarConfiguration()
-}
-
-protocol ControlCenterToolbarProviding {
-    var controlCenterToolbar: ControlCenterToolbarConfiguration { get }
-}
-
-private struct ControlCenterToolbarContent: ToolbarContent {
-    let configuration: ControlCenterToolbarConfiguration
-
-    @ToolbarContentBuilder
-    var body: some ToolbarContent {
-        if let search = configuration.search {
-            ToolbarItem(placement: .primaryAction) {
-                TextField(search.prompt, text: search.text)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(
-                        minWidth: 180,
-                        idealWidth: 220,
-                        maxWidth: 280
-                    )
-            }
-        }
-
-        if configuration.search != nil
-            && (configuration.filter != nil || !configuration.actions.isEmpty) {
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-        }
-
-        if let filter = configuration.filter {
-            ToolbarItem(placement: .primaryAction) {
-                filter.content
-            }
-        }
-
-        if configuration.filter != nil
-            && !configuration.actions.isEmpty {
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-        }
-
-        if !configuration.actions.isEmpty {
-            ToolbarItemGroup(placement: .primaryAction) {
-                ForEach(configuration.actions) { action in
-                    action.content
-                }
-            }
-        }
-    }
-}
-
 struct ControlCenterScrollableContent<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -306,10 +213,6 @@ private final class ControlCenterPresentationState {
     var diagnosticLevel: DiagnosticLevel?
     var diagnosticConfirmsClear = false
 
-    var confirmsFactoryReset = false
-    var factoryResetInProgress = false
-    var factoryResetError: String?
-
     func reset() {
         history?.releasePresentationResources()
         history = nil
@@ -330,9 +233,6 @@ private final class ControlCenterPresentationState {
         diagnosticLevel = nil
         diagnosticConfirmsClear = false
 
-        confirmsFactoryReset = false
-        factoryResetInProgress = false
-        factoryResetError = nil
     }
 }
 
@@ -430,18 +330,7 @@ private struct ControlCenterSidebar: View {
 
 private struct ControlCenterDetailHost<Content: View>: View {
     let section: ControlCenterSection
-    let toolbar: ControlCenterToolbarConfiguration
     @ViewBuilder let content: Content
-
-    init(
-        section: ControlCenterSection,
-        toolbar: ControlCenterToolbarConfiguration = .empty,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.section = section
-        self.toolbar = toolbar
-        self.content = content()
-    }
 
     var body: some View {
         content
@@ -453,11 +342,6 @@ private struct ControlCenterDetailHost<Content: View>: View {
             .navigationTitle(
                 section == .history ? "" : section.title
             )
-            .toolbar {
-                ControlCenterToolbarContent(
-                    configuration: toolbar
-                )
-            }
     }
 }
 
@@ -514,50 +398,6 @@ private struct ControlCenterRouteHost: View {
     var body: some View {
         ControlCenterDetailHost(section: session.currentSection) {
             routedPage
-        }
-        .toolbar {
-            routeToolbar
-        }
-        .confirmationDialog(
-            "恢复出厂设置？",
-            isPresented: $presentation.confirmsFactoryReset,
-            titleVisibility: .visible
-        ) {
-            Button("恢复出厂设置", role: .destructive) {
-                presentation.factoryResetInProgress = true
-                Task {
-                    do {
-                        await presentation.history?.cancelRecognitionAndWait()
-                        try await controller.factoryReset()
-                    } catch {
-                        presentation.factoryResetInProgress = false
-                        presentation.factoryResetError = error.localizedDescription
-                    }
-                }
-            }
-
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text(
-                "将永久删除历史记录、原始录音、字典、个人记忆、学习数据、诊断日志和外部 API 配置，并把所有 Morie 设置恢复默认。Morie 随后会退出。macOS 已授予的系统权限不会被撤销。"
-            )
-        }
-        .alert(
-            "恢复出厂设置失败",
-            isPresented: Binding(
-                get: { presentation.factoryResetError != nil },
-                set: {
-                    if !$0 {
-                        presentation.factoryResetError = nil
-                    }
-                }
-            )
-        ) {
-            Button("好", role: .cancel) {
-                presentation.factoryResetError = nil
-            }
-        } message: {
-            Text(presentation.factoryResetError ?? "")
         }
     }
 
@@ -621,244 +461,6 @@ private struct ControlCenterRouteHost: View {
                 confirmsClear: $presentation.diagnosticConfirmsClear
             )
         }
-    }
-
-    @ToolbarContentBuilder
-    private var routeToolbar: some ToolbarContent {
-        if session.currentSection == .history {
-            ToolbarItem(placement: .primaryAction) {
-                toolbarSearchField(
-                    "搜索历史记录",
-                    text: $presentation.historySearch
-                )
-            }
-
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItem(placement: .primaryAction) {
-                Picker(
-                    "筛选记录",
-                    selection: $presentation.historyFilter
-                ) {
-                    ForEach(CaptureHistoryFilter.allCases) { item in
-                        Text(item.title).tag(item)
-                    }
-                }
-                .pickerStyle(.menu)
-            }
-
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItem(placement: .primaryAction) {
-                Button(
-                    "开始录音",
-                    systemImage: "mic",
-                    action: controller.startCaptureOnly
-                )
-                .disabled(!controller.canStartCapture)
-            }
-        }
-
-        if session.currentSection == .dictionary {
-            ToolbarItem(placement: .primaryAction) {
-                toolbarSearchField(
-                    "搜索词语",
-                    text: $presentation.dictionarySearch
-                )
-            }
-
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button("编辑词语", systemImage: "pencil") {
-                    guard let id = selectedDictionaryUserEntryID else {
-                        return
-                    }
-                    presentation.dictionaryEditingEntryID = id
-                    presentation.dictionaryShowingEditor = true
-                }
-                .disabled(selectedDictionaryUserEntryID == nil)
-
-                Button(
-                    "删除词语…",
-                    systemImage: "trash",
-                    role: .destructive
-                ) {
-                    presentation.dictionaryConfirmsDeletion = true
-                }
-                .disabled(selectedDictionaryUserEntryID == nil)
-
-                Button("添加词语", systemImage: "plus") {
-                    presentation.dictionaryEditingEntryID = nil
-                    presentation.dictionaryShowingEditor = true
-                }
-            }
-        }
-
-        if session.currentSection == .memory {
-            ToolbarItem(placement: .primaryAction) {
-                toolbarSearchField(
-                    "搜索个人记忆",
-                    text: $presentation.memorySearch
-                )
-            }
-
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItem(placement: .primaryAction) {
-                Button("告诉 Morie 一件事", systemImage: "plus") {
-                    presentation.memoryEditor = .create
-                }
-            }
-        }
-
-        if session.currentSection == .settings {
-            ToolbarItem(placement: .primaryAction) {
-                Button(
-                    "恢复出厂设置…",
-                    systemImage: "arrow.counterclockwise",
-                    role: .destructive
-                ) {
-                    presentation.confirmsFactoryReset = true
-                }
-                .disabled(
-                    presentation.factoryResetInProgress
-                        || controller.isCaptureActive
-                )
-            }
-        }
-
-        if session.currentSection == .permissions {
-            ToolbarItem(placement: .primaryAction) {
-                Button("重新检查", systemImage: "arrow.clockwise") {
-                    Task {
-                        await controller.setup.refresh()
-                    }
-                }
-                .disabled(permissionRefreshDisabled)
-            }
-        }
-
-        if session.currentSection == .diagnostics {
-            ToolbarItem(placement: .primaryAction) {
-                toolbarSearchField(
-                    "搜索诊断日志",
-                    text: $presentation.diagnosticSearch
-                )
-            }
-
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItem(placement: .primaryAction) {
-                Picker(
-                    "筛选日志",
-                    selection: $presentation.diagnosticLevel
-                ) {
-                    Text("全部日志")
-                        .tag(nil as DiagnosticLevel?)
-
-                    ForEach(
-                        [
-                            DiagnosticLevel.info,
-                            .warning,
-                            .error,
-                        ],
-                        id: \.self
-                    ) {
-                        Text($0.title).tag(Optional($0))
-                    }
-                }
-                .pickerStyle(.menu)
-            }
-
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button(
-                    "复制当前筛选",
-                    systemImage: "line.3.horizontal.decrease.circle"
-                ) {
-                    copyDiagnostics(filteredDiagnosticEntries)
-                }
-
-                Button("复制全部日志", systemImage: "doc.on.doc") {
-                    copyDiagnostics(DiagnosticLogStore.shared.entries)
-                }
-
-                Menu("诊断操作", systemImage: "ellipsis") {
-                    Button(
-                        "在访达中显示日志文件",
-                        systemImage: "doc.text.magnifyingglass"
-                    ) {
-                        NSWorkspace.shared.activateFileViewerSelecting(
-                            [DiagnosticLogStore.shared.logFileURL]
-                        )
-                    }
-
-                    Divider()
-
-                    Button(
-                        "清空诊断日志…",
-                        systemImage: "trash",
-                        role: .destructive
-                    ) {
-                        presentation.diagnosticConfirmsClear = true
-                    }
-                }
-            }
-        }
-    }
-
-    private func toolbarSearchField(
-        _ prompt: String,
-        text: Binding<String>
-    ) -> some View {
-        TextField(prompt, text: text)
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 220)
-    }
-
-    private var permissionRefreshDisabled: Bool {
-        controller.setup.isRefreshing
-            || controller.setup.activeRequest != nil
-            || controller.capabilities.isBootstrapping
-    }
-
-    private var selectedDictionaryUserEntryID: UUID? {
-        guard let dictionary = controller.dictionary,
-              let selectedID = session.selectedDictionaryEntry,
-              dictionary.displayEntries.first(
-                  where: { $0.id == selectedID }
-              )?.isEditable == true
-        else {
-            return nil
-        }
-        return selectedID
-    }
-
-    private var filteredDiagnosticEntries: [DiagnosticLogStore.Entry] {
-        let query = presentation.diagnosticSearch
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        return DiagnosticLogStore.shared.entries.filter { entry in
-            (presentation.diagnosticLevel == nil || entry.level == presentation.diagnosticLevel)
-                && (
-                    query.isEmpty
-                        || entry.category.localizedStandardContains(query)
-                        || entry.message.localizedStandardContains(query)
-                )
-        }
-    }
-
-    private func copyDiagnostics(
-        _ entries: [DiagnosticLogStore.Entry]
-    ) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(
-            DiagnosticLogStore.shared.text(for: entries),
-            forType: .string
-        )
     }
 
     private func unavailable(_ title: String) -> some View {
