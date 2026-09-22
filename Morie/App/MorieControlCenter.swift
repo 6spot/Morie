@@ -184,6 +184,11 @@ private final class ControlCenterSession {
         selectedDictionaryEntry = nil
         columnVisibility = .all
     }
+
+    deinit {
+        Diagnostics.record("ControlCenter", "Session deinitialized")
+        Diagnostics.recordMemory("control-center-session-deinit")
+    }
 }
 
 @MainActor
@@ -232,7 +237,11 @@ private final class ControlCenterPresentationState {
         diagnosticSearch = ""
         diagnosticLevel = nil
         diagnosticConfirmsClear = false
+    }
 
+    deinit {
+        Diagnostics.record("ControlCenter", "Presentation state deinitialized")
+        Diagnostics.recordMemory("control-center-presentation-deinit")
     }
 }
 
@@ -282,6 +291,10 @@ struct MorieControlCenter: View {
                 try? await Task.sleep(for: .seconds(4))
                 Diagnostics.recordMemory("control-center-unmounted+5s")
             }
+        }
+        .onChange(of: session.selection) { _, section in
+            let name = section?.rawValue ?? ControlCenterSection.overview.rawValue
+            Diagnostics.recordMemory("control-center-route-\(name)")
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .morieShowSettings)
