@@ -969,9 +969,7 @@ final class AppController {
                         name: .morieShowSettings,
                         object: nil
                     )
-                    NSApplication.shared.activate(
-                        ignoringOtherApps: true
-                    )
+                    NSApplication.shared.activate()
                 }
             }
         )
@@ -1314,9 +1312,7 @@ final class AppController {
         alert.informativeText = message
         alert.addButton(withTitle: "好")
 
-        NSApplication.shared.activate(
-            ignoringOtherApps: true
-        )
+        NSApplication.shared.activate()
         alert.runModal()
     }
 }
