@@ -49,6 +49,9 @@ struct ControlCenterRuntimeSnapshot: Codable, Sendable {
 }
 
 extension Notification.Name {
+    static let morieShowSettings = Notification.Name(
+        "MorieShowSettings"
+    )
     static let morieControlCenterRouteRequest = Notification.Name(
         "me.morie.mac.control-center.route-request"
     )
