@@ -328,10 +328,19 @@ final class AppController {
     func setAudioRetentionDays(_ days: Int) {
         let value = min(max(days, 1), 365)
 
+        if processRole == .controlCenter {
+            UserDefaults.standard.set(
+                value,
+                forKey: CaptureStore.audioRetentionDaysDefaultsKey
+            )
+            preferences.audioRetentionDays = value
+            notifyRuntimeOfSharedStateChange()
+            return
+        }
+
         do {
             try captureStore?.setAudioRetentionDays(value)
             preferences.audioRetentionDays = value
-            notifyRuntimeOfSharedStateChange()
         } catch {
             Diagnostics.record(
                 "CaptureStore",
@@ -1014,8 +1023,22 @@ final class AppController {
             setCaptureShortcut(shortcut)
         }
 
-        preferences.audioRetentionDays =
-            CaptureStore.audioRetentionDays
+        let audioRetentionDays = CaptureStore.audioRetentionDays
+        if audioRetentionDays != preferences.audioRetentionDays {
+            do {
+                try captureStore?.setAudioRetentionDays(
+                    audioRetentionDays
+                )
+                preferences.audioRetentionDays =
+                    audioRetentionDays
+            } catch {
+                Diagnostics.record(
+                    "CaptureStore",
+                    "Could not apply Control Center audio retention change: \(error.localizedDescription)",
+                    level: .warning
+                )
+            }
+        }
 
         let inputRefinementEnabled =
             defaults.object(
