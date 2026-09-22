@@ -44,6 +44,8 @@ final class MemoryStore: ObservableObject {
 
     @Published private(set) var entries: [MemoryRecord] = []
 
+    var onPersistentChange: (() -> Void)?
+
     private let container: ModelContainer
     private var context: ModelContext
     private let commit: (ModelContext) throws -> Void
@@ -93,6 +95,24 @@ final class MemoryStore: ObservableObject {
     func loadIfNeeded(now: Date = Date()) throws {
         guard !hasLoadedEntries else { return }
         try load(now: now)
+    }
+
+    func refreshAfterExternalChange() {
+        let shouldReload = hasLoadedEntries
+        resetContext()
+        hasLoadedEntries = false
+        entries.removeAll(keepingCapacity: false)
+
+        guard shouldReload else { return }
+        do {
+            try load()
+        } catch {
+            Diagnostics.record(
+                "Memory",
+                "Could not refresh after external change: \(error.localizedDescription)",
+                level: .warning
+            )
+        }
     }
 
     func analysisSource(for captureID: UUID) throws -> MemoryAnalysisSource {
@@ -936,6 +956,7 @@ final class MemoryStore: ObservableObject {
         }
         resetContext()
         try load()
+        onPersistentChange?()
     }
 
     private func analysis(
