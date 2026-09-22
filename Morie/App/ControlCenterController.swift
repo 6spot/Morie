@@ -70,6 +70,10 @@ final class ControlCenterController: ControlCenterControlling {
 
     private var distributedObservers: [NSObjectProtocol] = []
     private var iCloudStatusTask: Task<Void, Never>?
+    private var historyRecognitionRequests:
+        [UUID: CheckedContinuation<String, any Error>] = [:]
+    private var historyRecognitionTimeouts:
+        [UUID: Task<Void, Never>] = [:]
 
     init(
         captureStore: CaptureStore?,
@@ -211,8 +215,15 @@ final class ControlCenterController: ControlCenterControlling {
             CaptureHistoryController(
                 store: $0,
                 locale: Locale(identifier: "zh-CN"),
-                recognizeFile: { _, _ in
-                    throw CaptureStore.StoreError.audioUnavailable
+                recognizeFile: { [weak self] id, _, _ in
+                    guard let self else {
+                        throw ControllerError
+                            .persistenceUnavailable(
+                                "Morie 运行进程不可用。"
+                            )
+                    }
+                    return try await self
+                        .recognizeHistoryCapture(id)
                 }
             )
         }
@@ -456,6 +467,29 @@ final class ControlCenterController: ControlCenterControlling {
 
         distributedObservers.append(
             center.addObserver(
+                forName:
+                    .morieControlCenterHistoryRecognitionResult,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let result =
+                    ControlCenterProcessBridge
+                        .historyRecognitionResult(
+                            from: notification
+                        ) else {
+                    return
+                }
+
+                Task { @MainActor [weak self] in
+                    self?.finishHistoryRecognition(
+                        result
+                    )
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
                 forName: .morieControlCenterRuntimeSnapshot,
                 object: nil,
                 queue: .main
@@ -522,6 +556,86 @@ final class ControlCenterController: ControlCenterControlling {
                 }
             }
         )
+    }
+
+    private func recognizeHistoryCapture(
+        _ captureID: UUID
+    ) async throws -> String {
+        let requestID = UUID()
+
+        return try await withCheckedThrowingContinuation {
+            continuation in
+            historyRecognitionRequests[requestID] =
+                continuation
+            ControlCenterProcessBridge
+                .requestHistoryRecognition(
+                    captureID: captureID,
+                    requestID: requestID
+                )
+
+            historyRecognitionTimeouts[requestID] =
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(
+                        for: .seconds(90)
+                    )
+                    guard !Task.isCancelled,
+                          let self,
+                          let continuation =
+                            historyRecognitionRequests
+                                .removeValue(
+                                    forKey: requestID
+                                )
+                    else {
+                        return
+                    }
+
+                    historyRecognitionTimeouts[
+                        requestID
+                    ] = nil
+                    continuation.resume(
+                        throwing:
+                            ControllerError
+                                .persistenceUnavailable(
+                                    "重新识别请求超时。"
+                                )
+                    )
+                }
+        }
+    }
+
+    private func finishHistoryRecognition(
+        _ result: (
+            requestID: UUID,
+            text: String?,
+            error: String?
+        )
+    ) {
+        guard let continuation =
+            historyRecognitionRequests.removeValue(
+                forKey: result.requestID
+            ) else {
+            return
+        }
+
+        historyRecognitionTimeouts[
+            result.requestID
+        ]?.cancel()
+        historyRecognitionTimeouts[
+            result.requestID
+        ] = nil
+
+        if let text = result.text {
+            continuation.resume(returning: text)
+        } else {
+            continuation.resume(
+                throwing:
+                    ControllerError
+                        .persistenceUnavailable(
+                            result.error
+                                ?? "重新识别失败。"
+                        )
+            )
+        }
     }
 
     private func applyRuntimeSnapshot(
