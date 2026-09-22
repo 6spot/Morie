@@ -60,7 +60,7 @@ struct MemoryView: View {
             .font(.callout)
             .foregroundStyle(.secondary)
 
-            if !memoryEnabled {
+            if !preferences.personalMemoryEnabled {
                 Label(
                     "个人记忆已关闭。已有内容会保留，但 Morie 暂时不会继续学习，也不会在润色时使用这些内容。",
                     systemImage: "pause.circle"
@@ -555,7 +555,7 @@ struct MemoryEditorSheet: View {
     let mode: MemoryEditorMode
 
     @Environment(\.dismiss) private var dismiss
-    @State private var draft = MemoryDraft()
+    @State private var draft = MorieMemoryDraftDTO()
     @State private var errorMessage: String?
 
     var body: some View {

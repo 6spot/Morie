@@ -37,32 +37,32 @@ final class MemoryPresentationStore: ObservableObject {
         entries.first(where: { $0.id == id })?.evidence ?? []
     }
 
-    func create(_ draft: MemoryDraft) async throws {
+    func create(_ draft: MorieMemoryDraftDTO) async throws {
         entries = try await client.mutateMemory(.init(
             action: .create,
-            kind: draft.kind.rawValue,
+            kind: draft.kind,
             name: draft.name,
             notes: draft.notes
         ))
         hasLoaded = true
     }
 
-    func update(_ id: UUID, draft: MemoryDraft) async throws {
+    func update(_ id: UUID, draft: MorieMemoryDraftDTO) async throws {
         entries = try await client.mutateMemory(.init(
             action: .update,
             id: id,
-            kind: draft.kind.rawValue,
+            kind: draft.kind,
             name: draft.name,
             notes: draft.notes
         ))
         hasLoaded = true
     }
 
-    func replace(_ id: UUID, with draft: MemoryDraft) async throws {
+    func replace(_ id: UUID, with draft: MorieMemoryDraftDTO) async throws {
         entries = try await client.mutateMemory(.init(
             action: .replace,
             id: id,
-            kind: draft.kind.rawValue,
+            kind: draft.kind,
             name: draft.name,
             notes: draft.notes
         ))

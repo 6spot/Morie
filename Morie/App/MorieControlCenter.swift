@@ -154,7 +154,8 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
             MemoryView(
                 store: controller.memory,
                 search: $presentation.memorySearch,
-                editor: $presentation.memoryEditor
+                editor: $presentation.memoryEditor,
+                preferences: controller.preferences
             )
 
         case .settings: "设置"

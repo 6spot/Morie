@@ -24,7 +24,7 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
             true
         case .captureOnly:
             capture.deliveryModeRawValue
-                == CaptureDeliveryMode.captureOnly.rawValue
+                == MorieCaptureDeliveryModeDTO.captureOnly.rawValue
         case .needsAttention:
             capture.lifecycle == .failed
                 || capture.lifecycle == .deliveryFailed
@@ -544,7 +544,7 @@ struct CaptureDetailView: View {
             LabeledContent(
                 "保存位置",
                 value: capture.deliveryModeRawValue
-                    == CaptureDeliveryMode.captureOnly.rawValue
+                    == MorieCaptureDeliveryModeDTO.captureOnly.rawValue
                     ? "历史记录"
                     : "当前应用"
             )

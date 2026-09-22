@@ -2,6 +2,18 @@ import AppKit
 import ApplicationServices
 import Foundation
 
+
+private extension CaptureShortcut {
+    var requiredModifiers: CGEventFlags {
+        switch self {
+        case .functionKey: .maskSecondaryFn
+        case .controlSpace: .maskControl
+        case .optionSpace: .maskAlternate
+        case .commandShiftSpace: [.maskCommand, .maskShift]
+        }
+    }
+}
+
 /// Minimal macOS 27 voice-capture shortcut.
 ///
 /// Morie intentionally supports one focused keyboard interaction here. This is
