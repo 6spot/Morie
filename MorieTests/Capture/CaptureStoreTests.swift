@@ -32,7 +32,7 @@ final class CaptureStoreTests: XCTestCase {
 
         var reader = ModelContext(store.container)
         var descriptor = FetchDescriptor<CaptureRecord>(predicate: #Predicate { $0.id == id })
-        var persisted = try XCTUnwrap(reader.fetch(descriptor).first)
+        let persisted = try XCTUnwrap(reader.fetch(descriptor).first)
         XCTAssertEqual(persisted.lifecycle, .delivered)
         XCTAssertEqual(persisted.finalText, "newer")
 
