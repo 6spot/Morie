@@ -6,26 +6,26 @@ enum MorieRuntimeIPC {
 }
 
 @objc protocol MorieRuntimeXPCProtocol {
-    func runtimeSnapshot(reply: @escaping (Data?, String?) -> Void)
-    func startCaptureOnly(reply: @escaping (String?) -> Void)
-    func bootstrap(_ completingSetup: Bool, reply: @escaping (String?) -> Void)
-    func performPermissionAction(_ requirement: String, reply: @escaping (String?) -> Void)
+    func runtimeSnapshot(reply: @escaping @Sendable (Data?, String?) -> Void)
+    func startCaptureOnly(reply: @escaping @Sendable (String?) -> Void)
+    func bootstrap(_ completingSetup: Bool, reply: @escaping @Sendable (String?) -> Void)
+    func performPermissionAction(_ requirement: String, reply: @escaping @Sendable (String?) -> Void)
 
-    func historyPage(_ limit: Int, reply: @escaping (Data?, String?) -> Void)
-    func historyDetail(_ captureID: String, reply: @escaping (Data?, String?) -> Void)
-    func deleteHistory(_ captureID: String, reply: @escaping (String?) -> Void)
-    func rerecognizeHistory(_ captureID: String, reply: @escaping (Data?, String?) -> Void)
-    func cancelRerecognition(_ captureID: String, reply: @escaping (String?) -> Void)
+    func historyPage(_ limit: Int, reply: @escaping @Sendable (Data?, String?) -> Void)
+    func historyDetail(_ captureID: String, reply: @escaping @Sendable (Data?, String?) -> Void)
+    func deleteHistory(_ captureID: String, reply: @escaping @Sendable (String?) -> Void)
+    func rerecognizeHistory(_ captureID: String, reply: @escaping @Sendable (Data?, String?) -> Void)
+    func cancelRerecognition(_ captureID: String, reply: @escaping @Sendable (String?) -> Void)
 
-    func dictionarySnapshot(reply: @escaping (Data?, String?) -> Void)
-    func mutateDictionary(_ request: Data, reply: @escaping (Data?, String?) -> Void)
+    func dictionarySnapshot(reply: @escaping @Sendable (Data?, String?) -> Void)
+    func mutateDictionary(_ request: Data, reply: @escaping @Sendable (Data?, String?) -> Void)
 
-    func memorySnapshot(reply: @escaping (Data?, String?) -> Void)
-    func mutateMemory(_ request: Data, reply: @escaping (Data?, String?) -> Void)
+    func memorySnapshot(reply: @escaping @Sendable (Data?, String?) -> Void)
+    func mutateMemory(_ request: Data, reply: @escaping @Sendable (Data?, String?) -> Void)
 
-    func mutateSettings(_ request: Data, reply: @escaping (Data?, String?) -> Void)
-    func clearExpressionProfile(reply: @escaping (Data?, String?) -> Void)
-    func factoryReset(reply: @escaping (String?) -> Void)
+    func mutateSettings(_ request: Data, reply: @escaping @Sendable (Data?, String?) -> Void)
+    func clearExpressionProfile(reply: @escaping @Sendable (Data?, String?) -> Void)
+    func factoryReset(reply: @escaping @Sendable (String?) -> Void)
 }
 
 enum MorieRuntimeCodec {

@@ -34,7 +34,7 @@ final class MorieRuntimeXPCServer: NSObject, NSXPCListenerDelegate {
     }
 }
 
-private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
+private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol, @unchecked Sendable {
     private let controller: MorieRuntimeController
     @MainActor private var activeHistoryControllers:
         [UUID: RuntimeCaptureHistoryController] = [:]
@@ -43,13 +43,13 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
         self.controller = controller
     }
 
-    func runtimeSnapshot(reply: @escaping (Data?, String?) -> Void) {
+    func runtimeSnapshot(reply: @escaping @Sendable (Data?, String?) -> Void) {
         Task { @MainActor in
             reply(self.encodedSnapshot(), nil)
         }
     }
 
-    func startCaptureOnly(reply: @escaping (String?) -> Void) {
+    func startCaptureOnly(reply: @escaping @Sendable (String?) -> Void) {
         Task { @MainActor in
             guard self.controller.canStartCapture else {
                 reply("Morie Runtime 当前还不能开始录音。")
@@ -62,7 +62,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func bootstrap(
         _ completingSetup: Bool,
-        reply: @escaping (String?) -> Void
+        reply: @escaping @Sendable (String?) -> Void
     ) {
         Task { @MainActor in
             await self.controller.bootstrap(
@@ -74,7 +74,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func performPermissionAction(
         _ requirement: String,
-        reply: @escaping (String?) -> Void
+        reply: @escaping @Sendable (String?) -> Void
     ) {
         Task { @MainActor in
             guard let requirement = Self.requirement(from: requirement) else {
@@ -88,7 +88,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func historyPage(
         _ limit: Int,
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -118,7 +118,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func historyDetail(
         _ captureID: String,
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -132,7 +132,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func deleteHistory(
         _ captureID: String,
-        reply: @escaping (String?) -> Void
+        reply: @escaping @Sendable (String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -159,7 +159,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func rerecognizeHistory(
         _ captureID: String,
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -194,7 +194,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func cancelRerecognition(
         _ captureID: String,
-        reply: @escaping (String?) -> Void
+        reply: @escaping @Sendable (String?) -> Void
     ) {
         Task { @MainActor in
             guard let id = UUID(uuidString: captureID) else {
@@ -214,7 +214,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
     }
 
     func dictionarySnapshot(
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -228,7 +228,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func mutateDictionary(
         _ request: Data,
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -274,7 +274,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
     }
 
     func memorySnapshot(
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -288,7 +288,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func mutateMemory(
         _ request: Data,
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -360,7 +360,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
 
     func mutateSettings(
         _ request: Data,
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             do {
@@ -455,7 +455,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
     }
 
     func clearExpressionProfile(
-        reply: @escaping (Data?, String?) -> Void
+        reply: @escaping @Sendable (Data?, String?) -> Void
     ) {
         Task { @MainActor in
             self.controller.clearExpressionProfile()
@@ -463,7 +463,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
         }
     }
 
-    func factoryReset(reply: @escaping (String?) -> Void) {
+    func factoryReset(reply: @escaping @Sendable (String?) -> Void) {
         Task { @MainActor in
             do {
                 try await self.controller.factoryReset()

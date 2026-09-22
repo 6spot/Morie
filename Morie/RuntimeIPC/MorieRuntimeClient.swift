@@ -1,6 +1,31 @@
 import Foundation
 import ServiceManagement
 
+private final class MorieXPCContinuationGate<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Error>?
+
+    init(_ continuation: CheckedContinuation<Value, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning value: Value) {
+        take()?.resume(returning: value)
+    }
+
+    func resume(throwing error: Error) {
+        take()?.resume(throwing: error)
+    }
+
+    private func take() -> CheckedContinuation<Value, Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        let value = continuation
+        continuation = nil
+        return value
+    }
+}
+
 @MainActor
 final class MorieRuntimeClient {
     enum ClientError: LocalizedError {
@@ -169,7 +194,7 @@ final class MorieRuntimeClient {
     }
 
     private func remoteProxy(
-        errorHandler: @escaping (Error) -> Void
+        errorHandler: @escaping @Sendable (Error) -> Void
     ) throws -> MorieRuntimeXPCProtocol {
         let connection = try resolvedConnection()
         guard let proxy = connection.remoteObjectProxyWithErrorHandler(
@@ -212,32 +237,28 @@ final class MorieRuntimeClient {
     private func dataRequest(
         _ body: @escaping (
             MorieRuntimeXPCProtocol,
-            @escaping (Data?, String?) -> Void
+            @escaping @Sendable (Data?, String?) -> Void
         ) -> Void
     ) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
+            let gate = MorieXPCContinuationGate(continuation)
             do {
-                var resumed = false
                 let proxy = try remoteProxy { error in
-                    guard !resumed else { return }
-                    resumed = true
-                    continuation.resume(throwing: error)
+                    gate.resume(throwing: error)
                 }
                 body(proxy) { data, message in
-                    guard !resumed else { return }
-                    resumed = true
                     if let message {
-                        continuation.resume(
+                        gate.resume(
                             throwing: ClientError.serviceUnavailable(message)
                         )
                     } else if let data {
-                        continuation.resume(returning: data)
+                        gate.resume(returning: data)
                     } else {
-                        continuation.resume(throwing: ClientError.invalidResponse)
+                        gate.resume(throwing: ClientError.invalidResponse)
                     }
                 }
             } catch {
-                continuation.resume(throwing: error)
+                gate.resume(throwing: error)
             }
         }
     }
@@ -245,32 +266,29 @@ final class MorieRuntimeClient {
     private func voidRequest(
         _ body: @escaping (
             MorieRuntimeXPCProtocol,
-            @escaping (String?) -> Void
+            @escaping @Sendable (String?) -> Void
         ) -> Void
     ) async throws {
         try await withCheckedThrowingContinuation {
             (continuation: CheckedContinuation<Void, Error>) in
+            let gate = MorieXPCContinuationGate(continuation)
             do {
-                var resumed = false
                 let proxy = try remoteProxy { error in
-                    guard !resumed else { return }
-                    resumed = true
-                    continuation.resume(throwing: error)
+                    gate.resume(throwing: error)
                 }
                 body(proxy) { message in
-                    guard !resumed else { return }
-                    resumed = true
                     if let message {
-                        continuation.resume(
+                        gate.resume(
                             throwing: ClientError.serviceUnavailable(message)
                         )
                     } else {
-                        continuation.resume()
+                        gate.resume(returning: ())
                     }
                 }
             } catch {
-                continuation.resume(throwing: error)
+                gate.resume(throwing: error)
             }
         }
     }
+
 }
