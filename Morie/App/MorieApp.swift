@@ -1,10 +1,6 @@
 import AppKit
 import SwiftUI
 
-private enum ControlCenterWindowIdentity: String, Codable, Hashable {
-    case main
-}
-
 @main
 struct MorieApp: App {
     private let processRole: MorieProcessRole
@@ -369,7 +365,10 @@ struct MorieSettingsView: View {
                     "润色模型",
                     selection: Binding(
                         get: { refinementModels.mode },
-                        set: { refinementModels.setMode($0) }
+                        set: {
+                            refinementModels.setMode($0)
+                            controller.notifyRuntimeOfSharedStateChange()
+                        }
                     )
                 ) {
                     ForEach(RefinementModelMode.allCases) { mode in
@@ -454,6 +453,7 @@ struct MorieSettingsView: View {
                         refinementPrompts.restoreDefault()
                         refinementInstructions =
                             refinementPrompts.instructions
+                        controller.notifyRuntimeOfSharedStateChange()
                     }
                     .disabled(
                         refinementPrompts.isDefault
@@ -469,6 +469,7 @@ struct MorieSettingsView: View {
                         ) {
                             refinementInstructions =
                                 refinementPrompts.instructions
+                            controller.notifyRuntimeOfSharedStateChange()
                         }
                     }
                     .keyboardShortcut(.defaultAction)
@@ -525,6 +526,7 @@ struct MorieSettingsView: View {
                     ) {
                         if refinementModels.clearCloudAPIKey() {
                             cloudAPIKey = ""
+                            controller.notifyRuntimeOfSharedStateChange()
                         }
                     }
 
@@ -539,6 +541,7 @@ struct MorieSettingsView: View {
                             cloudBaseURL = refinementModels.cloudBaseURL
                             cloudModelName = refinementModels.cloudModelName
                             cloudAPIKey = ""
+                            controller.notifyRuntimeOfSharedStateChange()
                         }
                     }
                 }
