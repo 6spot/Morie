@@ -55,7 +55,7 @@ Morie Runtime
 
 ## Development-stage migration policy
 
-Morie is still in active development. M-045 does **not** preserve or migrate pre-M-045 local data, preference domains or process-owned state. Do not add compatibility shims for old development builds; the Runtime starts from the current architecture and its own process-owned defaults/store state.
+Morie is still in active development. M-045 makes **no compatibility guarantee** for pre-M-045 local data, preference domains or process-owned state. Do not add migration or compatibility shims for old development builds; existing development data may be reused or discarded only as a consequence of the current implementation.
 
 ## Runtime-owned capabilities
 
