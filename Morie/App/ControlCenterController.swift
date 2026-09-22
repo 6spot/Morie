@@ -289,8 +289,7 @@ final class ControlCenterController: ControlCenterControlling {
         MorieDefaults.shared.set(
             enabled,
             forKey:
-                PostInsertionLearningController
-                    .dictionarySuggestionsDefaultsKey
+                MoriePreferenceKey.dictionarySuggestionsEnabled
         )
         notifyRuntimeOfSharedStateChange()
     }
