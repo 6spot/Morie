@@ -438,7 +438,14 @@ final class RefinementModelPresentationController: ObservableObject {
 
     func setMode(_ mode: RefinementModelMode) {
         self.mode = mode
-        mutate(.init(action: .refinementMode, stringValue: mode.rawValue))
+        Task {
+            _ = await mutate(
+                .init(
+                    action: .refinementMode,
+                    stringValue: mode.rawValue
+                )
+            )
+        }
     }
 
     @discardableResult
