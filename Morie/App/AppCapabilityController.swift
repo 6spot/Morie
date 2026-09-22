@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-struct SpeechBackendPresentation: Equatable, Sendable {
+struct SpeechBackendPresentation: Codable, Equatable, Sendable {
     let displayName: String
     let localeIdentifier: String
     let isFallback: Bool
