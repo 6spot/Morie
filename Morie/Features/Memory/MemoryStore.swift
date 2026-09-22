@@ -95,12 +95,6 @@ final class MemoryStore: ObservableObject {
         try load(now: now)
     }
 
-    func releaseLoadedEntries() {
-        entries.removeAll(keepingCapacity: false)
-        hasLoadedEntries = false
-        resetContext()
-    }
-
     func analysisSource(for captureID: UUID) throws -> MemoryAnalysisSource {
         let capture = try requireSource(captureID)
         let reader = ModelContext(container)
