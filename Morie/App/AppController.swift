@@ -955,6 +955,69 @@ final class AppController {
 
         distributedObservers.append(
             center.addObserver(
+                forName:
+                    .morieRuntimeHistoryRecognitionRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let request =
+                    ControlCenterProcessBridge
+                        .historyRecognitionRequest(
+                            from: notification
+                        ) else {
+                    return
+                }
+
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+
+                    do {
+                        guard let captureStore else {
+                            throw ControllerError
+                                .persistenceUnavailable(
+                                    "记录存储尚未初始化。"
+                                )
+                        }
+
+                        try await captureStore
+                            .flushPersistence(
+                                for: request.captureID
+                            )
+                        let url = try captureStore
+                            .sourceAudioURL(
+                                for: request.captureID
+                            )
+                        let text = try await
+                            CaptureFileTranscriber
+                                .recognize(
+                                    url,
+                                    Locale(
+                                        identifier: "zh-CN"
+                                    )
+                                )
+                        ControlCenterProcessBridge
+                            .publishHistoryRecognitionResult(
+                                requestID:
+                                    request.requestID,
+                                text: text,
+                                error: nil
+                            )
+                    } catch {
+                        ControlCenterProcessBridge
+                            .publishHistoryRecognitionResult(
+                                requestID:
+                                    request.requestID,
+                                text: nil,
+                                error:
+                                    error.localizedDescription
+                            )
+                    }
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
                 forName: .morieRuntimeSharedStateChanged,
                 object: nil,
                 queue: .main
