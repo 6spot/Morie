@@ -7,6 +7,7 @@
 
 /* Begin PBXBuildFile section */
 		A1000000000000000000002A /* ControlCenterProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ControlCenterProcess.swift */; };
+		A20000000000000000000024 /* ControlCenterProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ControlCenterProcess.swift */; };
 		A90000000000000000000001 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
 		A90000000000000000000002 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
 		A80000000000000000000003 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
@@ -666,6 +667,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A20000000000000000000024 /* ControlCenterProcess.swift in Sources */,
 				A90000000000000000000002 /* SpeechContextHints.swift in Sources */,
 				A80000000000000000000003 /* ApplicationContext.swift in Sources */,
 				A50000000000000000000004 /* RefinementModelSettings.swift in Sources */,
