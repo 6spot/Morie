@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 
 enum MorieProcessRole: Equatable {
@@ -200,53 +201,85 @@ enum ControlCenterProcessBridge {
 
 @MainActor
 enum ControlCenterProcessLauncher {
-    static func open(_ route: ControlCenterLaunchRoute = .overview) {
-        Diagnostics.recordMemory("control-center-process-launch-request")
+    private static var launchedPID: pid_t?
+
+    static func open(
+        _ route: ControlCenterLaunchRoute = .overview
+    ) {
+        Diagnostics.recordMemory(
+            "control-center-process-launch-request"
+        )
 
         if let existing = runningControlCenterProcess() {
-            if route != .overview {
-                ControlCenterProcessBridge.requestRoute(route)
-            }
+            launchedPID = existing.processIdentifier
+            ControlCenterProcessBridge.requestRoute(route)
             _ = existing.activate(options: [])
             return
         }
 
-        let configuration = NSWorkspace.OpenConfiguration()
-        configuration.activates = true
-        configuration.createsNewApplicationInstance = true
-        configuration.arguments = [
-            MorieProcessRole.controlCenterArgument,
-            route.argument,
-        ]
+        if let launchedPID,
+           kill(launchedPID, 0) == 0 {
+            ControlCenterProcessBridge.requestRoute(route)
+            return
+        }
 
-        NSWorkspace.shared.openApplication(
-            at: Bundle.main.bundleURL,
-            configuration: configuration
-        ) { application, error in
-            if let error {
-                Diagnostics.record(
-                    "ControlCenterProcess",
-                    "Could not launch Control Center process: \(error.localizedDescription)",
-                    level: .error
-                )
-                return
-            }
+        let executableURL = controlCenterExecutableURL
+        guard FileManager.default.isExecutableFile(
+            atPath: executableURL.path
+        ) else {
+            Diagnostics.record(
+                "ControlCenterProcess",
+                "Embedded helper is missing or not executable at \(executableURL.path)",
+                level: .error
+            )
+            return
+        }
+
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = [route.argument]
+
+        do {
+            try process.run()
+            launchedPID = process.processIdentifier
 
             Diagnostics.record(
                 "ControlCenterProcess",
-                "Launched pid=\(application?.processIdentifier ?? 0); route=\(route.rawValue)"
+                "Launched helper pid=\(process.processIdentifier); route=\(route.rawValue)"
+            )
+
+            if let application = NSRunningApplication(
+                processIdentifier: process.processIdentifier
+            ) {
+                _ = application.activate(options: [])
+            }
+        } catch {
+            launchedPID = nil
+            Diagnostics.record(
+                "ControlCenterProcess",
+                "Could not launch Control Center helper: \(error.localizedDescription)",
+                level: .error
             )
         }
     }
 
-    private static func runningControlCenterProcess() -> NSRunningApplication? {
-        guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
-            return nil
-        }
+    private static var controlCenterExecutableURL: URL {
+        Bundle.main.bundleURL
+            .appending(path: "Contents/Helpers")
+            .appending(path: "Morie Control Center")
+    }
 
-        let currentPID = ProcessInfo.processInfo.processIdentifier
-        return NSRunningApplication
-            .runningApplications(withBundleIdentifier: bundleIdentifier)
-            .first { $0.processIdentifier != currentPID }
+    private static func runningControlCenterProcess()
+        -> NSRunningApplication? {
+        let helperURL =
+            controlCenterExecutableURL.standardizedFileURL
+        return NSWorkspace.shared.runningApplications
+            .first {
+                $0.processIdentifier
+                    != ProcessInfo.processInfo.processIdentifier
+                    && $0.executableURL?
+                        .standardizedFileURL == helperURL
+            }
     }
 }
+
