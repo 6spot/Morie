@@ -4,7 +4,8 @@ import SwiftUI
 @main
 struct MorieApp: App {
     private let processRole: MorieProcessRole
-    private let controller: AppController
+    private let runtimeController: AppController?
+    private let controlCenterController: ControlCenterController?
     private let captureStore: CaptureStore?
 
     init() {
@@ -12,45 +13,45 @@ struct MorieApp: App {
         processRole = role
 
         let wantsICloud = ICloudSyncSettings.isEnabled
+        var resolvedStore: CaptureStore?
+        var persistenceError: Error?
+        var cloudSyncStartupError: Error?
+
         do {
-            let store = try CaptureStore(
+            resolvedStore = try CaptureStore(
                 cloudSyncEnabled: wantsICloud,
                 performsLaunchMaintenance: role == .runtime
             )
-            captureStore = store
-            controller = AppController(
-                captureStore: store,
-                processRole: role
-            )
         } catch where wantsICloud {
-            // Optional iCloud must never make local input unusable. If the
-            // CloudKit-backed SwiftData configuration cannot open, retry the
-            // same current schema locally and surface the cloud failure.
+            cloudSyncStartupError = error
             do {
-                let store = try CaptureStore(
+                resolvedStore = try CaptureStore(
                     cloudSyncEnabled: false,
                     performsLaunchMaintenance: role == .runtime
                 )
-                captureStore = store
-                controller = AppController(
-                    captureStore: store,
-                    cloudSyncStartupError: error,
-                    processRole: role
-                )
             } catch {
-                captureStore = nil
-                controller = AppController(
-                    captureStore: nil,
-                    persistenceError: error,
-                    processRole: role
-                )
+                persistenceError = error
             }
         } catch {
-            captureStore = nil
-            controller = AppController(
-                captureStore: nil,
-                persistenceError: error,
-                processRole: role
+            persistenceError = error
+        }
+
+        captureStore = resolvedStore
+
+        if role == .runtime {
+            runtimeController = AppController(
+                captureStore: resolvedStore,
+                persistenceError: persistenceError,
+                cloudSyncStartupError: cloudSyncStartupError,
+                processRole: .runtime
+            )
+            controlCenterController = nil
+        } else {
+            runtimeController = nil
+            controlCenterController = ControlCenterController(
+                captureStore: resolvedStore,
+                persistenceError: persistenceError,
+                cloudSyncStartupError: cloudSyncStartupError
             )
         }
     }
@@ -59,18 +60,24 @@ struct MorieApp: App {
         MenuBarExtra(
             isInserted: .constant(processRole == .runtime)
         ) {
-            MorieMenuContent(controller: controller)
+            if let runtimeController {
+                MorieMenuContent(controller: runtimeController)
+            }
         } label: {
-            MorieMenuBarLabel(controller: controller)
+            if let runtimeController {
+                MorieMenuBarLabel(controller: runtimeController)
+            }
         }
         .menuBarExtraStyle(.menu)
 
         Window("Morie", id: "control-center") {
             Group {
                 if processRole == .controlCenter {
-                    if let captureStore {
-                        MorieControlCenter(controller: controller)
-                            .modelContainer(captureStore.container)
+                    if let captureStore, let controlCenterController {
+                        MorieControlCenter(
+                            controller: controlCenterController
+                        )
+                        .modelContainer(captureStore.container)
                     } else {
                         ContentUnavailableView(
                             "Morie 暂不可用",
@@ -144,8 +151,9 @@ struct MorieApp: App {
 
         Window("欢迎使用 Morie", id: "setup") {
             Group {
-                if processRole == .runtime {
-                    MorieSetupView(controller: controller)
+                if processRole == .runtime,
+                   let runtimeController {
+                    MorieSetupView(controller: runtimeController)
                 } else {
                     EmptyView()
                 }
