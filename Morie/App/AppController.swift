@@ -408,6 +408,12 @@ final class AppController {
     }
 
     func factoryReset() async throws {
+        if processRole == .controlCenter {
+            ControlCenterProcessBridge.requestFactoryReset()
+            NSApplication.shared.terminate(nil)
+            return
+        }
+
         guard !isCaptureActive else {
             throw ControllerError.factoryResetUnavailable(
                 "录音或润色进行中，暂时不能恢复出厂设置。"
@@ -468,6 +474,7 @@ final class AppController {
                     "已关闭，重启 Morie 后停止 iCloud 同步。"
                 )
                 : .off
+            notifyRuntimeOfSharedStateChange()
             return
         }
 
@@ -498,6 +505,7 @@ final class AppController {
                     : .restartRequired(
                         "已开启，重启 Morie 后开始 iCloud 同步。"
                     )
+                self.notifyRuntimeOfSharedStateChange()
 
             case .failure(let error):
                 self.preferences.iCloudSyncEnabled = false
@@ -577,6 +585,10 @@ final class AppController {
     }
 
     func startCaptureOnly() {
+        if processRole == .controlCenter {
+            ControlCenterProcessBridge.requestCaptureOnly()
+            return
+        }
         startNewCapture(deliveryMode: .captureOnly)
     }
 
@@ -602,6 +614,12 @@ final class AppController {
     func bootstrap(
         completingSetup: Bool = false
     ) async {
+        if processRole == .controlCenter {
+            ControlCenterProcessBridge.requestBootstrap()
+            await prepareControlCenterProcess()
+            return
+        }
+
         guard !captureSession.isActive,
               !capabilities.isBootstrapping,
               setup.activeRequest == nil else {
