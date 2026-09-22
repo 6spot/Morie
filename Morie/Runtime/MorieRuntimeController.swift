@@ -416,8 +416,6 @@ final class MorieRuntimeController {
 
         try await captureStore.eraseAllDataForFactoryReset()
         DiagnosticLogStore.shared.clear()
-
-        NSApplication.shared.terminate(nil)
     }
 
     func setICloudSyncEnabled(_ enabled: Bool) {

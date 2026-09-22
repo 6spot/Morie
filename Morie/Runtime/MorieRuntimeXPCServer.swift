@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftData
 
@@ -35,6 +36,8 @@ final class MorieRuntimeXPCServer: NSObject, NSXPCListenerDelegate {
 
 private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
     private let controller: MorieRuntimeController
+    @MainActor private var activeHistoryControllers:
+        [UUID: RuntimeCaptureHistoryController] = [:]
 
     init(controller: MorieRuntimeController) {
         self.controller = controller
@@ -95,14 +98,13 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
                 let context = ModelContext(store.container)
                 context.autosaveEnabled = false
 
-                var descriptor = FetchDescriptor<CaptureRecord>(
-                    sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+                let safeLimit = max(1, min(limit, 500))
+                let captures = try context.fetch(
+                    CaptureHistoryQuery.descriptor(limit: safeLimit)
                 )
-                descriptor.fetchLimit = max(1, min(limit, 500))
-                let captures = try context.fetch(descriptor)
-                let total = try context.fetchCount(
-                    FetchDescriptor<CaptureRecord>()
-                )
+                let total = try CaptureHistoryQuery
+                    .signature(in: context)
+                    .count
                 let payload = MorieHistoryPageDTO(
                     captures: captures.map { Self.captureDTO($0) },
                     totalCount: total
@@ -137,6 +139,12 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
                 guard let store = self.controller.captureStore,
                       let id = UUID(uuidString: captureID)
                 else { throw RuntimeError.persistenceUnavailable }
+
+                if let active = self.activeHistoryControllers[id] {
+                    await active.cancelRecognitionAndWait()
+                    self.activeHistoryControllers[id] = nil
+                }
+
                 let history = RuntimeCaptureHistoryController(
                     store: store,
                     locale: Locale(identifier: "zh-CN")
@@ -158,21 +166,50 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
                 guard let store = self.controller.captureStore,
                       let id = UUID(uuidString: captureID)
                 else { throw RuntimeError.persistenceUnavailable }
+                guard self.activeHistoryControllers[id] == nil else {
+                    throw RuntimeError.settingsRejected(
+                        "这条记录正在重新识别。"
+                    )
+                }
 
                 let history = RuntimeCaptureHistoryController(
                     store: store,
                     locale: Locale(identifier: "zh-CN")
                 )
                 history.setInputActive(self.controller.isCaptureActive)
+                self.activeHistoryControllers[id] = history
                 history.recognizeAgain(id)
-                while history.recognizingCaptureID != nil {
-                    try await Task.sleep(for: .milliseconds(50))
+                await history.waitForRecognition()
+                if self.activeHistoryControllers[id] === history {
+                    self.activeHistoryControllers[id] = nil
                 }
+
                 let payload = try self.historyDetailDTO(captureID)
                 reply(try MorieRuntimeCodec.encode(payload), nil)
             } catch {
                 reply(nil, error.localizedDescription)
             }
+        }
+    }
+
+    func cancelRerecognition(
+        _ captureID: String,
+        reply: @escaping (String?) -> Void
+    ) {
+        Task { @MainActor in
+            guard let id = UUID(uuidString: captureID) else {
+                reply("无效的历史记录标识。")
+                return
+            }
+            guard let history = self.activeHistoryControllers[id] else {
+                reply(nil)
+                return
+            }
+            await history.cancelRecognitionAndWait()
+            if self.activeHistoryControllers[id] === history {
+                self.activeHistoryControllers[id] = nil
+            }
+            reply(nil)
         }
     }
 
@@ -269,7 +306,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
                         throw RuntimeError.invalidRequest
                     }
                     let kind = mutation.kind
-                        .flatMap(MemoryKind.init(rawValue:))
+                        .flatMap { MemoryKind(rawValue: $0.rawValue) }
                         ?? .fact
                     return MemoryDraft(
                         kind: kind,
@@ -431,6 +468,10 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
             do {
                 try await self.controller.factoryReset()
                 reply(nil)
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    NSApplication.shared.terminate(nil)
+                }
             } catch {
                 reply(error.localizedDescription)
             }
@@ -598,7 +639,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
             MorieDictionaryEntryDTO(
                 id: $0.id,
                 name: $0.name,
-                source: $0.source
+                source: MorieDictionaryEntrySourceDTO(rawValue: $0.source.rawValue) ?? .manual
             )
         }
     }
@@ -620,14 +661,16 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
                 id: record.id,
                 createdAt: record.createdAt,
                 updatedAt: record.updatedAt,
-                kind: kind.rawValue,
-                scope: scope.rawValue,
-                status: status.rawValue,
-                archiveReason: record.archiveReason?.rawValue,
+                kind: MorieMemoryKindDTO(rawValue: kind.rawValue),
+                scope: MorieMemoryScopeDTO(rawValue: scope.rawValue),
+                status: MorieMemoryStatusDTO(rawValue: status.rawValue),
+                archiveReason: record.archiveReason.flatMap {
+                    MorieMemoryArchiveReasonDTO(rawValue: $0.rawValue)
+                },
                 name: record.name,
                 notes: record.notes,
                 sourceCaptureIDs: record.sourceCaptureIDs,
-                origin: origin,
+                origin: MorieMemoryOriginDTO(rawValue: origin.rawValue),
                 lastEvidenceAt: record.lastEvidenceAt,
                 confidence: record.confidence,
                 expiresAt: record.expiresAt,
@@ -651,8 +694,12 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
     ) -> MorieCaptureDTO {
         let refinement = capture.refinement.map {
             MorieCaptureRefinementDTO(
-                status: $0.status.rawValue,
-                reason: $0.reason?.rawValue,
+                status:
+                    MorieRefinementStatusDTO(rawValue: $0.status.rawValue)
+                    ?? .failed,
+                reason: $0.reason.flatMap {
+                    MorieRefinementReasonDTO(rawValue: $0.rawValue)
+                },
                 reasonMessage: $0.reason?.message,
                 durationSeconds: $0.durationSeconds
             )
@@ -661,8 +708,14 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
             id: capture.id,
             createdAt: capture.createdAt,
             updatedAt: capture.updatedAt,
-            lifecycle: capture.lifecycleRawValue,
-            deliveryMode: capture.deliveryModeRawValue,
+            lifecycle:
+                MorieCaptureLifecycleDTO(rawValue: capture.lifecycleRawValue)
+                ?? .failed,
+            deliveryMode:
+                MorieCaptureDeliveryModeDTO(
+                    rawValue: capture.deliveryModeRawValue
+                )
+                ?? .currentApp,
             recognizedText: capture.recognizedText,
             finalText: capture.finalText,
             sourceApplicationName: capture.sourceApplicationName,

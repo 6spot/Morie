@@ -17,6 +17,7 @@ final class CaptureHistoryController: ObservableObject {
     private let runtimeState: () -> Bool
     private var selectedCaptureID: UUID?
     private var playbackObservation: NSKeyValueObservation?
+    private var recognitionTask: Task<Void, Never>?
     private var listLimit = 0
     private var totalCount = 0
     private var isListVisible = false
@@ -47,6 +48,8 @@ final class CaptureHistoryController: ObservableObject {
 
     func releasePresentationResources() {
         isListVisible = false
+        recognitionTask?.cancel()
+        recognitionTask = nil
         releasePlayer()
         selectedCaptureID = nil
         recognitionMessage = nil
@@ -93,13 +96,21 @@ final class CaptureHistoryController: ObservableObject {
         recognitionMessage = nil
         pausePlayback()
 
-        Task {
-            defer { recognizingCaptureID = nil }
+        recognitionTask = Task {
+            defer {
+                recognizingCaptureID = nil
+                recognitionTask = nil
+            }
             do {
                 let updated = try await client.rerecognizeHistory(id)
+                try Task.checkCancellation()
                 replace(updated)
-                recognitionMessage = "识别结果已保存，可复制文字到其他应用使用。"
+                recognitionMessage =
+                    updated.lastRecognitionErrorDescription
+                    ?? "识别结果已保存，可复制文字到其他应用使用。"
                 configurePlayer(for: updated)
+            } catch is CancellationError {
+                recognitionMessage = nil
             } catch {
                 recognitionMessage = error.localizedDescription
             }
@@ -107,8 +118,11 @@ final class CaptureHistoryController: ObservableObject {
     }
 
     func cancelRecognition() {
-        // Runtime owns native recognition. Cancellation is added only when the
-        // Runtime can cooperatively cancel the underlying Speech request.
+        guard let id = recognizingCaptureID else { return }
+        recognitionTask?.cancel()
+        Task {
+            try? await client.cancelRerecognition(id)
+        }
     }
 
     func deleteCapture(_ id: UUID) async throws {

@@ -105,6 +105,12 @@ final class MorieRuntimeClient {
         return try MorieRuntimeCodec.decode(MorieCaptureDTO.self, from: data)
     }
 
+    func cancelRerecognition(_ id: UUID) async throws {
+        try await voidRequest { proxy, reply in
+            proxy.cancelRerecognition(id.uuidString, reply: reply)
+        }
+    }
+
     func dictionarySnapshot() async throws -> [MorieDictionaryEntryDTO] {
         let data = try await dataRequest { proxy, reply in
             proxy.dictionarySnapshot(reply: reply)
