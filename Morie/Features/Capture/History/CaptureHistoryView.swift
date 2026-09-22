@@ -72,8 +72,8 @@ struct CaptureHistoryWorkspace: View {
                 onRecord: controller.startCaptureOnly,
                 onLoadMore: history.loadMoreCaptures
             )
+            .frame(width: 340)
             .frame(
-                width: 340,
                 maxHeight: .infinity,
                 alignment: .topLeading
             )
