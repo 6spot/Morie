@@ -184,6 +184,19 @@ final class RefinementModelController: ObservableObject {
         )
     }
 
+    func reloadPersistedConfiguration() {
+        let saved = RefinementModelSettings.load()
+        mode = saved.mode
+        cloudBaseURL = saved.cloudBaseURL
+        cloudModelName = saved.cloudModelName
+        cachedAPIKey = nil
+        settingsMessage = nil
+        DevelopmentDiagnostics.record(
+            "CloudConfig",
+            "controllerReloaded; mode=\(saved.mode.rawValue); host=\(saved.cloudURL?.host ?? "none"); model=\(saved.trimmedCloudModelName.isEmpty ? "none" : saved.trimmedCloudModelName); keychainCacheCleared=true"
+        )
+    }
+
     @discardableResult
     func saveCloudConfiguration(
         baseURL: String,
