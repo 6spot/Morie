@@ -6,6 +6,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1000000000000000000002A /* ControlCenterProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ControlCenterProcess.swift */; };
 		A90000000000000000000001 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
 		A90000000000000000000002 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
 		A80000000000000000000003 /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* ApplicationContext.swift */; };
@@ -101,6 +102,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000044 /* ControlCenterProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterProcess.swift; sourceTree = "<group>"; };
 		BA0000000000000000000001 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		BA0000000000000000000002 /* LocalSigning.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = LocalSigning.xcconfig.example; sourceTree = "<group>"; };
 		B90000000000000000000001 /* SpeechContextHints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechContextHints.swift; sourceTree = "<group>"; };
@@ -225,6 +227,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000001 /* MorieApp.swift */,
+				B10000000000000000000044 /* ControlCenterProcess.swift */,
 				B10000000000000000000002 /* AppController.swift */,
 				B70000000000000000000001 /* AppRuntimeController.swift */,
 				B70000000000000000000002 /* AppPreferencesController.swift */,
@@ -606,6 +609,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000002A /* ControlCenterProcess.swift in Sources */,
 				A90000000000000000000001 /* SpeechContextHints.swift in Sources */,
 				A80000000000000000000001 /* ApplicationContext.swift in Sources */,
 				A80000000000000000000002 /* ApplicationContextCollector.swift in Sources */,
