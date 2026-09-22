@@ -97,7 +97,7 @@ final class ControlCenterController: ControlCenterControlling {
             ExpressionProfileStore(container: $0.container)
         }
 
-        let defaults = UserDefaults.standard
+        let defaults = MorieDefaults.shared
         let savedPersonalMemoryEnabled =
             PersonalMemorySettings.isEnabled
         let savedShortcut = defaults
@@ -263,7 +263,7 @@ final class ControlCenterController: ControlCenterControlling {
 
     func setAudioRetentionDays(_ days: Int) {
         let value = min(max(days, 1), 365)
-        UserDefaults.standard.set(
+        MorieDefaults.shared.set(
             value,
             forKey: CaptureStore.audioRetentionDaysDefaultsKey
         )
@@ -273,7 +273,7 @@ final class ControlCenterController: ControlCenterControlling {
 
     func setInputRefinementEnabled(_ enabled: Bool) {
         preferences.inputRefinementEnabled = enabled
-        UserDefaults.standard.set(
+        MorieDefaults.shared.set(
             enabled,
             forKey: MoriePreferenceKey.inputRefinementEnabled
         )
@@ -288,7 +288,7 @@ final class ControlCenterController: ControlCenterControlling {
 
     func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
         preferences.correctionSuggestionsEnabled = enabled
-        UserDefaults.standard.set(
+        MorieDefaults.shared.set(
             enabled,
             forKey:
                 PostInsertionLearningController
@@ -299,7 +299,7 @@ final class ControlCenterController: ControlCenterControlling {
 
     func setExpressionLearningEnabled(_ enabled: Bool) {
         preferences.expressionLearningEnabled = enabled
-        UserDefaults.standard.set(
+        MorieDefaults.shared.set(
             enabled,
             forKey: MoriePreferenceKey.expressionLearningEnabled
         )
@@ -308,7 +308,7 @@ final class ControlCenterController: ControlCenterControlling {
 
     func setSoundFeedbackEnabled(_ enabled: Bool) {
         preferences.soundFeedbackEnabled = enabled
-        UserDefaults.standard.set(
+        MorieDefaults.shared.set(
             enabled,
             forKey: MoriePreferenceKey.soundFeedbackEnabled
         )
@@ -320,7 +320,7 @@ final class ControlCenterController: ControlCenterControlling {
             return
         }
         preferences.captureShortcut = shortcut
-        UserDefaults.standard.set(
+        MorieDefaults.shared.set(
             shortcut.rawValue,
             forKey: CaptureShortcut.defaultsKey
         )
