@@ -649,8 +649,12 @@ final class AppController {
             CaptureHistoryController(
                 store: $0,
                 locale: Locale(identifier: "zh-CN"),
-                recognizeFile:
-                    CaptureFileTranscriber.recognize
+                recognizeFile: { _, url, locale in
+                    try await CaptureFileTranscriber.recognize(
+                        url,
+                        locale
+                    )
+                }
             )
         }
     }
