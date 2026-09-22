@@ -61,7 +61,7 @@ struct CaptureHistoryWorkspace: View {
     }
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             CaptureHistoryView(
                 captures: history.captures,
                 selection: $selection,
@@ -73,12 +73,12 @@ struct CaptureHistoryWorkspace: View {
                 onLoadMore: history.loadMoreCaptures
             )
             .frame(
-                minWidth: 340,
-                idealWidth: 340,
-                maxWidth: 340,
+                width: 340,
                 maxHeight: .infinity,
                 alignment: .topLeading
             )
+
+            Divider()
 
             CaptureHistoryDetailPane(
                 controller: controller,
@@ -90,7 +90,6 @@ struct CaptureHistoryWorkspace: View {
                 maxWidth: .infinity,
                 maxHeight: .infinity
             )
-            .layoutPriority(1)
         }
         .frame(
             maxWidth: .infinity,
