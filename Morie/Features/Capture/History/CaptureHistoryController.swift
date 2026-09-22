@@ -209,21 +209,21 @@ final class CaptureHistoryController: ObservableObject {
             playbackStateObservation = player.observe(
                 \.timeControlStatus,
                 options: [.initial, .new]
-            ) { [weak self, weak player] player, _ in
-                Task { @MainActor [weak self, weak player] in
-                    guard let self, let player,
+            ) { [weak self] observedPlayer, _ in
+                Task { @MainActor [weak self] in
+                    guard let self,
                           self.selectedCaptureID == id,
-                          self.player === player
+                          self.player === observedPlayer
                     else {
                         return
                     }
                     self.isPlaying =
-                        player.timeControlStatus == .playing
+                        observedPlayer.timeControlStatus == .playing
                 }
             }
 
             playbackEndObserver = NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemDidPlayToEndTime,
+                forName: AVPlayerItem.didPlayToEndTimeNotification,
                 object: item,
                 queue: .main
             ) { [weak self, weak item] _ in
