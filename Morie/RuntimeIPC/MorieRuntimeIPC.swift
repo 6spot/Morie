@@ -182,7 +182,7 @@ struct MorieMemoryDTO: Codable, Equatable, Identifiable, Sendable {
     let name: String
     let notes: String
     let sourceCaptureIDs: [UUID]
-    let origin: String
+    let origin: MemoryOrigin?
     let lastEvidenceAt: Date
     let confidence: Double?
     let expiresAt: Date?
@@ -232,4 +232,21 @@ struct MorieSettingsMutationDTO: Codable, Equatable, Sendable {
     var baseURL: String? = nil
     var modelName: String? = nil
     var apiKey: String? = nil
+}
+
+
+extension MorieCaptureDTO {
+    var deliveryModeRawValue: String { deliveryMode.rawValue }
+}
+
+extension MorieMemoryDTO {
+    var draft: MemoryDraft? {
+        guard let kind, let scope else { return nil }
+        return MemoryDraft(
+            kind: kind,
+            name: name,
+            notes: notes,
+            scope: scope
+        )
+    }
 }

@@ -596,7 +596,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
             MorieDictionaryEntryDTO(
                 id: $0.id,
                 name: $0.name,
-                source: $0.source.rawValue
+                source: $0.source
             )
         }
     }
@@ -625,7 +625,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
                 name: record.name,
                 notes: record.notes,
                 sourceCaptureIDs: record.sourceCaptureIDs,
-                origin: origin.rawValue,
+                origin: origin,
                 lastEvidenceAt: record.lastEvidenceAt,
                 confidence: record.confidence,
                 expiresAt: record.expiresAt,
