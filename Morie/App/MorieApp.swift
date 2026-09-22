@@ -234,22 +234,25 @@ extension Notification.Name {
     static let morieShowSettings = Notification.Name("MorieShowSettings")
 }
 
-private struct MorieCommands: Commands {
-    @Environment(\.openWindow) private var openWindow
-
+private struct MorieRuntimeCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appSettings) {
             Button("设置…") {
-                Task { @MainActor in
-                    MorieApplicationActivation.prepareToOpenWindow()
-                    openWindow(
-                        id: "control-center",
-                        value: ControlCenterWindowIdentity.main
-                    )
-                    NSApplication.shared.activate()
-                    await Task.yield()
-                    NotificationCenter.default.post(name: .morieShowSettings, object: nil)
-                }
+                ControlCenterProcessLauncher.open(.settings)
+            }
+            .keyboardShortcut(",", modifiers: .command)
+        }
+    }
+}
+
+private struct MorieControlCenterCommands: Commands {
+    var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button("设置…") {
+                NotificationCenter.default.post(
+                    name: .morieShowSettings,
+                    object: nil
+                )
             }
             .keyboardShortcut(",", modifiers: .command)
         }
@@ -283,16 +286,13 @@ private struct MorieMenuContent: View {
         Button("打开 Morie") {
             Task {
                 await setup.refresh()
-                MorieApplicationActivation.prepareToOpenWindow()
                 if capabilities.needsSetup || !setup.isReady {
+                    MorieApplicationActivation.prepareToOpenWindow()
                     openWindow(id: "setup")
+                    NSApplication.shared.activate()
                 } else {
-                    openWindow(
-                        id: "control-center",
-                        value: ControlCenterWindowIdentity.main
-                    )
+                    ControlCenterProcessLauncher.open(.overview)
                 }
-                NSApplication.shared.activate()
             }
         }
         .disabled(capabilities.isBootstrapping)
