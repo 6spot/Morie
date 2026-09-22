@@ -42,7 +42,8 @@ final class CaptureStore: ObservableObject {
 
     init(
         inMemory: Bool = false, storageURL: URL? = nil, audioDirectory: URL? = nil,
-        cloudSyncEnabled requestedCloudSync: Bool = false
+        cloudSyncEnabled requestedCloudSync: Bool = false,
+        performsLaunchMaintenance: Bool = true
     ) throws {
         let schema = Schema([
             CaptureRecord.self,
@@ -99,9 +100,11 @@ final class CaptureStore: ObservableObject {
             ).appending(path: "Morie/CaptureAudio", directoryHint: .isDirectory)
         }
         try FileManager.default.createDirectory(at: self.audioDirectory, withIntermediateDirectories: true)
-        try recoverInterruptedCaptures()
-        try pruneExpiredAudio()
-        try ensureUsageMetricsRecord()
+        if performsLaunchMaintenance {
+            try recoverInterruptedCaptures()
+            try pruneExpiredAudio()
+            try ensureUsageMetricsRecord()
+        }
     }
 
     func beginVoiceCapture(
