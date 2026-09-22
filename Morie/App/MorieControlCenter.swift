@@ -269,6 +269,8 @@ struct MorieControlCenter: View {
         .onDisappear {
             DiagnosticLogStore.shared.setPresentationVisible(false)
             presentation.reset()
+            controller.dictionary?.releaseLoadedEntries()
+            controller.memory?.releaseLoadedEntries()
             session.resetPresentation()
 
             Diagnostics.record("ControlCenter", "Shell unmounted")
