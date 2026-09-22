@@ -652,7 +652,7 @@ final class AppController {
                 recognizeFile: { _, url, locale in
                     try await CaptureFileTranscriber.recognize(
                         url,
-                        locale
+                        locale: locale
                     )
                 }
             )
@@ -991,7 +991,7 @@ final class AppController {
                             CaptureFileTranscriber
                                 .recognize(
                                     url,
-                                    Locale(
+                                    locale: Locale(
                                         identifier: "zh-CN"
                                     )
                                 )
