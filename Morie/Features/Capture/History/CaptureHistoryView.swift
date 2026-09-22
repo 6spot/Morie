@@ -62,47 +62,34 @@ struct CaptureHistoryWorkspace: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ControlCenterWorkspaceHeader(
-                "历史记录",
-                subtitle: "查看保存的文字、识别结果和原始录音",
-                trailingText: "\(history.captures.count) 条记录"
+        HSplitView {
+            CaptureHistoryView(
+                captures: history.captures,
+                selection: $selection,
+                search: $search,
+                filter: $filter,
+                canStartCapture: canStartCapture,
+                canLoadMore: history.canLoadMoreCaptures,
+                onRecord: controller.startCaptureOnly,
+                onLoadMore: history.loadMoreCaptures
             )
-
-            HSplitView {
-                CaptureHistoryView(
-                    captures: history.captures,
-                    selection: $selection,
-                    search: $search,
-                    filter: $filter,
-                    canStartCapture: canStartCapture,
-                    canLoadMore: history.canLoadMoreCaptures,
-                    onRecord: controller.startCaptureOnly,
-                    onLoadMore: history.loadMoreCaptures
-                )
-                .frame(
-                    minWidth: 250,
-                    idealWidth: 320,
-                    maxWidth: 360,
-                    maxHeight: .infinity,
-                    alignment: .topLeading
-                )
-
-                CaptureHistoryDetailPane(
-                    controller: controller,
-                    history: history,
-                    selectedCaptureID: selection
-                )
-                .frame(
-                    minWidth: 0,
-                    maxWidth: .infinity,
-                    maxHeight: .infinity
-                )
-            }
             .frame(
-                maxWidth: .infinity,
+                minWidth: 250,
+                idealWidth: 320,
+                maxWidth: 360,
                 maxHeight: .infinity,
                 alignment: .topLeading
+            )
+
+            CaptureHistoryDetailPane(
+                controller: controller,
+                history: history,
+                selectedCaptureID: selection
+            )
+            .frame(
+                minWidth: 0,
+                maxWidth: .infinity,
+                maxHeight: .infinity
             )
         }
         .frame(
