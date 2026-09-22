@@ -295,6 +295,10 @@ struct MorieControlCenter: View {
         .onChange(of: session.selection) { _, section in
             let name = section?.rawValue ?? ControlCenterSection.overview.rawValue
             Diagnostics.recordMemory("control-center-route-\(name)")
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                Diagnostics.recordMemory("control-center-route-\(name)+1s")
+            }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .morieShowSettings)
