@@ -68,6 +68,14 @@ extension Notification.Name {
     static let morieRuntimePermissionActionRequest = Notification.Name(
         "me.morie.mac.runtime.permission-action-request"
     )
+    static let morieRuntimeHistoryRecognitionRequest =
+        Notification.Name(
+            "me.morie.mac.runtime.history-recognition-request"
+        )
+    static let morieControlCenterHistoryRecognitionResult =
+        Notification.Name(
+            "me.morie.mac.control-center.history-recognition-result"
+        )
     static let morieControlCenterSharedDataChanged = Notification.Name(
         "me.morie.mac.control-center.shared-data-changed"
     )
@@ -92,6 +100,10 @@ enum ControlCenterProcessBridge {
     private static let routeKey = "route"
     private static let snapshotKey = "snapshot"
     private static let requirementKey = "requirement"
+    private static let requestIDKey = "requestID"
+    private static let captureIDKey = "captureID"
+    private static let textKey = "text"
+    private static let errorKey = "error"
 
     static func requestRoute(_ route: ControlCenterLaunchRoute) {
         DistributedNotificationCenter.default().postNotificationName(
@@ -159,6 +171,81 @@ enum ControlCenterProcessBridge {
             return nil
         }
         return SetupRequirement(rawValue: rawValue)
+    }
+
+    static func requestHistoryRecognition(
+        captureID: UUID,
+        requestID: UUID
+    ) {
+        DistributedNotificationCenter.default()
+            .postNotificationName(
+                .morieRuntimeHistoryRecognitionRequest,
+                object: nil,
+                userInfo: [
+                    requestIDKey: requestID.uuidString,
+                    captureIDKey: captureID.uuidString,
+                ],
+                deliverImmediately: true
+            )
+    }
+
+    static func historyRecognitionRequest(
+        from notification: Notification
+    ) -> (requestID: UUID, captureID: UUID)? {
+        guard let requestRaw =
+                notification.userInfo?[requestIDKey] as? String,
+              let captureRaw =
+                notification.userInfo?[captureIDKey] as? String,
+              let requestID = UUID(uuidString: requestRaw),
+              let captureID = UUID(uuidString: captureRaw)
+        else {
+            return nil
+        }
+        return (requestID, captureID)
+    }
+
+    static func publishHistoryRecognitionResult(
+        requestID: UUID,
+        text: String?,
+        error: String?
+    ) {
+        var userInfo: [String: Any] = [
+            requestIDKey: requestID.uuidString
+        ]
+        if let text {
+            userInfo[textKey] = text
+        }
+        if let error {
+            userInfo[errorKey] = error
+        }
+
+        DistributedNotificationCenter.default()
+            .postNotificationName(
+                .morieControlCenterHistoryRecognitionResult,
+                object: nil,
+                userInfo: userInfo,
+                deliverImmediately: true
+            )
+    }
+
+    static func historyRecognitionResult(
+        from notification: Notification
+    ) -> (
+        requestID: UUID,
+        text: String?,
+        error: String?
+    )? {
+        guard let requestRaw =
+                notification.userInfo?[requestIDKey] as? String,
+              let requestID = UUID(uuidString: requestRaw)
+        else {
+            return nil
+        }
+        return (
+            requestID,
+            notification.userInfo?[textKey] as? String,
+            notification.userInfo?[errorKey] as? String
+        )
     }
 
     static func notifySharedStateChanged() {
