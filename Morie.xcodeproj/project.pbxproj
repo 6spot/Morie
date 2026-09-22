@@ -6,6 +6,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1000000000000000000002B /* ControlCenterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000045 /* ControlCenterController.swift */; };
 		A1000000000000000000002A /* ControlCenterProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ControlCenterProcess.swift */; };
 		A20000000000000000000024 /* ControlCenterProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ControlCenterProcess.swift */; };
 		A90000000000000000000001 /* SpeechContextHints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* SpeechContextHints.swift */; };
@@ -103,6 +104,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000045 /* ControlCenterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterController.swift; sourceTree = "<group>"; };
 		B10000000000000000000044 /* ControlCenterProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterProcess.swift; sourceTree = "<group>"; };
 		BA0000000000000000000001 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		BA0000000000000000000002 /* LocalSigning.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = LocalSigning.xcconfig.example; sourceTree = "<group>"; };
@@ -229,6 +231,7 @@
 			children = (
 				B10000000000000000000001 /* MorieApp.swift */,
 				B10000000000000000000044 /* ControlCenterProcess.swift */,
+				B10000000000000000000045 /* ControlCenterController.swift */,
 				B10000000000000000000002 /* AppController.swift */,
 				B70000000000000000000001 /* AppRuntimeController.swift */,
 				B70000000000000000000002 /* AppPreferencesController.swift */,
@@ -610,6 +613,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000002B /* ControlCenterController.swift in Sources */,
 				A1000000000000000000002A /* ControlCenterProcess.swift in Sources */,
 				A90000000000000000000001 /* SpeechContextHints.swift in Sources */,
 				A80000000000000000000001 /* ApplicationContext.swift in Sources */,
