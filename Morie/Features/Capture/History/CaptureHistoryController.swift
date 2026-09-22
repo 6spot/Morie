@@ -5,7 +5,8 @@ import SwiftData
 
 @MainActor
 final class CaptureHistoryController: ObservableObject {
-    typealias RecognizeFile = @Sendable (URL, Locale) async throws -> String
+    typealias RecognizeFile =
+        @Sendable (UUID, URL, Locale) async throws -> String
 
     @Published private(set) var player: AVPlayer?
     @Published private(set) var audioMessage: String?
@@ -235,7 +236,11 @@ final class CaptureHistoryController: ObservableObject {
                 try Task.checkCancellation()
                 guard !self.isInputActive else { throw CancellationError() }
 
-                let text = try await recognizeFile(url, locale)
+                let text = try await recognizeFile(
+                    id,
+                    url,
+                    locale
+                )
                 try Task.checkCancellation()
                 guard !self.isInputActive else { throw CancellationError() }
                 try self.store.saveReRecognition(text, for: id)
