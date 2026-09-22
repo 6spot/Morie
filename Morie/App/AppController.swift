@@ -724,8 +724,18 @@ final class AppController {
             }
 
             try await captureSession.prepareSpeech()
-            capabilities.speechBackend =
-                await captureSession.preparedSpeechBackend()
+            if let backend =
+                await captureSession.preparedSpeechBackend() {
+                capabilities.speechBackend =
+                    SpeechBackendPresentation(
+                        displayName: backend.displayName,
+                        localeIdentifier:
+                            backend.localeIdentifier,
+                        isFallback: backend.isFallback
+                    )
+            } else {
+                capabilities.speechBackend = nil
+            }
 
             try Task.checkCancellation()
             guard runtime.state == .checking else {
