@@ -1,10 +1,13 @@
 import AppKit
 import SwiftUI
 
+private enum ControlCenterWindowIdentity: String, Codable, Hashable {
+    case main
+}
+
 @main
 struct MorieApp: App {
     private let controller: AppController
-    @Environment(\.openWindow) private var openWindow
     private let captureStore: CaptureStore?
 
     init() {
@@ -48,7 +51,11 @@ struct MorieApp: App {
         }
         .menuBarExtraStyle(.menu)
 
-        Window("Morie", id: "control-center") {
+        WindowGroup(
+            "Morie",
+            id: "control-center",
+            for: ControlCenterWindowIdentity.self
+        ) { _ in
             Group {
                 if let captureStore {
                     MorieControlCenter(controller: controller)
@@ -70,7 +77,9 @@ struct MorieApp: App {
             }
         }
         .defaultSize(width: 1120, height: 720)
+        .defaultLaunchBehavior(.suppressed)
         .commands {
+            CommandGroup(replacing: .newItem) { }
             SidebarCommands()
             MorieCommands()
         }
@@ -181,7 +190,10 @@ private struct MorieCommands: Commands {
             Button("设置…") {
                 Task { @MainActor in
                     MorieApplicationActivation.prepareToOpenWindow()
-                    openWindow(id: "control-center")
+                    openWindow(
+                        id: "control-center",
+                        value: ControlCenterWindowIdentity.main
+                    )
                     NSApplication.shared.activate()
                     await Task.yield()
                     NotificationCenter.default.post(name: .morieShowSettings, object: nil)
@@ -220,11 +232,14 @@ private struct MorieMenuContent: View {
             Task {
                 await setup.refresh()
                 MorieApplicationActivation.prepareToOpenWindow()
-                openWindow(
-                    id: capabilities.needsSetup || !setup.isReady
-                        ? "setup"
-                        : "control-center"
-                )
+                if capabilities.needsSetup || !setup.isReady {
+                    openWindow(id: "setup")
+                } else {
+                    openWindow(
+                        id: "control-center",
+                        value: ControlCenterWindowIdentity.main
+                    )
+                }
                 NSApplication.shared.activate()
             }
         }
