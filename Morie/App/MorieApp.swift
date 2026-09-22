@@ -262,10 +262,6 @@ private struct MorieMenuBarLabel: View {
     }
 }
 
-extension Notification.Name {
-    static let morieShowSettings = Notification.Name("MorieShowSettings")
-}
-
 @MainActor
 private struct MorieCommands: Commands {
     let processRole: MorieProcessRole
