@@ -92,7 +92,7 @@ final class CaptureHistoryTests: XCTestCase {
     func testHistoryControllerReleasesListAcrossPageSwitchAndReloadsOnReturn() async throws {
         let store = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
-        let history = CaptureHistoryController(
+        let history = RuntimeCaptureHistoryController(
             store: store,
             locale: Locale(identifier: "zh-CN")
         )
@@ -135,7 +135,7 @@ final class CaptureHistoryTests: XCTestCase {
     func testRetryRecoversFailedCaptureAndSurvivesRestart() async throws {
         let fixture = try HistoryFixture()
         defer { fixture.removeFiles() }
-        let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+        let history = RuntimeCaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
             "recovered speech"
         }
 
@@ -158,7 +158,7 @@ final class CaptureHistoryTests: XCTestCase {
     func testRetryPreservesOriginalDeliveryAndOutput() async throws {
         let fixture = try HistoryFixture(deliveredText: "original output")
         defer { fixture.removeFiles() }
-        let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+        let history = RuntimeCaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
             "new recognition"
         }
 
@@ -176,7 +176,7 @@ final class CaptureHistoryTests: XCTestCase {
     func testRetryRecoversCaptureOnlyWithoutChangingItsDestination() async throws {
         let fixture = try HistoryFixture(deliveryMode: .captureOnly)
         defer { fixture.removeFiles() }
-        let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+        let history = RuntimeCaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
             "recovered idea"
         }
 
@@ -194,7 +194,7 @@ final class CaptureHistoryTests: XCTestCase {
     func testEmptyRetryKeepsSavedTextAndAudio() async throws {
         let fixture = try HistoryFixture(deliveredText: "keep this output")
         defer { fixture.removeFiles() }
-        let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+        let history = RuntimeCaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
             " \n\t "
         }
 
@@ -212,7 +212,7 @@ final class CaptureHistoryTests: XCTestCase {
     func testFailedRetryKeepsOriginalFailureAndRecording() async throws {
         let fixture = try HistoryFixture()
         defer { fixture.removeFiles() }
-        let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+        let history = RuntimeCaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
             throw CocoaError(.fileReadCorruptFile)
         }
 
@@ -231,7 +231,7 @@ final class CaptureHistoryTests: XCTestCase {
         let fixture = try HistoryFixture(deliveredText: "original")
         defer { fixture.removeFiles() }
         let pending = PendingFileRecognition()
-        let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+        let history = RuntimeCaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
             await pending.recognize()
         }
 
@@ -253,7 +253,7 @@ final class CaptureHistoryTests: XCTestCase {
         let fixture = try HistoryFixture()
         defer { fixture.removeFiles() }
         let pending = PendingFileRecognition()
-        let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+        let history = RuntimeCaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
             await pending.recognize()
         }
 
@@ -281,7 +281,7 @@ final class CaptureHistoryTests: XCTestCase {
             } else {
                 try FileManager.default.removeItem(at: fixture.audioURL)
             }
-            let history = CaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
+            let history = RuntimeCaptureHistoryController(store: fixture.store, locale: Locale(identifier: "zh-CN")) { _, _ in
                 XCTFail("Unavailable source audio must not reach the recognizer")
                 return "unexpected"
             }

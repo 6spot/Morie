@@ -3,73 +3,18 @@ import SwiftUI
 
 @main
 struct MorieApp: App {
-    private let controller: AppController
-    @Environment(\.openWindow) private var openWindow
-    private let captureStore: CaptureStore?
+    @NSApplicationDelegateAdaptor(MorieAppDelegate.self)
+    private var appDelegate
 
-    init() {
-        let wantsICloud = ICloudSyncSettings.isEnabled
-        do {
-            let store = try CaptureStore(cloudSyncEnabled: wantsICloud)
-            captureStore = store
-            controller = AppController(captureStore: store)
-        } catch where wantsICloud {
-            // Optional iCloud must never make local input unusable. If the
-            // CloudKit-backed SwiftData configuration cannot open, retry the
-            // same current schema locally and surface the cloud failure.
-            do {
-                let store = try CaptureStore(cloudSyncEnabled: false)
-                captureStore = store
-                controller = AppController(
-                    captureStore: store,
-                    cloudSyncStartupError: error
-                )
-            } catch {
-                captureStore = nil
-                controller = AppController(
-                    captureStore: nil,
-                    persistenceError: error
-                )
-            }
-        } catch {
-            captureStore = nil
-            controller = AppController(
-                captureStore: nil,
-                persistenceError: error
-            )
-        }
-    }
+    private let controller = AppController()
 
     var body: some Scene {
-        MenuBarExtra {
-            MorieMenuContent(controller: controller)
-        } label: {
-            MorieMenuBarLabel(controller: controller)
-        }
-        .menuBarExtraStyle(.menu)
-
         Window("Morie", id: "control-center") {
-            Group {
-                if let captureStore {
-                    MorieControlCenter(controller: controller)
-                        .modelContainer(captureStore.container)
-                } else {
-                    ContentUnavailableView(
-                        "Morie 暂不可用",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text("无法打开记录存储，请在使用引导中查看详情。")
-                    )
-                }
-            }
-            .environment(\.locale, Locale(identifier: "zh-Hans"))
-            .onAppear {
-                MorieApplicationActivation.windowDidAppear("control-center")
-            }
-            .onDisappear {
-                MorieApplicationActivation.windowDidDisappear("control-center")
-            }
+            MorieControlCenter(controller: controller)
+                .environment(\.locale, Locale(identifier: "zh-Hans"))
         }
         .defaultSize(width: 1120, height: 720)
+        .windowToolbarStyle(.unified)
         .commands {
             SidebarCommands()
             MorieCommands()
@@ -78,99 +23,27 @@ struct MorieApp: App {
         Window("欢迎使用 Morie", id: "setup") {
             MorieSetupView(controller: controller)
                 .environment(\.locale, Locale(identifier: "zh-Hans"))
-                .onAppear {
-                    MorieApplicationActivation.windowDidAppear("setup")
-                }
-                .onDisappear {
-                    MorieApplicationActivation.windowDidDisappear("setup")
-                }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 700, height: 740)
         .defaultPosition(.center)
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
-
-    }
-}
-
-
-@MainActor
-private enum MorieApplicationActivation {
-    private static var visibleWindowIDs = Set<String>()
-
-    static func prepareToOpenWindow() {
-        useRegularPolicy()
-    }
-
-    static func windowDidAppear(_ id: String) {
-        visibleWindowIDs.insert(id)
-        useRegularPolicy()
-    }
-
-    static func windowDidDisappear(_ id: String) {
-        visibleWindowIDs.remove(id)
-        guard visibleWindowIDs.isEmpty else { return }
-
-        let application = NSApplication.shared
-        application.deactivate()
-        guard application.activationPolicy() != .accessory else { return }
-
-        if !application.setActivationPolicy(.accessory) {
-            Diagnostics.record(
-                "UI",
-                "Failed to restore accessory activation policy after closing Morie windows.",
-                level: .warning
-            )
-        }
-    }
-
-    private static func useRegularPolicy() {
-        let application = NSApplication.shared
-        guard application.activationPolicy() != .regular else { return }
-
-        if !application.setActivationPolicy(.regular) {
-            Diagnostics.record(
-                "UI",
-                "Failed to switch to regular activation policy for Morie window.",
-                level: .warning
-            )
-        }
     }
 }
 
 @MainActor
-private struct MorieMenuBarLabel: View {
-    let controller: AppController
-    @ObservedObject private var capabilities: AppCapabilityController
-    @ObservedObject private var setup: PermissionSetupController
-    @Environment(\.openWindow) private var openWindow
-    @State private var inspectedStartup = false
-
-    init(controller: AppController) {
-        self.controller = controller
-        _capabilities = ObservedObject(
-            wrappedValue: controller.capabilities
-        )
-        _setup = ObservedObject(wrappedValue: controller.setup)
-    }
-
-    var body: some View {
-        Label("Morie", systemImage: "waveform")
-            .task {
-                guard !inspectedStartup else { return }
-                inspectedStartup = true
-                await setup.refresh()
-                guard capabilities.needsSetup || !setup.isReady else { return }
-                MorieApplicationActivation.prepareToOpenWindow()
-                openWindow(id: "setup")
-                NSApplication.shared.activate()
-            }
+final class MorieAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(
+        _ sender: NSApplication
+    ) -> Bool {
+        true
     }
 }
 
 extension Notification.Name {
-    static let morieShowSettings = Notification.Name("MorieShowSettings")
+    static let morieShowSettings =
+        Notification.Name("MorieShowSettings")
 }
 
 private struct MorieCommands: Commands {
@@ -179,12 +52,14 @@ private struct MorieCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appSettings) {
             Button("设置…") {
+                openWindow(id: "control-center")
+                NSApplication.shared.activate()
                 Task { @MainActor in
-                    MorieApplicationActivation.prepareToOpenWindow()
-                    openWindow(id: "control-center")
-                    NSApplication.shared.activate()
                     await Task.yield()
-                    NotificationCenter.default.post(name: .morieShowSettings, object: nil)
+                    NotificationCenter.default.post(
+                        name: .morieShowSettings,
+                        object: nil
+                    )
                 }
             }
             .keyboardShortcut(",", modifiers: .command)
@@ -193,63 +68,11 @@ private struct MorieCommands: Commands {
 }
 
 @MainActor
-private struct MorieMenuContent: View {
-    let controller: AppController
-    @ObservedObject private var runtime: AppRuntimeController
-    @ObservedObject private var capabilities: AppCapabilityController
-    @ObservedObject private var preferences: AppPreferencesController
-    @ObservedObject private var setup: PermissionSetupController
-    @Environment(\.openWindow) private var openWindow
-
-    init(controller: AppController) {
-        self.controller = controller
-        _runtime = ObservedObject(wrappedValue: controller.runtime)
-        _capabilities = ObservedObject(
-            wrappedValue: controller.capabilities
-        )
-        _preferences = ObservedObject(wrappedValue: controller.preferences)
-        _setup = ObservedObject(wrappedValue: controller.setup)
-    }
-
-    var body: some View {
-        Text(controller.statusTitle)
-
-        Divider()
-
-        Button("打开 Morie") {
-            Task {
-                await setup.refresh()
-                MorieApplicationActivation.prepareToOpenWindow()
-                openWindow(
-                    id: capabilities.needsSetup || !setup.isReady
-                        ? "setup"
-                        : "control-center"
-                )
-                NSApplication.shared.activate()
-            }
-        }
-        .disabled(capabilities.isBootstrapping)
-
-        Divider()
-
-        Text("录音快捷键：\(preferences.captureShortcut.displayName)")
-        Text("录音中按 Esc 取消")
-
-        Divider()
-
-        Button("退出 Morie") {
-            NSApplication.shared.terminate(nil)
-        }
-        .keyboardShortcut("q", modifiers: .command)
-    }
-}
-
-@MainActor
 struct MorieSettingsView: View {
     let controller: AppController
     @ObservedObject private var preferences: AppPreferencesController
-    @ObservedObject private var refinementModels: RefinementModelController
-    @ObservedObject private var refinementPrompts: RefinementPromptController
+    @ObservedObject private var refinementModels: RefinementModelPresentationController
+    @ObservedObject private var refinementPrompts: RefinementPromptPresentationController
 
     @State private var confirmsExpressionReset = false
     @State private var confirmsFactoryReset = false
@@ -384,9 +207,12 @@ struct MorieSettingsView: View {
 
                 HStack(spacing: 10) {
                     Button("恢复默认") {
-                        refinementPrompts.restoreDefault()
-                        refinementInstructions =
-                            refinementPrompts.instructions
+                        Task {
+                            if await refinementPrompts.restoreDefault() {
+                                refinementInstructions =
+                                    refinementPrompts.instructions
+                            }
+                        }
                     }
                     .disabled(
                         refinementPrompts.isDefault
@@ -397,11 +223,13 @@ struct MorieSettingsView: View {
                     Spacer()
 
                     Button("保存提示词") {
-                        if refinementPrompts.save(
-                            refinementInstructions
-                        ) {
-                            refinementInstructions =
-                                refinementPrompts.instructions
+                        Task {
+                            if await refinementPrompts.save(
+                                refinementInstructions
+                            ) {
+                                refinementInstructions =
+                                    refinementPrompts.instructions
+                            }
                         }
                     }
                     .keyboardShortcut(.defaultAction)
@@ -456,22 +284,26 @@ struct MorieSettingsView: View {
                         "清除 API Key",
                         role: .destructive
                     ) {
-                        if refinementModels.clearCloudAPIKey() {
-                            cloudAPIKey = ""
+                        Task {
+                            if await refinementModels.clearCloudAPIKey() {
+                                cloudAPIKey = ""
+                            }
                         }
                     }
 
                     Spacer()
 
                     Button("保存 API 配置") {
-                        if refinementModels.saveCloudConfiguration(
-                            baseURL: cloudBaseURL,
-                            modelName: cloudModelName,
-                            apiKey: cloudAPIKey
-                        ) {
-                            cloudBaseURL = refinementModels.cloudBaseURL
-                            cloudModelName = refinementModels.cloudModelName
-                            cloudAPIKey = ""
+                        Task {
+                            if await refinementModels.saveCloudConfiguration(
+                                baseURL: cloudBaseURL,
+                                modelName: cloudModelName,
+                                apiKey: cloudAPIKey
+                            ) {
+                                cloudBaseURL = refinementModels.cloudBaseURL
+                                cloudModelName = refinementModels.cloudModelName
+                                cloudAPIKey = ""
+                            }
                         }
                     }
                 }
@@ -627,3 +459,4 @@ struct MorieSettingsView: View {
         }
     }
 }
+

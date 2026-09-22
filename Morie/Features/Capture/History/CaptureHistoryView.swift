@@ -18,13 +18,13 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
         }
     }
 
-    func includes(_ capture: CaptureRecord) -> Bool {
+    func includes(_ capture: MorieCaptureDTO) -> Bool {
         switch self {
         case .all:
             true
         case .captureOnly:
             capture.deliveryModeRawValue
-                == CaptureDeliveryMode.captureOnly.rawValue
+                == MorieCaptureDeliveryModeDTO.captureOnly.rawValue
         case .needsAttention:
             capture.lifecycle == .failed
                 || capture.lifecycle == .deliveryFailed
@@ -139,7 +139,7 @@ struct CaptureHistoryWorkspace: View {
 }
 
 struct CaptureHistoryView: View {
-    let captures: [CaptureRecord]
+    let captures: [MorieCaptureDTO]
     @Binding var selection: UUID?
     @Binding var search: String
     @Binding var filter: CaptureHistoryFilter
@@ -148,7 +148,7 @@ struct CaptureHistoryView: View {
     let onRecord: () -> Void
     let onLoadMore: () -> Void
 
-    private var visibleCaptures: [CaptureRecord] {
+    private var visibleCaptures: [MorieCaptureDTO] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return captures.filter { capture in
@@ -285,7 +285,7 @@ private struct CaptureHistoryDetailPane: View {
         self.selectedCaptureID = selectedCaptureID
     }
 
-    private var capture: CaptureRecord? {
+    private var capture: MorieCaptureDTO? {
         guard let selectedCaptureID else { return nil }
         return history.captures.first { $0.id == selectedCaptureID }
     }
@@ -322,7 +322,7 @@ private struct CaptureHistoryDetailPane: View {
 }
 
 struct CaptureDetailView: View {
-    let capture: CaptureRecord
+    let capture: MorieCaptureDTO
     let captureID: UUID
     @ObservedObject var history: CaptureHistoryController
     let canRecognize: Bool
@@ -515,7 +515,7 @@ struct CaptureDetailView: View {
         .onDisappear {
             history.close(captureID)
         }
-        .onChange(of: capture.sourceAudioRelativePath) { _, _ in
+        .onChange(of: capture.sourceAudioURL) { _, _ in
             history.refreshAudio(for: captureID)
         }
         .onChange(of: capture.refinement?.status) { _, _ in
@@ -544,7 +544,7 @@ struct CaptureDetailView: View {
             LabeledContent(
                 "保存位置",
                 value: capture.deliveryModeRawValue
-                    == CaptureDeliveryMode.captureOnly.rawValue
+                    == MorieCaptureDeliveryModeDTO.captureOnly.rawValue
                     ? "历史记录"
                     : "当前应用"
             )
@@ -618,7 +618,7 @@ struct CaptureDetailView: View {
 }
 
 struct CaptureRefinementSection: View {
-    let refinement: CaptureRefinement
+    let refinement: MorieCaptureRefinementDTO
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -677,7 +677,7 @@ private struct CaptureAudioPlayer: NSViewRepresentable {
     }
 }
 
-private extension CaptureRecord {
+private extension MorieCaptureDTO {
     var historyText: String {
         finalText.isEmpty ? recognizedText : finalText
     }

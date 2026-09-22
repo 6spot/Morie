@@ -378,29 +378,22 @@ private struct ControlCenterRouteHost: View {
             }
 
         case .dictionary:
-            if let dictionary = controller.dictionary {
-                DictionaryView(
-                    store: dictionary,
-                    selection: $session.selectedDictionaryEntry,
-                    search: $presentation.dictionarySearch,
-                    showingEditor: $presentation.dictionaryShowingEditor,
-                    editingEntryID: $presentation.dictionaryEditingEntryID,
-                    confirmsDeletion: $presentation.dictionaryConfirmsDeletion
-                )
-            } else {
-                unavailable("字典不可用")
-            }
+            DictionaryView(
+                store: controller.dictionary,
+                selection: $session.selectedDictionaryEntry,
+                search: $presentation.dictionarySearch,
+                showingEditor: $presentation.dictionaryShowingEditor,
+                editingEntryID: $presentation.dictionaryEditingEntryID,
+                confirmsDeletion: $presentation.dictionaryConfirmsDeletion
+            )
 
         case .memory:
-            if let memory = controller.memory {
-                MemoryView(
-                    store: memory,
-                    search: $presentation.memorySearch,
-                    editor: $presentation.memoryEditor
-                )
-            } else {
-                unavailable("个人记忆不可用")
-            }
+            MemoryView(
+                store: controller.memory,
+                search: $presentation.memorySearch,
+                editor: $presentation.memoryEditor,
+                preferences: controller.preferences
+            )
 
         case .settings:
             MorieSettingsView(controller: controller)

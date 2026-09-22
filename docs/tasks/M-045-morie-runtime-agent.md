@@ -4,6 +4,8 @@
 
 **IN PROGRESS** — 2026-09-22
 
+Implementation is CI-green on the M-045 branch. Owner-device process, permission, functionality and memory validation is still required before DONE.
+
 Supersedes the process-role direction explored in M-044 / PR #106.
 
 ## Goal
@@ -51,33 +53,37 @@ Morie Runtime
 - Do not use `DistributedNotificationCenter` as the primary RPC transport.
 - Do not share mutable SwiftData model objects or `ModelContext` instances across process boundaries.
 
+## Development-stage migration policy
+
+Morie is still in active development. M-045 makes **no compatibility guarantee** for pre-M-045 local data, preference domains or process-owned state. Do not add migration or compatibility shims for old development builds; existing development data may be reused or discarded only as a consequence of the current implementation.
+
 ## Runtime-owned capabilities
 
-- [ ] global shortcut / Hotkey
-- [ ] live Capture lifecycle
-- [ ] microphone / Speech recognition
-- [ ] saved-audio re-recognition
-- [ ] refinement providers and prompt execution
-- [ ] text delivery to the focused application
-- [ ] CaptureStore / History persistence
-- [ ] DictionaryStore
-- [ ] MemoryStore and learning
-- [ ] expression / post-insertion learning
-- [ ] launch maintenance and recovery
-- [ ] menu-bar runtime status / quick actions
-- [ ] typed XPC service
+- [x] global shortcut / Hotkey
+- [x] live Capture lifecycle
+- [x] microphone / Speech recognition
+- [x] saved-audio re-recognition
+- [x] refinement providers and prompt execution
+- [x] text delivery to the focused application
+- [x] CaptureStore / History persistence
+- [x] DictionaryStore
+- [x] MemoryStore and learning
+- [x] expression / post-insertion learning
+- [x] launch maintenance and recovery
+- [x] menu-bar runtime status / quick actions
+- [x] typed XPC service
 
 ## Morie.app-owned capabilities
 
-- [ ] primary application identity and app icon
-- [ ] native Control Center shell
-- [ ] Overview presentation
-- [ ] History list/detail presentation
-- [ ] Dictionary presentation and editing
-- [ ] Personal Memory presentation and editing
-- [ ] Settings and Permissions UI
-- [ ] Runtime connection / reconnect state
-- [ ] typed XPC client
+- [x] primary application identity and app icon
+- [x] native Control Center shell
+- [x] Overview presentation
+- [x] History list/detail presentation
+- [x] Dictionary presentation and editing
+- [x] Personal Memory presentation and editing
+- [x] Settings and Permissions UI
+- [x] Runtime connection / reconnect state
+- [x] typed XPC client
 
 ## IPC surface
 
@@ -96,18 +102,18 @@ Prefer request/response DTOs over leaking feature controllers or persistence mod
 
 ## Migration plan
 
-- [ ] Freeze PR #106 as the M-044 experimental checkpoint; do not merge it.
-- [ ] Add `Morie Runtime` agent target and launch-agent plist.
-- [ ] Register / ensure Runtime through `SMAppService` from Morie.app.
-- [ ] Add typed XPC protocol, transport DTOs, listener and client.
-- [ ] Move menu-bar / Hotkey / Capture composition from Morie.app into Runtime.
-- [ ] Keep Morie.app as the normal GUI / Control Center application.
-- [ ] Move durable Store ownership to Runtime only.
-- [ ] Replace direct Control Center Store access with IPC-backed presentation models.
-- [ ] Remove the temporary `Morie Control Center` helper-tool architecture from M-044.
-- [ ] Remove duplicate microphone / Speech capabilities from the GUI target.
-- [ ] Preserve the current global Control Center UI contract; architecture work must not redesign page geometry or toolbar styling.
-- [ ] Update tests and CI for both targets.
+- [x] Freeze PR #106 as the M-044 experimental checkpoint; do not merge it.
+- [x] Add `Morie Runtime` agent target and launch-agent plist.
+- [x] Register / ensure Runtime through `SMAppService` from Morie.app.
+- [x] Add typed XPC protocol, transport DTOs, listener and client.
+- [x] Move menu-bar / Hotkey / Capture composition from Morie.app into Runtime.
+- [x] Keep Morie.app as the normal GUI / Control Center application.
+- [x] Move durable Store ownership to Runtime only.
+- [x] Replace direct Control Center Store access with IPC-backed presentation models.
+- [x] Remove the temporary `Morie Control Center` helper-tool architecture from M-044.
+- [x] Remove duplicate microphone / Speech capabilities from the GUI target.
+- [x] Preserve the current global Control Center UI contract; architecture work must not redesign page geometry or toolbar styling.
+- [x] Update tests and CI for both targets.
 
 ## Acceptance
 
@@ -117,13 +123,13 @@ Prefer request/response DTOs over leaking feature controllers or persistence mod
 - [ ] closing the Morie Control Center terminates/releases the GUI process while `Morie Runtime` remains alive;
 - [ ] global shortcut still records, recognizes, refines and inserts text while Morie.app is closed;
 - [ ] reopening Morie reconnects to the existing Runtime instead of creating a second Runtime;
-- [ ] only Runtime owns microphone / Speech execution and runtime maintenance;
-- [ ] only Runtime owns writable Capture / Dictionary / Memory persistence;
-- [ ] Control Center History / Dictionary / Memory / Settings operate through IPC-backed presentation state;
-- [ ] UI layout, unified toolbar, sidebar geometry and established Apple-native Control Center styling remain unchanged by the architecture migration;
+- [x] only Runtime owns microphone / Speech execution and runtime maintenance;
+- [x] only Runtime owns writable Capture / Dictionary / Memory persistence;
+- [x] Control Center History / Dictionary / Memory / Settings operate through IPC-backed presentation state;
+- [x] UI layout, unified toolbar, sidebar geometry and established Apple-native Control Center styling remain unchanged by the architecture migration;
 - [ ] Runtime idle physical footprint stays near the pre-Control-Center baseline;
 - [ ] closing / reopening Morie repeatedly does not accumulate Control Center presentation memory in Runtime;
-- [ ] Xcode 27 compile and MorieTests pass;
+- [x] Xcode 27 compile and MorieTests pass;
 - [ ] owner-device process, permission, functionality and memory validation passes.
 
 Do not mark this task DONE until the owner-device process and memory boundary is verified.

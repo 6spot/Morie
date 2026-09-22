@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DictionaryView: View {
-    @ObservedObject var store: DictionaryStore
+    @ObservedObject var store: DictionaryPresentationStore
     @Binding var selection: UUID?
     @Binding var search: String
     @Binding var showingEditor: Bool
@@ -18,7 +18,7 @@ struct DictionaryView: View {
         )
     ]
 
-    private var selectedEntry: DictionaryDisplayEntry? {
+    private var selectedEntry: MorieDictionaryEntryDTO? {
         guard let selection else { return nil }
         return store.displayEntries.first { $0.id == selection }
     }
@@ -28,7 +28,7 @@ struct DictionaryView: View {
         return selectedEntry?.id
     }
 
-    private var filteredEntries: [DictionaryDisplayEntry] {
+    private var filteredEntries: [MorieDictionaryEntryDTO] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return store.displayEntries.filter { entry in
             query.isEmpty
@@ -36,11 +36,11 @@ struct DictionaryView: View {
         }
     }
 
-    private var visibleUserEntries: [DictionaryDisplayEntry] {
+    private var visibleUserEntries: [MorieDictionaryEntryDTO] {
         filteredEntries.filter(\.isEditable)
     }
 
-    private var visibleBuiltInEntries: [DictionaryDisplayEntry] {
+    private var visibleBuiltInEntries: [MorieDictionaryEntryDTO] {
         filteredEntries.filter { !$0.isEditable }
     }
 
@@ -193,7 +193,7 @@ struct DictionaryView: View {
         } message: {
             Text("已保存的输入和个人记忆会保留。")
         }
-        .onAppear(perform: load)
+        .task { await load() }
         .onChange(
             of: visibleUserEntries.map(\.id),
             initial: true
@@ -204,9 +204,9 @@ struct DictionaryView: View {
         }
     }
 
-    private func load() {
+    private func load() async {
         do {
-            try store.loadIfNeeded()
+            try await store.loadIfNeeded()
             errorMessage = nil
 
             if selectedEntry?.isEditable != true {
@@ -220,16 +220,18 @@ struct DictionaryView: View {
     private func deleteSelectedEntry() {
         guard let id = selectedUserEntryID else { return }
 
-        do {
-            try store.delete(id)
-            selection = nil
-        } catch {
-            errorMessage = error.localizedDescription
+        Task {
+            do {
+                try await store.delete(id)
+                selection = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     private func userWord(
-        _ entry: DictionaryDisplayEntry
+        _ entry: MorieDictionaryEntryDTO
     ) -> some View {
         Button {
             selection = entry.id
@@ -263,7 +265,7 @@ struct DictionaryView: View {
     }
 
     private func builtInWord(
-        _ entry: DictionaryDisplayEntry
+        _ entry: MorieDictionaryEntryDTO
     ) -> some View {
         HStack(spacing: 8) {
             Text(entry.name)
@@ -292,7 +294,7 @@ struct DictionaryView: View {
 }
 
 struct DictionaryEditorSheet: View {
-    @ObservedObject var store: DictionaryStore
+    @ObservedObject var store: DictionaryPresentationStore
     var entryID: UUID?
 
     @Environment(\.dismiss) private var dismiss
@@ -366,18 +368,18 @@ struct DictionaryEditorSheet: View {
     }
 
     private func save() {
-        do {
-            let draft = DictionaryDraft(name: name)
+        Task {
+            do {
+                if let entryID {
+                    try await store.update(entryID, name: name)
+                } else {
+                    try await store.create(name)
+                }
 
-            if let entryID {
-                try store.update(entryID, draft: draft)
-            } else {
-                try store.create(draft)
+                dismiss()
+            } catch {
+                errorMessage = error.localizedDescription
             }
-
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

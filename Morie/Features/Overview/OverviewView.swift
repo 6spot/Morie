@@ -4,7 +4,7 @@ import SwiftUI
 @MainActor
 @Observable
 final class OverviewPageState {
-    var metricsSnapshot: CaptureUsageMetricsSnapshot?
+    var metricsSnapshot: MorieUsageMetricsDTO?
 }
 
 
@@ -13,7 +13,7 @@ struct OverviewView: View {
     private let controller: AppController
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var preferences: AppPreferencesController
-    @ObservedObject private var refinementModels: RefinementModelController
+    @ObservedObject private var refinementModels: RefinementModelPresentationController
     @ObservedObject private var setup: PermissionSetupController
     @ObservedObject private var applicationContextInspector: ApplicationContextInspectionStore
 
@@ -55,7 +55,7 @@ struct OverviewView: View {
             }
         }
         .task {
-            loadUsageMetrics()
+            await loadUsageMetrics()
         }
     }
 
@@ -253,9 +253,10 @@ struct OverviewView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func loadUsageMetrics() {
+    private func loadUsageMetrics() async {
         do {
-            state.metricsSnapshot = try controller.controlCenterUsageMetrics()
+            state.metricsSnapshot =
+                try await controller.controlCenterUsageMetrics()
             metricsError = nil
         } catch {
             state.metricsSnapshot = nil
