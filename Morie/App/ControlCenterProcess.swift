@@ -117,7 +117,7 @@ enum ControlCenterProcessLauncher {
             if route != .overview {
                 ControlCenterProcessBridge.requestRoute(route)
             }
-            existing.activate(options: [.activateIgnoringOtherApps])
+            _ = existing.activate(options: [])
             return
         }
 
