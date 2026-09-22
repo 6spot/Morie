@@ -207,9 +207,12 @@ struct MorieSettingsView: View {
 
                 HStack(spacing: 10) {
                     Button("恢复默认") {
-                        refinementPrompts.restoreDefault()
-                        refinementInstructions =
-                            refinementPrompts.instructions
+                        Task {
+                            if await refinementPrompts.restoreDefault() {
+                                refinementInstructions =
+                                    refinementPrompts.instructions
+                            }
+                        }
                     }
                     .disabled(
                         refinementPrompts.isDefault
@@ -220,11 +223,13 @@ struct MorieSettingsView: View {
                     Spacer()
 
                     Button("保存提示词") {
-                        if refinementPrompts.save(
-                            refinementInstructions
-                        ) {
-                            refinementInstructions =
-                                refinementPrompts.instructions
+                        Task {
+                            if await refinementPrompts.save(
+                                refinementInstructions
+                            ) {
+                                refinementInstructions =
+                                    refinementPrompts.instructions
+                            }
                         }
                     }
                     .keyboardShortcut(.defaultAction)
@@ -279,22 +284,26 @@ struct MorieSettingsView: View {
                         "清除 API Key",
                         role: .destructive
                     ) {
-                        if refinementModels.clearCloudAPIKey() {
-                            cloudAPIKey = ""
+                        Task {
+                            if await refinementModels.clearCloudAPIKey() {
+                                cloudAPIKey = ""
+                            }
                         }
                     }
 
                     Spacer()
 
                     Button("保存 API 配置") {
-                        if refinementModels.saveCloudConfiguration(
-                            baseURL: cloudBaseURL,
-                            modelName: cloudModelName,
-                            apiKey: cloudAPIKey
-                        ) {
-                            cloudBaseURL = refinementModels.cloudBaseURL
-                            cloudModelName = refinementModels.cloudModelName
-                            cloudAPIKey = ""
+                        Task {
+                            if await refinementModels.saveCloudConfiguration(
+                                baseURL: cloudBaseURL,
+                                modelName: cloudModelName,
+                                apiKey: cloudAPIKey
+                            ) {
+                                cloudBaseURL = refinementModels.cloudBaseURL
+                                cloudModelName = refinementModels.cloudModelName
+                                cloudAPIKey = ""
+                            }
                         }
                     }
                 }

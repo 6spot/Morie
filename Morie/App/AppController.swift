@@ -446,31 +446,31 @@ final class RefinementModelPresentationController: ObservableObject {
         baseURL: String,
         modelName: String,
         apiKey: String
-    ) -> Bool {
-        mutate(.init(
+    ) async -> Bool {
+        await mutate(.init(
             action: .saveCloudConfiguration,
             baseURL: baseURL,
             modelName: modelName,
             apiKey: apiKey
         ))
-        return true
     }
 
     @discardableResult
-    func clearCloudAPIKey() -> Bool {
-        mutate(.init(action: .clearCloudAPIKey))
-        return true
+    func clearCloudAPIKey() async -> Bool {
+        await mutate(.init(action: .clearCloudAPIKey))
     }
 
-    private func mutate(_ request: MorieSettingsMutationDTO) {
-        Task {
-            do {
-                let snapshot = try await client.mutateSettings(request)
-                apply(snapshot.settings)
-                settingsMessage = nil
-            } catch {
-                settingsMessage = error.localizedDescription
-            }
+    private func mutate(
+        _ request: MorieSettingsMutationDTO
+    ) async -> Bool {
+        do {
+            let snapshot = try await client.mutateSettings(request)
+            apply(snapshot.settings)
+            settingsMessage = nil
+            return true
+        } catch {
+            settingsMessage = error.localizedDescription
+            return false
         }
     }
 }
@@ -493,29 +493,33 @@ final class RefinementPromptPresentationController: ObservableObject {
     }
 
     @discardableResult
-    func save(_ value: String) -> Bool {
+    func save(_ value: String) async -> Bool {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.isEmpty else {
             settingsMessage = "提示词不能为空。"
             return false
         }
-        mutate(.init(action: .savePrompt, stringValue: normalized))
-        return true
+        return await mutate(
+            .init(action: .savePrompt, stringValue: normalized)
+        )
     }
 
-    func restoreDefault() {
-        mutate(.init(action: .restoreDefaultPrompt))
+    @discardableResult
+    func restoreDefault() async -> Bool {
+        await mutate(.init(action: .restoreDefaultPrompt))
     }
 
-    private func mutate(_ request: MorieSettingsMutationDTO) {
-        Task {
-            do {
-                let snapshot = try await client.mutateSettings(request)
-                apply(snapshot.settings)
-                settingsMessage = nil
-            } catch {
-                settingsMessage = error.localizedDescription
-            }
+    private func mutate(
+        _ request: MorieSettingsMutationDTO
+    ) async -> Bool {
+        do {
+            let snapshot = try await client.mutateSettings(request)
+            apply(snapshot.settings)
+            settingsMessage = nil
+            return true
+        } catch {
+            settingsMessage = error.localizedDescription
+            return false
         }
     }
 }
