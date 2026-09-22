@@ -63,8 +63,8 @@ enum ControlCenterProcessBridge {
     private static let routeKey = "route"
 
     static func requestRoute(_ route: ControlCenterLaunchRoute) {
-        DistributedNotificationCenter.default().post(
-            name: .morieControlCenterRouteRequest,
+        DistributedNotificationCenter.default().postNotificationName(
+            .morieControlCenterRouteRequest,
             object: nil,
             userInfo: [routeKey: route.rawValue],
             deliverImmediately: true
@@ -99,8 +99,8 @@ enum ControlCenterProcessBridge {
     }
 
     private static func post(_ name: Notification.Name) {
-        DistributedNotificationCenter.default().post(
-            name: name,
+        DistributedNotificationCenter.default().postNotificationName(
+            name,
             object: nil,
             userInfo: nil,
             deliverImmediately: true
