@@ -507,18 +507,21 @@ final class ControlCenterController: ControlCenterControlling {
                 object: nil,
                 queue: .main
             ) { notification in
-                guard ControlCenterProcessBridge.route(
-                    from: notification
-                ) == .settings else {
-                    return
-                }
+                let route =
+                    ControlCenterProcessBridge.route(
+                        from: notification
+                    )
 
                 Task { @MainActor in
-                    NotificationCenter.default.post(
-                        name: .morieShowSettings,
-                        object: nil
-                    )
+                    if route == .settings {
+                        NotificationCenter.default.post(
+                            name: .morieShowSettings,
+                            object: nil
+                        )
+                    }
                     NSApplication.shared.activate()
+                    NSApplication.shared.keyWindow?
+                        .makeKeyAndOrderFront(nil)
                 }
             }
         )
