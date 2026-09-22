@@ -21,6 +21,8 @@ protocol ControlCenterControlling: AnyObject {
     func controlCenterUsageMetrics() throws -> CaptureUsageMetricsSnapshot
 
     func startCaptureOnly()
+    func refreshPermissions() async
+    func performPermissionAction(_ requirement: SetupRequirement) async
     func bootstrap(completingSetup: Bool) async
     func factoryReset() async throws
 
@@ -218,6 +220,18 @@ final class ControlCenterController: ControlCenterControlling {
 
     func startCaptureOnly() {
         ControlCenterProcessBridge.requestCaptureOnly()
+    }
+
+    func refreshPermissions() async {
+        ControlCenterProcessBridge.requestRuntimeSnapshot()
+    }
+
+    func performPermissionAction(
+        _ requirement: SetupRequirement
+    ) async {
+        ControlCenterProcessBridge.requestPermissionAction(
+            requirement
+        )
     }
 
     func bootstrap(
