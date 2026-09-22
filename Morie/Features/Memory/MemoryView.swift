@@ -146,6 +146,18 @@ struct MemoryView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+        .searchable(
+            text: $search,
+            placement: .toolbar,
+            prompt: Text("搜索个人记忆")
+        )
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("告诉 Morie 一件事", systemImage: "plus") {
+                    editor = .create
+                }
+            }
+        }
         .sheet(item: $editor) {
             MemoryEditorSheet(store: store, mode: $0)
         }
