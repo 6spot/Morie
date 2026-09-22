@@ -6,6 +6,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000032 /* PermissionManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000052 /* PermissionManagementView.swift */; };
+		AC0000000000000000000038 /* PermissionManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000052 /* PermissionManagementView.swift */; };
 		A10000000000000000000031 /* ControlCenterControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000051 /* ControlCenterControlling.swift */; };
 		AC0000000000000000000037 /* ControlCenterControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000051 /* ControlCenterControlling.swift */; };
 		A10000000000000000000030 /* MemoryAnalysisSourceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000050 /* MemoryAnalysisSourceView.swift */; };
@@ -151,6 +153,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000052 /* PermissionManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManagementView.swift; sourceTree = "<group>"; };
 		B10000000000000000000051 /* ControlCenterControlling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterControlling.swift; sourceTree = "<group>"; };
 		B10000000000000000000050 /* MemoryAnalysisSourceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryAnalysisSourceView.swift; sourceTree = "<group>"; };
 		BC0000000000000000000001 /* MorieControlCenterMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieControlCenterMain.swift; sourceTree = "<group>"; };
@@ -443,6 +446,7 @@
 		D30000000000000000000008 /* Setup */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000052 /* PermissionManagementView.swift */,
 				B10000000000000000000034 /* PermissionSetupController.swift */,
 				B10000000000000000000035 /* MorieSetupView.swift */,
 			);
@@ -753,6 +757,7 @@
 				A60000000000000000000001 /* RefinementPromptSettings.swift in Sources */,
 				A10000000000000000000020 /* PermissionSetupController.swift in Sources */,
 				A10000000000000000000021 /* MorieSetupView.swift in Sources */,
+				A10000000000000000000032 /* PermissionManagementView.swift in Sources */,
 				A10000000000000000000001 /* MorieApp.swift in Sources */,
 				A10000000000000000000002 /* AppController.swift in Sources */,
 				A70000000000000000000001 /* AppRuntimeController.swift in Sources */,
@@ -833,6 +838,7 @@
 				AC0000000000000000000026 /* OverviewView.swift in Sources */,
 				AC0000000000000000000027 /* ExpressionProfile.swift in Sources */,
 				AC0000000000000000000028 /* MorieSetupView.swift in Sources */,
+				AC0000000000000000000038 /* PermissionManagementView.swift in Sources */,
 				AC0000000000000000000029 /* PermissionSetupController.swift in Sources */,
 				AC0000000000000000000030 /* ICloudSyncSettings.swift in Sources */,
 				AC0000000000000000000031 /* RefinementModelConfiguration.swift in Sources */,
