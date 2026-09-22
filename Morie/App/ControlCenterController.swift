@@ -39,8 +39,6 @@ protocol ControlCenterControlling: AnyObject {
     func notifyRuntimeOfSharedStateChange()
 }
 
-extension AppController: ControlCenterControlling {}
-
 @MainActor
 final class ControlCenterController: ControlCenterControlling {
     enum ControllerError: LocalizedError {
