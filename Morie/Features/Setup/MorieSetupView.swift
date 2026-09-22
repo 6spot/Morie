@@ -325,7 +325,7 @@ struct PermissionManagementView: View {
         }
         .task {
             if setup.checks.isEmpty {
-                await setup.refresh()
+                await controller.refreshPermissions()
             }
         }
     }
