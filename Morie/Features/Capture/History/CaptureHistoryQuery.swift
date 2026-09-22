@@ -29,7 +29,6 @@ enum CaptureHistoryQuery {
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         latest.fetchLimit = 1
-        latest.propertiesToFetch = [\CaptureRecord.updatedAt]
 
         return CaptureHistorySignature(
             count: count,
