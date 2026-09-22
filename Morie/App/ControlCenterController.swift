@@ -57,9 +57,7 @@ final class ControlCenterController: ControlCenterControlling {
     let runtime = AppRuntimeController()
     let capabilities = AppCapabilityController()
     let preferences: AppPreferencesController
-    let setup = PermissionSetupController(
-        locale: Locale(identifier: "zh-CN")
-    )
+    let setup: PermissionSetupController
     let refinementModels = RefinementModelController()
     let refinementPrompts = RefinementPromptController()
     let applicationContextInspector =
@@ -80,6 +78,11 @@ final class ControlCenterController: ControlCenterControlling {
         persistenceError: Error? = nil,
         cloudSyncStartupError: Error? = nil
     ) {
+        setup = PermissionSetupController(
+            inspect: { [] },
+            requestPermission: { _ in },
+            openSettings: { _ in }
+        )
         self.captureStore = captureStore
         self.persistenceError = persistenceError
         self.cloudSyncStartupError = cloudSyncStartupError
@@ -167,9 +170,9 @@ final class ControlCenterController: ControlCenterControlling {
 
         installProcessObservers()
 
-        Task { @MainActor [weak self] in
-            await self?.prepare()
-        }
+        runtime.state = .checking
+        capabilities.isBootstrapping = true
+        ControlCenterProcessBridge.requestRuntimeSnapshot()
 
         refreshICloudSyncState()
 
@@ -180,9 +183,14 @@ final class ControlCenterController: ControlCenterControlling {
     }
 
     var canStartCapture: Bool {
-        !capabilities.isBootstrapping
-            && setup.isReady
-            && captureStore != nil
+        guard captureStore != nil,
+              !capabilities.isBootstrapping else {
+            return false
+        }
+        if case .ready = runtime.state {
+            return true
+        }
+        return false
     }
 
     var canCompleteSetup: Bool {
@@ -191,7 +199,13 @@ final class ControlCenterController: ControlCenterControlling {
     }
 
     var isCaptureActive: Bool {
-        false
+        switch runtime.state {
+        case .recording, .stopping, .finalizing, .refining,
+             .delivering:
+            return true
+        default:
+            return false
+        }
     }
 
     func makeControlCenterHistoryController()
@@ -238,7 +252,9 @@ final class ControlCenterController: ControlCenterControlling {
         completingSetup: Bool = false
     ) async {
         ControlCenterProcessBridge.requestBootstrap()
-        await prepare()
+        capabilities.isBootstrapping = true
+        runtime.state = .checking
+        ControlCenterProcessBridge.requestRuntimeSnapshot()
     }
 
     func factoryReset() async throws {
@@ -439,28 +455,27 @@ final class ControlCenterController: ControlCenterControlling {
         ControlCenterProcessBridge.notifySharedStateChanged()
     }
 
-    private func prepare() async {
-        await setup.refresh()
-
-        if setup.isReady {
-            capabilities.needsSetup = false
-            capabilities.setupError = nil
-            runtime.state = .ready
-        } else {
-            capabilities.needsSetup = true
-            runtime.state = .blocked(
-                setup.firstIssue?.detail
-                    ?? "请先完成设备与权限检查。"
-            )
-        }
-
-        Diagnostics.recordMemory(
-            "control-center-lightweight-ready"
-        )
-    }
-
     private func installProcessObservers() {
         let center = DistributedNotificationCenter.default()
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieControlCenterRuntimeSnapshot,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let snapshot =
+                    ControlCenterProcessBridge.runtimeSnapshot(
+                        from: notification
+                    ) else {
+                    return
+                }
+
+                Task { @MainActor [weak self] in
+                    self?.applyRuntimeSnapshot(snapshot)
+                }
+            }
+        )
 
         distributedObservers.append(
             center.addObserver(
@@ -507,6 +522,38 @@ final class ControlCenterController: ControlCenterControlling {
                     NSApplication.shared.activate()
                 }
             }
+        )
+    }
+
+    private func applyRuntimeSnapshot(
+        _ snapshot: ControlCenterRuntimeSnapshot
+    ) {
+        setup.applyExternalChecks(snapshot.checks)
+        capabilities.isBootstrapping =
+            snapshot.isBootstrapping
+        capabilities.setupError = snapshot.setupError
+        capabilities.needsSetup =
+            !snapshot.checks.isEmpty && !setup.isReady
+        capabilities.speechBackend =
+            snapshot.speechBackend
+        refinementModels.setLocalModelStatusTitle(
+            snapshot.localModelStatusTitle
+        )
+
+        if snapshot.isCaptureActive {
+            runtime.state = .recording
+        } else if snapshot.canStartCapture {
+            runtime.state = .ready
+        } else if let setupError = snapshot.setupError {
+            runtime.state = .blocked(setupError)
+        } else {
+            runtime.state = .blocked(
+                "Morie 运行进程尚未就绪。"
+            )
+        }
+
+        Diagnostics.recordMemory(
+            "control-center-runtime-snapshot"
         )
     }
 
