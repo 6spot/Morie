@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import FoundationModels
 import Security
 
 enum RefinementModelSettings {
@@ -89,6 +88,7 @@ final class RefinementModelController: ObservableObject {
     @Published private(set) var cloudBaseURL: String
     @Published private(set) var cloudModelName: String
     @Published private(set) var settingsMessage: String?
+    @Published private(set) var localModelStatusTitle = "未检查"
 
     /// A successful Keychain read/write is kept only for this process lifetime.
     /// Relaunch stays Keychain-free until an external model is actually needed.
@@ -156,23 +156,19 @@ final class RefinementModelController: ObservableObject {
     func modelStatusTitle(inputRefinementEnabled: Bool) -> String {
         guard inputRefinementEnabled else { return "已关闭" }
         if mode == .cloud {
-            return configuration.hasUsableCloudConfiguration ? "已配置" : "待配置"
+            return configuration.hasUsableCloudConfiguration
+                ? "已配置"
+                : "待配置"
         }
-        if mode == .automatic, configuration.hasUsableCloudConfiguration {
+        if mode == .automatic,
+           configuration.hasUsableCloudConfiguration {
             return "自动"
         }
-        switch SystemLanguageModel.default.availability {
-        case .available:
-            return "可用"
-        case .unavailable(.modelNotReady):
-            return "模型准备中"
-        case .unavailable(.appleIntelligenceNotEnabled):
-            return "Apple 智能未开启"
-        case .unavailable(.deviceNotEligible):
-            return "设备不支持"
-        case .unavailable:
-            return "暂不可用"
-        }
+        return localModelStatusTitle
+    }
+
+    func setLocalModelStatusTitle(_ title: String) {
+        localModelStatusTitle = title
     }
 
     func setMode(_ mode: RefinementModelMode) {
