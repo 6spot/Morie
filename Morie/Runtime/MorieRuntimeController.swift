@@ -18,7 +18,7 @@ final class MorieRuntimeController {
     }
 
     let runtime = AppRuntimeController()
-    let capabilities = AppCapabilityController()
+    let capabilities = MorieRuntimeCapabilityController()
     let preferences: AppPreferencesController
 
     let memory: MemoryStore?

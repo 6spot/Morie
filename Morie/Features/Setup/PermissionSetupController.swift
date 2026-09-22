@@ -124,6 +124,10 @@ final class PermissionSetupController: ObservableObject {
         self.openSettings = openSettings
     }
 
+    func replaceChecks(_ checks: [CapabilityCheck]) {
+        self.checks = checks
+    }
+
     var isBusy: Bool { isRefreshing || activeRequest != nil }
 
     var isReady: Bool {

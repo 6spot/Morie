@@ -158,8 +158,8 @@ struct MorieDictionaryMutationDTO: Codable, Equatable, Sendable {
     }
 
     let action: Action
-    var id: UUID?
-    var name: String?
+    var id: UUID? = nil
+    var name: String? = nil
 }
 
 struct MorieMemoryEvidenceDTO: Codable, Equatable, Identifiable, Sendable {
@@ -201,10 +201,10 @@ struct MorieMemoryMutationDTO: Codable, Equatable, Sendable {
     }
 
     let action: Action
-    var id: UUID?
-    var kind: String?
-    var name: String?
-    var notes: String?
+    var id: UUID? = nil
+    var kind: String? = nil
+    var name: String? = nil
+    var notes: String? = nil
 }
 
 struct MorieSettingsMutationDTO: Codable, Equatable, Sendable {
@@ -226,10 +226,10 @@ struct MorieSettingsMutationDTO: Codable, Equatable, Sendable {
     }
 
     let action: Action
-    var boolValue: Bool?
-    var intValue: Int?
-    var stringValue: String?
-    var baseURL: String?
-    var modelName: String?
-    var apiKey: String?
+    var boolValue: Bool? = nil
+    var intValue: Int? = nil
+    var stringValue: String? = nil
+    var baseURL: String? = nil
+    var modelName: String? = nil
+    var apiKey: String? = nil
 }
