@@ -252,6 +252,9 @@ struct MorieSettingsView: View {
     @ObservedObject private var refinementPrompts: RefinementPromptController
 
     @State private var confirmsExpressionReset = false
+    @State private var confirmsFactoryReset = false
+    @State private var factoryResetInProgress = false
+    @State private var factoryResetError: String?
     @State private var cloudBaseURL: String
     @State private var cloudModelName: String
     @State private var cloudAPIKey: String
@@ -553,6 +556,61 @@ struct MorieSettingsView: View {
                     "单独按下并松开 Fn / 地球仪键可切换录音状态；与其他按键组合时不会触发 Morie。"
                 )
             }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(
+                    "恢复出厂设置…",
+                    systemImage: "arrow.counterclockwise",
+                    role: .destructive
+                ) {
+                    confirmsFactoryReset = true
+                }
+                .disabled(
+                    factoryResetInProgress
+                        || controller.isCaptureActive
+                )
+            }
+        }
+        .confirmationDialog(
+            "恢复出厂设置？",
+            isPresented: $confirmsFactoryReset,
+            titleVisibility: .visible
+        ) {
+            Button("恢复出厂设置", role: .destructive) {
+                factoryResetInProgress = true
+                Task {
+                    do {
+                        try await controller.factoryReset()
+                    } catch {
+                        factoryResetInProgress = false
+                        factoryResetError = error.localizedDescription
+                    }
+                }
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(
+                "将永久删除历史记录、原始录音、字典、个人记忆、学习数据、诊断日志和外部 API 配置，并把所有 Morie 设置恢复默认。Morie 随后会退出。macOS 已授予的系统权限不会被撤销。"
+            )
+        }
+        .alert(
+            "恢复出厂设置失败",
+            isPresented: Binding(
+                get: { factoryResetError != nil },
+                set: {
+                    if !$0 {
+                        factoryResetError = nil
+                    }
+                }
+            )
+        ) {
+            Button("好", role: .cancel) {
+                factoryResetError = nil
+            }
+        } message: {
+            Text(factoryResetError ?? "")
         }
         .confirmationDialog(
             "清除已学习的表达习惯？",
