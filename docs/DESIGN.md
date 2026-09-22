@@ -10,68 +10,48 @@ The goal is not to make Morie look custom. The goal is to make it feel **native,
 
 This is a **MUST / MUST NOT** rule, not a preference.
 
-Morie's user-facing UI **MUST use the globally shared Apple-native macOS design system and the repository's shared Control Center structure**.
+Morie's user-facing UI **MUST use Apple-native platform patterns and the project's shared global design system before introducing any custom presentation**.
 
-A page **MUST NOT invent its own page-level visual language, title treatment, toolbar system, search control, container chrome, spacing system, card system, glass treatment, button geometry or navigation shell** merely because the page has different content.
+### Reuse the global system
 
-If Apple already provides the behavior or control, use the Apple-native SwiftUI/AppKit solution.
+Views at the same hierarchy level **MUST share the same shell, title system, page origin, navigation behavior, spacing rules and control conventions**.
 
-Examples include:
+A local view **MUST NOT replace or imitate an existing global pattern with its own visual treatment**.
 
-- `NavigationSplitView`;
-- `NavigationStack`;
-- `.navigationTitle`;
-- `.searchable`;
-- `.toolbar`, `ToolbarItem`, `ToolbarItemGroup`, `ToolbarSpacer`;
-- `List`;
-- `Table`;
-- `Form`;
-- `ScrollView`;
-- native split views;
-- native buttons, pickers, toggles, menus, sheets, popovers and confirmation dialogs;
-- semantic system typography, colors, materials and spacing behavior.
+If a global pattern already exists, extend or reuse it. Do not create a parallel implementation.
 
-### Global consistency is mandatory
+### Native before custom
 
-Peer pages at the same hierarchy level **MUST use the same global title position, shell, page origin and navigation behavior**.
+When Apple provides the required behavior, use the native SwiftUI/AppKit API and allow the system to own intrinsic sizing, focus behavior, materials, accessibility, platform adaptation and interaction semantics.
 
-A page **MUST NOT** create a custom header to imitate or replace the shared system title.
+Do not recreate native controls or platform behavior with custom containers, fixed geometry, decorative wrappers or look-alike components.
 
-In particular:
+### No local style inventions
 
-- Overview, History, Dictionary, Personal Memory, Settings, Permissions and Diagnostics all use the same Control Center title system;
-- History and Diagnostics are allowed to have workspace-style content, but that does **not** permit a custom page title/header system;
-- a full-width workspace may begin below the shared title/toolbar, but must not replace them;
-- pagination/loading implementation details such as an internal page size must never become decorative UI unless they represent meaningful user-facing information.
+A feature view **MUST NOT introduce page-local styling rules for concerns that are already governed globally**.
 
-### No page-specific style inventions
+This includes navigation chrome, titles, toolbars, search, outer layout, spacing, control geometry, materials, grouping and common interaction patterns.
 
-The following are prohibited unless an explicit product requirement cannot be implemented with the native/global system:
+Implementation details that are not meaningful to the user must remain implementation details and must not leak into presentation merely to fill space or create visual distinction.
 
-- custom page headers that duplicate `.navigationTitle`;
-- fake toolbar search fields when `.searchable` is available;
-- custom toolbar containers, action arrays, placeholder items or fixed-width fake slots;
-- manually imitated Liquid Glass;
-- one-off capsule/button backgrounds that override native toolbar sizing;
-- page-specific title offsets or outer content margins;
-- bespoke card shells or separators used only on one peer page;
-- arbitrary fixed widths/heights whose purpose is visual compensation rather than content or platform behavior;
-- duplicated controls or labels added only to make one page look different.
+### Shared components encode shared rules
 
-### Shared components are for shared rules
+Repository-owned UI components are appropriate only when they encode a reusable product-wide rule or provide behavior that the native platform does not supply.
 
-Repository-owned UI components are allowed only when they encode a **global, reusable product rule** or when Apple does not provide the required behavior.
+A shared component must not exist only to give one feature a unique appearance.
 
-A shared component must not exist merely to give one page a unique visual treatment.
+### Exceptions require an explicit decision
 
-If a page needs a real exception because Apple-native controls cannot satisfy the requirement:
+A custom UI exception is allowed only when the Apple-native and existing global patterns cannot satisfy a concrete product requirement.
 
-1. identify the missing native capability;
-2. document why the global pattern cannot satisfy the requirement;
-3. keep the custom implementation as small as possible;
-4. update this design document or an accepted decision before treating the exception as the new pattern.
+Before implementing the exception:
 
-Do not silently introduce exceptions in implementation code.
+1. identify the missing capability;
+2. explain why the existing global/native pattern is insufficient;
+3. keep the custom surface as small as possible;
+4. document the exception in the appropriate design or architecture decision.
+
+Do not introduce exceptions silently in implementation code.
 
 ## Design foundations
 
