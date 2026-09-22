@@ -339,53 +339,7 @@ private struct ControlCenterDetailHost<Content: View>: View {
                 maxHeight: .infinity,
                 alignment: .topLeading
             )
-            .navigationTitle(
-                section == .history ? "" : section.title
-            )
-    }
-}
-
-struct ControlCenterWorkspaceHeader: View {
-    let title: String
-    let subtitle: String?
-    let trailingText: String?
-
-    init(
-        _ title: String,
-        subtitle: String? = nil,
-        trailingText: String? = nil
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.trailingText = trailingText
-    }
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer(minLength: 16)
-
-            if let trailingText {
-                Text(trailingText)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
-        .padding(.top, 18)
-        .padding(.bottom, 14)
+            .navigationTitle(section.title)
     }
 }
 
