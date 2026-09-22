@@ -56,9 +56,18 @@ struct MorieApp: App {
     }
 
     var body: some Scene {
-        if processRole == .controlCenter {
-            Window("Morie", id: "control-center") {
-                Group {
+        MenuBarExtra(
+            isInserted: .constant(processRole == .runtime)
+        ) {
+            MorieMenuContent(controller: controller)
+        } label: {
+            MorieMenuBarLabel(controller: controller)
+        }
+        .menuBarExtraStyle(.menu)
+
+        Window("Morie", id: "control-center") {
+            Group {
+                if processRole == .controlCenter {
                     if let captureStore {
                         MorieControlCenter(controller: controller)
                             .modelContainer(captureStore.container)
@@ -71,84 +80,103 @@ struct MorieApp: App {
                             )
                         )
                     }
+                } else {
+                    EmptyView()
                 }
-                .environment(
-                    \.locale,
-                    Locale(identifier: "zh-Hans")
+            }
+            .environment(
+                \.locale,
+                Locale(identifier: "zh-Hans")
+            )
+            .onAppear {
+                guard processRole == .controlCenter else {
+                    return
+                }
+
+                MorieApplicationActivation.windowDidAppear(
+                    "control-center"
                 )
-                .onAppear {
-                    MorieApplicationActivation.windowDidAppear(
-                        "control-center"
-                    )
-                    Diagnostics.record(
-                        "ControlCenterProcess",
-                        "Window appeared; pid=\(ProcessInfo.processInfo.processIdentifier)"
-                    )
+                Diagnostics.record(
+                    "ControlCenterProcess",
+                    "Window appeared; pid=\(ProcessInfo.processInfo.processIdentifier)"
+                )
 
-                    guard ControlCenterLaunchRoute.current
-                        == .settings else {
-                        return
-                    }
-                    Task { @MainActor in
-                        await Task.yield()
-                        NotificationCenter.default.post(
-                            name: .morieShowSettings,
-                            object: nil
-                        )
-                    }
+                guard ControlCenterLaunchRoute.current
+                    == .settings else {
+                    return
                 }
-                .onDisappear {
-                    Diagnostics.record(
-                        "ControlCenterProcess",
-                        "Window closed; terminating presentation process"
+                Task { @MainActor in
+                    await Task.yield()
+                    NotificationCenter.default.post(
+                        name: .morieShowSettings,
+                        object: nil
                     )
-                    ControlCenterProcessBridge.notifyWillTerminate()
-                    MorieApplicationActivation.windowDidDisappear(
-                        "control-center"
-                    )
-                    NSApplication.shared.terminate(nil)
                 }
             }
-            .defaultSize(width: 1120, height: 720)
-            .commands {
-                CommandGroup(replacing: .newItem) { }
-                SidebarCommands()
-                MorieControlCenterCommands()
-            }
-        } else {
-            MenuBarExtra {
-                MorieMenuContent(controller: controller)
-            } label: {
-                MorieMenuBarLabel(controller: controller)
-            }
-            .menuBarExtraStyle(.menu)
-            .commands {
-                MorieRuntimeCommands()
-            }
+            .onDisappear {
+                guard processRole == .controlCenter else {
+                    return
+                }
 
-            Window("欢迎使用 Morie", id: "setup") {
-                MorieSetupView(controller: controller)
-                    .environment(
-                        \.locale,
-                        Locale(identifier: "zh-Hans")
-                    )
-                    .onAppear {
-                        MorieApplicationActivation.windowDidAppear(
-                            "setup"
-                        )
-                    }
-                    .onDisappear {
-                        MorieApplicationActivation.windowDidDisappear(
-                            "setup"
-                        )
-                    }
+                Diagnostics.record(
+                    "ControlCenterProcess",
+                    "Window closed; terminating presentation process"
+                )
+                ControlCenterProcessBridge.notifyWillTerminate()
+                MorieApplicationActivation.windowDidDisappear(
+                    "control-center"
+                )
+                NSApplication.shared.terminate(nil)
             }
-            .windowStyle(.hiddenTitleBar)
-            .defaultSize(width: 700, height: 740)
-            .defaultPosition(.center)
-            .windowResizability(.contentMinSize)
-            .defaultLaunchBehavior(.suppressed)
         }
+        .defaultSize(width: 1120, height: 720)
+        .defaultLaunchBehavior(
+            processRole == .controlCenter
+                ? .presented
+                : .suppressed
+        )
+        .restorationBehavior(.disabled)
+        .commands {
+            CommandGroup(replacing: .newItem) { }
+            SidebarCommands()
+            MorieCommands(processRole: processRole)
+        }
+
+        Window("欢迎使用 Morie", id: "setup") {
+            Group {
+                if processRole == .runtime {
+                    MorieSetupView(controller: controller)
+                } else {
+                    EmptyView()
+                }
+            }
+            .environment(
+                \.locale,
+                Locale(identifier: "zh-Hans")
+            )
+            .onAppear {
+                guard processRole == .runtime else {
+                    return
+                }
+                MorieApplicationActivation.windowDidAppear(
+                    "setup"
+                )
+            }
+            .onDisappear {
+                guard processRole == .runtime else {
+                    return
+                }
+                MorieApplicationActivation.windowDidDisappear(
+                    "setup"
+                )
+            }
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 700, height: 740)
+        .defaultPosition(.center)
+        .windowResizability(.contentMinSize)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
     }
 }
 
