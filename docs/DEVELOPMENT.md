@@ -88,15 +88,24 @@ Avoid speculative provider systems, plugin architectures, compatibility layers, 
 
 When a future requirement actually appears, redesign the relevant boundary then.
 
-## Prefer Apple-native capabilities
+## Apple-native UI is mandatory
 
-Use current Apple platform capabilities when they satisfy the requirement.
+For any user-facing UI work, `docs/DESIGN.md` is an engineering constraint, not optional visual guidance.
 
-Prefer system frameworks, native APIs and straightforward Swift implementations over recreating platform functionality.
+Before changing a view, identify the existing global pattern for its hierarchy and responsibility.
 
-Apple-native is a preference, not a reason to build unnecessary custom infrastructure.
+Implementation **must** reuse the shared design system and Apple-native platform behavior before considering custom UI.
 
-If a native solution is inadequate, choose the solution with the lowest total complexity.
+Developers and agents **must not**:
+
+- create a local replacement for an existing global shell, title, toolbar, search, layout or interaction pattern;
+- recreate behavior already provided by SwiftUI/AppKit;
+- introduce one-off geometry, spacing, materials or control styling merely to distinguish one feature;
+- preserve an incorrect custom mechanism merely because it already exists.
+
+If the global/native solution cannot satisfy a concrete requirement, identify the missing capability first. A custom implementation must be minimal and must be documented as an explicit design or architecture exception before it becomes an accepted pattern.
+
+For non-UI platform functionality, prefer current Apple frameworks and straightforward Swift implementations over recreating platform behavior.
 
 ## External dependencies
 
@@ -170,17 +179,18 @@ Related cleanup is appropriate when it removes code made obsolete by the change 
 
 For normal development:
 
-1. Read the relevant current documentation.
-2. Inspect the current implementation.
-3. Reproduce or understand the existing behavior.
-4. Identify the owning layer and root cause.
-5. Check relevant reference implementations when useful.
-6. Choose the simplest coherent solution.
-7. Implement the change.
-8. Remove mechanisms made obsolete by the change.
-9. Validate the affected behavior according to `TESTING.md`.
-10. Update documentation when current behavior or design changed.
-11. Review the final diff before committing or merging.
+1. Read the relevant current documentation. For any UI task, `docs/DESIGN.md` is mandatory.
+2. For UI changes, identify the existing global Apple-native pattern for the target hierarchy before writing code.
+3. Inspect the current implementation.
+4. Reproduce or understand the existing behavior.
+5. Identify the owning layer and root cause.
+6. Check relevant reference implementations when useful.
+7. Choose the simplest coherent solution.
+8. Implement the change.
+9. Remove mechanisms made obsolete by the change.
+10. Validate the affected behavior according to `TESTING.md`.
+11. Update documentation when current behavior or design changed.
+12. Review the final diff before committing or merging.
 
 ## Git workflow
 
