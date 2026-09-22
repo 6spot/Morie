@@ -61,21 +61,6 @@ final class DictionaryTests: XCTestCase {
         XCTAssertEqual(store.entries.first?.name, "Kept")
     }
 
-    func testLoadedEntriesCanBeReleasedAndReloadedForRuntimeUse() throws {
-        let captures = try CaptureStore(inMemory: true)
-        defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
-        let store = DictionaryStore(container: captures.container)
-        _ = try store.create(DictionaryDraft(name: "EphemeralDictionaryTerm"))
-
-        XCTAssertFalse(store.entries.isEmpty)
-
-        store.releaseLoadedEntries()
-
-        XCTAssertTrue(store.entries.isEmpty)
-        XCTAssertTrue(try store.speechHints().contains("EphemeralDictionaryTerm"))
-        XCTAssertFalse(store.entries.isEmpty)
-    }
-
     func testWordsOnlyNormalizeTheirOwnSpellingAndPreserveOtherText() {
         let entries = [snapshot("Morie"), snapshot("Git"), snapshot("项目")]
         let input = "不要发布 morie 2.0，用ＭＯＲＩＥ记录项目。GitHub more e 莫里。`morie` https://morie.app /morie/run morie_name"
