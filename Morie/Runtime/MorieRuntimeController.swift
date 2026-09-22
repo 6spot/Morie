@@ -545,15 +545,6 @@ final class MorieRuntimeController {
         startNewCapture(deliveryMode: .captureOnly)
     }
 
-    func makeControlCenterHistoryController() -> CaptureHistoryController? {
-        captureStore.map {
-            CaptureHistoryController(
-                store: $0,
-                locale: Locale(identifier: "zh-CN")
-            )
-        }
-    }
-
     func controlCenterUsageMetrics() throws -> CaptureUsageMetricsSnapshot {
         guard let captureStore else {
             throw ControllerError.persistenceUnavailable(
