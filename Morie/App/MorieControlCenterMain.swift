@@ -58,6 +58,10 @@ struct MorieControlCenterApp: App {
                 \.locale,
                 Locale(identifier: "zh-Hans")
             )
+            .toolbarBackground(
+                .visible,
+                for: .windowToolbar
+            )
             .onAppear {
                 Diagnostics.record(
                     "ControlCenterProcess",
@@ -90,6 +94,7 @@ struct MorieControlCenterApp: App {
             }
         }
         .defaultSize(width: 1120, height: 720)
+        .windowToolbarStyle(.unified)
         .restorationBehavior(.disabled)
         .commands {
             CommandGroup(replacing: .newItem) { }
