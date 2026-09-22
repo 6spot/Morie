@@ -45,6 +45,16 @@ struct MorieSetupView: View {
                 }
             }
         )
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("重新检查", systemImage: "arrow.clockwise") {
+                    Task {
+                        await setup.refresh()
+                    }
+                }
+                .disabled(isBusy)
+            }
+        }
         .task {
             if setup.checks.isEmpty {
                 await setup.refresh()
