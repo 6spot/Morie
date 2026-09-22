@@ -95,7 +95,9 @@ final class CaptureHistoryTests: XCTestCase {
         let history = CaptureHistoryController(
             store: store,
             locale: Locale(identifier: "zh-CN")
-        )
+        ) { _, _ in
+            throw CaptureStore.StoreError.audioUnavailable
+        }
 
         let firstID = UUID()
         _ = try store.beginVoiceCapture(
