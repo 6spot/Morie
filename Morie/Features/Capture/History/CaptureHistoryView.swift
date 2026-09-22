@@ -134,6 +134,7 @@ struct CaptureHistoryWorkspace: View {
                     Image(systemName: "mic")
                 }
                 .help("开始录音")
+                .accessibilityLabel("开始录音")
                 .disabled(!canStartCapture)
             }
         }
