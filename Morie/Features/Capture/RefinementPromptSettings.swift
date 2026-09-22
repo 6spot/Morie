@@ -36,7 +36,7 @@ enum RefinementPromptSettings {
         return text
     }()
 
-    static func load(from defaults: UserDefaults = MorieDefaults.shared) -> String {
+    static func load(from defaults: UserDefaults = UserDefaults.standard) -> String {
         guard let saved = defaults.string(forKey: defaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
               !saved.isEmpty
@@ -47,14 +47,14 @@ enum RefinementPromptSettings {
     }
 
     @discardableResult
-    static func save(_ instructions: String, to defaults: UserDefaults = MorieDefaults.shared) -> Bool {
+    static func save(_ instructions: String, to defaults: UserDefaults = UserDefaults.standard) -> Bool {
         let value = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return false }
         defaults.set(value, forKey: defaultsKey)
         return true
     }
 
-    static func restoreDefault(in defaults: UserDefaults = MorieDefaults.shared) {
+    static func restoreDefault(in defaults: UserDefaults = UserDefaults.standard) {
         defaults.removeObject(forKey: defaultsKey)
     }
 }

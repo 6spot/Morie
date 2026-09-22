@@ -135,27 +135,27 @@ final class MorieRuntimeController {
 
         let savedPersonalMemoryEnabled =
             PersonalMemorySettings.isEnabled
-        let savedShortcut = MorieDefaults.shared
+        let savedShortcut = UserDefaults.standard
             .string(forKey: CaptureShortcut.defaultsKey)
             .flatMap(CaptureShortcut.init(rawValue:))
             ?? CaptureShortcut.defaultValue
         let savedInputRefinementEnabled =
-            MorieDefaults.shared.object(
+            UserDefaults.standard.object(
                 forKey: CapturePersonalizer.enabledDefaultsKey
             ) as? Bool
             ?? true
         let savedCorrectionSuggestionsEnabled =
-            MorieDefaults.shared.bool(
+            UserDefaults.standard.bool(
                 forKey:
                     PostInsertionLearningController
                         .dictionarySuggestionsDefaultsKey
             )
         let savedExpressionLearningEnabled =
-            MorieDefaults.shared.bool(
+            UserDefaults.standard.bool(
                 forKey: ExpressionProfileStore.enabledDefaultsKey
             )
         let savedSoundFeedbackEnabled =
-            MorieDefaults.shared.object(
+            UserDefaults.standard.object(
                 forKey: CaptureSoundFeedback.enabledDefaultsKey
             ) as? Bool
             ?? true
@@ -305,7 +305,7 @@ final class MorieRuntimeController {
     func setInputRefinementEnabled(_ enabled: Bool) {
         preferences.inputRefinementEnabled = enabled
         captureSession.inputRefinementEnabled = enabled
-        MorieDefaults.shared.set(
+        UserDefaults.standard.set(
             enabled,
             forKey: CapturePersonalizer.enabledDefaultsKey
         )
@@ -319,7 +319,7 @@ final class MorieRuntimeController {
 
     func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
         preferences.correctionSuggestionsEnabled = enabled
-        MorieDefaults.shared.set(
+        UserDefaults.standard.set(
             enabled,
             forKey:
                 PostInsertionLearningController
@@ -335,7 +335,7 @@ final class MorieRuntimeController {
 
     func setExpressionLearningEnabled(_ enabled: Bool) {
         preferences.expressionLearningEnabled = enabled
-        MorieDefaults.shared.set(
+        UserDefaults.standard.set(
             enabled,
             forKey: ExpressionProfileStore.enabledDefaultsKey
         )
@@ -350,7 +350,7 @@ final class MorieRuntimeController {
     func setSoundFeedbackEnabled(_ enabled: Bool) {
         preferences.soundFeedbackEnabled = enabled
         captureSession.soundFeedbackEnabled = enabled
-        MorieDefaults.shared.set(
+        UserDefaults.standard.set(
             enabled,
             forKey: CaptureSoundFeedback.enabledDefaultsKey
         )
@@ -399,7 +399,7 @@ final class MorieRuntimeController {
         try RefinementModelSettings.resetToDefaults()
         RefinementPromptSettings.restoreDefault()
 
-        let defaults = MorieDefaults.shared
+        let defaults = UserDefaults.standard
         [
             Self.setupCompletedKey,
             CaptureShortcut.defaultsKey,
@@ -620,7 +620,7 @@ final class MorieRuntimeController {
             }
 
             guard completingSetup
-                || MorieDefaults.shared.bool(
+                || UserDefaults.standard.bool(
                     forKey: Self.setupCompletedKey
                 ) else {
                 runtime.state = .blocked(
@@ -658,7 +658,7 @@ final class MorieRuntimeController {
             try installHotkeyIfNeeded()
 
             lastPresentedFailure = nil
-            MorieDefaults.shared.set(
+            UserDefaults.standard.set(
                 true,
                 forKey: Self.setupCompletedKey
             )
@@ -720,7 +720,7 @@ final class MorieRuntimeController {
         }
 
         preferences.captureShortcut = shortcut
-        MorieDefaults.shared.set(
+        UserDefaults.standard.set(
             shortcut.rawValue,
             forKey: CaptureShortcut.defaultsKey
         )

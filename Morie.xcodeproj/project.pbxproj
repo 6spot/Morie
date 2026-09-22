@@ -104,9 +104,7 @@
 		A45000000000000000000004 /* RefinementModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000005 /* RefinementModelConfiguration.swift */;};
 		A45000000000000000000005 /* DictionaryPresentationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000006 /* DictionaryPresentationStore.swift */;};
 		A45000000000000000000006 /* MemoryPresentationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000007 /* MemoryPresentationStore.swift */;};
-		A45000000000000000000007 /* MorieDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000010 /* MorieDefaults.swift */;};
 		A45000000000000000000008 /* RefinementModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000005 /* RefinementModelConfiguration.swift */;};
-		A45000000000000000000009 /* MorieDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000010 /* MorieDefaults.swift */;};
 		A4500000000000000000000A /* DefaultRefinementInstructions.txt in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000002 /* DefaultRefinementInstructions.txt */; };
 		A4500000000000000000000B /* Morie Runtime.app in Embed Runtime */ = {isa = PBXBuildFile; fileRef = B45000000000000000000001 /* Morie Runtime.app */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A4500000000000000000000C /* me.morie.mac.runtime.plist in Copy Runtime LaunchAgent */ = {isa = PBXBuildFile; fileRef = B4500000000000000000000E /* me.morie.mac.runtime.plist */; };
@@ -150,7 +148,6 @@
 		A45000000000000000000032 /* DictionaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000030 /* DictionaryStore.swift */;};
 		A45000000000000000000033 /* CaptureShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000004 /* CaptureShortcut.swift */;};
 		A45000000000000000000034 /* RefinementModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000005 /* RefinementModelConfiguration.swift */;};
-		A45000000000000000000035 /* MorieDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000010 /* MorieDefaults.swift */;};
 		A45000000000000000000036 /* MorieRuntimeIPC.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000002 /* MorieRuntimeIPC.swift */;};
 		A45000000000000000000037 /* MorieRuntimeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000008 /* MorieRuntimeController.swift */;};
 		A45000000000000000000038 /* MorieRuntimeCapabilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45000000000000000000009 /* MorieRuntimeCapabilityController.swift */;};
@@ -281,7 +278,6 @@
 		B4500000000000000000000D /* RuntimeCaptureHistoryController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCaptureHistoryController.swift; sourceTree = "<group>"; };
 		B4500000000000000000000E /* me.morie.mac.runtime.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = me.morie.mac.runtime.plist; sourceTree = "<group>"; };
 		B4500000000000000000000F /* MorieRuntime.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MorieRuntime.entitlements; sourceTree = "<group>"; };
-		B45000000000000000000010 /* MorieDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieDefaults.swift; sourceTree = "<group>"; };
 		B45000000000000000000040 /* ICloudSyncState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSyncState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -542,7 +538,6 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000008 /* Diagnostics.swift */,
-				B45000000000000000000010 /* MorieDefaults.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -819,7 +814,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A45000000000000000000008 /* RefinementModelConfiguration.swift in Sources */,
-				A45000000000000000000009 /* MorieDefaults.swift in Sources */,
 				A90000000000000000000002 /* SpeechContextHints.swift in Sources */,
 				A80000000000000000000003 /* ApplicationContext.swift in Sources */,
 				A50000000000000000000004 /* RefinementModelSettings.swift in Sources */,
@@ -908,7 +902,6 @@
 				A45000000000000000000032 /* DictionaryStore.swift in Sources */,
 				A45000000000000000000033 /* CaptureShortcut.swift in Sources */,
 				A45000000000000000000034 /* RefinementModelConfiguration.swift in Sources */,
-				A45000000000000000000035 /* MorieDefaults.swift in Sources */,
 				A45000000000000000000036 /* MorieRuntimeIPC.swift in Sources */,
 				A45000000000000000000037 /* MorieRuntimeController.swift in Sources */,
 				A45000000000000000000038 /* MorieRuntimeCapabilityController.swift in Sources */,

@@ -10,7 +10,7 @@ enum RefinementModelSettings {
 
     /// Loads only non-secret preferences. Launch-time callers must never touch Keychain.
     static func load() -> RefinementModelConfiguration {
-        let defaults = MorieDefaults.shared
+        let defaults = UserDefaults.standard
         let mode = defaults.string(forKey: modeDefaultsKey)
             .flatMap(RefinementModelMode.init(rawValue:)) ?? .local
 
@@ -27,7 +27,7 @@ enum RefinementModelSettings {
     }
 
     static func saveMode(_ mode: RefinementModelMode) {
-        MorieDefaults.shared.set(mode.rawValue, forKey: modeDefaultsKey)
+        UserDefaults.standard.set(mode.rawValue, forKey: modeDefaultsKey)
     }
 
     /// Saves public endpoint metadata and optionally replaces the Keychain credential.
@@ -50,8 +50,8 @@ enum RefinementModelSettings {
                 throw RefinementModelSettingsError.invalidBaseURL
             }        }
 
-        MorieDefaults.shared.set(baseURL, forKey: cloudBaseURLDefaultsKey)
-        MorieDefaults.shared.set(modelName, forKey: cloudModelNameDefaultsKey)
+        UserDefaults.standard.set(baseURL, forKey: cloudBaseURLDefaultsKey)
+        UserDefaults.standard.set(modelName, forKey: cloudModelNameDefaultsKey)
 
         if let newAPIKey {
             try RefinementCredentialStore.writeAPIKey(
@@ -59,7 +59,7 @@ enum RefinementModelSettings {
             )
         }
 
-        let mode = MorieDefaults.shared.string(forKey: modeDefaultsKey)
+        let mode = UserDefaults.standard.string(forKey: modeDefaultsKey)
             .flatMap(RefinementModelMode.init(rawValue:)) ?? .local
         return RefinementModelConfiguration(
             mode: mode,
@@ -76,7 +76,7 @@ enum RefinementModelSettings {
     static func resetToDefaults() throws {
         try RefinementCredentialStore.writeAPIKey("")
 
-        let defaults = MorieDefaults.shared
+        let defaults = UserDefaults.standard
         defaults.removeObject(forKey: modeDefaultsKey)
         defaults.removeObject(forKey: cloudBaseURLDefaultsKey)
         defaults.removeObject(forKey: cloudModelNameDefaultsKey)
