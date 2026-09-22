@@ -333,7 +333,7 @@ private struct MorieMenuContent: View {
 
 @MainActor
 struct MorieSettingsView: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
     @ObservedObject private var preferences: AppPreferencesController
     @ObservedObject private var refinementModels: RefinementModelController
     @ObservedObject private var refinementPrompts: RefinementPromptController
@@ -347,7 +347,7 @@ struct MorieSettingsView: View {
     @State private var cloudAPIKey: String
     @State private var refinementInstructions: String
 
-    init(controller: AppController) {
+    init(controller: any ControlCenterControlling) {
         self.controller = controller
         _preferences = ObservedObject(
             wrappedValue: controller.preferences
