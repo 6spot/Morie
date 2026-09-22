@@ -35,6 +35,8 @@ final class CaptureStore: ObservableObject {
 
     @Published private(set) var historyRevision: UInt64 = 0
 
+    var onHistoryChange: (() -> Void)?
+
     private var records: [UUID: CaptureRecord] = [:]
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
     private var persistenceRevision: [UUID: Int] = [:]
@@ -749,8 +751,13 @@ final class CaptureStore: ObservableObject {
         Diagnostics.record("CaptureStore", "Recovered \(interrupted.count) interrupted Capture(s)")
     }
 
+    func refreshHistoryAfterExternalChange() {
+        historyRevision &+= 1
+    }
+
     private func markHistoryChanged() {
         historyRevision &+= 1
+        onHistoryChange?()
     }
 
     private func label(_ id: UUID) -> String {
