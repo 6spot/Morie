@@ -137,7 +137,7 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
                 guard let store = self.controller.captureStore,
                       let id = UUID(uuidString: captureID)
                 else { throw RuntimeError.persistenceUnavailable }
-                let history = CaptureHistoryController(
+                let history = RuntimeCaptureHistoryController(
                     store: store,
                     locale: Locale(identifier: "zh-CN")
                 )
@@ -159,13 +159,15 @@ private final class MorieRuntimeXPCService: NSObject, MorieRuntimeXPCProtocol {
                       let id = UUID(uuidString: captureID)
                 else { throw RuntimeError.persistenceUnavailable }
 
-                let history = CaptureHistoryController(
+                let history = RuntimeCaptureHistoryController(
                     store: store,
                     locale: Locale(identifier: "zh-CN")
                 )
                 history.setInputActive(self.controller.isCaptureActive)
                 history.recognizeAgain(id)
-                await history.waitForRecognition()
+                while history.recognizingCaptureID != nil {
+                    try await Task.sleep(for: .milliseconds(50))
+                }
                 let payload = try self.historyDetailDTO(captureID)
                 reply(try MorieRuntimeCodec.encode(payload), nil)
             } catch {

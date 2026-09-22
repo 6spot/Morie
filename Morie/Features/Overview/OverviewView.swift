@@ -55,7 +55,7 @@ struct OverviewView: View {
             }
         }
         .task {
-            loadUsageMetrics()
+            await loadUsageMetrics()
         }
     }
 
@@ -253,9 +253,10 @@ struct OverviewView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func loadUsageMetrics() {
+    private func loadUsageMetrics() async {
         do {
-            state.metricsSnapshot = try controller.controlCenterUsageMetrics()
+            state.metricsSnapshot =
+                try await controller.controlCenterUsageMetrics()
             metricsError = nil
         } catch {
             state.metricsSnapshot = nil

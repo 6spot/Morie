@@ -204,9 +204,9 @@ struct DictionaryView: View {
         }
     }
 
-    private func load() {
+    private func load() async {
         do {
-            try store.loadIfNeeded()
+            try await store.loadIfNeeded()
             errorMessage = nil
 
             if selectedEntry?.isEditable != true {
@@ -220,11 +220,13 @@ struct DictionaryView: View {
     private func deleteSelectedEntry() {
         guard let id = selectedUserEntryID else { return }
 
-        do {
-            try store.delete(id)
-            selection = nil
-        } catch {
-            errorMessage = error.localizedDescription
+        Task {
+            do {
+                try await store.delete(id)
+                selection = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -366,18 +368,18 @@ struct DictionaryEditorSheet: View {
     }
 
     private func save() {
-        do {
-            let draft = DictionaryDraft(name: name)
+        Task {
+            do {
+                if let entryID {
+                    try await store.update(entryID, name: name)
+                } else {
+                    try await store.create(name)
+                }
 
-            if let entryID {
-                try store.update(entryID, draft: draft)
-            } else {
-                try store.create(draft)
+                dismiss()
+            } catch {
+                errorMessage = error.localizedDescription
             }
-
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

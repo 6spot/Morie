@@ -164,9 +164,9 @@ struct MemoryView: View {
         .task { await load() }
     }
 
-    private func load() {
+    private func load() async {
         do {
-            try store.loadIfNeeded()
+            try await store.loadIfNeeded()
             errorMessage = nil
         } catch {
             errorMessage = "无法加载个人记忆。"
@@ -508,12 +508,16 @@ struct MemoryDetailView: View {
         }
     }
 
-    private func perform(_ action: () throws -> Void) {
-        do {
-            try action()
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
+    private func perform(
+        _ action: @escaping () async throws -> Void
+    ) {
+        Task {
+            do {
+                try await action()
+                errorMessage = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }
@@ -618,18 +622,20 @@ struct MemoryEditorSheet: View {
     }
 
     private func save() {
-        do {
-            switch mode {
-            case .create:
-                try store.create(draft)
-            case .edit(let id):
-                try store.update(id, draft: draft)
-            case .replace(let id):
-                try store.replace(id, with: draft)
+        Task {
+            do {
+                switch mode {
+                case .create:
+                    try await store.create(draft)
+                case .edit(let id):
+                    try await store.update(id, draft: draft)
+                case .replace(let id):
+                    try await store.replace(id, with: draft)
+                }
+                dismiss()
+            } catch {
+                errorMessage = error.localizedDescription
             }
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }
