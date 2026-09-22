@@ -9,15 +9,31 @@ enum DiagnosticLevel: String, Sendable {
     case error = "ERROR"
 }
 
+struct DiagnosticLogEntry: Identifiable, Sendable {
+    let id: UUID
+    let timestamp: Date
+    let level: DiagnosticLevel
+    let category: String
+    let message: String
+
+    init(
+        id: UUID = UUID(),
+        timestamp: Date,
+        level: DiagnosticLevel,
+        category: String,
+        message: String
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.level = level
+        self.category = category
+        self.message = message
+    }
+}
+
 @MainActor
 final class DiagnosticLogStore: ObservableObject {
-    struct Entry: Identifiable {
-        let id = UUID()
-        let timestamp: Date
-        let level: DiagnosticLevel
-        let category: String
-        let message: String
-    }
+    typealias Entry = DiagnosticLogEntry
 
     static let shared = DiagnosticLogStore()
 
@@ -27,6 +43,8 @@ final class DiagnosticLogStore: ObservableObject {
     private let fileFlushDelay: Duration = .milliseconds(400)
     private var pendingFileText = ""
     private var fileFlushTask: Task<Void, Never>?
+    private var presentationLoadTask: Task<Void, Never>?
+    private var isPresentationVisible = false
     let logFileURL: URL
 
     private init() {
@@ -56,12 +74,15 @@ final class DiagnosticLogStore: ObservableObject {
             category: category,
             message: message
         )
-        entries.append(entry)
-        pendingFileText += format(entry) + "\n"
+        if isPresentationVisible {
+            entries.append(entry)
 
-        if entries.count > maximumEntries {
-            entries.removeFirst(entries.count - maximumEntries)
+            if entries.count > maximumEntries {
+                entries.removeFirst(entries.count - maximumEntries)
+            }
         }
+
+        pendingFileText += format(entry) + "\n"
 
         if level == .error {
             flushPendingFile()
@@ -71,11 +92,50 @@ final class DiagnosticLogStore: ObservableObject {
     }
 
     func clear() {
-        entries.removeAll(keepingCapacity: true)
-        pendingFileText.removeAll(keepingCapacity: true)
+        entries.removeAll(keepingCapacity: false)
+        pendingFileText.removeAll(keepingCapacity: false)
         fileFlushTask?.cancel()
         fileFlushTask = nil
+        presentationLoadTask?.cancel()
+        presentationLoadTask = nil
         DiagnosticFileWriter.clear(logFileURL)
+    }
+
+    func setPresentationVisible(_ visible: Bool) {
+        isPresentationVisible = visible
+        presentationLoadTask?.cancel()
+        presentationLoadTask = nil
+
+        guard visible else {
+            entries.removeAll(keepingCapacity: false)
+            return
+        }
+
+        entries.removeAll(keepingCapacity: false)
+        let url = logFileURL
+        let limit = maximumEntries
+
+        presentationLoadTask = Task { [weak self] in
+            let loaded = await Task.detached(priority: .utility) {
+                DiagnosticFileReader.readRecent(
+                    from: url,
+                    limit: limit
+                )
+            }.value
+
+            guard !Task.isCancelled,
+                  let self,
+                  self.isPresentationVisible
+            else { return }
+
+            let live = self.entries
+            self.entries = DiagnosticFileReader.merge(
+                loaded,
+                live,
+                limit: limit
+            )
+            self.presentationLoadTask = nil
+        }
     }
 
     var plainText: String {
@@ -105,7 +165,7 @@ final class DiagnosticLogStore: ObservableObject {
         fileFlushTask = nil
         guard !pendingFileText.isEmpty else { return }
         let text = pendingFileText
-        pendingFileText.removeAll(keepingCapacity: true)
+        pendingFileText.removeAll(keepingCapacity: false)
         DiagnosticFileWriter.append(text, to: logFileURL)
     }
 
@@ -116,6 +176,141 @@ final class DiagnosticLogStore: ObservableObject {
         )
         return "\(time) [\(entry.level.rawValue)] [\(entry.category)] \(entry.message)"
     }
+}
+
+private enum DiagnosticFileReader {
+    private static let maximumReadBytes: UInt64 = 1_048_576
+
+    static func readRecent(
+        from url: URL,
+        limit: Int
+    ) -> [DiagnosticLogEntry] {
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return []
+        }
+        defer { try? handle.close() }
+
+        do {
+            let size = try handle.seekToEnd()
+            let start = size > maximumReadBytes
+                ? size - maximumReadBytes
+                : 0
+            try handle.seek(toOffset: start)
+
+            guard let data = try handle.readToEnd(),
+                  !data.isEmpty
+            else { return [] }
+
+            var text = String(decoding: data, as: UTF8.self)
+            if start > 0,
+               let newline = text.firstIndex(of: "\n") {
+                text = String(text[text.index(after: newline)...])
+            }
+
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [
+                .withInternetDateTime,
+                .withFractionalSeconds,
+            ]
+            let standard = ISO8601DateFormatter()
+
+            return text
+                .split(separator: "\n", omittingEmptySubsequences: true)
+                .suffix(limit)
+                .compactMap {
+                    parse(
+                        String($0),
+                        fractionalISO8601: fractional,
+                        standardISO8601: standard
+                    )
+                }
+        } catch {
+            return []
+        }
+    }
+
+    static func merge(
+        _ persisted: [DiagnosticLogEntry],
+        _ live: [DiagnosticLogEntry],
+        limit: Int
+    ) -> [DiagnosticLogEntry] {
+        var seen = Set<String>()
+        var merged: [DiagnosticLogEntry] = []
+
+        for entry in persisted + live {
+            let key =
+                "\(entry.timestamp.timeIntervalSince1970)|"
+                + "\(entry.level.rawValue)|"
+                + "\(entry.category)|"
+                + entry.message
+            guard seen.insert(key).inserted else { continue }
+            merged.append(entry)
+        }
+
+        merged.sort { $0.timestamp < $1.timestamp }
+        return Array(merged.suffix(limit))
+    }
+
+    private static func parse(
+        _ line: String,
+        fractionalISO8601: ISO8601DateFormatter,
+        standardISO8601: ISO8601DateFormatter
+    ) -> DiagnosticLogEntry? {
+        guard let firstSpace = line.firstIndex(of: " ") else {
+            return nil
+        }
+
+        let timestampText = String(line[..<firstSpace])
+        var remainder = String(line[line.index(after: firstSpace)...])
+        guard remainder.first == "[",
+              let levelEnd = remainder.firstIndex(of: "]")
+        else { return nil }
+
+        let levelText = String(
+            remainder[
+                remainder.index(after: remainder.startIndex)..<levelEnd
+            ]
+        )
+        guard let level = DiagnosticLevel(rawValue: levelText) else {
+            return nil
+        }
+
+        let afterLevel = remainder.dropFirst(
+            remainder.distance(
+                from: remainder.startIndex,
+                to: remainder.index(after: levelEnd)
+            )
+        )
+        remainder = String(afterLevel)
+            .trimmingCharacters(in: .whitespaces)
+
+        guard remainder.first == "[",
+              let categoryEnd = remainder.firstIndex(of: "]")
+        else { return nil }
+
+        let category = String(
+            remainder[
+                remainder.index(after: remainder.startIndex)..<categoryEnd
+            ]
+        )
+        let message = String(
+            remainder[remainder.index(after: categoryEnd)...]
+        )
+        .trimmingCharacters(in: .whitespaces)
+
+        let timestamp =
+            fractionalISO8601.date(from: timestampText)
+            ?? standardISO8601.date(from: timestampText)
+        guard let timestamp else { return nil }
+
+        return DiagnosticLogEntry(
+            timestamp: timestamp,
+            level: level,
+            category: category,
+            message: message
+        )
+    }
+
 }
 
 private enum DiagnosticFileWriter {
@@ -415,11 +610,11 @@ enum Diagnostics {
 @MainActor
 struct DiagnosticLogView: View {
     @ObservedObject private var store = DiagnosticLogStore.shared
+    @Binding var search: String
+    @Binding var level: DiagnosticLevel?
+    @Binding var confirmsClear: Bool
 
-    @State private var search = ""
-    @State private var level: DiagnosticLevel?
     @State private var selection: UUID?
-    @State private var confirmsClear = false
 
     private var visibleEntries: [DiagnosticLogStore.Entry] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -435,84 +630,110 @@ struct DiagnosticLogView: View {
     }
 
     var body: some View {
-        VSplitView {
-            Table(visibleEntries, selection: $selection) {
-                TableColumn("时间") { entry in
-                    Text(
-                        entry.timestamp.formatted(
-                            .dateTime
-                                .locale(Locale(identifier: "zh-Hans"))
-                                .hour()
-                                .minute()
-                                .second()
-                        )
-                    )
-                    .monospacedDigit()
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text("\(visibleEntries.count) 条日志")
                     .foregroundStyle(.secondary)
-                }
-                .width(min: 80, ideal: 94, max: 120)
 
-                TableColumn("级别") { entry in
-                    Label(
-                        entry.level.title,
-                        systemImage: entry.level.systemImage
-                    )
-                    .foregroundStyle(entry.level.color)
+                if let level {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(level.title)
+                        .foregroundStyle(.secondary)
                 }
-                .width(min: 80, ideal: 94, max: 110)
 
-                TableColumn("类别") { entry in
-                    Text(entry.category)
-                }
-                .width(min: 90, ideal: 120, max: 200)
+                Spacer()
 
-                TableColumn("内容") { entry in
-                    Text(entry.message)
-                        .lineLimit(1)
-                }
+                Text(store.logFileURL.lastPathComponent)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.tertiary)
             }
-            .overlay {
-                if visibleEntries.isEmpty {
-                    ContentUnavailableView(
-                        store.entries.isEmpty
-                            ? "暂无诊断日志"
-                            : "没有匹配的日志",
-                        systemImage: "ladybug",
-                        description: Text(
-                            store.entries.isEmpty
-                                ? "录音和识别过程的诊断信息会显示在这里。"
-                                : "试试其他搜索词或日志级别。"
+            .font(.callout)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            VSplitView {
+                Table(visibleEntries, selection: $selection) {
+                    TableColumn("时间") { entry in
+                        Text(
+                            entry.timestamp.formatted(
+                                .dateTime
+                                    .locale(Locale(identifier: "zh-Hans"))
+                                    .hour()
+                                    .minute()
+                                    .second()
+                            )
                         )
-                    )
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    }
+                    .width(min: 80, ideal: 94, max: 120)
+
+                    TableColumn("级别") { entry in
+                        Label(
+                            entry.level.title,
+                            systemImage: entry.level.systemImage
+                        )
+                        .foregroundStyle(entry.level.color)
+                    }
+                    .width(min: 80, ideal: 94, max: 110)
+
+                    TableColumn("类别") { entry in
+                        Text(entry.category)
+                    }
+                    .width(min: 90, ideal: 120, max: 200)
+
+                    TableColumn("内容") { entry in
+                        Text(entry.message)
+                            .lineLimit(1)
+                    }
                 }
+                .overlay {
+                    if visibleEntries.isEmpty {
+                        ContentUnavailableView(
+                            store.entries.isEmpty
+                                ? "暂无诊断日志"
+                                : "没有匹配的日志",
+                            systemImage: "ladybug",
+                            description: Text(
+                                store.entries.isEmpty
+                                    ? "录音和识别过程的诊断信息会显示在这里。"
+                                    : "试试其他搜索词或日志级别。"
+                            )
+                        )
+                    }
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+
+                diagnosticDetail
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 160,
+                        idealHeight: 220,
+                        maxHeight: 320
+                    )
             }
             .frame(
                 maxWidth: .infinity,
-                maxHeight: .infinity
+                maxHeight: .infinity,
+                alignment: .topLeading
             )
-
-            diagnosticDetail
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 160,
-                    idealHeight: 220,
-                    maxHeight: 320
-                )
         }
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,
             alignment: .topLeading
         )
-        .navigationTitle("诊断")
-        .navigationSubtitle(
-            DevelopmentDiagnostics.isEnabled
-                ? "\(visibleEntries.count) 条日志 · 开发追踪已启用"
-                : "\(visibleEntries.count) 条日志"
+        .searchable(
+            text: $search,
+            placement: .toolbar,
+            prompt: Text("搜索诊断日志")
         )
-        .searchable(text: $search, prompt: "搜索诊断日志")
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Picker("筛选日志", selection: $level) {
                     Text("全部日志")
                         .tag(nil as DiagnosticLevel?)
@@ -521,7 +742,7 @@ struct DiagnosticLogView: View {
                         [
                             DiagnosticLevel.info,
                             .warning,
-                            .error
+                            .error,
                         ],
                         id: \.self
                     ) {
@@ -529,32 +750,21 @@ struct DiagnosticLogView: View {
                     }
                 }
                 .pickerStyle(.menu)
+            }
 
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button(
                     "复制当前筛选",
                     systemImage: "line.3.horizontal.decrease.circle"
                 ) {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(
-                        store.text(for: visibleEntries),
-                        forType: .string
-                    )
+                    copyDiagnostics(visibleEntries)
                 }
-                .disabled(visibleEntries.isEmpty)
 
-                Button(
-                    "复制全部日志",
-                    systemImage: "doc.on.doc"
-                ) {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(
-                        store.plainText,
-                        forType: .string
-                    )
+                Button("复制全部日志", systemImage: "doc.on.doc") {
+                    copyDiagnostics(store.entries)
                 }
-                .disabled(store.entries.isEmpty)
 
                 Menu("诊断操作", systemImage: "ellipsis") {
                     Button(
@@ -575,7 +785,6 @@ struct DiagnosticLogView: View {
                     ) {
                         confirmsClear = true
                     }
-                    .disabled(store.entries.isEmpty)
                 }
             }
         }
@@ -590,11 +799,28 @@ struct DiagnosticLogView: View {
         } message: {
             Text("将清空当前显示的全部日志和本地诊断日志文件。")
         }
+        .onAppear {
+            store.setPresentationVisible(true)
+        }
+        .onDisappear {
+            store.setPresentationVisible(false)
+        }
         .onChange(of: visibleEntries.map(\.id)) { _, ids in
             if let selection, !ids.contains(selection) {
                 self.selection = nil
             }
         }
+    }
+
+    private func copyDiagnostics(
+        _ entries: [DiagnosticLogStore.Entry]
+    ) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(
+            store.text(for: entries),
+            forType: .string
+        )
     }
 
     @ViewBuilder
@@ -642,7 +868,7 @@ struct DiagnosticLogView: View {
     }
 }
 
-private extension DiagnosticLevel {
+extension DiagnosticLevel {
     var title: String {
         switch self {
         case .info: "信息"

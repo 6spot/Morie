@@ -58,6 +58,6 @@ Detailed task records live under [`docs/tasks/`](./tasks/README.md).
 | M-040 | Architecture | Split AppController observable state into runtime and preferences domains | IN PROGRESS | [#92](https://github.com/6spot/Morie/issues/92) | [`M-040`](./tasks/M-040-app-controller-domains.md) |
 | M-041 | Control Center | Redesign the management UI around native grouped Forms and stable workspaces | BLOCKED | [#94](https://github.com/6spot/Morie/issues/94) | [`M-041`](./tasks/M-041-control-center-visual-redesign.md) |
 | M-042 | Input quality | Add bounded ephemeral Application Context for Speech and refinement | DONE | [#97](https://github.com/6spot/Morie/issues/97) / [PR #98](https://github.com/6spot/Morie/pull/98) | [`M-042`](./tasks/M-042-application-context.md) |
-| M-043 | Control Center | Rebuild routed page families with SwiftUI best-practice containers and full workspaces | IN PROGRESS | [#99](https://github.com/6spot/Morie/issues/99) | [`M-043`](./tasks/M-043-control-center-page-families.md) |
+| M-043 | Control Center | Unify all Control Center pages under one native shell and current Morie design rules | IN PROGRESS | [#99](https://github.com/6spot/Morie/issues/99) / [PR #105](https://github.com/6spot/Morie/pull/105) | [`M-043`](./tasks/M-043-control-center-page-families.md) |
 | M-006 | Phase 4 | iOS instant Capture entry points | TODO | — | [`M-006`](./tasks/M-006-ios-capture.md) |
 | M-007 | Later | Optional Morie Cloud / API / MCP | TODO | — | [`M-007`](./tasks/M-007-cloud.md) |

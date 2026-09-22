@@ -89,7 +89,7 @@ final class CaptureHistoryTests: XCTestCase {
                        "A retained terminal Capture should enter History exactly after it stops being live.")
     }
 
-    func testHistoryControllerRetainsListAcrossPageSwitchAndRefreshesWhenNeeded() async throws {
+    func testHistoryControllerReleasesListAcrossPageSwitchAndReloadsOnReturn() async throws {
         let store = try CaptureStore(inMemory: true)
         defer { try? FileManager.default.removeItem(at: store.audioDirectory) }
         let history = CaptureHistoryController(
@@ -123,10 +123,9 @@ final class CaptureHistoryTests: XCTestCase {
         try await store.flushPersistence(for: secondID)
         history.captureListDidChange()
 
-        XCTAssertEqual(
-            history.captures.map(\.id),
-            [firstID],
-            "An off-screen History page should keep its existing snapshot instead of reloading."
+        XCTAssertTrue(
+            history.captures.isEmpty,
+            "An off-screen History page should release its presentation records."
         )
 
         history.setListVisible(true)

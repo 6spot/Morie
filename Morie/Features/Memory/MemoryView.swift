@@ -3,11 +3,11 @@ import SwiftUI
 
 struct MemoryView: View {
     @ObservedObject var store: MemoryStore
+    @Binding var search: String
+    @Binding var editor: MemoryEditorMode?
     @AppStorage(PersonalMemorySettings.enabledDefaultsKey)
     private var memoryEnabled = true
 
-    @State private var search = ""
-    @State private var editor: MemoryEditorMode?
     @State private var errorMessage: String?
 
     private var query: String {
@@ -45,10 +45,19 @@ struct MemoryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            Text(
-                "Morie 会把稳定事实沉淀为长期记忆，把近期但仍可能变化的信息保留在“最近”里。"
-            )
+        ControlCenterPage {
+            HStack(spacing: 8) {
+                Text("\(activeLongTerm.count) 条长期")
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Text("\(recentContext.count) 条近期")
+                if !history.isEmpty {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text("\(history.count) 条历史")
+                }
+            }
+            .font(.callout)
             .foregroundStyle(.secondary)
 
             if !memoryEnabled {
@@ -68,33 +77,48 @@ struct MemoryView: View {
             }
 
             if !activeLongTerm.isEmpty {
-                memorySection(
-                    title: "长期记忆",
-                    entries: activeLongTerm
-                )
+                ControlCenterSectionBlock(
+                    "长期记忆",
+                    subtitle: "稳定且仍然有效的事实。Morie 会在相关输入中参考这些内容。"
+                ) {
+                    MemoryTopicRows(
+                        entries: activeLongTerm,
+                        store: store
+                    )
+                }
             }
 
             if !recentContext.isEmpty {
-                memorySection(
-                    title: "最近",
-                    entries: recentContext,
-                    showsDate: true
-                )
+                if !activeLongTerm.isEmpty {
+                    Divider()
+                }
+
+                ControlCenterSectionBlock(
+                    "最近",
+                    subtitle: "近期仍可能变化的上下文，不会被当作长期事实保存。"
+                ) {
+                    MemoryTopicRows(
+                        entries: recentContext,
+                        store: store,
+                        showsDate: true
+                    )
+                }
             }
 
             if !history.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("已归档与历史")
-                        .font(.headline)
+                if !activeLongTerm.isEmpty || !recentContext.isEmpty {
+                    Divider()
+                }
 
-                    DisclosureGroup("查看历史内容") {
-                        MemoryTopicRows(
-                            entries: history,
-                            store: store,
-                            showsStatus: true
-                        )
-                        .padding(.top, 8)
-                    }
+                ControlCenterSectionBlock(
+                    "已归档与历史",
+                    subtitle: "已归档或被新内容替代的记忆，仅供查阅。"
+                ) {
+                    MemoryTopicRows(
+                        entries: history,
+                        store: store,
+                        showsStatus: true
+                    )
                 }
             }
 
@@ -112,53 +136,32 @@ struct MemoryView: View {
                             ? "继续正常使用即可。Morie 会逐渐形成有用的长期理解和近期上下文。"
                             : "试试其他搜索词。"
                     )
+                } actions: {
+                    if query.isEmpty {
+                        Button("告诉 Morie 一件事", systemImage: "plus") {
+                            editor = .create
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(maxWidth: 840, alignment: .topLeading)
-        .navigationTitle("个人记忆")
-        .navigationSubtitle(
-            "\(activeLongTerm.count) 条长期 · \(recentContext.count) 条近期"
-        )
         .searchable(
             text: $search,
-            prompt: "搜索 Morie 记住的内容"
+            placement: .toolbar,
+            prompt: Text("搜索个人记忆")
         )
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(
-                    "告诉 Morie 一件事",
-                    systemImage: "plus",
-                    action: addMemory
-                )
+                Button("告诉 Morie 一件事", systemImage: "plus") {
+                    editor = .create
+                }
             }
         }
         .sheet(item: $editor) {
             MemoryEditorSheet(store: store, mode: $0)
         }
         .onAppear(perform: load)
-    }
-
-    private func memorySection(
-        title: String,
-        entries: [MemoryRecord],
-        showsDate: Bool = false
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-
-            MemoryTopicRows(
-                entries: entries,
-                store: store,
-                showsDate: showsDate
-            )
-        }
-    }
-
-    private func addMemory() {
-        editor = .create
     }
 
     private func load() {
@@ -273,9 +276,10 @@ struct MemoryDetailView: View {
         Group {
             if let memory = store.entries.first(where: { $0.id == memoryID }) {
                 ManagementDetailContent {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text(memory.name)
-                            .font(.title)
+                            .font(.title2)
+                            .fontWeight(.semibold)
                             .textSelection(.enabled)
 
                         Label(
@@ -292,121 +296,130 @@ struct MemoryDetailView: View {
                         .lineSpacing(5)
                         .textSelection(.enabled)
 
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 8) {
-                            LabeledContent(
-                                "状态",
-                                value: memory.status?.title ?? "不可用"
-                            )
-                            Text(
-                                memory.status == .active
-                                    ? "Morie 会在与这段内容相关的后续输入中参考它，但不会把没有说出的背景补进正文。"
-                                    : "这段内容保留供你查阅，不再用于理解后续输入。"
-                            )
-                            .foregroundStyle(.secondary)
+                    Divider()
 
-                            if memory.origin == .user {
-                                Text("你的手动修改始终优先于后续自动学习。")
-                                    .foregroundStyle(.secondary)
-                            }
+                    ControlCenterSectionBlock(
+                        "Morie 如何使用它",
+                        subtitle: "这段内容只会在相关输入中作为理解上下文，不会替你补充没有说过的正文。"
+                    ) {
+                        LabeledContent(
+                            "状态",
+                            value: memory.status?.title ?? "不可用"
+                        )
+
+                        Text(
+                            memory.status == .active
+                                ? "当前会参与相关输入的理解与润色。"
+                                : "当前仅保留供你查阅，不再参与后续输入。"
+                        )
+                        .foregroundStyle(.secondary)
+
+                        if memory.origin == .user {
+                            Text("你的手动修改始终优先于后续自动学习。")
+                                .foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    } label: {
-                        Label("Morie 如何使用它", systemImage: "text.bubble")
                     }
 
-                    DisclosureGroup("来源与历史") {
-                        VStack(alignment: .leading, spacing: 16) {
-                            if evidence.isEmpty {
-                                Text(
-                                    memory.sourceCaptureIDs.isEmpty
-                                        ? "由你手动添加"
-                                        : "来源证据暂不可用"
-                                )
-                                .foregroundStyle(.secondary)
-                            }
+                    Divider()
 
-                            ForEach(evidence) { item in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(item.claim)
-                                        .textSelection(.enabled)
-
-                                    Text(
-                                        item.capturedAt.formatted(
-                                            .dateTime
-                                                .locale(Locale(identifier: "zh-Hans"))
-                                                .year()
-                                                .month()
-                                                .day()
-                                                .hour()
-                                                .minute()
-                                        )
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-
-                                    NavigationLink("查看来源输入") {
-                                        ManagementDetailContent {
-                                            CaptureMemorySource(
-                                                captureID: item.sourceCaptureID
-                                            )
-                                            MemoryAnalysisSourceView(
-                                                sourceText: item.sourceText
-                                            )
-                                        }
-                                        .navigationTitle("记忆来源")
-                                    }
-                                    .buttonStyle(.link)
-                                }
-                            }
-
-                            if let previousID = memory.supersedesID {
-                                NavigationLink("上一条记忆") {
-                                    MemoryDetailView(
-                                        store: store,
-                                        memoryID: previousID
-                                    )
-                                }
-                            }
-
-                            if let replacement = store.entries.first(
-                                where: { $0.supersedesID == memory.id }
-                            ) {
-                                NavigationLink("替代后的记忆") {
-                                    MemoryDetailView(
-                                        store: store,
-                                        memoryID: replacement.id
-                                    )
-                                }
-                            }
-
-                            LabeledContent(
-                                "创建时间",
-                                value: memory.createdAt.formatted(
-                                    .dateTime
-                                        .locale(Locale(identifier: "zh-Hans"))
-                                        .year()
-                                        .month()
-                                        .day()
-                                        .hour()
-                                        .minute()
-                                )
+                    ControlCenterSectionBlock(
+                        "来源与历史",
+                        subtitle: "查看 Morie 为什么形成这段记忆，以及它是否替代过其他内容。"
+                    ) {
+                        if evidence.isEmpty {
+                            Text(
+                                memory.sourceCaptureIDs.isEmpty
+                                    ? "由你手动添加"
+                                    : "来源证据暂不可用"
                             )
-                            LabeledContent(
-                                "更新时间",
-                                value: memory.updatedAt.formatted(
-                                    .dateTime
-                                        .locale(Locale(identifier: "zh-Hans"))
-                                        .year()
-                                        .month()
-                                        .day()
-                                        .hour()
-                                        .minute()
-                                )
-                            )
+                            .foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 12)
+
+                        ForEach(evidence.indices, id: \.self) { index in
+                            let item = evidence[index]
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(item.claim)
+                                    .textSelection(.enabled)
+
+                                Text(
+                                    item.capturedAt.formatted(
+                                        .dateTime
+                                            .locale(Locale(identifier: "zh-Hans"))
+                                            .year()
+                                            .month()
+                                            .day()
+                                            .hour()
+                                            .minute()
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                                NavigationLink("查看来源输入") {
+                                    ManagementDetailContent {
+                                        CaptureMemorySource(
+                                            captureID: item.sourceCaptureID
+                                        )
+                                        MemoryAnalysisSourceView(
+                                            sourceText: item.sourceText
+                                        )
+                                    }
+                                    .navigationTitle("记忆来源")
+                                }
+                                .buttonStyle(.link)
+                            }
+
+                            if index < evidence.count - 1 {
+                                Divider()
+                            }
+                        }
+
+                        if let previousID = memory.supersedesID {
+                            NavigationLink("查看上一条记忆") {
+                                MemoryDetailView(
+                                    store: store,
+                                    memoryID: previousID
+                                )
+                            }
+                        }
+
+                        if let replacement = store.entries.first(
+                            where: { $0.supersedesID == memory.id }
+                        ) {
+                            NavigationLink("查看替代后的记忆") {
+                                MemoryDetailView(
+                                    store: store,
+                                    memoryID: replacement.id
+                                )
+                            }
+                        }
+
+                        LabeledContent(
+                            "创建时间",
+                            value: memory.createdAt.formatted(
+                                .dateTime
+                                    .locale(Locale(identifier: "zh-Hans"))
+                                    .year()
+                                    .month()
+                                    .day()
+                                    .hour()
+                                    .minute()
+                            )
+                        )
+
+                        LabeledContent(
+                            "更新时间",
+                            value: memory.updatedAt.formatted(
+                                .dateTime
+                                    .locale(Locale(identifier: "zh-Hans"))
+                                    .year()
+                                    .month()
+                                    .day()
+                                    .hour()
+                                    .minute()
+                            )
+                        )
                     }
                 }
                 .toolbar {
@@ -416,23 +429,23 @@ struct MemoryDetailView: View {
                         }
                         .disabled(memory.status == .superseded)
 
-                        Menu("个人记忆操作", systemImage: "ellipsis") {
-                            if memory.status == .active {
-                                Button(
-                                    "归档个人记忆",
-                                    systemImage: "archivebox"
-                                ) {
-                                    perform { try store.archive(memoryID) }
-                                }
-                            } else if memory.status == .archived {
-                                Button(
-                                    "恢复个人记忆",
-                                    systemImage: "arrow.uturn.backward"
-                                ) {
-                                    perform { try store.restore(memoryID) }
-                                }
+                        if memory.status == .active {
+                            Button(
+                                "归档个人记忆",
+                                systemImage: "archivebox"
+                            ) {
+                                perform { try store.archive(memoryID) }
                             }
+                        } else if memory.status == .archived {
+                            Button(
+                                "恢复个人记忆",
+                                systemImage: "arrow.uturn.backward"
+                            ) {
+                                perform { try store.restore(memoryID) }
+                            }
+                        }
 
+                        Menu("更多操作", systemImage: "ellipsis") {
                             if memory.status != .superseded {
                                 Button(
                                     "替代个人记忆…",

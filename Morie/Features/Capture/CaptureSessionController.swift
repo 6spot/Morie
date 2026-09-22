@@ -59,7 +59,6 @@ final class CaptureSessionController {
     private let injector = TextInjector()
     private let hud = CaptureHUDController()
     private let captureStore: CaptureStore?
-    private let history: CaptureHistoryController?
     private let dictionary: DictionaryStore?
     private let personalizer: CapturePersonalizer?
     private let postInsertionLearning: PostInsertionLearningController?
@@ -84,7 +83,6 @@ final class CaptureSessionController {
 
     init(
         captureStore: CaptureStore?,
-        history: CaptureHistoryController?,
         dictionary: DictionaryStore?,
         personalizer: CapturePersonalizer?,
         postInsertionLearning: PostInsertionLearningController?,
@@ -97,7 +95,6 @@ final class CaptureSessionController {
         soundFeedbackEnabled: Bool
     ) {
         self.captureStore = captureStore
-        self.history = history
         self.dictionary = dictionary
         self.personalizer = personalizer
         self.postInsertionLearning = postInsertionLearning
@@ -211,7 +208,6 @@ final class CaptureSessionController {
         finishRequestedCaptureID = nil
         onTranscriptChange?("")
         setPhase(.recording)
-        history?.setInputActive(true)
         postInsertionLearning?.stop()
         memoryLearning?.setInputActive(true)
 
@@ -452,7 +448,6 @@ final class CaptureSessionController {
         Diagnostics.record("Speech", "Starting Speech session \(label(sessionID))")
 
         do {
-            await history?.cancelRecognitionAndWait()
             try Task.checkCancellation()
             guard activeCaptureID == sessionID else { throw CancellationError() }
             guard let sessionContext = activeSessionContext, sessionContext.id == sessionID else {
@@ -657,7 +652,6 @@ final class CaptureSessionController {
 
             guard !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 try captureStore.finishEmptyRecognition(for: sessionID)
-                history?.captureListDidChange()
                 onCancellationEnabledChange?(false)
                 resetSessionIdentity()
                 setPhase(.idle)
@@ -731,6 +725,7 @@ final class CaptureSessionController {
             }
 
             if deliveryMode == .captureOnly {
+                try captureStore.finalizeCaptureOnlyUsage(sessionID)
                 try await captureStore.flushPersistence(for: sessionID)
                 captureStore.releaseCaptureOwnership(sessionID)
                 Diagnostics.record(
@@ -894,8 +889,7 @@ final class CaptureSessionController {
                     try captureStore?.cancel(sessionID)
                 case .interrupted(let message):
                     try captureStore?.markFailed(sessionID, error: message)
-                    history?.captureListDidChange()
-                }
+                    }
             } catch {
                 Diagnostics.record(
                     "CaptureStore",
@@ -953,8 +947,7 @@ final class CaptureSessionController {
                 )
             }
             try captureStore.finishEmptyRecognition(for: sessionID)
-            history?.captureListDidChange()
-
+    
             Diagnostics.record(
                 "SpeechQuality",
                 "Recognition rejection discarded for \(label(sessionID)); historyRetained=false"
@@ -1011,7 +1004,6 @@ final class CaptureSessionController {
             captureID: sessionID,
             "completed; deliveryMode=\(deliveryMode.rawValue); hud=success"
         )
-        history?.captureListDidChange()
         onCancellationEnabledChange?(false)
         resetSessionIdentity()
         setPhase(.idle)
@@ -1038,7 +1030,6 @@ final class CaptureSessionController {
         do {
             if preservedOnClipboard {
                 try captureStore?.markDeliveryFailed(sessionID, error: message)
-                history?.captureListDidChange()
                 if let captureStore {
                     Task { @MainActor [weak self, weak captureStore] in
                         guard let self, let captureStore else { return }
@@ -1056,7 +1047,6 @@ final class CaptureSessionController {
                 }
             } else if stoppingCaptureID != sessionID {
                 try captureStore?.markFailed(sessionID, error: message)
-                history?.captureListDidChange()
             }
         } catch {
             Diagnostics.record(
@@ -1109,7 +1099,6 @@ final class CaptureSessionController {
         finishRequestedAt = nil
         captureStartTask = nil
         captureFinishTask = nil
-        history?.setInputActive(false)
         memoryLearning?.setInputActive(false)
     }
 

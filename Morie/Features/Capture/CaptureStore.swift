@@ -1,8 +1,9 @@
+import Combine
 import Foundation
 import SwiftData
 
 @MainActor
-final class CaptureStore {
+final class CaptureStore: ObservableObject {
     enum StoreError: LocalizedError {
         case captureNotFound
         case captureInProgress
@@ -32,6 +33,8 @@ final class CaptureStore {
     let audioDirectory: URL
     let cloudSyncEnabled: Bool
 
+    @Published private(set) var historyRevision: UInt64 = 0
+
     private var records: [UUID: CaptureRecord] = [:]
     private var lastProgressiveSave: [UUID: ContinuousClock.Instant] = [:]
     private var persistenceRevision: [UUID: Int] = [:]
@@ -43,6 +46,7 @@ final class CaptureStore {
     ) throws {
         let schema = Schema([
             CaptureRecord.self,
+            CaptureUsageMetricsRecord.self,
             DictionaryEntry.self,
             DictionaryCorrectionRule.self,
             MemoryRecord.self,
@@ -97,6 +101,7 @@ final class CaptureStore {
         try FileManager.default.createDirectory(at: self.audioDirectory, withIntermediateDirectories: true)
         try recoverInterruptedCaptures()
         try pruneExpiredAudio()
+        try ensureUsageMetricsRecord()
     }
 
     func beginVoiceCapture(
@@ -159,6 +164,15 @@ final class CaptureStore {
 
         schedulePersistence(for: record)
         lastProgressiveSave[id] = now
+    }
+
+    func finalizeCaptureOnlyUsage(_ id: UUID) throws {
+        guard let record = records[id] else {
+            throw StoreError.captureNotFound
+        }
+        record.usageMetricsFinalized = true
+        record.updatedAt = Date()
+        schedulePersistence(for: record)
     }
 
     @discardableResult
@@ -345,6 +359,7 @@ final class CaptureStore {
             container.mainContext.rollback()
             throw error
         }
+        markHistoryChanged()
         Diagnostics.record("History", "Recognition updated for \(label(id)); characters=\(text.count)")
     }
 
@@ -360,6 +375,7 @@ final class CaptureStore {
             container.mainContext.rollback()
             throw error
         }
+        markHistoryChanged()
     }
 
     func deleteCapture(_ id: UUID) throws {
@@ -375,7 +391,67 @@ final class CaptureStore {
         for extraction in extractions { container.mainContext.delete(extraction) }
         container.mainContext.delete(record)
         try container.mainContext.save()
+        markHistoryChanged()
         Diagnostics.record("History", "Deleted Capture \(label(id))")
+    }
+
+    func eraseAllDataForFactoryReset() async throws {
+        guard records.isEmpty else {
+            throw StoreError.captureInProgress
+        }
+
+        await persistenceWriter.beginFactoryReset()
+
+        let context = container.mainContext
+        do {
+            for record in try context.fetch(FetchDescriptor<MemoryEvidenceRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<MemoryAnalysisRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<MemoryLearningBlock>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<MemoryRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<DictionaryCorrectionRule>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<DictionaryEntry>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<ExpressionProfileRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<CaptureRecord>()) {
+                context.delete(record)
+            }
+            for record in try context.fetch(FetchDescriptor<CaptureUsageMetricsRecord>()) {
+                context.delete(record)
+            }
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: audioDirectory.path) {
+            for url in try fileManager.contentsOfDirectory(
+                at: audioDirectory,
+                includingPropertiesForKeys: nil
+            ) {
+                try fileManager.removeItem(at: url)
+            }
+        }
+
+        records.removeAll(keepingCapacity: false)
+        lastProgressiveSave.removeAll(keepingCapacity: false)
+        persistenceRevision.removeAll(keepingCapacity: false)
+
+        Diagnostics.record("FactoryReset", "Cleared SwiftData records and CaptureAudio files")
     }
 
     func cancel(_ id: UUID) throws {
@@ -399,6 +475,7 @@ final class CaptureStore {
         }
         record.lifecycle = lifecycle
         record.deliveryErrorDescription = error
+        record.usageMetricsFinalized = true
         record.updatedAt = Date()
         schedulePersistence(for: record)
         records[id] = nil
@@ -422,6 +499,9 @@ final class CaptureStore {
         )
         do {
             try await persistenceWriter.persist(snapshot)
+            if snapshot.usageMetricsFinalized {
+                markHistoryChanged()
+            }
             DevelopmentDiagnostics.record(
                 "Persistence",
                 captureID: id,
@@ -448,9 +528,12 @@ final class CaptureStore {
             captureID: id,
             "backgroundPersistQueued; revision=\(revision); lifecycle=\(record.lifecycle.rawValue)"
         )
-        Task(priority: .utility) { [persistenceWriter] in
+        Task(priority: .utility) { [weak self, persistenceWriter] in
             do {
                 try await persistenceWriter.persist(snapshot)
+                if snapshot.usageMetricsFinalized {
+                    await self?.markHistoryChanged()
+                }
                 DevelopmentDiagnostics.record(
                     "Persistence",
                     captureID: id,
@@ -495,6 +578,82 @@ final class CaptureStore {
         CapturePersistenceSnapshot(record: record, revision: revision)
     }
 
+    func usageMetricsSnapshot() throws -> CaptureUsageMetricsSnapshot {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+
+        var descriptor = FetchDescriptor<CaptureUsageMetricsRecord>(
+            predicate: #Predicate { $0.key == "overview" }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first?.snapshot ?? .empty
+    }
+
+    private func ensureUsageMetricsRecord() throws {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+
+        var metricsDescriptor = FetchDescriptor<CaptureUsageMetricsRecord>(
+            predicate: #Predicate { $0.key == "overview" }
+        )
+        metricsDescriptor.fetchLimit = 1
+        guard try context.fetch(metricsDescriptor).first == nil else {
+            return
+        }
+
+        let metrics = CaptureUsageMetricsRecord()
+        let capturing = CaptureLifecycle.capturing.rawValue
+        var descriptor = FetchDescriptor<CaptureRecord>(
+            predicate: #Predicate { $0.lifecycleRawValue != capturing }
+        )
+        descriptor.propertiesToFetch = [
+            \CaptureRecord.lifecycleRawValue,
+            \CaptureRecord.deliveryModeRawValue,
+            \CaptureRecord.recognizedText,
+            \CaptureRecord.refinement,
+        ]
+
+        try context.enumerate(
+            descriptor,
+            batchSize: 128,
+            allowEscapingMutations: false
+        ) { capture in
+            Self.accumulateUsage(capture, into: metrics)
+        }
+
+        context.insert(metrics)
+        try context.save()
+    }
+
+    nonisolated static func accumulateUsage(
+        _ capture: CaptureRecord,
+        into metrics: CaptureUsageMetricsRecord
+    ) {
+        metrics.totalCaptures += 1
+        metrics.recognizedCharacters += capture.recognizedText.count
+
+        if capture.deliveryModeRawValue
+            == CaptureDeliveryMode.currentApp.rawValue,
+           [.delivered, .deliveryFailed, .failed].contains(capture.lifecycle) {
+            metrics.currentAppAttempts += 1
+
+            switch capture.lifecycle {
+            case .delivered:
+                metrics.successfulInputs += 1
+            case .deliveryFailed, .failed:
+                metrics.failedInputs += 1
+            default:
+                break
+            }
+        }
+
+        if let duration = capture.refinement?.durationSeconds,
+           duration >= 0 {
+            metrics.refinementSamples += 1
+            metrics.refinementDurationTotal += duration
+        }
+    }
+
     func pruneExpiredAudio(now: Date = Date()) throws {
         let noExpiry = Date.distantFuture
         let descriptor = FetchDescriptor<CaptureRecord>(
@@ -513,6 +672,7 @@ final class CaptureStore {
             record.sourceAudioRelativePath = nil
         }
         try container.mainContext.save()
+        markHistoryChanged()
         Diagnostics.record("CaptureStore", "Expired source audio for \(expired.count) Capture(s)")
     }
 
@@ -524,6 +684,7 @@ final class CaptureStore {
             record.sourceAudioExpiresAt = Calendar.current.date(byAdding: .day, value: value, to: record.createdAt)
         }
         try container.mainContext.save()
+        markHistoryChanged()
         try pruneExpiredAudio()
     }
 
@@ -583,6 +744,10 @@ final class CaptureStore {
         }
         try container.mainContext.save()
         Diagnostics.record("CaptureStore", "Recovered \(interrupted.count) interrupted Capture(s)")
+    }
+
+    private func markHistoryChanged() {
+        historyRevision &+= 1
     }
 
     private func label(_ id: UUID) -> String {

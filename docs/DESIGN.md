@@ -1,26 +1,68 @@
 # Design
 
-This document defines the UI and interaction rules for Morie.
+This document is the source of truth for Morie's macOS UI and interaction design.
 
-It applies to all user-facing interfaces. It does not document individual screens or historical UI implementations.
+It applies to every user-facing surface: Control Center, History, Dictionary, Personal Memory, Settings, Permissions, diagnostics, floating capture UI and future macOS features.
 
-## Apple native UI
+The goal is not to make Morie look custom. The goal is to make it feel **native, fast, predictable and carefully made**.
 
-Morie uses **Apple's native macOS UI**.
+## Design foundations
 
-This is the default design and implementation path.
+Morie follows these principles in order.
 
-Use current macOS system components provided by SwiftUI, AppKit and Apple system frameworks.
+### Purpose before decoration
 
-If macOS already provides a component or interaction for the requirement, use it. Do not replace a native component merely because a custom implementation is easier to style or gives more visual control.
+Every visible element must help the user understand, decide or act.
 
-The default order is:
+Do not add cards, color, glass, borders, shadows, animation, icons or secondary containers only to make a page look designed.
+
+If an element does not improve hierarchy, feedback, navigation or comprehension, remove it.
+
+### Simplicity is not minimalism
+
+Do not hide useful information or common actions merely to make the interface look sparse.
+
+A simple interface makes the common path obvious and keeps the number of decisions small.
+
+Adding a useful label, status, action or explanation can make an interface simpler if it removes uncertainty.
+
+### Familiarity before invention
+
+Use the interaction patterns macOS users already understand.
+
+Prefer native selection, toolbar placement, sidebars, menus, sheets, confirmation dialogs, keyboard navigation and system controls.
+
+Break a familiar macOS pattern only when there is a concrete product reason and the replacement is demonstrably clearer.
+
+### Stable geometry builds trust
+
+Frequent navigation and state changes must not make the shell jump, flash, resize or rebuild.
+
+Sidebar, window title area, toolbar structure and page origin should remain visually stable while route-specific content changes.
+
+Async work should update the smallest possible content region.
+
+### Restraint
+
+Morie is a high-frequency productivity tool.
+
+Repeated interactions should feel immediate, quiet and unsurprising.
+
+Do not spend visual or animation attention on things the user may see dozens or hundreds of times a day.
+
+## Apple-native implementation
+
+Morie uses **Apple's native macOS UI stack**.
+
+Use current SwiftUI, AppKit and Apple system frameworks.
+
+Implementation priority:
 
 1. SwiftUI native component.
 2. AppKit native component when SwiftUI is insufficient.
-3. Small custom implementation only when no suitable native component exists.
+3. Small repository-owned custom implementation only when the native stack cannot satisfy the requirement.
 
-External UI frameworks, component libraries, design systems, rendering runtimes and other UI dependencies should not be introduced unless there is a concrete requirement that cannot reasonably be satisfied with Apple's native stack.
+Do not introduce an external UI framework, component library, animation library or design system without a concrete requirement that cannot reasonably be met with Apple's native stack.
 
 **No external UI dependency by default.**
 
@@ -28,202 +70,510 @@ External UI frameworks, component libraries, design systems, rendering runtimes 
 
 Correct macOS behavior has priority over visual customization.
 
-Preserve native focus behavior, keyboard navigation, window behavior, menu behavior, selection, scrolling, resizing, accessibility, system appearance, reduced motion and contrast.
+Preserve:
+
+- focus and keyboard navigation;
+- native selection;
+- window and split-view resizing;
+- menu and toolbar behavior;
+- scrolling;
+- accessibility;
+- light and dark appearance;
+- increased contrast;
+- Reduce Motion;
+- system control sizing and hit targets.
 
 Custom styling must not break native interaction.
 
-## System components
+## One window shell
 
-Prefer native system implementations for windows, panels, menus, menu bar items, sidebars, navigation, toolbars, forms, lists, tables, split views, sheets, popovers, alerts, confirmation dialogs, buttons, toggles, pickers, text fields, text editors, search, context menus and progress indicators.
+A Control Center window has one persistent structural shell.
 
-Do not recreate these as custom components when the native component satisfies the interaction.
+The shell owns:
 
-## Liquid Glass
+- sidebar;
+- route selection;
+- navigation stack;
+- primary title;
+- top-level toolbar;
+- window geometry.
 
-Liquid Glass is provided by the system.
+Pages provide content.
 
-When a native component already receives the current macOS glass appearance, use that component directly.
+A routed page must not create a replacement sidebar, navigation root or title-bar shell. The current routed page may contribute route-specific toolbar/search controls to the persistent NavigationStack using Apple's native SwiftUI toolbar APIs.
 
-Do not imitate system glass using custom combinations of blur, transparency, gradients, overlays, borders, shadows or shaders.
+## Page coordinate system
 
-For genuinely custom surfaces that require glass behavior, use Apple's current native APIs.
+Top-level pages at the same hierarchy level must begin from the same visual coordinate system.
 
-## One navigation shell
+Overview, Dictionary, Personal Memory, Settings and Permissions use the same outer content inset and content origin.
 
-A window should have one clear navigation structure.
+A page must not introduce a different outer margin merely because it uses a different native control internally.
 
-Do not let individual pages recreate sidebars, navigation roots, title bars, global toolbars or window-level navigation state.
+Do not let default Form/List margins silently create a different page geometry.
 
-Navigation belongs to the window shell. Pages provide content.
+History and Diagnostics may use full-size workspace layouts, but they must remain subordinate to the outer Control Center shell.
 
-## Page owns content, shell owns layout
+## Containers are content choices, not alternate shells
 
-The shell owns sidebar, routing, toolbar placement, window geometry and global navigation.
+Use the native container that matches the content:
 
-A page owns its content, local controls, local selection and feature-specific interaction.
+- `ScrollView` for reading and free-form content;
+- `List` for selectable collections;
+- `Table` for structured tabular data;
+- `Form` or form-like native controls for configuration content when appropriate;
+- split views for workspace-style content.
 
-Do not make every page invent its own outer margins, scroll container, navigation container or toolbar system.
+These containers live **inside the shared page shell**.
 
-## Use the native container that matches the content
+Do not switch the whole right-side root between unrelated container systems.
 
-Choose the system container based on the job of the page.
+## Toolbar
 
-Use `Form` for settings, `ScrollView` for reading and free-form content, `List` for selectable collections, `Table` for structured tabular data, `NavigationSplitView` for native sidebar navigation, and split views for appropriate workspaces.
+The Control Center keeps one persistent NavigationStack/window toolbar surface.
 
-Do not force unrelated pages into one universal custom container.
+Route-specific controls are declared by the routed page that owns them, using Apple's native `.searchable` and `.toolbar` APIs. The shell/router must not contain a route switch that reconstructs page-specific toolbar business logic, custom action arrays, AnyView wrappers, placeholder items or fixed-width fake toolbar slots.
 
-## Stable layout
+### Toolbar controls preserve semantic grouping
 
-State changes should update the smallest appropriate part of the interface.
+Search, filters and actions must remain visually distinct by function.
 
-Navigation, sidebar, window shell and unrelated page structure should remain stable while feature content changes.
+Do not merge a search field with action buttons, or a filter control with unrelated actions, into one large custom capsule or fake toolbar surface merely to keep geometry stable.
 
-Do not recreate the surrounding page because loading started, a transcript changed, a background operation completed, selection changed or a small status changed.
+Related action buttons at the same semantic level may use native macOS toolbar grouping. For example, Edit / Delete / Add may appear as one action group.
 
-## Consistent spacing
+Prefer this structure:
 
-Pages at the same hierarchy level should follow the same layout rhythm.
+- search field;
+- fixed visual separation;
+- filter when present;
+- fixed visual separation;
+- one related action group.
 
-Prefer current system spacing and control metrics. Avoid arbitrary hard-coded geometry when native layout can determine the appropriate size.
+Stability must come from native toolbar structure, not from visually fusing unrelated control types together.
+
+### Search
+
+When search belongs to the current route, prefer Apple-native `.searchable(text:placement:prompt:)` with toolbar placement unless the page specifically requires inline search.
+
+Do not simulate toolbar search with a manually sized TextField. Let macOS own the search field's intrinsic width, glass/material treatment, focus behavior and window-size adaptation.
+
+Search state belongs to route/page presentation state, not to the global application controller.
+
+### Action visibility
+
+Common and important actions should be directly visible.
+
+Use a `Menu` for secondary, infrequent or overflow actions — not to hide the normal path.
+
+Do not bury an action merely to reduce the number of visible controls.
+
+Destructive actions should be visually restrained and confirmed when irreversible.
 
 ## Visual hierarchy
 
-Use native hierarchy before decoration.
+Build hierarchy primarily with:
 
-Prefer typography, spacing, grouping, alignment, system selection and native control prominence.
+1. typography;
+2. spacing;
+3. alignment;
+4. grouping;
+5. native control prominence;
+6. selection/state.
 
-Do not create hierarchy primarily through custom cards, borders, background boxes, excessive glass or decorative colors.
+Decoration comes after structure.
 
-## Avoid card-heavy UI
+Do not manufacture hierarchy primarily through custom backgrounds, heavy borders, card stacks, gradients or decorative color.
 
-Do not turn every section into a card.
+## Section design
 
-Use the natural native page structure first. A grouped surface should exist because the content forms a meaningful group, not because every block needs a background.
+A section should represent a meaningful conceptual group.
 
-## Color
+Use a clear section title, then the controls/content, then optional explanatory text.
 
-Use system semantic colors.
+Prefer whitespace and typography over boxed containers.
 
-Color should communicate state or meaning rather than decorate the interface. Do not depend on color alone.
+Do not wrap every section in a card.
 
-Support light mode, dark mode and increased contrast.
+Do not add a divider after every row automatically. Use separation only where it clarifies structure.
+
+## Settings design
+
+Settings is configuration, not a dashboard.
+
+Settings should use the shared Control Center page geometry and native controls.
+
+A good Settings section normally contains:
+
+- a concise heading;
+- direct controls;
+- current status when useful;
+- short explanatory text only where the behavior is not obvious.
+
+### Show common controls directly
+
+Frequently used or conceptually important settings should be visible without expansion.
+
+Do not use `DisclosureGroup` simply to make a page look shorter.
+
+Use progressive disclosure only for genuinely advanced, rare or potentially confusing configuration.
+
+Examples that may justify progressive disclosure:
+
+- raw provider/API configuration;
+- advanced diagnostic details;
+- expert-only model parameters.
+
+Even then, the collapsed state must clearly communicate what is inside and its current status.
+
+### Avoid setting-row ambiguity
+
+A label should make clear what a control changes.
+
+Prefer:
+
+- Toggle for boolean state;
+- Picker for bounded choices;
+- TextField/SecureField for short values;
+- TextEditor for long prompts;
+- Stepper only when stepwise adjustment is natural;
+- Button for an explicit action.
+
+Do not use a Button to imitate a Toggle or Picker.
+
+### Destructive settings
+
+Actions such as clearing learned data or factory reset must:
+
+- use destructive semantics;
+- explain the scope clearly;
+- require confirmation when irreversible;
+- never be visually confused with ordinary configuration.
+
+Factory reset means restoring Morie-owned state to first-run defaults. macOS-owned system permissions are outside Morie's control and must be described separately.
+
+## Overview design
+
+Overview is a status summary, not a diagnostics dump.
+
+The first screen should answer quickly:
+
+- what Morie is currently using;
+- whether the main capabilities are ready;
+- useful high-level usage information;
+- the current model/backend.
+
+Do not give implementation/debug metadata the same visual weight as user-facing status.
+
+Development-only diagnostics may appear in development builds, but they should be visually subordinate.
+
+### Stable async metrics
+
+Overview must reserve layout for async values before data arrives.
+
+Do not replace an entire block such as a ProgressView with a structurally different Grid after loading.
+
+Prefer stable placeholders such as `—`, then update only the values.
+
+Async metric refreshes must not invalidate the window shell or toolbar.
+
+## Dictionary design
+
+Dictionary is a lightweight management surface.
+
+Priorities:
+
+1. fast search;
+2. clear distinction between user entries and built-in entries;
+3. direct add/edit/delete for editable entries;
+4. visible count/status;
+5. no unnecessary navigation depth.
+
+Built-in entries must look read-only without appearing disabled or broken.
+
+Do not decorate every word as a heavy card.
+
+Use compact native density suitable for desktop scanning.
+
+## Personal Memory design
+
+Personal Memory should explain Morie's understanding, not expose raw storage.
+
+Priorities:
+
+1. stable long-term memory;
+2. recent context;
+3. clear provenance/status where useful;
+4. direct edit/delete when appropriate;
+5. readable grouping by topic.
+
+Avoid raw database-style rows.
+
+Do not hide ordinary memory content behind disclosure controls merely to reduce vertical length.
+
+Archived/history content may be visually secondary, but should remain easy to inspect.
+
+## History design
+
+History is a desktop workspace.
+
+The list and detail panes should remain stable while selection changes.
+
+The workspace must never impose minimum widths that squeeze or distort the outer sidebar.
+
+### History detail
+
+The selected record detail should expose the useful information directly.
+
+Do not require repeated disclosure for ordinary record data.
+
+Recognition/refinement information and original recording controls should be visible when a record is selected.
+
+Common record actions such as copy, re-recognize and delete should be directly available unless there is a strong reason to demote them.
+
+Use menus only for true overflow/secondary actions.
+
+## Permissions design
+
+Permissions should show:
+
+- current device capability status;
+- current permission status;
+- the action required to resolve a missing permission;
+- a direct Recheck action in the top-level toolbar.
+
+Do not duplicate the same refresh action in both the toolbar and page content unless there is a specific usability reason.
+
+## Information density
+
+Morie is a desktop productivity application.
+
+Use space efficiently.
+
+Avoid:
+
+- oversized empty areas with no semantic purpose;
+- mobile-style giant cards;
+- unnecessarily tall rows;
+- excessively large headings;
+- decorative padding that pushes useful information below the fold.
+
+At the same time, do not compress information until scanning becomes difficult.
+
+The target is calm desktop density: compact enough to scan, spacious enough to understand.
 
 ## Typography
 
-Use system typography.
+Use the macOS system font and semantic text styles.
 
-Prefer semantic system text styles and weights. Do not create a collection of arbitrary font sizes simply to manufacture hierarchy.
+Hierarchy should come from appropriate system size and weight, not many arbitrary font sizes.
 
-## Controls
+Guidelines:
 
-Use the native control matching the interaction: Toggle for boolean state, Picker for choices, Button for actions, TextField or SecureField for short input, TextEditor for multiline input, Menu for secondary actions, and native confirmation for destructive actions.
+- page title: system navigation title;
+- section heading: headline/subheadline as appropriate;
+- primary content: body;
+- metadata/help text: callout/caption/secondary;
+- numeric metrics: tabular/monospaced digits where value stability matters.
 
-## Toolbars
+Do not use custom fonts for application UI without a product requirement.
 
-Use the native toolbar for actions belonging to the current window, workspace, page or selection.
+## Color
 
-Do not create toolbar-like rows inside content when the system toolbar is appropriate.
+Use semantic system colors.
 
-## Settings
+Color communicates state, priority or meaning.
 
-Configuration interfaces use normal macOS settings patterns.
+Do not use color as decoration.
 
-Prefer native Form and native controls. Use progressive disclosure for advanced configuration when appropriate.
+Do not rely on color alone to communicate state.
 
-Do not turn Settings into a custom dashboard, and do not turn ordinary product pages into Settings forms merely for visual consistency.
+Support light mode, dark mode and increased contrast.
 
-## Selection
+## Borders, backgrounds and shadows
 
-Selection should use native selection behavior.
+Use system materials and separators before custom borders.
 
-When filtering, deleting or changing data makes the current selection invalid, clear or update it explicitly.
+Avoid opaque card outlines around ordinary content.
 
-Do not maintain invisible stale selection or draw a second custom selection layer over native selection.
+Avoid shadows on flat management/settings content unless the surface truly floats above another surface.
+
+Do not imitate Liquid Glass with custom blur/gradient/shadow stacks.
+
+If the system already provides current macOS glass/material behavior, use it directly.
 
 ## Empty states
 
 Use native empty-state presentation where available.
 
-An empty state should communicate what is empty and the natural next action when one exists.
+An empty state should answer:
+
+- what is empty;
+- whether that is normal;
+- what the user can do next.
+
+If a natural next action exists, show it directly.
 
 ## Loading and processing
 
-Show activity when users need to know work is still running.
+Show activity only when users need to know work is still happening.
 
-Use indeterminate feedback for indeterminate work. Do not invent progress percentages for operations whose progress cannot actually be measured.
+Use indeterminate feedback for indeterminate work.
 
-## Success feedback
+Do not invent fake percentages.
 
-Use the minimum feedback needed to confirm success.
+Do not replace large portions of stable layout merely to show loading.
 
-If the resulting state already makes success obvious, additional banners, checkmarks, success pages, artificial delays or bright success colors are usually unnecessary.
+Prefer to reserve the final layout and update values in place.
 
 ## Errors
 
-User-visible errors should explain a meaningful product condition.
+User-visible errors should explain a meaningful product condition and what the user can do.
 
-Do not surface internal framework or implementation errors directly. Prefer contextual or inline feedback when a modal interruption is unnecessary.
+Do not surface raw framework or implementation errors directly.
 
-Technical details belong in diagnostics.
+Prefer contextual/inline feedback when a modal interruption is unnecessary.
+
+Technical details belong in Diagnostics.
+
+## Success feedback
+
+Use the minimum feedback needed.
+
+If the resulting state already proves success, do not add another banner, success screen, bright green state or artificial delay.
 
 ## Motion
 
-Motion should communicate appearance, disappearance, state transition, spatial relationship or ongoing indeterminate activity.
+Morie should use less motion than a consumer entertainment app.
 
-Do not animate purely for decoration. Respect Reduce Motion.
+Motion must serve one of these purposes:
 
-## Floating UI
+- feedback;
+- spatial consistency;
+- state indication;
+- preventing a jarring visual change;
+- explaining a rare/first-run interaction.
 
-Temporary floating UI must remain subordinate to the application the user is working in.
+If none apply, do not animate.
 
-Do not steal keyboard focus unless interaction genuinely requires it.
+### Frequency rule
 
-Floating surfaces should be compact, temporary and purpose-specific.
+The more frequently an interaction occurs, the less motion it should use.
 
-## Content density
+- keyboard/global shortcut actions: no decorative transition;
+- sidebar/page switching: instant or effectively imperceptible;
+- frequently used toolbar/list interactions: minimal feedback only;
+- sheets/popovers: normal native transition;
+- rare onboarding/empty/success moments: may use more expressive motion.
 
-Morie is a desktop application.
+Do not animate navigation simply to make it feel modern.
 
-Use space efficiently. Do not introduce excessive whitespace merely to create a stylized appearance, and do not compress information to the point of harming readability.
+### Animation behavior
+
+Prefer native system animation behavior.
+
+For custom motion:
+
+- keep UI feedback fast;
+- prefer interruptible state changes;
+- preserve spatial continuity;
+- enter and exit along the same conceptual path;
+- animate transform/opacity rather than layout where possible;
+- avoid bounce unless momentum or physical interaction justifies it;
+- respect Reduce Motion.
+
+## Press and interaction feedback
+
+Controls should feel responsive immediately.
+
+Prefer the native macOS pressed/hover/focus behavior.
+
+Do not add custom scale effects to native controls that already provide correct feedback.
+
+Custom controls must provide equivalent immediate feedback and keyboard/accessibility behavior.
+
+## Selection
+
+Use native selection behavior.
+
+When filtering, deleting or changing data invalidates the current selection, clear or update it explicitly.
+
+Do not maintain hidden stale selection.
+
+Do not draw a second fake selection layer over native selection.
 
 ## User content
 
 User-created text is primary content.
 
-Prefer readable line length, selectable text, natural wrapping and scrolling where needed.
+Prefer:
 
-Do not truncate meaningful user content to preserve decorative geometry.
+- natural wrapping;
+- selectable text;
+- readable line length;
+- scrolling where necessary;
+- full content over decorative truncation.
+
+Do not truncate meaningful user content merely to preserve a visual composition.
+
+## Floating capture UI
+
+Floating capture UI must remain subordinate to the application the user is working in.
+
+It should:
+
+- respond immediately;
+- avoid stealing keyboard focus unless required;
+- remain compact;
+- use spatially consistent enter/exit behavior;
+- clearly communicate recording/thinking/cancel state;
+- disappear as soon as the interaction is complete.
+
+Do not add decorative motion that slows repeated voice input.
 
 ## Accessibility
 
-New or changed UI must remain compatible with keyboard navigation, VoiceOver, increased contrast, light and dark appearance, and reduced motion where relevant.
+Every new or changed UI must remain compatible with:
 
-A custom component assumes responsibility for behavior that a native control would otherwise provide automatically.
+- keyboard navigation;
+- VoiceOver;
+- increased contrast;
+- light/dark appearance;
+- Reduce Motion;
+- native focus behavior.
 
-## External UI dependencies
+A custom component assumes responsibility for behavior a native component would otherwise provide automatically.
 
-External UI dependencies are **not part of the normal Morie design stack**.
+## Design review checklist
 
-Do not introduce a third-party UI framework or component library simply for styling, convenience, custom navigation, custom controls, animation, glass effects or layout helpers.
+Before accepting a UI change, verify:
 
-Consider an external dependency only when there is a concrete requirement that cannot reasonably be achieved with current SwiftUI, AppKit or other Apple-native APIs.
-
-Prefer a small repository-owned implementation when the missing behavior is small. Do not build a large custom UI framework either.
-
-## Design consistency
-
-Consistency means using the same interaction language and native system conventions.
-
-It does not mean every page must look structurally identical.
-
-Different jobs may appropriately use different native components while sharing navigation behavior, spacing rhythm, typography hierarchy, control conventions, feedback behavior and system appearance.
+1. Is this using the native macOS component/pattern where one exists?
+2. Is the common action directly visible?
+3. Is anything hidden only to make the interface look cleaner?
+4. Does the page begin from the same coordinate system as peer pages?
+5. Does route/state change keep sidebar, title and toolbar geometry stable?
+6. Does the page use Apple-native searchable/toolbar APIs, with search/filter/actions semantically separated and only related actions grouped?
+7. Is hierarchy created with type/spacing/alignment before decoration?
+8. Is the page unnecessarily card-heavy?
+9. Is desktop information density appropriate?
+10. Does async work update only the smallest necessary region?
+11. Does every animation have a functional purpose?
+12. Would a high-frequency user find this interaction slower or more distracting after the hundredth use?
+13. Does the page still work with keyboard, VoiceOver, dark mode, increased contrast and Reduce Motion?
 
 ## Design principle
 
-**Use Apple native macOS components by default.**
+**Native before custom.**
 
-**Do not replace native UI without a real requirement.**
+**Clarity before visual novelty.**
 
-**Do not introduce external UI dependencies without necessity.**
+**Simplicity before minimalism.**
 
-Morie should feel native because it is built from the platform's own components and behaves according to macOS conventions.
+**Stable structure before animated polish.**
+
+**Common actions should be visible.**
+
+**High-frequency workflows should feel immediate.**
+
+Morie should feel polished because every small interaction behaves exactly as a macOS user expects — not because the interface is visually loud.

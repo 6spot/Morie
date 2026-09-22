@@ -35,25 +35,25 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 @MainActor
 struct CaptureHistoryWorkspace: View {
     let controller: AppController
+    @ObservedObject var history: CaptureHistoryController
     @ObservedObject private var runtime: AppRuntimeController
-    @ObservedObject private var capabilities: AppCapabilityController
-    @ObservedObject private var setup: PermissionSetupController
     @Binding var selection: UUID?
-
-    @State private var search = ""
-    @State private var filter: CaptureHistoryFilter = .all
+    @Binding var search: String
+    @Binding var filter: CaptureHistoryFilter
 
     init(
         controller: AppController,
-        selection: Binding<UUID?>
+        history: CaptureHistoryController,
+        selection: Binding<UUID?>,
+        search: Binding<String>,
+        filter: Binding<CaptureHistoryFilter>
     ) {
         self.controller = controller
+        _history = ObservedObject(wrappedValue: history)
         _runtime = ObservedObject(wrappedValue: controller.runtime)
-        _capabilities = ObservedObject(
-            wrappedValue: controller.capabilities
-        )
-        _setup = ObservedObject(wrappedValue: controller.setup)
         _selection = selection
+        _search = search
+        _filter = filter
     }
 
     private var canStartCapture: Bool {
@@ -62,78 +62,91 @@ struct CaptureHistoryWorkspace: View {
     }
 
     var body: some View {
-        Group {
-            if let history = controller.history {
-                HSplitView {
-                    CaptureHistoryView(
-                        captures: history.captures,
-                        selection: $selection,
-                        search: $search,
-                        filter: $filter,
-                        canStartCapture: canStartCapture,
-                        onRecord: controller.startCaptureOnly
-                    )
-                    .frame(
-                        minWidth: 280,
-                        idealWidth: 340,
-                        maxWidth: 420,
-                        maxHeight: .infinity,
-                        alignment: .topLeading
-                    )
+        VStack(spacing: 0) {
+            ControlCenterWorkspaceHeader(
+                "历史记录",
+                subtitle: "查看保存的文字、识别结果和原始录音",
+                trailingText: "\(history.captures.count) 条记录"
+            )
 
-                    CaptureHistoryDetailPane(
-                        controller: controller,
-                        history: history,
-                        selectedCaptureID: selection
-                    )
-                    .frame(
-                        minWidth: 420,
-                        maxWidth: .infinity,
-                        maxHeight: .infinity
-                    )
-                }
+            HSplitView {
+                CaptureHistoryView(
+                    captures: history.captures,
+                    selection: $selection,
+                    search: $search,
+                    filter: $filter,
+                    canStartCapture: canStartCapture,
+                    canLoadMore: history.canLoadMoreCaptures,
+                    onRecord: controller.startCaptureOnly,
+                    onLoadMore: history.loadMoreCaptures
+                )
                 .frame(
-                    maxWidth: .infinity,
+                    minWidth: 250,
+                    idealWidth: 320,
+                    maxWidth: 360,
                     maxHeight: .infinity,
                     alignment: .topLeading
                 )
-                .onAppear {
-                    history.setListVisible(true)
-                }
-                .onDisappear {
-                    history.setListVisible(false)
-                }
-            } else {
-                ContentUnavailableView(
-                    "历史记录不可用",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("记录存储尚未初始化。")
+
+                CaptureHistoryDetailPane(
+                    controller: controller,
+                    history: history,
+                    selectedCaptureID: selection
+                )
+                .frame(
+                    minWidth: 0,
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
                 )
             }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,
             alignment: .topLeading
         )
-        .navigationTitle("历史记录")
-        .searchable(text: $search, prompt: "搜索历史记录")
+        .searchable(
+            text: $search,
+            placement: .toolbar,
+            prompt: Text("搜索历史记录")
+        )
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Picker("筛选记录", selection: $filter) {
                     ForEach(CaptureHistoryFilter.allCases) { item in
                         Text(item.title).tag(item)
                     }
                 }
                 .pickerStyle(.menu)
+            }
 
-                Button(
-                    "开始录音",
-                    systemImage: "mic",
-                    action: controller.startCaptureOnly
-                )
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    controller.startCaptureOnly()
+                } label: {
+                    Image(systemName: "mic")
+                }
+                .help("开始录音")
+                .accessibilityLabel("开始录音")
                 .disabled(!canStartCapture)
             }
+        }
+        .onAppear {
+            history.setInputActive(controller.isCaptureActive)
+            history.setListVisible(true)
+        }
+        .onDisappear {
+            history.setListVisible(false)
+        }
+        .onChange(of: runtime.state) { _, _ in
+            history.setInputActive(controller.isCaptureActive)
         }
     }
 }
@@ -144,7 +157,9 @@ struct CaptureHistoryView: View {
     @Binding var search: String
     @Binding var filter: CaptureHistoryFilter
     let canStartCapture: Bool
+    let canLoadMore: Bool
     let onRecord: () -> Void
+    let onLoadMore: () -> Void
 
     private var visibleCaptures: [CaptureRecord] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -165,36 +180,56 @@ struct CaptureHistoryView: View {
     }
 
     var body: some View {
-        List(visibleCaptures, selection: $selection) { capture in
-            VStack(alignment: .leading, spacing: 5) {
-                Text(capture.historySummary)
-                    .lineLimit(2, reservesSpace: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        List(selection: $selection) {
+            ForEach(visibleCaptures) { capture in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(capture.historySummary)
+                            .lineLimit(2, reservesSpace: true)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
 
-                HStack(spacing: 8) {
-                    if let applicationName = capture.sourceApplicationName {
-                        Text(applicationName)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                        HStack(spacing: 8) {
+                            if let applicationName =
+                                capture.sourceApplicationName {
+                                Text(applicationName)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+
+                            if let status = capture.historyStatus {
+                                Text(status)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Text(capture.historyListDate)
+                                .lineLimit(1)
+                                .fixedSize(
+                                    horizontal: true,
+                                    vertical: false
+                                )
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
-
-                    if let status = capture.historyStatus {
-                        Text(status)
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 8)
-
-                    Text(capture.historyListDate)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
+                    .padding(.vertical, 4)
+                    .transaction { $0.animation = nil }
+                    .tag(capture.id)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+
+            if canLoadMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.small)
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+                .onAppear(perform: onLoadMore)
             }
-            .padding(.vertical, 4)
-            .transaction { $0.animation = nil }
-            .tag(capture.id)
         }
         .listStyle(.inset)
         .frame(
@@ -249,8 +284,6 @@ struct CaptureHistoryView: View {
 private struct CaptureHistoryDetailPane: View {
     let controller: AppController
     @ObservedObject private var runtime: AppRuntimeController
-    @ObservedObject private var capabilities: AppCapabilityController
-    @ObservedObject private var setup: PermissionSetupController
     @ObservedObject var history: CaptureHistoryController
     let selectedCaptureID: UUID?
 
@@ -261,10 +294,6 @@ private struct CaptureHistoryDetailPane: View {
     ) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
-        _capabilities = ObservedObject(
-            wrappedValue: controller.capabilities
-        )
-        _setup = ObservedObject(wrappedValue: controller.setup)
         _history = ObservedObject(wrappedValue: history)
         self.selectedCaptureID = selectedCaptureID
     }
@@ -287,7 +316,7 @@ private struct CaptureHistoryDetailPane: View {
                 captureID: selectedCaptureID,
                 history: history,
                 canRecognize: canStartCapture,
-                onRecognize: controller.recognizeHistoryCapture
+                onRecognize: history.recognizeAgain
             )
         } else {
             ContentUnavailableView(
@@ -317,61 +346,95 @@ struct CaptureDetailView: View {
 
     var body: some View {
         ControlCenterReadingContent {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(capture.finalText.isEmpty ? "识别文字" : "最终文字")
-                    .font(.title)
-
-                HStack(spacing: 8) {
-                    if let app = capture.sourceApplicationName {
-                        Text(app)
+            VStack(alignment: .leading, spacing: 20) {
+                ControlCenterCommandBar {
+                    Button("复制最终文字", systemImage: "doc.on.doc") {
+                        copy(capture.finalText)
                     }
+                    .disabled(capture.finalText.isEmpty)
 
-                    Text(
-                        capture.createdAt.formatted(
-                            .dateTime
-                                .locale(Locale(identifier: "zh-Hans"))
-                                .year()
-                                .month()
-                                .day()
-                                .hour()
-                                .minute()
+                    Button("复制识别文字", systemImage: "doc.on.doc") {
+                        copy(capture.recognizedText)
+                    }
+                    .disabled(capture.recognizedText.isEmpty)
+
+                    Button(
+                        "删除记录…",
+                        systemImage: "trash",
+                        role: .destructive
+                    ) {
+                        confirmsDeletion = true
+                    }
+                    .disabled(
+                        capture.lifecycle == .capturing
+                            || capture.refinement?.status == .running
+                    )
+
+                    Spacer(minLength: 0)
+                }
+
+                ControlCenterSectionBlock(
+                    capture.finalText.isEmpty ? "识别文字" : "最终文字"
+                ) {
+                    HStack(spacing: 8) {
+                        if let app = capture.sourceApplicationName {
+                            Text(app)
+                        }
+
+                        Text(
+                            capture.createdAt.formatted(
+                                .dateTime
+                                    .locale(Locale(identifier: "zh-Hans"))
+                                    .year()
+                                    .month()
+                                    .day()
+                                    .hour()
+                                    .minute()
+                            )
                         )
-                    )
 
-                    if let status = capture.historyStatus {
-                        Label(status, systemImage: "waveform")
+                        if let status = capture.historyStatus {
+                            Label(status, systemImage: "waveform")
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                    if let issue = capture.deliveryErrorDescription {
+                        Label(
+                            issue,
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .foregroundStyle(.secondary)
+                    }
+
+                    if capture.historyText.isEmpty {
+                        Text(
+                            capture.lifecycle == .capturing
+                                ? "正在录音… 使用录音控件或快捷键结束。"
+                                : "未识别到语音，可以播放录音后重新识别。"
+                        )
+                        .foregroundStyle(.secondary)
+                    } else {
+                        Text(capture.historyText)
+                            .lineSpacing(5)
+                            .textSelection(.enabled)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
                     }
                 }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
 
-                if let issue = capture.deliveryErrorDescription {
-                    Label(
-                        issue,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.secondary)
-                }
-            }
+                Divider()
 
-            if capture.historyText.isEmpty {
-                Text(
-                    capture.lifecycle == .capturing
-                        ? "正在录音… 使用录音控件或快捷键结束。"
-                        : "未识别到语音，可以播放录音后重新识别。"
-                )
-                .foregroundStyle(.secondary)
-            } else {
-                Text(capture.historyText)
-                    .lineSpacing(5)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            DisclosureGroup("识别与润色") {
-                VStack(alignment: .leading, spacing: 16) {
+                ControlCenterSectionBlock(
+                    "识别与润色",
+                    subtitle: "保留原始识别结果和本次润色处理信息，便于核对最终文字。"
+                ) {
                     Text("原始语音识别")
-                        .font(.headline)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
 
                     Text(
                         capture.recognizedText.isEmpty
@@ -395,7 +458,8 @@ struct CaptureDetailView: View {
                         )
                     }
 
-                    if let error = capture.lastRecognitionErrorDescription {
+                    if let error =
+                        capture.lastRecognitionErrorDescription {
                         Label(
                             error,
                             systemImage: "exclamationmark.triangle"
@@ -405,44 +469,19 @@ struct CaptureDetailView: View {
 
                     if let refinement = capture.refinement {
                         Divider()
-                        CaptureRefinementSection(refinement: refinement)
+                        CaptureRefinementSection(
+                            refinement: refinement
+                        )
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 12)
-            }
 
-            DisclosureGroup("原始录音") {
-                recording
-                    .padding(.top, 12)
-            }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button("复制最终文字", systemImage: "doc.on.doc") {
-                    copy(capture.finalText)
-                }
-                .disabled(capture.finalText.isEmpty)
+                Divider()
 
-                Menu("记录操作", systemImage: "ellipsis") {
-                    Button("复制识别文字", systemImage: "doc.on.doc") {
-                        copy(capture.recognizedText)
-                    }
-                    .disabled(capture.recognizedText.isEmpty)
-
-                    Divider()
-
-                    Button(
-                        "删除记录…",
-                        systemImage: "trash",
-                        role: .destructive
-                    ) {
-                        confirmsDeletion = true
-                    }
-                    .disabled(
-                        capture.lifecycle == .capturing
-                            || capture.refinement?.status == .running
-                    )
+                ControlCenterSectionBlock(
+                    "原始录音",
+                    subtitle: "原始录音只保存在当前 Mac，并按设置中的保留周期自动清理。"
+                ) {
+                    recording
                 }
             }
         }

@@ -5,11 +5,14 @@ import Foundation
 final class AppController {
     enum ControllerError: LocalizedError {
         case persistenceUnavailable(String)
+        case factoryResetUnavailable(String)
 
         var errorDescription: String? {
             switch self {
             case .persistenceUnavailable(let reason):
                 "记录存储不可用：\(reason)"
+            case .factoryResetUnavailable(let reason):
+                reason
             }
         }
     }
@@ -18,7 +21,6 @@ final class AppController {
     let capabilities = AppCapabilityController()
     let preferences: AppPreferencesController
 
-    let history: CaptureHistoryController?
     let memory: MemoryStore?
     let dictionary: DictionaryStore?
     let expressionProfile: ExpressionProfileStore?
@@ -47,7 +49,6 @@ final class AppController {
     private lazy var captureSession: CaptureSessionController = {
         let session = CaptureSessionController(
             captureStore: captureStore,
-            history: history,
             dictionary: dictionary,
             personalizer: personalizer,
             postInsertionLearning: postInsertionLearning,
@@ -96,12 +97,6 @@ final class AppController {
         self.persistenceError = persistenceError
         self.cloudSyncStartupError = cloudSyncStartupError
 
-        history = captureStore.map {
-            CaptureHistoryController(
-                store: $0,
-                locale: Locale(identifier: "zh-CN")
-            )
-        }
         memory = captureStore.map {
             MemoryStore(container: $0.container)
         }
@@ -377,6 +372,54 @@ final class AppController {
         }
     }
 
+    func factoryReset() async throws {
+        guard !isCaptureActive else {
+            throw ControllerError.factoryResetUnavailable(
+                "录音或润色进行中，暂时不能恢复出厂设置。"
+            )
+        }
+        guard let captureStore else {
+            throw ControllerError.persistenceUnavailable(
+                persistenceError?.localizedDescription ?? "记录存储尚未初始化。"
+            )
+        }
+
+        postInsertionLearning?.stop()
+        memoryLearning?.stop()
+        await memoryLearning?.waitForCurrentBatch()
+
+        iCloudStatusTask?.cancel()
+        iCloudStatusTask = nil
+        audioMaintenanceTask?.cancel()
+        audioMaintenanceTask = nil
+
+        hotkey?.invalidate()
+        hotkey = nil
+
+        try RefinementModelSettings.resetToDefaults()
+        RefinementPromptSettings.restoreDefault()
+
+        let defaults = UserDefaults.standard
+        [
+            Self.setupCompletedKey,
+            CaptureShortcut.defaultsKey,
+            CaptureStore.audioRetentionDaysDefaultsKey,
+            CapturePersonalizer.enabledDefaultsKey,
+            PersonalMemorySettings.enabledDefaultsKey,
+            PostInsertionLearningController.dictionarySuggestionsDefaultsKey,
+            ExpressionProfileStore.enabledDefaultsKey,
+            CaptureSoundFeedback.enabledDefaultsKey,
+            ICloudSyncSettings.enabledDefaultsKey,
+        ].forEach {
+            defaults.removeObject(forKey: $0)
+        }
+
+        try await captureStore.eraseAllDataForFactoryReset()
+        DiagnosticLogStore.shared.clear()
+
+        NSApplication.shared.terminate(nil)
+    }
+
     func setICloudSyncEnabled(_ enabled: Bool) {
         iCloudStatusTask?.cancel()
         iCloudStatusTask = nil
@@ -498,13 +541,27 @@ final class AppController {
         }
     }
 
-    func recognizeHistoryCapture(_ id: UUID) {
-        guard canStartCapture else { return }
-        history?.recognizeAgain(id)
-    }
-
     func startCaptureOnly() {
         startNewCapture(deliveryMode: .captureOnly)
+    }
+
+    func makeControlCenterHistoryController() -> CaptureHistoryController? {
+        captureStore.map {
+            CaptureHistoryController(
+                store: $0,
+                locale: Locale(identifier: "zh-CN")
+            )
+        }
+    }
+
+    func controlCenterUsageMetrics() throws -> CaptureUsageMetricsSnapshot {
+        guard let captureStore else {
+            throw ControllerError.persistenceUnavailable(
+                persistenceError?.localizedDescription
+                    ?? "记录存储尚未初始化。"
+            )
+        }
+        return try captureStore.usageMetricsSnapshot()
     }
 
     func bootstrap(
@@ -535,8 +592,6 @@ final class AppController {
         hotkey = nil
 
         captureSession.hideHUD()
-        history?.pausePlayback()
-        await history?.cancelRecognitionAndWait()
 
         do {
             await setup.refresh()

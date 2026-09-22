@@ -1,14 +1,41 @@
+import AppKit
+import Observation
 import SwiftUI
-
-enum ControlCenterPageFamily {
-    case scrolling
-    case form
-    case workspace
-}
 
 private enum ControlCenterLayout {
     static let contentInset: CGFloat = 24
     static let readingMaxWidth: CGFloat = 760
+    static let sidebarMinWidth: CGFloat = 190
+    static let sidebarIdealWidth: CGFloat = 220
+    static let sidebarMaxWidth: CGFloat = 260
+}
+
+struct ControlCenterScrollableContent<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(ControlCenterLayout.contentInset)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct ControlCenterPage<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ControlCenterScrollableContent {
+            VStack(alignment: .leading, spacing: 28) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
 }
 
 struct ControlCenterReadingContent<Content: View>: View {
@@ -16,16 +43,85 @@ struct ControlCenterReadingContent<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 0) {
                 content
             }
             .frame(
                 maxWidth: ControlCenterLayout.readingMaxWidth,
-                alignment: .leading
+                alignment: .topLeading
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(ControlCenterLayout.contentInset)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct ControlCenterSectionBlock<Content: View, Footer: View>: View {
+    let title: String
+    let subtitle: String?
+    @ViewBuilder let content: Content
+    @ViewBuilder let footer: Footer
+
+    init(
+        _ title: String,
+        subtitle: String? = nil,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.content = content()
+        self.footer = footer()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            footer
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension ControlCenterSectionBlock where Footer == EmptyView {
+    init(
+        _ title: String,
+        subtitle: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(title, subtitle: subtitle, content: content) {
+            EmptyView()
+        }
+    }
+}
+
+struct ControlCenterCommandBar<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 10) {
+            content
+        }
+        .controlSize(.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -64,15 +160,79 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var pageFamily: ControlCenterPageFamily {
-        switch self {
-        case .overview, .dictionary, .memory:
-            .scrolling
-        case .settings, .permissions:
-            .form
-        case .history, .diagnostics:
-            .workspace
+}
+
+@MainActor
+@Observable
+private final class ControlCenterSession {
+    var selection: ControlCenterSection? = .overview
+    var selectedCaptureID: UUID?
+    var selectedDictionaryEntry: UUID?
+    var columnVisibility: NavigationSplitViewVisibility = .all
+
+    var currentSection: ControlCenterSection {
+        selection ?? .overview
+    }
+
+    func open(_ section: ControlCenterSection) {
+        selection = section
+    }
+
+    func resetPresentation() {
+        selection = .overview
+        selectedCaptureID = nil
+        selectedDictionaryEntry = nil
+        columnVisibility = .all
+    }
+}
+
+@MainActor
+@Observable
+private final class ControlCenterPresentationState {
+    var history: CaptureHistoryController?
+    var overview = OverviewPageState()
+
+    func prepare(history: CaptureHistoryController?) {
+        if self.history == nil {
+            self.history = history
         }
+    }
+
+    var dictionarySearch = ""
+    var dictionaryShowingEditor = false
+    var dictionaryEditingEntryID: UUID?
+    var dictionaryConfirmsDeletion = false
+
+    var memorySearch = ""
+    var memoryEditor: MemoryEditorMode?
+
+    var historySearch = ""
+    var historyFilter: CaptureHistoryFilter = .all
+
+    var diagnosticSearch = ""
+    var diagnosticLevel: DiagnosticLevel?
+    var diagnosticConfirmsClear = false
+
+    func reset() {
+        history?.releasePresentationResources()
+        history = nil
+        overview.metricsSnapshot = nil
+
+        dictionarySearch = ""
+        dictionaryShowingEditor = false
+        dictionaryEditingEntryID = nil
+        dictionaryConfirmsDeletion = false
+
+        memorySearch = ""
+        memoryEditor = nil
+
+        historySearch = ""
+        historyFilter = .all
+
+        diagnosticSearch = ""
+        diagnosticLevel = nil
+        diagnosticConfirmsClear = false
+
     }
 }
 
@@ -80,38 +240,51 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
 struct MorieControlCenter: View {
     let controller: AppController
 
-    @State private var selection: ControlCenterSection? = .overview
-    @State private var selectedCaptureID: UUID?
-    @State private var selectedDictionaryEntry: UUID?
-    @State private var overviewMetricsSnapshot: OverviewMetricsSnapshot?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var session = ControlCenterSession()
+    @State private var presentation = ControlCenterPresentationState()
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            ControlCenterSidebar(selection: $selection)
+        @Bindable var session = session
+
+        NavigationSplitView(columnVisibility: $session.columnVisibility) {
+            ControlCenterSidebar(selection: $session.selection)
         } detail: {
             NavigationStack {
                 ControlCenterRouteHost(
                     controller: controller,
-                    section: selection ?? .overview,
-                    selectedCaptureID: $selectedCaptureID,
-                    selectedDictionaryEntry: $selectedDictionaryEntry,
-                    overviewMetricsSnapshot: $overviewMetricsSnapshot
+                    session: session,
+                    presentation: presentation
                 )
             }
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 960, minHeight: 600)
         .onAppear {
+            presentation.prepare(
+                history: controller.makeControlCenterHistoryController()
+            )
             Diagnostics.record("ControlCenter", "Shell mounted")
+            Diagnostics.recordMemory("control-center-mounted")
         }
         .onDisappear {
+            DiagnosticLogStore.shared.setPresentationVisible(false)
+            presentation.reset()
+            session.resetPresentation()
+
             Diagnostics.record("ControlCenter", "Shell unmounted")
+            Diagnostics.recordMemory("control-center-unmounted")
+
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                Diagnostics.recordMemory("control-center-unmounted+1s")
+                try? await Task.sleep(for: .seconds(4))
+                Diagnostics.recordMemory("control-center-unmounted+5s")
+            }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .morieShowSettings)
         ) { _ in
-            selection = .settings
+            session.open(.settings)
         }
     }
 }
@@ -129,13 +302,18 @@ private struct ControlCenterSidebar: View {
                 sidebarItem(.memory)
             }
 
-            Section("应用") {
+            Section("系统") {
                 sidebarItem(.settings)
                 sidebarItem(.permissions)
                 sidebarItem(.diagnostics)
             }
         }
         .listStyle(.sidebar)
+        .navigationSplitViewColumnWidth(
+            min: ControlCenterLayout.sidebarMinWidth,
+            ideal: ControlCenterLayout.sidebarIdealWidth,
+            max: ControlCenterLayout.sidebarMaxWidth
+        )
         .onAppear {
             Diagnostics.record("ControlCenter", "Sidebar mounted")
         }
@@ -150,60 +328,110 @@ private struct ControlCenterSidebar: View {
     }
 }
 
+private struct ControlCenterDetailHost<Content: View>: View {
+    let section: ControlCenterSection
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
+            .navigationTitle(
+                section == .history ? "" : section.title
+            )
+    }
+}
+
+struct ControlCenterWorkspaceHeader: View {
+    let title: String
+    let subtitle: String?
+    let trailingText: String?
+
+    init(
+        _ title: String,
+        subtitle: String? = nil,
+        trailingText: String? = nil
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.trailingText = trailingText
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 16)
+
+            if let trailingText {
+                Text(trailingText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 24)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+    }
+}
+
 @MainActor
 private struct ControlCenterRouteHost: View {
     let controller: AppController
-    let section: ControlCenterSection
-    @Binding var selectedCaptureID: UUID?
-    @Binding var selectedDictionaryEntry: UUID?
-    @Binding var overviewMetricsSnapshot: OverviewMetricsSnapshot?
+    @Bindable var session: ControlCenterSession
+    @Bindable var presentation: ControlCenterPresentationState
 
-    @ViewBuilder
     var body: some View {
-        switch section.pageFamily {
-        case .scrolling:
-            ScrollView {
-                routedPage
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(ControlCenterLayout.contentInset)
-            }
-
-        case .form:
-            Form {
-                routedPage
-            }
-            .formStyle(.grouped)
-
-        case .workspace:
+        ControlCenterDetailHost(section: session.currentSection) {
             routedPage
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: .topLeading
-                )
         }
     }
 
     @ViewBuilder
     private var routedPage: some View {
-        switch section {
+        switch session.currentSection {
         case .overview:
             OverviewView(
                 controller: controller,
-                metricsSnapshot: $overviewMetricsSnapshot
+                state: presentation.overview
             )
 
         case .history:
-            CaptureHistoryWorkspace(
-                controller: controller,
-                selection: $selectedCaptureID
-            )
+            if let history = presentation.history {
+                CaptureHistoryWorkspace(
+                    controller: controller,
+                    history: history,
+                    selection: $session.selectedCaptureID,
+                    search: $presentation.historySearch,
+                    filter: $presentation.historyFilter
+                )
+            } else {
+                unavailable("历史记录不可用")
+            }
 
         case .dictionary:
             if let dictionary = controller.dictionary {
                 DictionaryView(
                     store: dictionary,
-                    selection: $selectedDictionaryEntry
+                    selection: $session.selectedDictionaryEntry,
+                    search: $presentation.dictionarySearch,
+                    showingEditor: $presentation.dictionaryShowingEditor,
+                    editingEntryID: $presentation.dictionaryEditingEntryID,
+                    confirmsDeletion: $presentation.dictionaryConfirmsDeletion
                 )
             } else {
                 unavailable("字典不可用")
@@ -211,7 +439,11 @@ private struct ControlCenterRouteHost: View {
 
         case .memory:
             if let memory = controller.memory {
-                MemoryView(store: memory)
+                MemoryView(
+                    store: memory,
+                    search: $presentation.memorySearch,
+                    editor: $presentation.memoryEditor
+                )
             } else {
                 unavailable("个人记忆不可用")
             }
@@ -223,7 +455,11 @@ private struct ControlCenterRouteHost: View {
             PermissionManagementView(controller: controller)
 
         case .diagnostics:
-            DiagnosticLogView()
+            DiagnosticLogView(
+                search: $presentation.diagnosticSearch,
+                level: $presentation.diagnosticLevel,
+                confirmsClear: $presentation.diagnosticConfirmsClear
+            )
         }
     }
 

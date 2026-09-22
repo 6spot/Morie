@@ -3,11 +3,11 @@ import SwiftUI
 struct DictionaryView: View {
     @ObservedObject var store: DictionaryStore
     @Binding var selection: UUID?
+    @Binding var search: String
+    @Binding var showingEditor: Bool
+    @Binding var editingEntryID: UUID?
+    @Binding var confirmsDeletion: Bool
 
-    @State private var search = ""
-    @State private var showingEditor = false
-    @State private var editingEntryID: UUID?
-    @State private var confirmsDeletion = false
     @State private var errorMessage: String?
 
     private let columns = [
@@ -48,8 +48,25 @@ struct DictionaryView: View {
         visibleUserEntries.count + visibleBuiltInEntries.count
     }
 
+    private var totalUserCount: Int {
+        store.displayEntries.filter(\.isEditable).count
+    }
+
+    private var totalBuiltInCount: Int {
+        store.displayEntries.filter { !$0.isEditable }.count
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
+        ControlCenterPage {
+            HStack(spacing: 8) {
+                Text("\(totalUserCount) 个自定义")
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Text("\(totalBuiltInCount) 个系统词语")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+
             if let errorMessage {
                 Label(
                     errorMessage,
@@ -59,9 +76,9 @@ struct DictionaryView: View {
             }
 
             if search.isEmpty || !visibleUserEntries.isEmpty {
-                dictionarySection(
-                    title: "用户添加",
-                    description: "你添加或确认过的词语，可以编辑和删除。"
+                ControlCenterSectionBlock(
+                    "我的词语",
+                    subtitle: "你添加或确认过的词语。选中后可在右上角编辑或删除。"
                 ) {
                     if visibleUserEntries.isEmpty {
                         ContentUnavailableView {
@@ -95,48 +112,59 @@ struct DictionaryView: View {
                 }
             }
 
-            if !visibleBuiltInEntries.isEmpty {
-                Divider()
+            if search.isEmpty || !visibleBuiltInEntries.isEmpty {
+                if search.isEmpty || !visibleUserEntries.isEmpty {
+                    Divider()
+                }
 
-                dictionarySection(
-                    title: "系统内置",
-                    description:
-                        "用于增强语音识别，由 Morie 维护，不支持修改或删除。"
+                ControlCenterSectionBlock(
+                    "系统词语",
+                    subtitle: "由 Morie 维护，用于增强语音识别；这些词语只读。"
                 ) {
-                    LazyVGrid(
-                        columns: columns,
-                        alignment: .leading,
-                        spacing: 8
-                    ) {
-                        ForEach(visibleBuiltInEntries) { entry in
-                            builtInWord(entry)
+                    if visibleBuiltInEntries.isEmpty {
+                        Text("暂无系统词语。")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        LazyVGrid(
+                            columns: columns,
+                            alignment: .leading,
+                            spacing: 8
+                        ) {
+                            ForEach(visibleBuiltInEntries) { entry in
+                                builtInWord(entry)
+                            }
                         }
                     }
                 }
             }
 
             if visibleCount == 0 && errorMessage == nil {
-                ContentUnavailableView {
-                    Label(
-                        "没有匹配的词语",
-                        systemImage: "magnifyingglass"
-                    )
-                } description: {
-                    Text("试试其他搜索词。")
-                }
+                Divider()
+
+                ContentUnavailableView(
+                    "没有匹配的词语",
+                    systemImage: "magnifyingglass",
+                    description: Text("试试其他搜索词。")
+                )
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .navigationTitle("字典")
-        .navigationSubtitle("\(visibleCount) 个词语")
-        .searchable(text: $search, prompt: "搜索词语")
+        .sheet(isPresented: $showingEditor) {
+            DictionaryEditorSheet(
+                store: store,
+                entryID: editingEntryID
+            )
+        }
+        .searchable(
+            text: $search,
+            placement: .toolbar,
+            prompt: Text("搜索词语")
+        )
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("编辑词语", systemImage: "pencil") {
-                    if let selectedUserEntryID {
-                        edit(selectedUserEntryID)
-                    }
+                    guard let selectedUserEntryID else { return }
+                    edit(selectedUserEntryID)
                 }
                 .disabled(selectedUserEntryID == nil)
 
@@ -149,14 +177,10 @@ struct DictionaryView: View {
                 }
                 .disabled(selectedUserEntryID == nil)
 
-                Button("添加词语", systemImage: "plus", action: add)
+                Button("添加词语", systemImage: "plus") {
+                    add()
+                }
             }
-        }
-        .sheet(isPresented: $showingEditor) {
-            DictionaryEditorSheet(
-                store: store,
-                entryID: editingEntryID
-            )
         }
         .confirmationDialog(
             "删除这个字典词语？",
@@ -178,24 +202,6 @@ struct DictionaryView: View {
                 self.selection = nil
             }
         }
-    }
-
-    private func dictionarySection<Content: View>(
-        title: String,
-        description: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-
-            content()
-
-            Text(description)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func load() {
@@ -242,7 +248,6 @@ struct DictionaryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
         .controlSize(.small)
         .help(entry.source.helpText)
         .contextMenu {

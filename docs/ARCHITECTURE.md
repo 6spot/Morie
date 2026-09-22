@@ -184,6 +184,30 @@ Owns application preference values used by the UI.
 
 Side effects caused by preference changes are coordinated with the appropriate owning subsystem.
 
+## Control Center ownership
+
+The macOS Control Center has one window-level presentation owner.
+
+`MorieControlCenter` owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. A Control Center session owns only state that must survive route changes, such as the selected destination, sidebar visibility and cross-route selections.
+
+`ControlCenterRouteHost` only resolves the selected route into page content. Every route is rendered inside the same persistent `ControlCenterDetailHost`; the router must not replace the right-side root with different ScrollView/Form/workspace containers.
+
+The persistent detail host owns the primary navigation title and stable navigation shell. Route-specific toolbar intent belongs to the routed page that owns the behavior. Pages use Apple-native `.searchable(..., placement: .toolbar)`, `.toolbar`, `ToolbarItem`, `ToolbarItemGroup` and `ToolbarSpacer` directly; the router/host must not mirror route business logic or translate custom toolbar configuration arrays. Search/filter/action state remains page or Control Center presentation state and is shared through normal SwiftUI bindings. Secondary pushed destinations may contribute their own native title/actions.
+
+Overview, Dictionary, Personal Memory, Settings and Permissions share the same `ControlCenterScrollableContent` geometry and the same 24-point outer content inset. Overview metrics live in a dedicated page state rather than `ControlCenterSession`, so asynchronous metric refreshes do not invalidate the window-level shell or toolbar. They must not introduce route-specific outer widths or an alternate top-level Form margin model. History and Diagnostics are full-size internal workspaces, but their split-view minimum widths must remain subordinate to the outer NavigationSplitView and must never squeeze the sidebar below its supported width range.
+
+Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center navigation shells or move unrelated feature state into `AppController`.
+
+Control Center presentation memory follows the Control Center window lifecycle.
+
+- Overview never scans Capture history when the window opens. Capture usage metrics are persisted incrementally with Capture persistence and Overview reads only the small aggregate snapshot.
+- History owns a presentation-only `CaptureHistoryController` and `ModelContext` created for the Control Center session. The first page is bounded, further records load on demand, and the list/context/player are released when History or the Control Center closes.
+- Diagnostics writes runtime logs to disk regardless of UI visibility, but its in-memory Entry collection exists only while the Diagnostics page is visible. Leaving the page releases that collection.
+- Search, filters, selections and page snapshots belong to `ControlCenterPresentationState` and are reset when the Control Center closes.
+- Runtime Dictionary/Memory state is separate from Control Center presentation state because voice recognition/refinement can use those domains while the window is closed.
+
+Do not attach History/Diagnostics/Overview presentation collections to `AppController` or another application-lifetime owner.
+
 ## Core input flow
 
 The primary interactive flow is:
