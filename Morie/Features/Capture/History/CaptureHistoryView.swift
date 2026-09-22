@@ -73,9 +73,9 @@ struct CaptureHistoryWorkspace: View {
                 onLoadMore: history.loadMoreCaptures
             )
             .frame(
-                minWidth: 280,
+                minWidth: 340,
                 idealWidth: 340,
-                maxWidth: 420,
+                maxWidth: 340,
                 maxHeight: .infinity,
                 alignment: .topLeading
             )
@@ -86,10 +86,11 @@ struct CaptureHistoryWorkspace: View {
                 selectedCaptureID: selection
             )
             .frame(
-                minWidth: 420,
+                minWidth: 0,
                 maxWidth: .infinity,
                 maxHeight: .infinity
             )
+            .layoutPriority(1)
         }
         .frame(
             maxWidth: .infinity,
