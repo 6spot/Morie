@@ -5,11 +5,11 @@ enum ICloudSyncSettings {
     static let enabledDefaultsKey = "iCloudSyncEnabled"
 
     static var isEnabled: Bool {
-        UserDefaults.standard.bool(forKey: enabledDefaultsKey)
+        MorieDefaults.shared.bool(forKey: enabledDefaultsKey)
     }
 
     static func setEnabled(_ enabled: Bool) {
-        UserDefaults.standard.set(enabled, forKey: enabledDefaultsKey)
+        MorieDefaults.shared.set(enabled, forKey: enabledDefaultsKey)
     }
 }
 

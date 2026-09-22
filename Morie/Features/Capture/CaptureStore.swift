@@ -678,7 +678,7 @@ final class CaptureStore: ObservableObject {
 
     func setAudioRetentionDays(_ days: Int) throws {
         let value = min(max(days, 1), 365)
-        UserDefaults.standard.set(value, forKey: Self.audioRetentionDaysDefaultsKey)
+        MorieDefaults.shared.set(value, forKey: Self.audioRetentionDaysDefaultsKey)
         let descriptor = FetchDescriptor<CaptureRecord>()
         for record in try container.mainContext.fetch(descriptor) where record.sourceAudioRelativePath != nil {
             record.sourceAudioExpiresAt = Calendar.current.date(byAdding: .day, value: value, to: record.createdAt)
@@ -689,7 +689,7 @@ final class CaptureStore: ObservableObject {
     }
 
     static var audioRetentionDays: Int {
-        let saved = UserDefaults.standard.integer(forKey: audioRetentionDaysDefaultsKey)
+        let saved = MorieDefaults.shared.integer(forKey: audioRetentionDaysDefaultsKey)
         return saved > 0 ? saved : defaultAudioRetentionDays
     }
 

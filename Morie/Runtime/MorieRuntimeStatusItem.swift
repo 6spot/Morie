@@ -72,10 +72,8 @@ final class MorieRuntimeStatusItem: NSObject {
     }
 
     @objc private func openMorie() {
-        let executable = URL(
-            fileURLWithPath: CommandLine.arguments[0]
-        ).standardizedFileURL
-        let appURL = executable
+        let appURL = Bundle.main.bundleURL
+            .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
