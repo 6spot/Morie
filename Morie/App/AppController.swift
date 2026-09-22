@@ -1467,3 +1467,5 @@ final class AppController {
         alert.runModal()
     }
 }
+
+extension AppController: ControlCenterControlling {}
