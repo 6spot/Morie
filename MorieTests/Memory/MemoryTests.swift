@@ -74,6 +74,22 @@ final class MemoryStoreTests: XCTestCase {
         XCTAssertEqual(try memory.memory(id).notes, "original")
     }
 
+    func testLoadedEntriesCanBeReleasedAndReloadedForRuntimeUse() throws {
+        let (captures, memory) = try temporaryStore()
+        defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
+        let id = try memory.create(
+            MemoryDraft(name: "Ephemeral memory", notes: "still available after cache release")
+        )
+
+        XCTAssertFalse(memory.entries.isEmpty)
+
+        memory.releaseLoadedEntries()
+
+        XCTAssertTrue(memory.entries.isEmpty)
+        XCTAssertEqual(try memory.relevantContext(for: "Ephemeral memory").map(\.id), [id])
+        XCTAssertFalse(memory.entries.isEmpty)
+    }
+
     func testSourceMustExistAndHaveCompletedText() throws {
         let (captures, memory) = try temporaryStore()
         defer { try? FileManager.default.removeItem(at: captures.audioDirectory) }
