@@ -185,10 +185,6 @@ private final class ControlCenterSession {
         columnVisibility = .all
     }
 
-    deinit {
-        Diagnostics.record("ControlCenter", "Session deinitialized")
-        Diagnostics.recordMemory("control-center-session-deinit")
-    }
 }
 
 @MainActor
@@ -239,10 +235,6 @@ private final class ControlCenterPresentationState {
         diagnosticConfirmsClear = false
     }
 
-    deinit {
-        Diagnostics.record("ControlCenter", "Presentation state deinitialized")
-        Diagnostics.recordMemory("control-center-presentation-deinit")
-    }
 }
 
 @MainActor
@@ -273,7 +265,6 @@ struct MorieControlCenter: View {
                 history: controller.makeControlCenterHistoryController()
             )
             Diagnostics.record("ControlCenter", "Shell mounted")
-            Diagnostics.recordMemory("control-center-mounted")
         }
         .onDisappear {
             DiagnosticLogStore.shared.setPresentationVisible(false)
@@ -281,22 +272,6 @@ struct MorieControlCenter: View {
             session.resetPresentation()
 
             Diagnostics.record("ControlCenter", "Shell unmounted")
-            Diagnostics.recordMemory("control-center-unmounted")
-
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1))
-                Diagnostics.recordMemory("control-center-unmounted+1s")
-                try? await Task.sleep(for: .seconds(4))
-                Diagnostics.recordMemory("control-center-unmounted+5s")
-            }
-        }
-        .onChange(of: session.selection) { _, section in
-            let name = section?.rawValue ?? ControlCenterSection.overview.rawValue
-            Diagnostics.recordMemory("control-center-route-\(name)")
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1))
-                Diagnostics.recordMemory("control-center-route-\(name)+1s")
-            }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .morieShowSettings)
