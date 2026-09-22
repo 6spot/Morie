@@ -274,6 +274,12 @@ final class AppController {
     }
 
     var canStartCapture: Bool {
+        if processRole == .controlCenter {
+            return !capabilities.isBootstrapping
+                && setup.isReady
+                && captureStore != nil
+        }
+
         guard !captureSession.isActive,
               !capabilities.isBootstrapping,
               setup.isReady,
@@ -296,7 +302,7 @@ final class AppController {
     }
 
     var isCaptureActive: Bool {
-        captureSession.isActive
+        processRole == .runtime && captureSession.isActive
     }
 
     func setAudioRetentionDays(_ days: Int) {
