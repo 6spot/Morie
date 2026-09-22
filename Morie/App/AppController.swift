@@ -804,6 +804,7 @@ final class AppController {
                 "Bootstrap complete; Morie is Ready"
             )
             Diagnostics.recordMemory("bootstrap-ready")
+            publishControlCenterRuntimeSnapshot()
         } catch is CancellationError {
             runtime.state = .blocked(
                 "准备已取消，可以在使用引导中重试。"
@@ -912,6 +913,39 @@ final class AppController {
 
     private func installRuntimeProcessObservers() {
         let center = DistributedNotificationCenter.default()
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimeSnapshotRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.publishControlCenterRuntimeSnapshot()
+                }
+            }
+        )
+
+        distributedObservers.append(
+            center.addObserver(
+                forName: .morieRuntimePermissionActionRequest,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let requirement =
+                    ControlCenterProcessBridge.permissionRequirement(
+                        from: notification
+                    ) else {
+                    return
+                }
+
+                Task { @MainActor [weak self] in
+                    await self?.performPermissionAction(
+                        requirement
+                    )
+                }
+            }
+        )
 
         distributedObservers.append(
             center.addObserver(
@@ -1037,6 +1071,25 @@ final class AppController {
                     NSApplication.shared.activate()
                 }
             }
+        )
+    }
+
+    private func publishControlCenterRuntimeSnapshot() {
+        guard processRole == .runtime else { return }
+
+        ControlCenterProcessBridge.publishRuntimeSnapshot(
+            ControlCenterRuntimeSnapshot(
+                checks: setup.checks,
+                isBootstrapping:
+                    capabilities.isBootstrapping,
+                setupError: capabilities.setupError,
+                canStartCapture: canStartCapture,
+                isCaptureActive: isCaptureActive,
+                speechBackend:
+                    capabilities.speechBackend,
+                localModelStatusTitle:
+                    refinementModels.localModelStatusTitle
+            )
         )
     }
 
@@ -1330,6 +1383,8 @@ final class AppController {
         case .failed(let message):
             runtime.state = .failed(message)
         }
+
+        publishControlCenterRuntimeSnapshot()
     }
 
     private func startAudioMaintenanceLoopIfNeeded() {
