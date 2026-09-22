@@ -240,7 +240,7 @@ final class AppController {
 
         Diagnostics.record(
             "App",
-            "Morie controller initialized; role=\(processRole); \(AppBuildIdentity.current.logValue)"
+            "Morie controller initialized; role=\(processRole); pid=\(ProcessInfo.processInfo.processIdentifier); \(AppBuildIdentity.current.logValue)"
         )
         DevelopmentDiagnostics.recordEnvironment()
 
