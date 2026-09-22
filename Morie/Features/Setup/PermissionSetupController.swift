@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-enum SetupRequirement: CaseIterable, Hashable, Identifiable, Sendable {
+enum SetupRequirement: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
     case appleIntelligence
     case speechTranscription
     case microphone
@@ -62,12 +62,12 @@ enum SetupRequirement: CaseIterable, Hashable, Identifiable, Sendable {
     }
 }
 
-struct CapabilityCheck: Equatable, Identifiable, Sendable {
-    enum State: Equatable, Sendable {
+struct CapabilityCheck: Codable, Equatable, Identifiable, Sendable {
+    enum State: String, Codable, Equatable, Sendable {
         case ready, notDetermined, denied, restricted, unavailable
     }
 
-    enum Action: Equatable, Sendable {
+    enum Action: String, Codable, Equatable, Sendable {
         case requestPermission, openSettings
 
         var title: String {
