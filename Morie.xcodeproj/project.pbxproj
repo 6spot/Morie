@@ -6,6 +6,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000030 /* MemoryAnalysisSourceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000050 /* MemoryAnalysisSourceView.swift */; };
+		AC0000000000000000000036 /* MemoryAnalysisSourceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000050 /* MemoryAnalysisSourceView.swift */; };
 		AC0000000000000000000001 /* AppCapabilityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000003 /* AppCapabilityController.swift */; };
 		AC0000000000000000000002 /* AppPreferencesController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000002 /* AppPreferencesController.swift */; };
 		AC0000000000000000000003 /* AppRuntimeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000001 /* AppRuntimeController.swift */; };
@@ -147,6 +149,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000050 /* MemoryAnalysisSourceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryAnalysisSourceView.swift; sourceTree = "<group>"; };
 		BC0000000000000000000001 /* MorieControlCenterMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieControlCenterMain.swift; sourceTree = "<group>"; };
 		BC0000000000000000000002 /* Morie Control Center */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "Morie Control Center"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000049 /* MorieDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieDefaults.swift; sourceTree = "<group>"; };
@@ -400,6 +403,7 @@
 		D30000000000000000000005 /* Memory */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000050 /* MemoryAnalysisSourceView.swift */,
 				B10000000000000000000019 /* MemoryRecord.swift */,
 				B10000000000000000000023 /* MemoryAnalysisRecord.swift */,
 				B10000000000000000000020 /* MemoryStore.swift */,
@@ -774,6 +778,7 @@
 				A10000000000000000000013 /* MemoryContextRetriever.swift in Sources */,
 				A10000000000000000000014 /* MemoryView.swift in Sources */,
 				A10000000000000000000015 /* MemoryAnalysisRecord.swift in Sources */,
+				A10000000000000000000030 /* MemoryAnalysisSourceView.swift in Sources */,
 				A10000000000000000000016 /* MemoryLearner.swift in Sources */,
 				A10000000000000000000017 /* MemoryLearningController.swift in Sources */,
 				A10000000000000000000018 /* MemoryLearningView.swift in Sources */,
@@ -815,6 +820,7 @@
 				AC0000000000000000000020 /* DictionaryView.swift in Sources */,
 				AC0000000000000000000021 /* MemoryRecord.swift in Sources */,
 				AC0000000000000000000022 /* MemoryAnalysisRecord.swift in Sources */,
+				AC0000000000000000000036 /* MemoryAnalysisSourceView.swift in Sources */,
 				AC0000000000000000000023 /* MemoryContextRetriever.swift in Sources */,
 				AC0000000000000000000024 /* MemoryStore.swift in Sources */,
 				AC0000000000000000000025 /* MemoryView.swift in Sources */,
