@@ -143,10 +143,12 @@ final class DictionaryStore: ObservableObject {
         }
     }
 
-    private let context: ModelContext
+    private let container: ModelContainer
+    private var context: ModelContext
     private var hasLoadedEntries = false
 
     init(container: ModelContainer) {
+        self.container = container
         context = ModelContext(container)
         context.autosaveEnabled = false
     }
@@ -159,6 +161,12 @@ final class DictionaryStore: ObservableObject {
     func loadIfNeeded() throws {
         guard !hasLoadedEntries else { return }
         try load()
+    }
+
+    func releaseLoadedEntries() {
+        entries.removeAll(keepingCapacity: false)
+        hasLoadedEntries = false
+        resetContext()
     }
 
     @discardableResult
@@ -352,7 +360,13 @@ final class DictionaryStore: ObservableObject {
     private func save() throws {
         do { try context.save() }
         catch { context.rollback(); throw error }
+        resetContext()
         try load()
+    }
+
+    private func resetContext() {
+        context = ModelContext(container)
+        context.autosaveEnabled = false
     }
 }
 
