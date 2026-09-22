@@ -158,55 +158,93 @@ Expose the narrow capability or data required by the caller.
 
 ## Application composition
 
-`AppController` is the current application composition and coordination boundary.
+Morie has two process-level composition roots with different responsibilities.
 
-Conceptually it connects Runtime, Capabilities, Preferences, Capture, History, Dictionary, Memory and Personalization.
+### Morie.app — primary GUI application
 
-Its role is to receive an application-level action, delegate to the owning feature and coordinate cross-feature results when necessary.
+`Morie.app` is the product-facing macOS application. It owns the application icon, Dock / Launchpad / Finder identity, Control Center window, Settings, History, Dictionary, Personal Memory and permission-management UI.
 
-If logic can be described entirely as part of Capture, Dictionary, Memory, History or another feature, it normally belongs there rather than in `AppController`.
+The GUI process owns presentation state and an IPC client. It does not own the live voice-input runtime.
+
+### Morie Runtime — background agent
+
+`Morie Runtime` is the always-running background agent. It owns Hotkey, Capture, Speech, refinement, text delivery, runtime Dictionary / Memory usage, background learning, maintenance and durable stores.
+
+The Runtime exposes a narrow typed IPC service to `Morie.app`. It does not construct Control Center views.
+
+## Process architecture
+
+```text
+Morie.app
+├─ App icon / Dock / Launchpad / Finder identity
+├─ Control Center
+├─ SwiftUI / AppKit UI
+├─ lightweight presentation state
+├─ History / Dictionary / Memory / Settings view models
+└─ Runtime IPC client
+
+Morie Runtime
+├─ Menu bar status entry
+├─ Hotkey
+├─ Capture / Speech
+├─ Refinement / delivery
+├─ Capture / Dictionary / Memory stores
+├─ Background learning / maintenance
+└─ Runtime IPC server
+```
+
+`Morie.app` is allowed to terminate when its Control Center closes. `Morie Runtime` remains alive so global voice input continues without the GUI process.
+
+`Morie Runtime` is registered as an embedded background launch agent through Apple ServiceManagement. The Runtime advertises a launchd Mach service and the GUI connects through `NSXPCConnection`. Cross-process requests and responses use transport-safe DTOs.
+
+Do not use `DistributedNotificationCenter` as the primary RPC layer. Do not pass feature controllers, SwiftData models or mutable `ModelContext` objects across the process boundary.
 
 ## Application state
 
-Application-visible state is separated by responsibility.
+### GUI presentation state
 
-### AppRuntimeController
+The GUI owns only state required to render the Control Center: navigation, search, filters, selections, page-loading state and transport DTOs returned by Runtime.
 
-Owns frequently changing live runtime presentation state such as current Capture phase and progressive transcript.
+### Runtime state
 
-### AppCapabilityController
+The Runtime is the source of truth for live Capture state, Speech readiness, runtime capability state and background activity.
 
-Owns capability and bootstrap presentation state such as setup requirements, bootstrap state, capability availability and the prepared Speech backend.
+### Preferences
 
-### AppPreferencesController
+Settings are presented in `Morie.app`, but changes that affect live runtime behavior are applied by `Morie Runtime` through typed IPC.
 
-Owns application preference values used by the UI.
+## Persistence ownership
 
-Side effects caused by preference changes are coordinated with the appropriate owning subsystem.
+Writable product persistence has one process owner: `Morie Runtime`.
+
+`CaptureStore`, `DictionaryStore`, `MemoryStore` and other runtime stores are created by Runtime, not by the GUI process. `Morie.app` requests bounded data pages / detail DTOs and explicit mutations through IPC.
+
+This prevents two processes from independently owning writable SwiftData contexts for the same product data.
 
 ## Control Center ownership
 
-The macOS Control Center has one window-level presentation owner.
+The Control Center remains a native SwiftUI/AppKit UI owned by `Morie.app`.
 
-`MorieControlCenter` owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. A Control Center session owns only state that must survive route changes, such as the selected destination, sidebar visibility and cross-route selections.
+`MorieControlCenter` owns exactly one persistent `NavigationSplitView` and one persistent detail `NavigationStack`. The established global toolbar, title, sidebar geometry and page spacing rules remain unchanged by the Runtime-agent migration.
 
-`ControlCenterRouteHost` only resolves the selected route into page content. Every route is rendered inside the same persistent `ControlCenterDetailHost`; the router must not replace the right-side root with different ScrollView/Form/workspace containers.
+History, Dictionary, Personal Memory, Settings and Permissions are presentation clients of Runtime-owned capabilities. They must not recreate Runtime stores or runtime controllers simply to render a page.
 
-The persistent detail host owns the primary navigation title and stable navigation shell. Route-specific toolbar intent belongs to the routed page that owns the behavior. Pages use Apple-native `.searchable(..., placement: .toolbar)`, `.toolbar`, `ToolbarItem`, `ToolbarItemGroup` and `ToolbarSpacer` directly; the router/host must not mirror route business logic or translate custom toolbar configuration arrays. Search/filter/action state remains page or Control Center presentation state and is shared through normal SwiftUI bindings. Secondary pushed destinations may contribute their own native title/actions.
+Control Center presentation memory belongs only to `Morie.app`. Closing the Control Center may terminate the GUI process, allowing macOS to reclaim its SwiftUI/AppKit/CoreUI presentation working set without affecting voice input.
 
-Overview, Dictionary, Personal Memory, Settings and Permissions share the same `ControlCenterScrollableContent` geometry and the same 24-point outer content inset. Overview metrics live in a dedicated page state rather than `ControlCenterSession`, so asynchronous metric refreshes do not invalidate the window-level shell or toolbar. They must not introduce route-specific outer widths or an alternate top-level Form margin model. History and Diagnostics are full-size internal workspaces, but their split-view minimum widths must remain subordinate to the outer NavigationSplitView and must never squeeze the sidebar below its supported width range.
+## IPC ownership
 
-Routed feature views own their feature-specific presentation state and actions; they must not create replacement Control Center navigation shells or move unrelated feature state into `AppController`.
+The Runtime IPC surface must remain narrow and explicit. Expected capability groups include:
 
-Control Center presentation memory follows the Control Center window lifecycle.
+- runtime snapshot / health;
+- Capture actions;
+- permission state / permission actions;
+- History page / detail / delete / saved-audio re-recognition;
+- Dictionary query / mutations;
+- Memory query / mutations;
+- Settings snapshot / mutations;
+- Runtime restart / factory reset where required.
 
-- Overview never scans Capture history when the window opens. Capture usage metrics are persisted incrementally with Capture persistence and Overview reads only the small aggregate snapshot.
-- History owns a presentation-only `CaptureHistoryController` and `ModelContext` created for the Control Center session. The first page is bounded, further records load on demand, and the list/context/player are released when History or the Control Center closes.
-- Diagnostics writes runtime logs to disk regardless of UI visibility, but its in-memory Entry collection exists only while the Diagnostics page is visible. Leaving the page releases that collection.
-- Search, filters, selections and page snapshots belong to `ControlCenterPresentationState` and are reset when the Control Center closes.
-- Runtime Dictionary/Memory state is separate from Control Center presentation state because voice recognition/refinement can use those domains while the window is closed.
-
-Do not attach History/Diagnostics/Overview presentation collections to `AppController` or another application-lifetime owner.
+IPC contracts use request/response DTOs. Feature-internal types remain private to their owning process.
 
 ## Core input flow
 
@@ -336,7 +374,9 @@ Secondary flows may consume results from the primary flow. They must not become 
 
 | State / responsibility | Owner |
 | --- | --- |
-| Application composition | `AppController` |
+| GUI application composition | `Morie.app` presentation root |
+| Runtime composition | `Morie Runtime` / runtime controller |
+| Cross-process transport | typed Runtime IPC / XPC |
 | Live application runtime state | `AppRuntimeController` |
 | Capability/bootstrap state | `AppCapabilityController` |
 | User preference state | `AppPreferencesController` |
@@ -377,6 +417,9 @@ Place it based on ownership.
 
 The following relationships should remain easy to see:
 
+- `Morie.app` is the primary GUI application.
+- `Morie Runtime` is the background owner of live input and writable product persistence.
+- Cross-process communication is typed and explicit.
 - App coordinates Features.
 - Features own product behavior.
 - Platform owns system integration.
