@@ -14,6 +14,15 @@ enum CaptureHistoryQuery {
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = limit
+        descriptor.propertiesToFetch = [
+            \CaptureRecord.id,
+            \CaptureRecord.createdAt,
+            \CaptureRecord.lifecycleRawValue,
+            \CaptureRecord.deliveryModeRawValue,
+            \CaptureRecord.recognizedText,
+            \CaptureRecord.finalText,
+            \CaptureRecord.sourceApplicationName,
+        ]
         return descriptor
     }
 
@@ -29,6 +38,7 @@ enum CaptureHistoryQuery {
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         latest.fetchLimit = 1
+        latest.propertiesToFetch = [\CaptureRecord.updatedAt]
 
         return CaptureHistorySignature(
             count: count,
