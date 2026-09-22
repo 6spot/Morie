@@ -10,6 +10,99 @@ private enum ControlCenterLayout {
     static let sidebarMaxWidth: CGFloat = 260
 }
 
+struct ControlCenterToolbarSearch {
+    let prompt: String
+    let text: Binding<String>
+}
+
+struct ControlCenterToolbarFilter {
+    let content: AnyView
+
+    init<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) {
+        self.content = AnyView(content())
+    }
+}
+
+struct ControlCenterToolbarAction: Identifiable {
+    let id: String
+    let content: AnyView
+
+    init<Content: View>(
+        _ id: String,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.id = id
+        self.content = AnyView(content())
+    }
+}
+
+struct ControlCenterToolbarConfiguration {
+    var search: ControlCenterToolbarSearch?
+    var filter: ControlCenterToolbarFilter?
+    var actions: [ControlCenterToolbarAction]
+
+    init(
+        search: ControlCenterToolbarSearch? = nil,
+        filter: ControlCenterToolbarFilter? = nil,
+        actions: [ControlCenterToolbarAction] = []
+    ) {
+        self.search = search
+        self.filter = filter
+        self.actions = actions
+    }
+
+    static let empty = ControlCenterToolbarConfiguration()
+}
+
+protocol ControlCenterToolbarProviding {
+    var controlCenterToolbar: ControlCenterToolbarConfiguration { get }
+}
+
+private struct ControlCenterToolbarContent: ToolbarContent {
+    let configuration: ControlCenterToolbarConfiguration
+
+    @ToolbarContentBuilder
+    var body: some ToolbarContent {
+        if let search = configuration.search {
+            ToolbarItem(placement: .primaryAction) {
+                TextField(search.prompt, text: search.text)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(
+                        minWidth: 180,
+                        idealWidth: 220,
+                        maxWidth: 280
+                    )
+            }
+        }
+
+        if configuration.search != nil
+            && (configuration.filter != nil || !configuration.actions.isEmpty) {
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+        }
+
+        if let filter = configuration.filter {
+            ToolbarItem(placement: .primaryAction) {
+                filter.content
+            }
+        }
+
+        if configuration.filter != nil
+            && !configuration.actions.isEmpty {
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+        }
+
+        if !configuration.actions.isEmpty {
+            ToolbarItemGroup(placement: .primaryAction) {
+                ForEach(configuration.actions) { action in
+                    action.content
+                }
+            }
+        }
+    }
+}
+
 struct ControlCenterScrollableContent<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -337,7 +430,18 @@ private struct ControlCenterSidebar: View {
 
 private struct ControlCenterDetailHost<Content: View>: View {
     let section: ControlCenterSection
+    let toolbar: ControlCenterToolbarConfiguration
     @ViewBuilder let content: Content
+
+    init(
+        section: ControlCenterSection,
+        toolbar: ControlCenterToolbarConfiguration = .empty,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.section = section
+        self.toolbar = toolbar
+        self.content = content()
+    }
 
     var body: some View {
         content
@@ -349,6 +453,11 @@ private struct ControlCenterDetailHost<Content: View>: View {
             .navigationTitle(
                 section == .history ? "" : section.title
             )
+            .toolbar {
+                ControlCenterToolbarContent(
+                    configuration: toolbar
+                )
+            }
     }
 }
 
