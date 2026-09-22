@@ -106,22 +106,21 @@ final class ControlCenterController: ControlCenterControlling {
             ?? CaptureShortcut.defaultValue
         let savedInputRefinementEnabled =
             defaults.object(
-                forKey: CapturePersonalizer.enabledDefaultsKey
+                forKey: MoriePreferenceKey.inputRefinementEnabled
             ) as? Bool
             ?? true
         let savedCorrectionSuggestionsEnabled =
             defaults.bool(
                 forKey:
-                    PostInsertionLearningController
-                        .dictionarySuggestionsDefaultsKey
+                    MoriePreferenceKey.dictionarySuggestionsEnabled
             )
         let savedExpressionLearningEnabled =
             defaults.bool(
-                forKey: ExpressionProfileStore.enabledDefaultsKey
+                forKey: MoriePreferenceKey.expressionLearningEnabled
             )
         let savedSoundFeedbackEnabled =
             defaults.object(
-                forKey: CaptureSoundFeedback.enabledDefaultsKey
+                forKey: MoriePreferenceKey.soundFeedbackEnabled
             ) as? Bool
             ?? true
         let savedICloudSyncEnabled = ICloudSyncSettings.isEnabled
@@ -276,7 +275,7 @@ final class ControlCenterController: ControlCenterControlling {
         preferences.inputRefinementEnabled = enabled
         UserDefaults.standard.set(
             enabled,
-            forKey: CapturePersonalizer.enabledDefaultsKey
+            forKey: MoriePreferenceKey.inputRefinementEnabled
         )
         notifyRuntimeOfSharedStateChange()
     }
@@ -302,7 +301,7 @@ final class ControlCenterController: ControlCenterControlling {
         preferences.expressionLearningEnabled = enabled
         UserDefaults.standard.set(
             enabled,
-            forKey: ExpressionProfileStore.enabledDefaultsKey
+            forKey: MoriePreferenceKey.expressionLearningEnabled
         )
         notifyRuntimeOfSharedStateChange()
     }
@@ -311,7 +310,7 @@ final class ControlCenterController: ControlCenterControlling {
         preferences.soundFeedbackEnabled = enabled
         UserDefaults.standard.set(
             enabled,
-            forKey: CaptureSoundFeedback.enabledDefaultsKey
+            forKey: MoriePreferenceKey.soundFeedbackEnabled
         )
         notifyRuntimeOfSharedStateChange()
     }
