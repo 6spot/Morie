@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import FoundationModels
 
 @MainActor
 final class AppController {
@@ -237,6 +238,10 @@ final class AppController {
                 level: .error
             )
         }
+
+        refinementModels.setLocalModelStatusTitle(
+            Self.localModelStatusTitle()
+        )
 
         Diagnostics.record(
             "App",
@@ -677,6 +682,9 @@ final class AppController {
 
         do {
             await setup.refresh()
+            refinementModels.setLocalModelStatusTitle(
+                Self.localModelStatusTitle()
+            )
             DevelopmentDiagnostics.list(
                 "Capability",
                 label: "bootstrapChecks",
@@ -1341,6 +1349,21 @@ final class AppController {
                     }
                 }
             }
+    }
+
+    private static func localModelStatusTitle() -> String {
+        switch SystemLanguageModel.default.availability {
+        case .available:
+            return "可用"
+        case .unavailable(.modelNotReady):
+            return "模型准备中"
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return "Apple 智能未开启"
+        case .unavailable(.deviceNotEligible):
+            return "设备不支持"
+        case .unavailable:
+            return "暂不可用"
+        }
     }
 
     private func presentFailure(
