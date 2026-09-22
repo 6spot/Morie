@@ -34,7 +34,7 @@ enum CaptureHistoryFilter: String, CaseIterable, Identifiable {
 
 @MainActor
 struct CaptureHistoryWorkspace: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
     @ObservedObject var history: CaptureHistoryController
     @ObservedObject private var runtime: AppRuntimeController
     @Binding var selection: UUID?
@@ -42,7 +42,7 @@ struct CaptureHistoryWorkspace: View {
     @Binding var filter: CaptureHistoryFilter
 
     init(
-        controller: AppController,
+        controller: any ControlCenterControlling,
         history: CaptureHistoryController,
         selection: Binding<UUID?>,
         search: Binding<String>,
@@ -269,13 +269,13 @@ struct CaptureHistoryView: View {
 
 @MainActor
 private struct CaptureHistoryDetailPane: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
     @ObservedObject private var runtime: AppRuntimeController
     @ObservedObject var history: CaptureHistoryController
     let selectedCaptureID: UUID?
 
     init(
-        controller: AppController,
+        controller: any ControlCenterControlling,
         history: CaptureHistoryController,
         selectedCaptureID: UUID?
     ) {
