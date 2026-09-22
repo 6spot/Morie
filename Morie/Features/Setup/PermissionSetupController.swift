@@ -135,6 +135,14 @@ final class PermissionSetupController: ObservableObject {
 
     var firstIssue: CapabilityCheck? { checks.first { !$0.isReady } }
 
+    func applyExternalChecks(_ checks: [CapabilityCheck]) {
+        refreshTask?.cancel()
+        refreshTask = nil
+        isRefreshing = false
+        activeRequest = nil
+        self.checks = checks
+    }
+
     func refresh() async {
         if let refreshTask {
             await refreshTask.value
