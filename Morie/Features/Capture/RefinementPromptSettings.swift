@@ -72,6 +72,11 @@ final class RefinementPromptController: ObservableObject {
         instructions == RefinementPromptSettings.defaultInstructions
     }
 
+    func reloadPersistedInstructions() {
+        instructions = RefinementPromptSettings.load()
+        settingsMessage = nil
+    }
+
     @discardableResult
     func save(_ value: String) -> Bool {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
