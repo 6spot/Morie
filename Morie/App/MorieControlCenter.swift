@@ -238,7 +238,7 @@ private final class ControlCenterPresentationState {
 
 @MainActor
 struct MorieControlCenter: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
 
     @State private var session = ControlCenterSession()
     @State private var presentation = ControlCenterPresentationState()
@@ -336,7 +336,7 @@ private struct ControlCenterDetailHost<Content: View>: View {
 
 @MainActor
 private struct ControlCenterRouteHost: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
     @Bindable var session: ControlCenterSession
     @Bindable var presentation: ControlCenterPresentationState
 
