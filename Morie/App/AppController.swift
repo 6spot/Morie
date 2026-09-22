@@ -626,6 +626,24 @@ final class AppController {
         startNewCapture(deliveryMode: .captureOnly)
     }
 
+    func refreshPermissions() async {
+        await setup.refresh()
+        refinementModels.setLocalModelStatusTitle(
+            Self.localModelStatusTitle()
+        )
+        publishControlCenterRuntimeSnapshot()
+    }
+
+    func performPermissionAction(
+        _ requirement: SetupRequirement
+    ) async {
+        await setup.performAction(for: requirement)
+        refinementModels.setLocalModelStatusTitle(
+            Self.localModelStatusTitle()
+        )
+        publishControlCenterRuntimeSnapshot()
+    }
+
     func makeControlCenterHistoryController() -> CaptureHistoryController? {
         captureStore.map {
             CaptureHistoryController(
