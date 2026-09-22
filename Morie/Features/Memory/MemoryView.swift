@@ -1,12 +1,10 @@
-import SwiftData
 import SwiftUI
 
 struct MemoryView: View {
     @ObservedObject var store: MemoryPresentationStore
     @Binding var search: String
     @Binding var editor: MemoryEditorMode?
-    @AppStorage(PersonalMemorySettings.enabledDefaultsKey)
-    private var memoryEnabled = true
+    @ObservedObject var preferences: AppPreferencesController
 
     @State private var errorMessage: String?
 

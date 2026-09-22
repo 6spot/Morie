@@ -140,24 +140,8 @@ private enum ControlCenterSection: String, CaseIterable, Identifiable {
         switch self {
         case .overview: "总览"
         case .history: "历史记录"
-        case .dictionary:
-            DictionaryView(
-                store: controller.dictionary,
-                selection: $session.selectedDictionaryEntry,
-                search: $presentation.dictionarySearch,
-                showingEditor: $presentation.dictionaryShowingEditor,
-                editingEntryID: $presentation.dictionaryEditingEntryID,
-                confirmsDeletion: $presentation.dictionaryConfirmsDeletion
-            )
-
-        case .memory:
-            MemoryView(
-                store: controller.memory,
-                search: $presentation.memorySearch,
-                editor: $presentation.memoryEditor,
-                preferences: controller.preferences
-            )
-
+        case .dictionary: "字典"
+        case .memory: "个人记忆"
         case .settings: "设置"
         case .permissions: "权限"
         case .diagnostics: "诊断"
