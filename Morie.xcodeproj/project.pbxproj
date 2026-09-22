@@ -6,6 +6,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1000000000000000000002C /* MorieSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000046 /* MorieSettingsView.swift */; };
 		A50000000000000000000005 /* RefinementModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000003 /* RefinementModelConfiguration.swift */; };
 		A50000000000000000000006 /* RefinementModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000003 /* RefinementModelConfiguration.swift */; };
 		A1000000000000000000002B /* ControlCenterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000045 /* ControlCenterController.swift */; };
@@ -106,6 +107,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000046 /* MorieSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MorieSettingsView.swift; sourceTree = "<group>"; };
 		B50000000000000000000003 /* RefinementModelConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefinementModelConfiguration.swift; sourceTree = "<group>"; };
 		B10000000000000000000045 /* ControlCenterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterController.swift; sourceTree = "<group>"; };
 		B10000000000000000000044 /* ControlCenterProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCenterProcess.swift; sourceTree = "<group>"; };
@@ -235,6 +237,7 @@
 				B10000000000000000000001 /* MorieApp.swift */,
 				B10000000000000000000044 /* ControlCenterProcess.swift */,
 				B10000000000000000000045 /* ControlCenterController.swift */,
+				B10000000000000000000046 /* MorieSettingsView.swift */,
 				B10000000000000000000002 /* AppController.swift */,
 				B70000000000000000000001 /* AppRuntimeController.swift */,
 				B70000000000000000000002 /* AppPreferencesController.swift */,
@@ -617,6 +620,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000002C /* MorieSettingsView.swift in Sources */,
 				A1000000000000000000002B /* ControlCenterController.swift in Sources */,
 				A1000000000000000000002A /* ControlCenterProcess.swift in Sources */,
 				A90000000000000000000001 /* SpeechContextHints.swift in Sources */,
