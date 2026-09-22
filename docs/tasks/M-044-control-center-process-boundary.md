@@ -37,9 +37,11 @@ Release Instruments validation showed that Morie-owned Control Center/History pr
 - [x] Remove disproven History projection and Dictionary/Memory cache-release experiments.
 - [x] Remove temporary per-page/deinit memory probes.
 - [x] Document the accepted process boundary in ADR 0002 and `ARCHITECTURE.md`.
-- [ ] Xcode 27 compile passes on final implementation.
-- [ ] MorieTests pass on final implementation.
+- [x] Xcode 27 compile passes on final implementation.
+- [x] MorieTests pass on final implementation.
 - [ ] Owner-device process, feature and memory acceptance passes.
+
+Validation: macOS 27 CI run `35683405445` passed on code commit `9bfb56fbd9774a4b36e86f13e2a4fa7b33b1ecaf`; both Xcode 27 compile and MorieTests succeeded with the process-boundary implementation and presentation-store regression test.
 
 ## Owner-device acceptance
 
