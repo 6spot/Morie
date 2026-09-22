@@ -3,181 +3,68 @@ import SwiftUI
 
 @main
 struct MorieApp: App {
-    private let processRole: MorieProcessRole
-    private let runtimeController: AppController?
-    private let controlCenterController: ControlCenterController?
-    private let captureStore: CaptureStore?
+    private let controller: AppController
 
     init() {
-        let role = MorieProcessRole.current
-        processRole = role
-
         let wantsICloud = ICloudSyncSettings.isEnabled
-        var resolvedStore: CaptureStore?
-        var persistenceError: Error?
-        var cloudSyncStartupError: Error?
 
         do {
-            resolvedStore = try CaptureStore(
-                cloudSyncEnabled: wantsICloud,
-                performsLaunchMaintenance: role == .runtime
+            let store = try CaptureStore(
+                cloudSyncEnabled: wantsICloud
+            )
+            controller = AppController(
+                captureStore: store
             )
         } catch where wantsICloud {
-            cloudSyncStartupError = error
             do {
-                resolvedStore = try CaptureStore(
-                    cloudSyncEnabled: false,
-                    performsLaunchMaintenance: role == .runtime
+                let store = try CaptureStore(
+                    cloudSyncEnabled: false
+                )
+                controller = AppController(
+                    captureStore: store,
+                    cloudSyncStartupError: error
                 )
             } catch {
-                persistenceError = error
+                controller = AppController(
+                    captureStore: nil,
+                    persistenceError: error
+                )
             }
         } catch {
-            persistenceError = error
-        }
-
-        captureStore = resolvedStore
-
-        if role == .runtime {
-            runtimeController = AppController(
-                captureStore: resolvedStore,
-                persistenceError: persistenceError,
-                cloudSyncStartupError: cloudSyncStartupError,
-                processRole: .runtime
-            )
-            controlCenterController = nil
-        } else {
-            runtimeController = nil
-            controlCenterController = ControlCenterController(
-                captureStore: resolvedStore,
-                persistenceError: persistenceError,
-                cloudSyncStartupError: cloudSyncStartupError
+            controller = AppController(
+                captureStore: nil,
+                persistenceError: error
             )
         }
     }
 
     var body: some Scene {
-        MenuBarExtra(
-            isInserted: .constant(processRole == .runtime)
-        ) {
-            if let runtimeController {
-                MorieMenuContent(controller: runtimeController)
-            }
+        MenuBarExtra {
+            MorieMenuContent(controller: controller)
         } label: {
-            if let runtimeController {
-                MorieMenuBarLabel(controller: runtimeController)
-            }
+            MorieMenuBarLabel(controller: controller)
         }
         .menuBarExtraStyle(.menu)
-
-        Window("Morie", id: "control-center") {
-            Group {
-                if processRole == .controlCenter {
-                    if let captureStore, let controlCenterController {
-                        MorieControlCenter(
-                            controller: controlCenterController
-                        )
-                        .modelContainer(captureStore.container)
-                    } else {
-                        ContentUnavailableView(
-                            "Morie 暂不可用",
-                            systemImage: "exclamationmark.triangle",
-                            description: Text(
-                                "无法打开记录存储，请重新启动 Morie 后重试。"
-                            )
-                        )
-                    }
-                } else {
-                    EmptyView()
-                }
-            }
-            .environment(
-                \.locale,
-                Locale(identifier: "zh-Hans")
-            )
-            .onAppear {
-                guard processRole == .controlCenter else {
-                    return
-                }
-
-                MorieApplicationActivation.windowDidAppear(
-                    "control-center"
-                )
-                Diagnostics.record(
-                    "ControlCenterProcess",
-                    "Window appeared; pid=\(ProcessInfo.processInfo.processIdentifier)"
-                )
-
-                guard ControlCenterLaunchRoute.current
-                    == .settings else {
-                    return
-                }
-                Task { @MainActor in
-                    await Task.yield()
-                    NotificationCenter.default.post(
-                        name: .morieShowSettings,
-                        object: nil
-                    )
-                }
-            }
-            .onDisappear {
-                guard processRole == .controlCenter else {
-                    return
-                }
-
-                Diagnostics.record(
-                    "ControlCenterProcess",
-                    "Window closed; terminating presentation process"
-                )
-                ControlCenterProcessBridge.notifyWillTerminate()
-                MorieApplicationActivation.windowDidDisappear(
-                    "control-center"
-                )
-                NSApplication.shared.terminate(nil)
-            }
-        }
-        .defaultSize(width: 1120, height: 720)
-        .defaultLaunchBehavior(
-            processRole == .controlCenter
-                ? .presented
-                : .suppressed
-        )
-        .restorationBehavior(.disabled)
         .commands {
-            CommandGroup(replacing: .newItem) { }
-            SidebarCommands()
-            MorieCommands(processRole: processRole)
+            MorieCommands()
         }
 
         Window("欢迎使用 Morie", id: "setup") {
-            Group {
-                if processRole == .runtime,
-                   let runtimeController {
-                    MorieSetupView(controller: runtimeController)
-                } else {
-                    EmptyView()
-                }
-            }
-            .environment(
-                \.locale,
-                Locale(identifier: "zh-Hans")
-            )
-            .onAppear {
-                guard processRole == .runtime else {
-                    return
-                }
-                MorieApplicationActivation.windowDidAppear(
-                    "setup"
+            MorieSetupView(controller: controller)
+                .environment(
+                    \.locale,
+                    Locale(identifier: "zh-Hans")
                 )
-            }
-            .onDisappear {
-                guard processRole == .runtime else {
-                    return
+                .onAppear {
+                    MorieApplicationActivation.windowDidAppear(
+                        "setup"
+                    )
                 }
-                MorieApplicationActivation.windowDidDisappear(
-                    "setup"
-                )
-            }
+                .onDisappear {
+                    MorieApplicationActivation.windowDidDisappear(
+                        "setup"
+                    )
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 700, height: 740)
@@ -264,19 +151,10 @@ private struct MorieMenuBarLabel: View {
 
 @MainActor
 private struct MorieCommands: Commands {
-    let processRole: MorieProcessRole
-
     var body: some Commands {
         CommandGroup(replacing: .appSettings) {
             Button("设置…") {
-                if processRole == .controlCenter {
-                    NotificationCenter.default.post(
-                        name: .morieShowSettings,
-                        object: nil
-                    )
-                } else {
-                    ControlCenterProcessLauncher.open(.settings)
-                }
+                ControlCenterProcessLauncher.open(.settings)
             }
             .keyboardShortcut(",", modifiers: .command)
         }
