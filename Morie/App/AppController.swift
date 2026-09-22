@@ -648,7 +648,9 @@ final class AppController {
         captureStore.map {
             CaptureHistoryController(
                 store: $0,
-                locale: Locale(identifier: "zh-CN")
+                locale: Locale(identifier: "zh-CN"),
+                recognizeFile:
+                    CaptureFileTranscriber.recognize
             )
         }
     }
