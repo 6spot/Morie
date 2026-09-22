@@ -532,7 +532,7 @@ final class CaptureStore: ObservableObject {
             do {
                 try await persistenceWriter.persist(snapshot)
                 if snapshot.usageMetricsFinalized {
-                    await self?.markHistoryChanged()
+                    self?.markHistoryChanged()
                 }
                 DevelopmentDiagnostics.record(
                     "Persistence",
