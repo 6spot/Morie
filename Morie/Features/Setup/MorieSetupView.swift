@@ -27,13 +27,21 @@ struct MorieSetupView: View {
             isInputActive: controller.isCaptureActive,
             canFinish: setup.isReady && controller.canCompleteSetup,
             preparationError: capabilities.setupError,
-            onRefresh: { Task { await setup.refresh() } },
-            onAction: { requirement in Task { await setup.performAction(for: requirement) } },
+            onRefresh: {
+                Task { await controller.refreshPermissions() }
+            },
+            onAction: { requirement in
+                Task {
+                    await controller.performPermissionAction(
+                        requirement
+                    )
+                }
+            },
             onLater: { dismissWindow(id: "setup") },
             onFinish: {
                 Task {
                     if runtime.state == .ready {
-                        await setup.refresh()
+                        await controller.refreshPermissions()
                     } else {
                         await controller.bootstrap(completingSetup: true)
                     }
@@ -46,7 +54,7 @@ struct MorieSetupView: View {
         )
         .task {
             if setup.checks.isEmpty {
-                await setup.refresh()
+                await controller.refreshPermissions()
             }
         }
     }
@@ -309,7 +317,7 @@ struct PermissionManagementView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("重新检查", systemImage: "arrow.clockwise") {
                     Task {
-                        await setup.refresh()
+                        await controller.refreshPermissions()
                     }
                 }
                 .disabled(isBusy)
@@ -344,7 +352,9 @@ struct PermissionManagementView: View {
 
     private func perform(_ requirement: SetupRequirement) {
         Task {
-            await setup.performAction(for: requirement)
+            await controller.performPermissionAction(
+                requirement
+            )
         }
     }
 }
