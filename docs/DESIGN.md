@@ -100,7 +100,7 @@ The shell owns:
 
 Pages provide content.
 
-A routed page must not create a replacement sidebar, navigation root, title bar or top-level toolbar.
+A routed page must not create a replacement sidebar, navigation root or title-bar shell. The current routed page may contribute route-specific toolbar/search controls to the persistent NavigationStack using Apple's native SwiftUI toolbar APIs.
 
 ## Page coordinate system
 
@@ -130,9 +130,9 @@ Do not switch the whole right-side root between unrelated container systems.
 
 ## Toolbar
 
-The top-level toolbar belongs to the persistent shell.
+The Control Center keeps one persistent NavigationStack/window toolbar surface.
 
-Route-specific controls are composed into that toolbar by the shell using route-owned presentation state.
+Route-specific controls are declared by the routed page that owns them, using Apple's native `.searchable` and `.toolbar` APIs. The shell/router must not contain a route switch that reconstructs page-specific toolbar business logic, custom action arrays, AnyView wrappers, placeholder items or fixed-width fake toolbar slots.
 
 ### Toolbar controls preserve semantic grouping
 
@@ -154,11 +154,11 @@ Stability must come from native toolbar structure, not from visually fusing unre
 
 ### Search
 
-When search belongs to the current route, place it in the top-level toolbar unless the page's interaction specifically requires inline search.
+When search belongs to the current route, prefer Apple-native `.searchable(text:placement:prompt:)` with toolbar placement unless the page specifically requires inline search.
 
-Do not use route-local `.searchable` when it causes the NavigationStack or window toolbar structure to be replaced during routing.
+Do not simulate toolbar search with a manually sized TextField. Let macOS own the search field's intrinsic width, glass/material treatment, focus behavior and window-size adaptation.
 
-Search state belongs to the route/page presentation state, not to the global application controller.
+Search state belongs to route/page presentation state, not to the global application controller.
 
 ### Action visibility
 
@@ -553,7 +553,7 @@ Before accepting a UI change, verify:
 3. Is anything hidden only to make the interface look cleaner?
 4. Does the page begin from the same coordinate system as peer pages?
 5. Does route/state change keep sidebar, title and toolbar geometry stable?
-6. Are toolbar controls independent native items rather than one fused custom surface?
+6. Does the page use Apple-native searchable/toolbar APIs, with search/filter/actions semantically separated and only related actions grouped?
 7. Is hierarchy created with type/spacing/alignment before decoration?
 8. Is the page unnecessarily card-heavy?
 9. Is desktop information density appropriate?
