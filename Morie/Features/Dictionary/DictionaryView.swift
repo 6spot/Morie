@@ -155,6 +155,33 @@ struct DictionaryView: View {
                 entryID: editingEntryID
             )
         }
+        .searchable(
+            text: $search,
+            placement: .toolbar,
+            prompt: Text("搜索词语")
+        )
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button("编辑词语", systemImage: "pencil") {
+                    guard let selectedUserEntryID else { return }
+                    edit(selectedUserEntryID)
+                }
+                .disabled(selectedUserEntryID == nil)
+
+                Button(
+                    "删除词语…",
+                    systemImage: "trash",
+                    role: .destructive
+                ) {
+                    confirmsDeletion = true
+                }
+                .disabled(selectedUserEntryID == nil)
+
+                Button("添加词语", systemImage: "plus") {
+                    add()
+                }
+            }
+        }
         .confirmationDialog(
             "删除这个字典词语？",
             isPresented: $confirmsDeletion,
