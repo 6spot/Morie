@@ -93,10 +93,16 @@ struct PermissionSetupContent: View {
                 if checks.isEmpty {
                     ProgressView("正在检查设备和权限…")
                 } else {
-                    ControlCenterSectionBlock("设备能力") {
-                        ForEach(checks.filter { !$0.requirement.isPermission }) { check in
+                    Section("设备能力") {
+                        ForEach(
+                            checks.filter {
+                                !$0.requirement.isPermission
+                            }
+                        ) { check in
                             PermissionRequirementRow(
-                                check: check, activeRequest: activeRequest, isBusy: isBusy,
+                                check: check,
+                                activeRequest: activeRequest,
+                                isBusy: isBusy,
                                 onAction: onAction
                             )
                         }
