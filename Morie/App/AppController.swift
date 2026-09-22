@@ -311,6 +311,7 @@ final class AppController {
         do {
             try captureStore?.setAudioRetentionDays(value)
             preferences.audioRetentionDays = value
+            notifyRuntimeOfSharedStateChange()
         } catch {
             Diagnostics.record(
                 "CaptureStore",
@@ -322,17 +323,23 @@ final class AppController {
 
     func setInputRefinementEnabled(_ enabled: Bool) {
         preferences.inputRefinementEnabled = enabled
-        captureSession.inputRefinementEnabled = enabled
+        if processRole == .runtime {
+            captureSession.inputRefinementEnabled = enabled
+        }
         UserDefaults.standard.set(
             enabled,
             forKey: CapturePersonalizer.enabledDefaultsKey
         )
+        notifyRuntimeOfSharedStateChange()
     }
 
     func setPersonalMemoryEnabled(_ enabled: Bool) {
         preferences.personalMemoryEnabled = enabled
         PersonalMemorySettings.setEnabled(enabled)
-        memoryLearning?.setEnabled(enabled)
+        if processRole == .runtime {
+            memoryLearning?.setEnabled(enabled)
+        }
+        notifyRuntimeOfSharedStateChange()
     }
 
     func setCorrectionSuggestionsEnabled(_ enabled: Bool) {
@@ -343,12 +350,15 @@ final class AppController {
                 PostInsertionLearningController
                     .dictionarySuggestionsDefaultsKey
         )
-        captureSession.correctionSuggestionsEnabled = enabled
+        if processRole == .runtime {
+            captureSession.correctionSuggestionsEnabled = enabled
 
-        if !enabled
-            && !preferences.expressionLearningEnabled {
-            postInsertionLearning?.stop()
+            if !enabled
+                && !preferences.expressionLearningEnabled {
+                postInsertionLearning?.stop()
+            }
         }
+        notifyRuntimeOfSharedStateChange()
     }
 
     func setExpressionLearningEnabled(_ enabled: Bool) {
@@ -357,26 +367,33 @@ final class AppController {
             enabled,
             forKey: ExpressionProfileStore.enabledDefaultsKey
         )
-        captureSession.expressionLearningEnabled = enabled
+        if processRole == .runtime {
+            captureSession.expressionLearningEnabled = enabled
 
-        if !enabled
-            && !preferences.correctionSuggestionsEnabled {
-            postInsertionLearning?.stop()
+            if !enabled
+                && !preferences.correctionSuggestionsEnabled {
+                postInsertionLearning?.stop()
+            }
         }
+        notifyRuntimeOfSharedStateChange()
     }
 
     func setSoundFeedbackEnabled(_ enabled: Bool) {
         preferences.soundFeedbackEnabled = enabled
-        captureSession.soundFeedbackEnabled = enabled
+        if processRole == .runtime {
+            captureSession.soundFeedbackEnabled = enabled
+        }
         UserDefaults.standard.set(
             enabled,
             forKey: CaptureSoundFeedback.enabledDefaultsKey
         )
+        notifyRuntimeOfSharedStateChange()
     }
 
     func clearExpressionProfile() {
         do {
             try expressionProfile?.clear()
+            notifyRuntimeOfSharedStateChange()
             Diagnostics.record(
                 "ExpressionProfile",
                 "Cleared learned expression profile"
