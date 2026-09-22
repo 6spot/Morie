@@ -3,13 +3,13 @@ import SwiftUI
 
 @MainActor
 struct MorieSetupView: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
     @ObservedObject private var runtime: AppRuntimeController
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
     @Environment(\.dismissWindow) private var dismissWindow
 
-    init(controller: AppController) {
+    init(controller: any ControlCenterControlling) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
         _capabilities = ObservedObject(
@@ -200,12 +200,12 @@ private struct PermissionRequirementRow: View {
 
 @MainActor
 struct PermissionManagementView: View {
-    let controller: AppController
+    let controller: any ControlCenterControlling
     @ObservedObject private var runtime: AppRuntimeController
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
 
-    init(controller: AppController) {
+    init(controller: any ControlCenterControlling) {
         self.controller = controller
         _runtime = ObservedObject(wrappedValue: controller.runtime)
         _capabilities = ObservedObject(
