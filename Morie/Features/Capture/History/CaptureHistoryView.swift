@@ -110,6 +110,33 @@ struct CaptureHistoryWorkspace: View {
             maxHeight: .infinity,
             alignment: .topLeading
         )
+        .searchable(
+            text: $search,
+            placement: .toolbar,
+            prompt: Text("搜索历史记录")
+        )
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Picker("筛选记录", selection: $filter) {
+                    ForEach(CaptureHistoryFilter.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    controller.startCaptureOnly()
+                } label: {
+                    Image(systemName: "mic")
+                }
+                .help("开始录音")
+                .disabled(!canStartCapture)
+            }
+        }
         .onAppear {
             history.setInputActive(controller.isCaptureActive)
             history.setListVisible(true)
