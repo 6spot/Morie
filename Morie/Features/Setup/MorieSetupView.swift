@@ -7,7 +7,6 @@ struct MorieSetupView: View {
     @ObservedObject private var runtime: AppRuntimeController
     @ObservedObject private var capabilities: AppCapabilityController
     @ObservedObject private var setup: PermissionSetupController
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
     init(controller: AppController) {
@@ -39,7 +38,7 @@ struct MorieSetupView: View {
                         await controller.bootstrap(completingSetup: true)
                     }
                     if controller.canStartCapture {
-                        openWindow(id: "control-center")
+                        ControlCenterProcessLauncher.open(.overview)
                         dismissWindow(id: "setup")
                     }
                 }
