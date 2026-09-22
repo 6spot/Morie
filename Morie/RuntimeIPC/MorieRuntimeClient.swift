@@ -1,7 +1,7 @@
 import Foundation
 import ServiceManagement
 
-private final class MorieXPCContinuationGate<Value>: @unchecked Sendable {
+private final class MorieXPCContinuationGate<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Value, Error>?
 
